@@ -11,6 +11,7 @@ import {
   updateQuotationStatus,
   updateQuotation,
   getQuotationsByProductIdAndCompanyId,
+  calculateProratedPrice,
 } from "@/lib/quotation-service"
 import type { Quotation, QuotationProduct } from "@/lib/types/quotation"
 import { format } from "date-fns"
@@ -120,16 +121,18 @@ const formatDate = (date: any) => {
   }
 }
 
-const formatDuration = (days: number) => {
-  if (days <= 30) {
-    return `${days} days`
+const formatDuration = (days: number, startDate?: Date | any, endDate?: Date | any) => {
+  let totalDays = days
+  if (startDate && endDate) {
+    const start = getDateObject(startDate)
+    const end = getDateObject(endDate)
+
+    if (start && end) {
+      totalDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    }
   }
-  const months = Math.floor(days / 30)
-  const remainingDays = days % 30
-  if (remainingDays === 0) {
-    return `${months} ${months === 1 ? "month" : "months"}`
-  }
-  return `${months} ${months === 1 ? "month" : "months"} and ${remainingDays} ${remainingDays === 1 ? "day" : "days"}`
+
+  return `${totalDays} ${totalDays === 1 ? "day" : "days"}`
 }
 
 const safeFormatNumber = (value: any, options?: Intl.NumberFormatOptions): string => {
@@ -146,41 +149,6 @@ const formatCurrency = (amount: number | string | undefined | null) => {
   return `PHP ${numAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
-const calculateProratedPrice = (price: number, startDate: Date, endDate: Date): number => {
-  let total = 0;
-  let currentDate = new Date(startDate);
-
-  while (currentDate <= endDate) {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-
-    // Get days in this month
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-    // Daily price for this month
-    const dailyRate = price / daysInMonth;
-
-    // Determine start and end days for this month
-    let startDay = (currentDate.getMonth() === startDate.getMonth() && currentDate.getFullYear() === startDate.getFullYear())
-      ? startDate.getDate()
-      : 1;
-
-    let endDay = (currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear())
-      ? endDate.getDate()
-      : daysInMonth;
-
-    // Days counted in this month
-    const daysCounted = (endDay - startDay + 1);
-
-    // Add to total
-    total += dailyRate * daysCounted;
-
-    // Move to next month
-    currentDate = new Date(year, month + 1, 1);
-  }
-
-  return total;
-}
 
 export default function QuotationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: quotationId } = use(params)
@@ -270,7 +238,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
           fieldName === "end_date" ? new Date(newValue) : (getDateObject(editableQuotation.end_date) || new Date())
 
         const timeDiff = endDate.getTime() - startDate.getTime()
-        const durationDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1
+        const durationDays = Math.floor(timeDiff / (1000 * 3600 * 24)) + 1
 
         // Update pricing based on prorated calculation
         const price = editableQuotation.items?.price || 0
@@ -657,43 +625,102 @@ The OH Plus Team`,
         }
       }
 
-      const response = await fetch('/api/generate-quotation-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          quotation,
-          companyData,
-          logoDataUrl,
-        }),
-      })
+      // Check if there are multiple related quotations (same page_id)
+      if (relatedQuotations.length > 1) {
+        console.log("[v0] Downloading multiple quotation PDFs:", relatedQuotations.length)
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('API Error:', response.status, errorText)
-        throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+        // Download all related quotations as separate PDFs
+        for (let i = 0; i < relatedQuotations.length; i++) {
+          const relatedQuotation = relatedQuotations[i]
+
+          // Create unique quotation number with suffix
+          const baseQuotationNumber = relatedQuotation.quotation_number || relatedQuotation.id?.slice(-8) || "QT-000"
+          const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+
+          // Create modified quotation with unique number
+          const modifiedQuotation = {
+            ...relatedQuotation,
+            quotation_number: uniqueQuotationNumber,
+          }
+
+          const response = await fetch('/api/generate-quotation-pdf', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              quotation: modifiedQuotation,
+              companyData,
+              logoDataUrl,
+            }),
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error('API Error:', response.status, errorText)
+            throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+          }
+
+          const blob = await response.blob()
+          const url = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `${uniqueQuotationNumber}.pdf`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          window.URL.revokeObjectURL(url)
+
+          // Add small delay between downloads to ensure proper file naming
+          if (i < relatedQuotations.length - 1) {
+            await new Promise((resolve) => setTimeout(resolve, 100))
+          }
+        }
+
+        toast({
+          title: "PDFs Generated",
+          description: `${relatedQuotations.length} PDF files have been downloaded for all pages.`,
+        })
+      } else {
+        // Single quotation
+        const response = await fetch('/api/generate-quotation-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            quotation,
+            companyData,
+            logoDataUrl,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('API Error:', response.status, errorText)
+          throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+
+        toast({
+          title: "Success",
+          description: "PDF downloaded successfully",
+        })
       }
-
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-
-      toast({
-        title: "Success",
-        description: "PDF downloaded successfully",
-      })
     } catch (error) {
-      console.error("Error generating PDF:", error)
+      console.error("Error generating image:", error)
       toast({
         title: "Error",
-        description: "Failed to generate PDF. Please try again.",
+        description: "Failed to generate image. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -834,7 +861,7 @@ The OH Plus Team`,
 
         <div id="quotation-body">
           {/* Date */}
-          <div className="text-left mb-4">
+          <div className="text-left mb-8">
             <p className="text-base">{format(new Date(), "MMMM dd, yyyy")}</p>
           </div>
 
@@ -958,7 +985,7 @@ The OH Plus Team`,
                 onClick={() => isEditing && handleFieldEdit("duration_days", currentQuotation?.duration_days || 0)}
                 title={isEditing ? "Click to edit contract duration" : ""}
               >
-                {formatDuration(currentQuotation?.duration_days || 0)}
+                {formatDuration(currentQuotation?.duration_days || 0, currentQuotation?.start_date, currentQuotation?.end_date)}
                 {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
               </span>
             )}
@@ -971,14 +998,14 @@ The OH Plus Team`,
               <div className="flex items-center gap-2 ml-1">
                 <Input
                   type="date"
-                  value={tempValues.start_date ? format(new Date(tempValues.start_date), "yyyy-MM-dd") : ""}
+                  value={tempValues.start_date ? tempValues.start_date.toISOString().split('T')[0] : ""}
                   onChange={(e) => updateTempValues("start_date", new Date(e.target.value))}
                   className="w-36 h-8 text-sm border-gray-300 rounded-md"
                 />
                 <span className="text-gray-500">-</span>
                 <Input
                   type="date"
-                  value={tempValues.end_date ? format(new Date(tempValues.end_date), "yyyy-MM-dd") : ""}
+                  value={tempValues.end_date ? tempValues.end_date.toISOString().split('T')[0] : ""}
                   onChange={(e) => updateTempValues("end_date", new Date(e.target.value))}
                   className="w-36 h-8 text-sm border-gray-300 rounded-md"
                 />
@@ -1092,7 +1119,7 @@ The OH Plus Team`,
 
         <p className="font-bold mt-2">Price breakdown:</p>
         {/* Pricing Table - Updated for quotation pricing */}
-        <div className="p-4 mb-6">
+        <div className="px-4 pt-2">
           <div className="space-y-1">
             <div className="flex justify-between">
               <span className="text-gray-700">Lease rate per month</span>
@@ -1100,7 +1127,7 @@ The OH Plus Team`,
             </div>
             <div className="flex justify-between">
               <span className="text-gray-700">Contract duration</span>
-              <span className="text-gray-900">x{Math.ceil((currentQuotation.duration_days || 0) / 30)} months</span>
+              <span className="text-gray-900">x {formatDuration(currentQuotation.duration_days || 0, currentQuotation.start_date, currentQuotation.end_date)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-700">Total lease</span>
@@ -1150,7 +1177,7 @@ The OH Plus Team`,
         ) : null}
 
         {/* Terms and Conditions */}
-        <div className="mb-8">
+        <div className="mb-8 mt-2">
           <p className="font-semibold mb-4">Terms and Conditions:</p>
           <div className="space-y-2 text-sm">
             {(isEditing
@@ -1394,24 +1421,6 @@ The OH Plus Team`,
           </Button>
           <Button
             variant="ghost"
-            onClick={handleDownloadPDF}
-            disabled={downloadingPDF}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            {downloadingPDF ? (
-              <>
-                <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
-                <span className="text-[10px] text-gray-700">Generating...</span>
-              </>
-            ) : (
-              <>
-                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
-                <span className="text-[10px] text-gray-700">Download</span>
-              </>
-            )}
-          </Button>
-          <Button
-            variant="ghost"
             onClick={handleDownloadImage}
             disabled={downloadingImage}
             className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
@@ -1423,8 +1432,8 @@ The OH Plus Team`,
               </>
             ) : (
               <>
-                <ImageIcon className="h-8 w-8 text-gray-500 mb-1" />
-                <span className="text-[10px] text-gray-700">Download Image</span>
+                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
+                <span className="text-[10px] text-gray-700">Download</span>
               </>
             )}
           </Button>
@@ -1498,7 +1507,7 @@ The OH Plus Team`,
                       {historyItem.quotation_number || historyItem.id?.slice(-8) || "N/A"}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {safeFormatNumber(historyItem.items?.item_total_amount || historyItem.total_amount || 0)}
+                      PHP {safeFormatNumber(historyItem.items?.price || historyItem.price || 0)}
                       /month
                     </div>
                     <div className="flex justify-end">

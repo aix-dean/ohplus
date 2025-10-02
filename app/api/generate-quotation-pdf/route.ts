@@ -12,7 +12,41 @@ const formatDate = (date: any) => {
   }).format(dateObj)
 }
 
-const formatDuration = (days: number): string => {
+const formatDuration = (days: number, startDate?: any, endDate?: any): string => {
+  // If we have actual dates, calculate based on calendar months
+  if (startDate && endDate) {
+    const start = getDateObject(startDate)
+    const end = getDateObject(endDate)
+
+    if (start && end) {
+      let years = end.getFullYear() - start.getFullYear()
+      let months = end.getMonth() - start.getMonth()
+      let dayDiff = end.getDate() - start.getDate()
+
+      // Adjust for negative months/days
+      if (dayDiff < 0) {
+        months--
+        // Get days in previous month
+        const prevMonth = new Date(end.getFullYear(), end.getMonth() - 1, end.getDate())
+        const daysInPrevMonth = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0).getDate()
+        dayDiff += daysInPrevMonth
+      }
+
+      if (months < 0) {
+        years--
+        months += 12
+      }
+
+      const parts = []
+      if (years > 0) parts.push(`${years} ${years === 1 ? "year" : "years"}`)
+      if (months > 0) parts.push(`${months} ${months === 1 ? "month" : "months"}`)
+      if (dayDiff > 0) parts.push(`${dayDiff} ${dayDiff === 1 ? "day" : "days"}`)
+
+      return parts.join(" and ") || "0 days"
+    }
+  }
+
+  // Fallback to the old method if no dates provided
   if (days <= 0) return "0 days"
 
   const months = Math.floor(days / 30)
@@ -90,16 +124,17 @@ const getDateObject = (date: any): Date | undefined => {
 }
 
 export async function POST(request: NextRequest) {
+  const { quotation, companyData, logoDataUrl, format = 'pdf' }: { quotation: Quotation; companyData: any; logoDataUrl: string | null; format?: 'pdf' | 'image' } = await request.json()
+  console.log('Received quotation:', quotation)
+  console.log('Received companyData:', companyData)
+  console.log('Received logoDataUrl:', !!logoDataUrl)
+  console.log('Format:', format)
+
   try {
-    const { quotation, companyData, logoDataUrl }: { quotation: Quotation; companyData: any; logoDataUrl: string | null } = await request.json()
-    console.log('Received quotation:', quotation)
-    console.log('Received companyData:', companyData)
-    console.log('Received logoDataUrl:', !!logoDataUrl)
-
     // Generate HTML content
-    const htmlContent = generateQuotationHTML(quotation, companyData, logoDataUrl)
+    const htmlContent = generateQuotationHTML(quotation, companyData)
 
-    // Launch puppeteer and generate PDF
+    // Launch puppeteer
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -108,7 +143,8 @@ export async function POST(request: NextRequest) {
     const page = await browser.newPage()
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
 
-    const pdfBuffer = await page.pdf({
+    // Generate PDF
+    const buffer = await page.pdf({
       format: 'A4',
       printBackground: true,
       displayHeaderFooter: true,
@@ -132,18 +168,20 @@ export async function POST(request: NextRequest) {
         left: '10mm'
       }
     })
+    const contentType = 'application/pdf'
+    const filename = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
 
     await browser.close()
 
-    return new NextResponse(Buffer.from(pdfBuffer), {
+    return new NextResponse(Buffer.from(buffer), {
       headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${quotation.quotation_number || quotation.id || 'quotation'}.pdf"`,
+        'Content-Type': contentType,
+        'Content-Disposition': `attachment; filename="${filename}"`,
       },
     })
   } catch (error) {
-    console.error('Error generating PDF:', error)
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 })
+    console.error(`Error generating ${format}:`, error)
+    return NextResponse.json({ error: `Failed to generate ${format}` }, { status: 500 })
   }
 }
 
@@ -294,6 +332,7 @@ function generateQuotationHTML(
       .terms-title {
         font-weight: bold;
         margin-bottom: 5px;
+        font-size: 14px;
       }
       .term-item {
         margin-bottom: 3px;
@@ -362,7 +401,7 @@ function generateQuotationHTML(
     <li>
       <div class="details-row">
         <div class="details-label">Contract Duration:</div>
-        <div class="details-value">${formatDuration(quotation.duration_days || 0)}</div>
+        <div class="details-value">${quotation.duration_days || 0} days</div>
       </div>
     </li>
      <li>
@@ -405,7 +444,7 @@ function generateQuotationHTML(
       </div>
       <div class="price-row">
         <span>Contract duration</span>
-        <span>x ${formatDuration(quotation.duration_days || 0)}</span>
+        <span>x ${formatDuration(quotation.duration_days || 0, startDate, endDate)}</span>
       </div>
       <div class="price-row">
         <span>Total lease</span>
