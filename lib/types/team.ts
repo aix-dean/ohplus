@@ -14,6 +14,7 @@ export interface Team {
   createdAt: Date
   updatedAt: Date
   createdBy: string
+  company_id?: string
 }
 
 export interface TeamMember {
@@ -37,4 +38,5 @@ export interface CreateTeamData {
   location: string
   contactNumber?: string
   email?: string
+  company_id: string
 }

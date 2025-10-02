@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { X } from "lucide-react"
 import type { Team, CreateTeamData } from "@/lib/types/team"
+import { useAuth } from "@/contexts/auth-context"
 
 interface TeamFormDialogProps {
   open: boolean
@@ -43,6 +44,8 @@ const COMMON_SPECIALIZATIONS = [
 ]
 
 export function TeamFormDialog({ open, onOpenChange, onSubmit, team, loading }: TeamFormDialogProps) {
+  const { userData } = useAuth()
+
   const [formData, setFormData] = useState<CreateTeamData>({
     name: team?.name || "",
     description: team?.description || "",
@@ -52,6 +55,7 @@ export function TeamFormDialog({ open, onOpenChange, onSubmit, team, loading }: 
     location: team?.location || "",
     contactNumber: team?.contactNumber || "",
     email: team?.email || "",
+    company_id: team?.company_id || userData?.company_id || "",
   })
 
   const [newSpecialization, setNewSpecialization] = useState("")
