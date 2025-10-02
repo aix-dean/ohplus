@@ -1,8 +1,147 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
+import type { WeatherForecast } from "@/lib/weather-service"
+import { getLatestVideoByCategory, getNewsItemsByCategory, type ContentMedia } from "@/lib/firebase-service"
 
 export default function LogisticsWeatherPage() {
+  const [weatherData, setWeatherData] = useState<WeatherForecast | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const [videoUrl, setVideoUrl] = useState<string | null>(null)
+  const [videoLoading, setVideoLoading] = useState(true)
+  const [videoError, setVideoError] = useState<string | null>(null)
+
+  const [newsItems, setNewsItems] = useState<ContentMedia[]>([])
+  const [newsLoading, setNewsLoading] = useState(true)
+  const [newsError, setNewsError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchWeatherData = async () => {
+      try {
+        console.log('Weather page: Starting weather data fetch from /api/weather/accuweather')
+        setLoading(true)
+        setError(null)
+        const response = await fetch('/api/weather/accuweather?locationKey=264885')
+        console.log('Weather page: Fetch response status:', response.status)
+        if (!response.ok) {
+          throw new Error('Failed to fetch weather data')
+        }
+        const data = await response.json()
+        console.log('Weather page: Fetch successful, data received')
+        setWeatherData(data)
+      } catch (err) {
+        console.error('Weather page: Fetch error:', err)
+        setError(err instanceof Error ? err.message : "Failed to fetch weather data")
+      } finally {
+        console.log('Weather page: Fetch completed')
+        setLoading(false)
+      }
+    }
+
+    fetchWeatherData()
+  }, [])
+
+  useEffect(() => {
+    const fetchVideo = async () => {
+      try {
+        console.log('Weather page: Starting video fetch from content_media')
+        setVideoLoading(true)
+        setVideoError(null)
+        const url = await getLatestVideoByCategory("0YxkR7oed1qzzaqPqUKh")
+        console.log('Weather page: Video fetch successful, URL:', url)
+        console.log('Weather page: Setting videoUrl state to:', url)
+        setVideoUrl(url)
+        console.log('Weather page: videoUrl state set')
+
+        // Verify URL accessibility
+        try {
+          if (url) {
+            const response = await fetch(url, { method: 'HEAD' })
+            console.log('Weather page: Video URL accessibility check:', response.ok ? 'Accessible' : `Not accessible, status ${response.status}`)
+          }
+        } catch (verifyErr) {
+          console.log('Weather page: Error checking video URL accessibility:', verifyErr)
+        }
+      } catch (err) {
+        console.error('Weather page: Video fetch error:', err)
+        setVideoError(err instanceof Error ? err.message : "Failed to fetch video")
+      } finally {
+        console.log('Weather page: Video fetch completed')
+        setVideoLoading(false)
+      }
+    }
+
+    fetchVideo()
+  }, [])
+
+  useEffect(() => {
+    if (videoUrl) {
+      console.log('Weather page: Video element about to render with URL:', videoUrl)
+    }
+  }, [videoUrl])
+
+  useEffect(() => {
+    const fetchNewsItems = async () => {
+      try {
+        console.log('Weather page: Starting news items fetch from content_media')
+        setNewsLoading(true)
+        setNewsError(null)
+        const items = await getNewsItemsByCategory("0YxkR7oed1qzzaqPqUKh", 5)
+        console.log('Weather page: News items fetch successful, items:', items)
+        setNewsItems(items)
+      } catch (err) {
+        console.error('Weather page: News items fetch error:', err)
+        setNewsError(err instanceof Error ? err.message : "Failed to fetch news items")
+      } finally {
+        console.log('Weather page: News items fetch completed')
+        setNewsLoading(false)
+      }
+    }
+
+    fetchNewsItems()
+  }, [])
+
+  // Helper function to map icon strings to emojis
+  const getWeatherIcon = (icon: string) => {
+    const iconMap: { [key: string]: string } = {
+      sun: "☀️",
+      "cloud-sun": "⛅",
+      cloud: "☁️",
+      "cloud-fog": "🌫️",
+      "cloud-rain": "🌧️",
+      "cloud-lightning": "⛈️",
+      "cloud-snow": "❄️",
+      wind: "💨",
+      moon: "🌙",
+    }
+    return iconMap[icon] || "☁️"
+  }
+
+  // Handler for news item clicks
+  const handleNewsItemClick = (item: ContentMedia) => {
+    console.log('News item click handler called for item:', item.title || 'Untitled')
+
+    // Get the URL from the first media item
+    const url = item.media?.[0]?.url
+    console.log('News item URL:', url)
+
+    if (url) {
+      console.log('Opening URL in new window:', url)
+      const newWindow = window.open(url, '_blank')
+
+      if (newWindow) {
+        console.log('window.open succeeded - new window opened')
+      } else {
+        console.log('window.open failed - popup blocked or other error')
+      }
+    } else {
+      console.log('No URL found for news item')
+    }
+  }
+
   return (
     <div className="flex-1 overflow-auto p-4">
       <div className="flex justify-between items-center mb-6">
@@ -49,26 +188,30 @@ export default function LogisticsWeatherPage() {
         <div className="space-y-6 lg:col-span-2">
           {/* Weekly Weather Forecast */}
           <div className="bg-white rounded-2xl shadow-lg p-6">
-
-            <div className="grid grid-cols-7 gap-4 overflow-x-auto">
-              {[
-                { day: 'Sun', temp: '30°', icon: 'sun' },
-                { day: 'Mon', temp: '28°', icon: 'rain' },
-                { day: 'Tue', temp: '25°', icon: 'rain' },
-                { day: 'Wed', temp: '17°', icon: 'rain' },
-                { day: 'Thu', temp: '16°', icon: 'cloud' },
-                { day: 'Fri', temp: '16°', icon: 'cloud' },
-                { day: 'Sat', temp: '25°', icon: 'sun' },
-              ].map((item, index) => (
-                <div key={index} className="text-center min-w-[80px]">
-                  <div className="text-sm font-medium text-gray-600 mb-2">{item.day}</div>
-                  <div className="w-16 h-16 bg-gray-200 rounded-lg mx-auto mb-2 flex items-center justify-center">
-                    <span className="text-2xl">{item.icon === 'sun' ? '☀️' : item.icon === 'rain' ? '🌧️' : '☁️'}</span>
-                  </div>
-                  <div className="text-lg font-semibold text-gray-800">{item.temp}</div>
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-gray-600">Loading weather data...</div>
+              </div>
+            ) : error ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-red-600 text-center">
+                  <div className="font-semibold mb-2">Failed to load weather data</div>
+                  <div className="text-sm">{error}</div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-7 gap-4 overflow-x-auto">
+                {weatherData?.forecast.slice(0, 7).map((item, index) => (
+                  <div key={index} className="text-center min-w-[80px]">
+                    <div className="text-sm font-medium text-gray-600 mb-2">{item.dayOfWeek}</div>
+                    <div className="w-16 h-16 bg-gray-200 rounded-lg mx-auto mb-2 flex items-center justify-center">
+                      <span className="text-2xl">{getWeatherIcon(item.icon)}</span>
+                    </div>
+                    <div className="text-lg font-semibold text-gray-800">{item.temperature.max}°</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col lg:flex-row gap-6">
@@ -76,30 +219,92 @@ export default function LogisticsWeatherPage() {
           <div className="bg-white rounded-2xl shadow-lg p-6 flex-1 aspect-square">
             <h3 className="text-xl font-semibold text-gray-800 mb-4">Publikong Impormasyon</h3>
             <div className="relative">
-              <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-16 h-16 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                  <span className="text-white text-2xl">▶️</span>
+              {videoLoading ? (
+                <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                  <div className="text-gray-600">Loading video...</div>
                 </div>
-              </div>
+              ) : videoError ? (
+                <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                  <div className="text-red-600 text-center">
+                    <div className="font-semibold mb-2">Failed to load video</div>
+                    <div className="text-sm">{videoError}</div>
+                  </div>
+                </div>
+              ) : videoUrl ? (
+                <video
+                  className="w-full aspect-square bg-gray-200 rounded-lg mb-4"
+                  controls
+                  autoPlay
+                  muted
+                  src={videoUrl}
+                  poster=""
+                  onLoadStart={() => console.log('Weather page: Video load started')}
+                  onCanPlay={() => console.log('Weather page: Video can play')}
+                  onPlay={() => console.log('Weather page: Video started playing (autoplay working)')}
+                  onError={(e) => console.log('Weather page: Video error:', e)}
+                  onPause={() => console.log('Weather page: Video paused')}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              ) : (
+                <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                  <div className="text-gray-600">No video available</div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* OOH News for you */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 flex-1">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">OOH News for you</h3>
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((news) => (
-                <div key={news} className="border border-gray-200 rounded-lg p-4 flex items-center space-x-4">
-                  <div className="w-16 h-16 bg-gray-300 rounded-lg flex-shrink-0"></div>
-                  <div>
-                    <h4 className="font-semibold text-gray-800">News 001</h4>
-                    <p className="text-sm text-gray-600">Date</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+           <div className="bg-white rounded-2xl shadow-lg p-6 flex-1">
+             <h3 className="text-xl font-semibold text-gray-800 mb-4">OOH News for you</h3>
+             {newsLoading ? (
+               <div className="flex items-center justify-center py-8">
+                 <div className="text-gray-600">Loading news items...</div>
+               </div>
+             ) : newsError ? (
+               <div className="flex items-center justify-center py-8">
+                 <div className="text-red-600 text-center">
+                   <div className="font-semibold mb-2">Failed to load news items</div>
+                   <div className="text-sm">{newsError}</div>
+                 </div>
+               </div>
+             ) : (
+               <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-1 gap-4">
+                 {newsItems.map((item, index) => (
+                   <div
+                     key={item.id || index}
+                     className="border border-gray-200 rounded-lg p-4 flex items-center space-x-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                     onClick={() => handleNewsItemClick(item)}
+                   >
+                     <div className="w-16 h-16 bg-gray-300 rounded-lg flex-shrink-0 overflow-hidden">
+                       {item.thumbnail ? (
+                         <img
+                           src={item.thumbnail}
+                           alt={item.title || "News thumbnail"}
+                           className="w-full h-full object-cover"
+                         />
+                       ) : (
+                         <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+                           <span className="text-xs text-gray-500">No image</span>
+                         </div>
+                       )}
+                     </div>
+                     <div className="flex-1 min-w-0">
+                       <h4 className="font-semibold text-gray-800 truncate">{item.title || "Untitled News"}</h4>
+                       <p className="text-sm text-gray-600">
+                         {item.created ? new Date(item.created.toDate ? item.created.toDate() : item.created).toLocaleDateString() : "No date"}
+                       </p>
+                     </div>
+                   </div>
+                 ))}
+                 {newsItems.length === 0 && (
+                   <div className="col-span-full text-center py-8 text-gray-500">
+                     No news items available
+                   </div>
+                 )}
+               </div>
+             )}
+           </div>
           </div>
         </div>
       </div>

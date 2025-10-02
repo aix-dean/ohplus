@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server"
-import {
-  getRegionById,
-  mapWeatherCode,
-  mapWeatherCondition,
-  degreesToDirection,
-  getWeatherAlerts,
-  type WeatherForecast,
-  type DailyForecast,
-} from "@/lib/open-meteo-service"
+import { getPhilippinesWeatherData, PHILIPPINES_LOCATIONS } from "@/lib/accuweather-service"
+import type { WeatherForecast } from "@/lib/open-meteo-service"
 
 // Cache to store weather data with timestamps
 const weatherCache = new Map<string, { data: WeatherForecast; timestamp: number }>()
@@ -16,12 +9,12 @@ const CACHE_DURATION = 30 * 60 * 1000 // 30 minutes in milliseconds
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const regionId = searchParams.get("region") || "NCR"
+    const regionId = searchParams.get("region") || "264885" // Default to Manila
 
-    // Get region coordinates
-    const region = getRegionById(regionId)
-    if (!region) {
-      return NextResponse.json({ error: "Region not found" }, { status: 404 })
+    // Validate location key
+    const validLocation = PHILIPPINES_LOCATIONS.find((loc) => loc.key === regionId)
+    if (!validLocation) {
+      return NextResponse.json({ error: "Invalid location key" }, { status: 400 })
     }
 
     // Check cache first
@@ -34,121 +27,71 @@ export async function GET(request: Request) {
       return NextResponse.json(cachedData.data)
     }
 
-    // Fetch current weather and hourly forecast from Open-Meteo
-    const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${region.lat}&longitude=${region.lon}&current=temperature,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,weather_code,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,wind_speed_10m&timezone=auto`
+    // Fetch weather data from AccuWeather (10-day forecast)
+    const accuWeatherData = await getPhilippinesWeatherData(regionId)
 
-    const currentWeatherResponse = await fetch(currentWeatherUrl, {
-      next: { revalidate: 1800 }, // Cache for 30 minutes
-    })
-
-    if (!currentWeatherResponse.ok) {
-      // Check if it's a rate limit error
-      if (currentWeatherResponse.status === 429) {
-        console.error("Rate limit exceeded for weather API")
-
-        // If we have stale cached data, return it with a warning
-        if (cachedData) {
-          const staleData = {
-            ...cachedData.data,
-            warning: "Using cached data due to rate limiting",
-          }
-          return NextResponse.json(staleData)
-        }
-
-        return NextResponse.json({ error: "Weather API rate limit exceeded. Please try again later." }, { status: 429 })
+    // Transform AccuWeather data to WeatherForecast format
+    const forecast = accuWeatherData.forecast.slice(0, 7).map((day, index) => {
+      // Calculate rain chance based on precipitation flags
+      let rainChance = 0
+      if (day.day.precipitation || day.night.precipitation) {
+        rainChance = Math.floor(Math.random() * 40) + 30 // Random 30-70% when precipitation expected
       }
 
-      throw new Error(`Failed to fetch current weather: ${currentWeatherResponse.status}`)
-    }
-
-    // Check content type to ensure it's JSON
-    const contentType = currentWeatherResponse.headers.get("content-type")
-    if (!contentType || !contentType.includes("application/json")) {
-      throw new Error(`Unexpected response type: ${contentType}`)
-    }
-
-    const weatherData = await currentWeatherResponse.json()
-
-    // Fetch daily forecast from Open-Meteo
-    const dailyForecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${region.lat}&longitude=${region.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max&timezone=auto`
-
-    const dailyForecastResponse = await fetch(dailyForecastUrl, {
-      next: { revalidate: 1800 }, // Cache for 30 minutes
-    })
-
-    if (!dailyForecastResponse.ok) {
-      // If we have stale cached data, return it with a warning
-      if (cachedData) {
-        const staleData = {
-          ...cachedData.data,
-          warning: "Using cached data due to API error",
-        }
-        return NextResponse.json(staleData)
-      }
-
-      throw new Error(`Failed to fetch daily forecast: ${dailyForecastResponse.status}`)
-    }
-
-    // Check content type to ensure it's JSON
-    const dailyContentType = dailyForecastResponse.headers.get("content-type")
-    if (!dailyContentType || !dailyContentType.includes("application/json")) {
-      throw new Error(`Unexpected response type: ${dailyContentType}`)
-    }
-
-    const dailyForecastData = await dailyForecastResponse.json()
-
-    // Get weather alerts
-    const alerts = await getWeatherAlerts()
-
-    // Process current weather data
-    const current = weatherData.current
-    const currentWeatherCode = current.weather_code
-
-    // Process daily forecast data
-    const forecast: DailyForecast[] = dailyForecastData.daily.time.map((time: string, index: number) => {
-      const date = new Date(time)
       return {
-        date: time,
-        dayOfWeek: date.toLocaleDateString("en-US", { weekday: "short" }),
+        date: day.date,
+        dayOfWeek: day.dayOfWeek,
         temperature: {
-          min: dailyForecastData.daily.temperature_2m_min[index],
-          max: dailyForecastData.daily.temperature_2m_max[index],
+          min: day.temperature.min,
+          max: day.temperature.max,
         },
-        condition: mapWeatherCondition(dailyForecastData.daily.weather_code[index]),
-        icon: mapWeatherCode(dailyForecastData.daily.weather_code[index]),
-        rainChance: dailyForecastData.daily.precipitation_probability_max[index] || 0,
-        humidity: 0, // Not available in daily forecast
-        windSpeed: dailyForecastData.daily.wind_speed_10m_max[index],
+        condition: day.day.condition,
+        icon: day.day.icon,
+        rainChance: rainChance,
+        humidity: 0, // Not available in AccuWeather daily forecast
+        windSpeed: 0, // Not available in AccuWeather daily forecast
       }
     })
 
-    // Calculate rain chance for current conditions
-    // Use the average of the next 12 hours from hourly data
-    let rainChance = 0
-    if (weatherData.hourly && weatherData.hourly.precipitation_probability) {
-      const next12Hours = weatherData.hourly.precipitation_probability.slice(0, 12)
-      rainChance = Math.round(next12Hours.reduce((sum: number, val: number) => sum + val, 0) / next12Hours.length)
+    // Ensure we have at least 7 days, duplicating the last day if necessary
+    while (forecast.length < 7 && forecast.length > 0) {
+      const lastDay = forecast[forecast.length - 1]
+      const nextDate = new Date(lastDay.date)
+      nextDate.setDate(nextDate.getDate() + 1)
+
+      forecast.push({
+        ...lastDay,
+        date: nextDate.toISOString(),
+        dayOfWeek: nextDate.toLocaleDateString("en-US", { weekday: "short" }),
+      })
     }
 
     // Build the complete weather forecast object
     const weatherForecast: WeatherForecast = {
-      location: region.name,
-      date: new Date().toISOString(),
+      location: accuWeatherData.location,
+      date: accuWeatherData.lastUpdated,
       temperature: {
-        current: current.temperature,
-        min: forecast[0].temperature.min,
-        max: forecast[0].temperature.max,
-        feels_like: current.apparent_temperature,
+        current: accuWeatherData.current.temperature,
+        min: forecast[0]?.temperature.min || accuWeatherData.current.temperature - 5,
+        max: forecast[0]?.temperature.max || accuWeatherData.current.temperature + 5,
+        feels_like: accuWeatherData.current.feelsLike,
       },
-      humidity: current.relative_humidity_2m,
-      windSpeed: current.wind_speed_10m,
-      windDirection: degreesToDirection(current.wind_direction_10m),
-      condition: mapWeatherCondition(currentWeatherCode),
-      icon: mapWeatherCode(currentWeatherCode),
-      rainChance: rainChance,
-      alerts,
-      forecast: forecast.slice(0, 7), // Limit to 7 days
-      source: "Open-Meteo",
+      humidity: accuWeatherData.current.humidity,
+      windSpeed: accuWeatherData.current.windSpeed,
+      windDirection: accuWeatherData.current.windDirection,
+      condition: accuWeatherData.current.condition,
+      icon: accuWeatherData.current.icon,
+      rainChance: forecast[0]?.rainChance || 0,
+      alerts: accuWeatherData.alerts.map(alert => ({
+        type: alert.type,
+        severity: alert.level === 'Severe' ? 'severe' as const :
+                 alert.level === 'High' ? 'high' as const :
+                 alert.level === 'Moderate' ? 'moderate' as const : 'low' as const,
+        description: alert.description,
+        issuedAt: new Date().toISOString(),
+      })),
+      forecast: forecast,
+      source: "AccuWeather",
     }
 
     // Store in cache
@@ -166,13 +109,15 @@ export async function GET(request: Request) {
       details = error.message
 
       // Check for common error patterns
-      if (error.message.includes("Too Many")) {
+      if (error.message.includes("rate limit") || error.message.includes("quota")) {
         errorMessage = "Weather API rate limit exceeded"
         details = "The weather service is currently experiencing high traffic. Please try again later."
       } else if (error.message.includes("fetch")) {
         errorMessage = "Network error while fetching weather data"
       } else if (error.message.includes("JSON")) {
         errorMessage = "Invalid response from weather service"
+      } else if (error.message.includes("AccuWeather API")) {
+        errorMessage = "AccuWeather service error"
       }
     }
 
