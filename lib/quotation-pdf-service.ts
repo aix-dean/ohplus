@@ -48,9 +48,9 @@ const formatDuration = (days: number): string => {
 const formatCompanyAddress = (companyData: any): string => {
   if (!companyData) return ""
   const parts = []
-  if (companyData.address) parts.push(companyData.address)
-  if (companyData.city) parts.push(companyData.city)
-  if (companyData.state) parts.push(companyData.state)
+  if (companyData.address?.street) parts.push(companyData.address.street)
+  if (companyData.address?.city) parts.push(companyData.address.city)
+  if (companyData.address?.province) parts.push(companyData.address.province)
   if (companyData.zip) parts.push(companyData.zip)
   return parts.join(", ")
 }
@@ -63,10 +63,32 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
 
   let yPosition = margin
 
-  pdf.setFontSize(20)
-  pdf.setFont("helvetica", "bold")
-  pdf.text(companyData?.name || "AI Xynergy", pageWidth / 2, yPosition, { align: "center" })
-  yPosition += 12
+  // Load company logo if available
+  let logoDataUrl: string | null = null
+  if (companyData?.photo_url) {
+    try {
+      const response = await fetch(companyData.photo_url)
+      const blob = await response.blob()
+      logoDataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(blob)
+      })
+    } catch (error) {
+      console.error('Error loading company logo:', error)
+    }
+  }
+
+  // Add header with logo or company name
+  if (logoDataUrl) {
+    pdf.addImage(logoDataUrl, 'PNG', pageWidth / 2 - 15, yPosition - 10, 30, 15)
+    yPosition += 12
+  } else {
+    pdf.setFontSize(20)
+    pdf.setFont("helvetica", "bold")
+    pdf.text(companyData?.name || "AI Xynergy", pageWidth / 2, yPosition, { align: "center" })
+    yPosition += 12
+  }
 
   pdf.setFontSize(10)
   pdf.setFont("helvetica", "normal")

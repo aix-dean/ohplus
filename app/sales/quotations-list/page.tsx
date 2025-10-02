@@ -887,6 +887,10 @@ export default function QuotationsListPage() {
     router.push(`/sales/job-orders/create?quotationId=${quotationId}`)
   }
 
+
+  const handleQuotationRoute = (id: string) => {
+    router.push(`/sales/quotations/${id}`)
+  }
   const handleProjectNameSubmit = async () => {
     if (!selectedQuotationForProject || !user?.uid || !userData?.company_id || !projectName.trim()) {
       toast({
@@ -1055,7 +1059,7 @@ export default function QuotationsListPage() {
                   const isExpanded = expandedCompliance.has(quotation.id)
 
                   return (
-                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200">
+                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200" onClick={(e) => router.push(`/sales/quotations/${quotation.id}`)}>
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600">
                           {(() => {
@@ -1067,8 +1071,8 @@ export default function QuotationsListPage() {
                           })()}
                         </div>
                       </TableCell>
-                      <TableCell className="py-3">
-                        <div className="font-medium text-gray-900">{quotation.quotation_number || quotation.id || "—"}</div>
+                      <TableCell className="py-3" >
+                        <div className="font-medium text-gray-900"   >{quotation.quotation_number || quotation.id || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="font-medium text-gray-900">{quotation.client_name || "—"}</div>
