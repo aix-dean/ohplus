@@ -778,10 +778,10 @@ export async function getPaginatedCostEstimatesByCreatedBy(
         company_id: data.company_id || "",
         page_id: data.page_id || "",
         page_number: data.page_number || 1,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        startDate: safeToDate(data.startDate),
+        endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
+        validUntil: safeToDate(data.validUntil),
       } as CostEstimate
     })
 
@@ -957,10 +957,10 @@ export async function getCostEstimatesByClientId(clientId: string): Promise<Cost
         company_id: data.company_id || "",
         page_id: data.page_id || "",
         page_number: data.page_number || 1,
-        startDate: data.startDate?.toDate() || null,
-        endDate: data.endDate?.toDate() || null,
+        startDate: safeToDate(data.startDate),
+        endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
-        validUntil: data.validUntil?.toDate() || null,
+        validUntil: safeToDate(data.validUntil),
       } as CostEstimate
     })
   } catch (error) {
