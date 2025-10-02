@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { X, Upload, CheckCircle } from "lucide-react"
+import { format } from "date-fns"
 
 interface ComplianceItem {
   key: string
@@ -13,6 +14,9 @@ interface ComplianceItem {
   file?: string
   fileUrl?: string
   note?: string
+  uploadedBy?: string
+  uploadedAt?: string
+  completed?: boolean
 }
 
 interface ComplianceDialogProps {
@@ -23,6 +27,8 @@ interface ComplianceDialogProps {
   uploadingFiles: Set<string>
   onAccept?: (quotationId: string, complianceType: string) => void
   onDecline?: (quotationId: string, complianceType: string) => void
+  onMarkAsReserved?: (quotation: any) => void
+  userEmail?: string
 }
 
 export function ComplianceDialog({
@@ -32,7 +38,9 @@ export function ComplianceDialog({
   onFileUpload,
   uploadingFiles,
   onAccept = () => {},
-  onDecline = () => {}
+  onDecline = () => {},
+  onMarkAsReserved,
+  userEmail
 }: ComplianceDialogProps) {
   const [fileViewerOpen, setFileViewerOpen] = useState(false)
   const [selectedFileUrl, setSelectedFileUrl] = useState<string>("")
@@ -42,27 +50,73 @@ export function ComplianceDialog({
 
   const compliance = quotation?.projectCompliance || {}
 
+  const getDisplayFilename = (key: string) => {
+    switch (key) {
+      case "signedContract":
+        return "signed-contract.pdf"
+      case "paymentAsDeposit":
+        return "payment-deposit.pdf"
+      case "irrevocablePo":
+        return "irrevocable-po.pdf"
+      case "finalArtwork":
+        return "final-artwork.pdf"
+      case "signedQuotation":
+        return "signed-quotation.pdf"
+      default:
+        return "document.pdf"
+    }
+  }
+
   const toReserveItems: ComplianceItem[] = [
     {
       key: "signedContract",
       name: "Signed Contract",
-      status: acceptedItems.has("signedContract") ? "accepted" : declinedItems.has("signedContract") ? "declined" : compliance.signedContract?.status === "accepted" ? "accepted" : compliance.signedContract?.status === "declined" ? "declined" : compliance.signedContract?.fileUrl ? "uploaded" : "uploaded",
+      status: acceptedItems.has("signedContract") ? "accepted" : declinedItems.has("signedContract") ? "declined" : (compliance.signedContract?.status === "accepted" || compliance.signedContract?.status === "completed") ? "accepted" : compliance.signedContract?.status === "declined" ? "declined" : compliance.signedContract?.fileUrl ? "uploaded" : "uploaded",
       file: compliance.signedContract?.fileName,
       fileUrl: compliance.signedContract?.fileUrl,
+      uploadedBy: compliance.signedContract?.uploadedBy,
+      uploadedAt: compliance.signedContract?.uploadedAt,
+      completed: compliance.signedContract?.completed,
     },
     {
       key: "paymentAsDeposit",
       name: "Payment as Deposit",
-      status: acceptedItems.has("paymentAsDeposit") ? "accepted" : declinedItems.has("paymentAsDeposit") ? "declined" : compliance.paymentAsDeposit?.status === "accepted" ? "accepted" : compliance.paymentAsDeposit?.status === "declined" ? "declined" : compliance.paymentAsDeposit?.fileUrl ? "uploaded" : "confirmation",
+      status: acceptedItems.has("paymentAsDeposit") ? "accepted" : declinedItems.has("paymentAsDeposit") ? "declined" : (compliance.paymentAsDeposit?.status === "accepted" || compliance.paymentAsDeposit?.status === "completed") ? "accepted" : compliance.paymentAsDeposit?.status === "declined" ? "declined" : compliance.paymentAsDeposit?.fileUrl ? "uploaded" : "confirmation",
       file: compliance.paymentAsDeposit?.fileName,
       fileUrl: compliance.paymentAsDeposit?.fileUrl,
+      uploadedBy: compliance.paymentAsDeposit?.uploadedBy,
+      uploadedAt: compliance.paymentAsDeposit?.uploadedAt,
+      completed: compliance.paymentAsDeposit?.completed,
     },
     {
       key: "irrevocablePo",
       name: "Irrevocable PO/MO",
-      status: acceptedItems.has("irrevocablePo") ? "accepted" : declinedItems.has("irrevocablePo") ? "declined" : compliance.irrevocablePo?.status === "accepted" ? "accepted" : compliance.irrevocablePo?.status === "declined" ? "declined" : compliance.irrevocablePo?.fileUrl ? "uploaded" : "uploaded",
+      status: acceptedItems.has("irrevocablePo") ? "accepted" : declinedItems.has("irrevocablePo") ? "declined" : (compliance.irrevocablePo?.status === "accepted" || compliance.irrevocablePo?.status === "completed") ? "accepted" : compliance.irrevocablePo?.status === "declined" ? "declined" : compliance.irrevocablePo?.fileUrl ? "uploaded" : "uploaded",
       file: compliance.irrevocablePo?.fileName,
       fileUrl: compliance.irrevocablePo?.fileUrl,
+      uploadedBy: compliance.irrevocablePo?.uploadedBy,
+      uploadedAt: compliance.irrevocablePo?.uploadedAt,
+      completed: compliance.irrevocablePo?.completed,
+    },
+    {
+      key: "finalArtwork",
+      name: "Final Artwork",
+      status: acceptedItems.has("finalArtwork") ? "accepted" : declinedItems.has("finalArtwork") ? "declined" : (compliance.finalArtwork?.status === "accepted" || compliance.finalArtwork?.status === "completed") ? "accepted" : compliance.finalArtwork?.status === "declined" ? "declined" : compliance.finalArtwork?.fileUrl ? "uploaded" : "uploaded",
+      file: compliance.finalArtwork?.fileName,
+      fileUrl: compliance.finalArtwork?.fileUrl,
+      uploadedBy: compliance.finalArtwork?.uploadedBy,
+      uploadedAt: compliance.finalArtwork?.uploadedAt,
+      completed: compliance.finalArtwork?.completed,
+    },
+    {
+      key: "signedQuotation",
+      name: "Signed Quotation",
+      status: acceptedItems.has("signedQuotation") ? "accepted" : declinedItems.has("signedQuotation") ? "declined" : (quotation?.signedQuotation?.status === "accepted" || quotation?.signedQuotation?.status === "completed") ? "accepted" : quotation?.signedQuotation?.status === "declined" ? "declined" : quotation?.signedQuotation?.fileUrl ? "uploaded" : "uploaded",
+      file: quotation?.signedQuotation?.fileName,
+      fileUrl: quotation?.signedQuotation?.fileUrl,
+      uploadedBy: quotation?.signedQuotation?.uploadedBy,
+      uploadedAt: quotation?.signedQuotation?.uploadedAt,
+      completed: quotation?.signedQuotation?.completed,
     },
   ]
 
@@ -115,7 +169,7 @@ export function ComplianceDialog({
 
         <div className="px-4 pb-3">
           <p className="text-[12px] text-[#a1a1a1] italic">
-            *Upload/approve at least (1) document to "Reserve"
+            *Upload/approve at least (1) of 5 documents to "Reserve"
           </p>
         </div>
 
@@ -144,7 +198,7 @@ export function ComplianceDialog({
                         className="text-[12px] text-[#2d3fff] cursor-pointer flex items-center justify-center gap-1"
                         onClick={() => item.fileUrl && handleViewFile(item.fileUrl, item.key)}
                       >
-                        {item.file}
+                        {getDisplayFilename(item.key)}
                         <img src={item.status === "accepted" ? "/approve_sign.png" : "/exclamation_sign.png"} alt={item.status === "accepted" ? "approved" : "warning"} className="w-4 h-4" />
                       </span>
                     ) : (
@@ -182,7 +236,13 @@ export function ComplianceDialog({
         {/* Mark as Reserved Button */}
         <div className="flex justify-end pb-4 pr-4">
           <Button
-            className="bg-[#48b02c] hover:bg-[#3d8f24] text-white font-bold text-[12px] rounded-[6px] h-[28px] px-4"
+            disabled={completed === 0}
+            onClick={() => {
+              if (onMarkAsReserved) {
+                onMarkAsReserved(quotation)
+              }
+            }}
+            className="bg-[#48b02c] hover:bg-[#3d8f24] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold text-[12px] rounded-[6px] h-[28px] px-4"
           >
             Mark as Reserved
           </Button>
@@ -216,17 +276,38 @@ export function ComplianceDialog({
           <div className="flex flex-col sm:flex-row sm:justify-between items-center p-4 pt-0 shrink-0 gap-4 sm:gap-0">
             <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
               <p className="mb-0">
-                <span className="font-bold">Sent from:</span> GTS Kiosk
+                <span className="font-bold">Sent from:</span> OH! Plus
               </p>
               <p className="mb-0">
-                <span className="font-bold">Sent by:</span> abccompany.ph@gmail.com
+                <span className="font-bold">Sent by:</span> {userEmail || "Unknown"}
               </p>
-              <p className="mb-0">
-                <span className="font-bold">Date:</span> Nov 15, 2025
-              </p>
-              <p className="mb-0">
-                <span className="font-bold">Time:</span> 10:00 GMT
-              </p>
+              {(() => {
+                const compliance = quotation?.projectCompliance?.[selectedItemKey]
+                const uploadedAt = compliance?.uploadedAt
+                if (uploadedAt) {
+                  const date = uploadedAt && typeof uploadedAt.toDate === 'function' ? uploadedAt.toDate() : new Date(uploadedAt)
+                  return (
+                    <>
+                      <p className="mb-0">
+                        <span className="font-bold">Date:</span> {format(date, "MMM d, yyyy")}
+                      </p>
+                      <p className="mb-0">
+                        <span className="font-bold">Time:</span> {date.toLocaleTimeString()} GMT
+                      </p>
+                    </>
+                  )
+                }
+                return (
+                  <>
+                    <p className="mb-0">
+                      <span className="font-bold">Date:</span> N/A
+                    </p>
+                    <p className="mb-0">
+                      <span className="font-bold">Time:</span> N/A
+                    </p>
+                  </>
+                )
+              })()}
             </div>
             <div className="flex gap-2">
               <Button

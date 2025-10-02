@@ -454,7 +454,7 @@ export default function QuotationsListPage() {
       const quotationRef = doc(db, "quotations", quotationId)
       const updateData: { [key: string]: any } = {
         [`projectCompliance.${complianceType}`]: {
-          status: "completed",
+          status: "uploaded",
           fileUrl: downloadURL,
           fileName: file.name,
           uploadedAt: serverTimestamp(),
@@ -501,7 +501,7 @@ export default function QuotationsListPage() {
             ...updatedQuotation.projectCompliance,
             [complianceType]: {
               ...updatedQuotation.projectCompliance?.[complianceType],
-              status: "completed",
+              status: "uploaded",
               fileUrl: downloadURL,
               fileName: file.name,
               uploadedAt: serverTimestamp(),
@@ -576,7 +576,7 @@ export default function QuotationsListPage() {
       },
     ]
 
-    const allItems = toReserveItems
+    const allItems = [...toReserveItems, ...otherRequirementsItems]
     const completed = allItems.filter((item) => item.status === "completed").length
     return {
       completed,
@@ -1017,6 +1017,7 @@ export default function QuotationsListPage() {
     try {
       const quotationRef = doc(db, "quotations", quotationId)
       const updateData: { [key: string]: any } = {
+        [`projectCompliance.${complianceType}.status`]: "completed",
         [`projectCompliance.${complianceType}.completed`]: true,
         updated: serverTimestamp(),
       }
@@ -1039,6 +1040,7 @@ export default function QuotationsListPage() {
             ...selectedQuotationForCompliance.projectCompliance,
             [complianceType]: {
               ...selectedQuotationForCompliance.projectCompliance?.[complianceType],
+              status: "completed",
               completed: true,
             }
           }
@@ -1058,6 +1060,7 @@ export default function QuotationsListPage() {
     try {
       const quotationRef = doc(db, "quotations", quotationId)
       const updateData: { [key: string]: any } = {
+        [`projectCompliance.${complianceType}.status`]: "declined",
         [`projectCompliance.${complianceType}.completed`]: false,
         updated: serverTimestamp(),
       }
@@ -1080,6 +1083,7 @@ export default function QuotationsListPage() {
             ...selectedQuotationForCompliance.projectCompliance,
             [complianceType]: {
               ...selectedQuotationForCompliance.projectCompliance?.[complianceType],
+              status: "declined",
               completed: false,
             }
           }
@@ -1098,6 +1102,12 @@ export default function QuotationsListPage() {
   const handleViewCompliance = (quotation: any) => {
     setSelectedQuotationForCompliance(quotation)
     setShowComplianceDialog(true)
+  }
+
+  const handleMarkAsReserved = (quotation: any) => {
+    setSelectedQuotationForProject(quotation)
+    setProjectNameDialogOpen(true)
+    setShowComplianceDialog(false) // Close the compliance dialog
   }
 
   return (
@@ -1550,6 +1560,8 @@ export default function QuotationsListPage() {
         uploadingFiles={uploadingFiles}
         onAccept={handleAcceptCompliance}
         onDecline={handleDeclineCompliance}
+        onMarkAsReserved={handleMarkAsReserved}
+        userEmail={user?.email || userData?.email || undefined}
       />
     </div>
   )
