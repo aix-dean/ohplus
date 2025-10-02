@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { ArrowLeft, Search, MoreVertical, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
 import { getReports, type ReportData } from "@/lib/report-service"
@@ -17,8 +16,6 @@ export default function ServiceReportsPage() {
   const [reports, setReports] = useState<ReportData[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [filterType, setFilterType] = useState("All")
-  const [showDrafts, setShowDrafts] = useState(false)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -46,15 +43,15 @@ export default function ServiceReportsPage() {
   // Single useEffect to handle all data fetching
   useEffect(() => {
     fetchReports(currentPage)
-  }, [currentPage, searchQuery, filterType, showDrafts])
+  }, [currentPage, searchQuery])
 
-  // Separate effect to reset pagination when search/filter changes
+  // Separate effect to reset pagination when search changes
   useEffect(() => {
     setCurrentPage(1)
     setLastDoc(null)
     setPageLastDocs({})
     setIsSearchMode(false)
-  }, [searchQuery, filterType, showDrafts])
+  }, [searchQuery])
 
   useEffect(() => {
     // Check if we just posted a report
@@ -73,14 +70,11 @@ export default function ServiceReportsPage() {
       const hasSearch = !!(searchQuery && searchQuery.trim())
       setIsSearchMode(hasSearch)
 
-      const status = showDrafts ? "draft" : "published"
-
       const result = await getReports({
         page,
         limit: itemsPerPage,
         companyId: userData?.company_id || undefined,
-        status,
-        reportType: filterType !== "All" ? filterType : undefined,
+        status: "published", // Only show published reports
         searchQuery: hasSearch ? searchQuery.trim() : undefined,
         lastDoc: page > 1 ? pageLastDocs[page - 1] || lastDoc : undefined
       })
@@ -189,41 +183,20 @@ export default function ServiceReportsPage() {
         <h2 className="text-2xl font-semibold text-gray-900">Reports</h2>
       </div>
 
-      {/* Search and Filters */}
+      {/* Search */}
       <div className="px-6 pb-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative flex-1 max-w-sm">
-              <div className="bg-white rounded-[15px] border-2 border-gray-300 px-4 flex items-center h-10">
-                <Search className="h-4 w-4 text-gray-400 mr-2 border-none" />
-                <Input
-                  placeholder="Search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="border-0 p-0 focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-transparent text-gray-400 h-[90%] rounded-none"
-                />
-              </div>
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <div className="bg-white rounded-[15px] border-2 border-gray-300 px-4 flex items-center h-10">
+              <Search className="h-4 w-4 text-gray-400 mr-2 border-none" />
+              <Input
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="border-0 p-0 focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-transparent text-gray-400 h-[90%] rounded-none"
+              />
             </div>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                <SelectItem value="completion-report">Completion</SelectItem>
-                <SelectItem value="monitoring-report">Monitoring</SelectItem>
-                <SelectItem value="installation-report">Installation</SelectItem>
-                <SelectItem value="roll-down">Roll Down</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
-          <Button
-            variant={showDrafts ? "default" : "outline"}
-            onClick={() => setShowDrafts(!showDrafts)}
-            className="px-4"
-          >
-            Drafts
-          </Button>
         </div>
       </div>
 
