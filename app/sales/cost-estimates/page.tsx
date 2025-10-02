@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -34,7 +34,7 @@ import {
   Mail,
   MessageSquare,
   MessageCircle,
-  Loader2,
+  History,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy, getCostEstimate } from "@/lib/cost-estimate-service" // Import CostEstimate service
@@ -44,6 +44,7 @@ import { useResponsive } from "@/hooks/use-responsive"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
 import { SendCostEstimateOptionsDialog } from "@/components/send-cost-estimate-options-dialog" // Import SendCostEstimateOptionsDialog
+import { SentHistoryDialog } from "@/components/sent-history-dialog"
 import { searchCostEstimates, SearchResult } from "@/lib/algolia-service"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Timestamp } from "firebase/firestore"
@@ -59,7 +60,8 @@ function CostEstimatesPageContent() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [selectedCostEstimateForShare, setSelectedCostEstimateForShare] = useState<any>(null)
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
-  const [generatingPDFs, setGeneratingPDFs] = useState<Set<string>>(new Set())
+  const [showSentHistoryDialog, setShowSentHistoryDialog] = useState(false)
+  const [selectedCostEstimateForHistory, setSelectedCostEstimateForHistory] = useState<any>(null)
 
   // Algolia search states
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
@@ -515,6 +517,11 @@ function CostEstimatesPageContent() {
     window.open(`https://m.me/?text=${message}`)
   }
 
+  const handleViewSentHistory = (costEstimate: any) => {
+    setSelectedCostEstimateForHistory(costEstimate)
+    setShowSentHistoryDialog(true)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -674,22 +681,6 @@ function CostEstimatesPageContent() {
                               <Download className="mr-2 h-4 w-4" />
                               Download PDF
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handlePrintPDF(costEstimate as CostEstimate)}
-                              disabled={generatingPDFs.has(costEstimate.id || costEstimate.objectID)}
-                            >
-                              {generatingPDFs.has(costEstimate.id || costEstimate.objectID) ? (
-                                <>
-                                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                                  Generating PDF...
-                                </>
-                              ) : (
-                                <>
-                                  <Printer className="mr-2 h-4 w-4" />
-                                  Print
-                                </>
-                              )}
-                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleShareCostEstimate(costEstimate.id || costEstimate.objectID)}>
                               <Share2 className="mr-2 h-4 w-4" />
                               Share
@@ -697,6 +688,16 @@ function CostEstimatesPageContent() {
                             <DropdownMenuItem onClick={() => handleCreateQuotation(costEstimate.id || costEstimate.objectID)}>
                               <Calculator className="mr-2 h-4 w-4" />
                               Create Quotation
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleViewSentHistory(costEstimate)}>
+                              <History className="mr-2 h-4 w-4" />
+                              View Sent History
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handlePrintPDF(costEstimate as CostEstimate)}>
+                              <Printer className="mr-2 h-4 w-4" />
+                              Print
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -780,6 +781,13 @@ function CostEstimatesPageContent() {
           }}
         />
       )}
+
+      <SentHistoryDialog
+        open={showSentHistoryDialog}
+        onOpenChange={setShowSentHistoryDialog}
+        proposalId={selectedCostEstimateForHistory?.id || selectedCostEstimateForHistory?.objectID || ""}
+        emailType="cost_estimate"
+      />
     </div>
   )
 }
