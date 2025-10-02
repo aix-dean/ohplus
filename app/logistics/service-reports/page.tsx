@@ -11,14 +11,22 @@ import { getReports, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
+import { Pagination } from "@/components/ui/pagination"
 
 export default function ServiceReportsPage() {
   const [reports, setReports] = useState<ReportData[]>([])
-  const [filteredReports, setFilteredReports] = useState<ReportData[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("All")
   const [showDrafts, setShowDrafts] = useState(false)
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasNextPage, setHasNextPage] = useState(false)
+  const [lastDoc, setLastDoc] = useState<any>(null)
+  const [pageLastDocs, setPageLastDocs] = useState<{ [page: number]: any }>({})
+  const [isSearchMode, setIsSearchMode] = useState(false)
+  const itemsPerPage = 10
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [postedReportId, setPostedReportId] = useState<string>("")
@@ -29,19 +37,24 @@ export default function ServiceReportsPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    fetchReports()
-  }, [])
-
-  useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date().toLocaleString())
     }, 60000) // update every minute
     return () => clearInterval(interval)
   }, [])
 
+  // Single useEffect to handle all data fetching
   useEffect(() => {
-    filterReports()
-  }, [reports, searchQuery, filterType, showDrafts])
+    fetchReports(currentPage)
+  }, [currentPage, searchQuery, filterType, showDrafts])
+
+  // Separate effect to reset pagination when search/filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+    setLastDoc(null)
+    setPageLastDocs({})
+    setIsSearchMode(false)
+  }, [searchQuery, filterType, showDrafts])
 
   useEffect(() => {
     // Check if we just posted a report
@@ -54,12 +67,36 @@ export default function ServiceReportsPage() {
     }
   }, [])
 
-  const fetchReports = async () => {
+  const fetchReports = async (page: number = 1) => {
+    setLoading(true)
     try {
-      setLoading(true)
-      const reportsData = await getReports()
-      console.log("Fetched reports data:", reportsData)
-      setReports(reportsData)
+      const hasSearch = !!(searchQuery && searchQuery.trim())
+      setIsSearchMode(hasSearch)
+
+      const status = showDrafts ? "draft" : "published"
+
+      const result = await getReports({
+        page,
+        limit: itemsPerPage,
+        companyId: userData?.company_id || undefined,
+        status,
+        reportType: filterType !== "All" ? filterType : undefined,
+        searchQuery: hasSearch ? searchQuery.trim() : undefined,
+        lastDoc: page > 1 ? pageLastDocs[page - 1] || lastDoc : undefined
+      })
+
+      // Update cursor for next page (only when going forward)
+      if (page >= currentPage && result.hasNextPage && result.lastDoc) {
+        setLastDoc(result.lastDoc)
+        setPageLastDocs(prev => ({
+          ...prev,
+          [page]: result.lastDoc
+        }))
+      }
+
+      setReports(result.reports)
+      setHasNextPage(result.hasNextPage)
+      setCurrentPage(page)
     } catch (error) {
       console.error("Error fetching reports:", error)
       toast({
@@ -67,48 +104,13 @@ export default function ServiceReportsPage() {
         description: "Failed to load reports",
         variant: "destructive",
       })
+      setReports([])
+      setHasNextPage(false)
     } finally {
       setLoading(false)
     }
   }
 
-  const filterReports = () => {
-    let filtered = [...reports]
-
-    // Filter by company ID - only show reports from the same company
-    if (userData?.company_id) {
-      filtered = filtered.filter((report) => report.companyId === userData.company_id)
-    }
-
-
-    // Filter by drafts
-    if (showDrafts) {
-      filtered = filtered.filter((report) => report.status === "draft")
-    } else {
-      filtered = filtered.filter((report) => report.status !== "draft")
-    }
-
-    // Filter by report type
-    if (filterType !== "All") {
-      filtered = filtered.filter((report) => report.reportType === filterType)
-    }
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (report) =>
-          report.siteName?.toLowerCase().includes(query) ||
-          report.reportType?.toLowerCase().includes(query) ||
-          report.createdByName?.toLowerCase().includes(query) ||
-          report.id?.toLowerCase().includes(query) ||
-          report.report_id?.toLowerCase().includes(query) ||
-          report.client?.toLowerCase().includes(query),
-      )
-    }
-
-    setFilteredReports(filtered)
-  }
 
   const formatDate = (date: any) => {
     if (!date) return "N/A"
@@ -162,6 +164,19 @@ export default function ServiceReportsPage() {
       title: "Delete Report",
       description: "Delete functionality will be implemented",
     })
+  }
+
+  // Pagination handlers
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      setCurrentPage(prev => prev + 1)
+    }
+  }
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1)
+    }
   }
 
   return (
@@ -252,14 +267,14 @@ export default function ServiceReportsPage() {
                     </div>
                   </td>
                 </tr>
-              ) : filteredReports.length === 0 ? (
+              ) : reports.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                     No reports found
                   </td>
                 </tr>
               ) : (
-                filteredReports.map((report, index) => (
+                reports.map((report, index) => (
                   <>
                     <tr key={report.id} className="hover:bg-gray-50">
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-20">
@@ -315,7 +330,7 @@ export default function ServiceReportsPage() {
                         </DropdownMenu>
                       </td>
                     </tr>
-                    {index < filteredReports.length - 1 && (
+                    {index < reports.length - 1 && (
                       <tr>
                         <td colSpan={8} className="p-0">
                           <hr className="border-gray-200 mx-4" />
@@ -330,6 +345,17 @@ export default function ServiceReportsPage() {
         </div>
       </div>
 
+      {/* Pagination Controls */}
+      {reports.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          itemsPerPage={itemsPerPage}
+          totalItems={reports.length}
+          onNextPage={handleNextPage}
+          onPreviousPage={handlePreviousPage}
+          hasMore={hasNextPage}
+        />
+      )}
 
       {/* Report Post Success Dialog */}
       <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />

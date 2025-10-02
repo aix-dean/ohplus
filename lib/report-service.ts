@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   limit,
+  startAfter,
   Timestamp,
 } from "firebase/firestore"
 import { db } from "./firebase"
@@ -218,7 +219,123 @@ export async function createReport(reportData: ReportData): Promise<string> {
   }
 }
 
-export async function getReports(): Promise<ReportData[]> {
+export async function getReports(options: {
+  page?: number
+  limit?: number
+  companyId?: string
+  status?: string
+  reportType?: string
+  searchQuery?: string
+  lastDoc?: any
+}): Promise<{ reports: ReportData[], hasNextPage: boolean, lastDoc: any }> {
+  try {
+    const { page = 1, limit: pageLimit = 10, companyId, status, reportType, searchQuery, lastDoc } = options
+
+    // For search queries, we need to fetch all and filter client-side
+    if (searchQuery && searchQuery.trim()) {
+      console.log(`Fetching all reports for search: "${searchQuery}"`)
+      let q = query(collection(db, "reports"), orderBy("created", "desc"))
+
+      if (companyId) {
+        q = query(q, where("companyId", "==", companyId))
+      }
+
+      const querySnapshot = await getDocs(q)
+      let allReports = querySnapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          ...data,
+          attachments: Array.isArray(data.attachments) ? data.attachments : [],
+        }
+      }) as ReportData[]
+
+      // Apply search filtering
+      const searchTerm = searchQuery.trim().toLowerCase()
+      allReports = allReports.filter(report =>
+        report.siteName?.toLowerCase().includes(searchTerm) ||
+        report.reportType?.toLowerCase().includes(searchTerm) ||
+        report.createdByName?.toLowerCase().includes(searchTerm) ||
+        report.id?.toLowerCase().includes(searchTerm) ||
+        report.report_id?.toLowerCase().includes(searchTerm) ||
+        report.client?.toLowerCase().includes(searchTerm)
+      )
+
+      // Apply status filtering
+      if (status && status !== "all") {
+        if (status === "published") {
+          allReports = allReports.filter(report => report.status !== "draft")
+        } else {
+          allReports = allReports.filter(report => report.status === status)
+        }
+      }
+
+      // Apply report type filtering
+      if (reportType && reportType !== "All") {
+        allReports = allReports.filter(report => report.reportType === reportType)
+      }
+
+      // Apply pagination
+      const offset = (page - 1) * pageLimit
+      const reports = allReports.slice(offset, offset + pageLimit)
+      const hasNextPage = allReports.length > offset + pageLimit
+
+      console.log(`Search results: ${allReports.length} total, ${reports.length} on page ${page}`)
+      return { reports, hasNextPage, lastDoc: null }
+    }
+
+    // For non-search: use server-side pagination
+    let q = query(collection(db, "reports"), orderBy("created", "desc"), limit(pageLimit + 1))
+
+    if (companyId) {
+      q = query(q, where("companyId", "==", companyId))
+    }
+
+    // Apply status filtering server-side
+    if (status && status !== "all") {
+      if (status === "published") {
+        q = query(q, where("status", "!=", "draft"))
+      } else {
+        q = query(q, where("status", "==", status))
+      }
+    }
+
+    // Apply report type filtering server-side
+    if (reportType && reportType !== "All") {
+      q = query(q, where("reportType", "==", reportType))
+    }
+
+    // Handle pagination cursor
+    if (page > 1 && lastDoc) {
+      q = query(q, startAfter(lastDoc))
+    }
+
+    const querySnapshot = await getDocs(q)
+    const docs = querySnapshot.docs
+
+    const hasNextPage = docs.length > pageLimit
+    const pageDocs = hasNextPage ? docs.slice(0, pageLimit) : docs
+    const newLastDoc = hasNextPage ? docs[pageLimit - 1] : docs[docs.length - 1]
+
+    const reports = pageDocs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        attachments: Array.isArray(data.attachments) ? data.attachments : [],
+      }
+    }) as ReportData[]
+
+    console.log(`Fetched ${reports.length} reports for page ${page}, hasNextPage: ${hasNextPage}`)
+    return { reports, hasNextPage, lastDoc: newLastDoc }
+  } catch (error) {
+    console.error("Error fetching reports:", error)
+    throw error
+  }
+}
+
+// Keep the old function for backward compatibility
+export async function getReportsLegacy(): Promise<ReportData[]> {
   try {
     const q = query(collection(db, "reports"), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
