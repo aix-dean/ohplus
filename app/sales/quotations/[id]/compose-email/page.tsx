@@ -20,7 +20,6 @@ import {
 import { ArrowLeft, Paperclip, Edit, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getQuotation, getQuotationsByPageId } from "@/lib/quotation-service"
-import { generateQuotationEmailPDF } from "@/lib/quotation-pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { Quotation } from "@/lib/types/quotation"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
@@ -70,7 +69,7 @@ export default function ComposeEmailPage() {
   }, [userData])
 
   const preGenerateAllPDFs = useCallback(
-    async (mainQuotation: Quotation, relatedQuotations: Quotation[]) => {
+    async (mainQuotation: Quotation, relatedQuotations: Quotation[], companyDataParam?: any) => {
       if (!mainQuotation) return
 
       setPdfGenerating(true)
@@ -86,20 +85,61 @@ export default function ComposeEmailPage() {
             }
           : undefined
 
+        // Load company logo if available
+        let logoDataUrl: string | null = null
+        if (companyDataParam?.photo_url) {
+          try {
+            const response = await fetch(companyDataParam.photo_url)
+            const blob = await response.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(blob)
+            })
+          } catch (error) {
+            console.error('Error loading company logo:', error)
+          }
+        }
+
         const allPDFs: Array<{ filename: string; content: string }> = []
 
-        // Generate PDF for main quotation
+        // Generate PDF for main quotation using the same API as download button
         try {
-          const mainPdfBase64 = await generateQuotationEmailPDF(mainQuotation, true, userDataForPDF)
-          if (typeof mainPdfBase64 === "string") {
-            const mainFilename = `QT-${mainQuotation.quotation_number}_${mainQuotation.client_company_name || "Client"}_Quotation.pdf`
-            allPDFs.push({
-              filename: mainFilename,
-              content: mainPdfBase64,
-            })
-            setPreGeneratedPDF(mainPdfBase64)
-            console.log("[v0] Main PDF pre-generated successfully")
+          const response = await fetch('/api/generate-quotation-pdf', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              quotation: mainQuotation,
+              companyData: companyDataParam,
+              logoDataUrl,
+            }),
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error('API Error:', response.status, errorText)
+            throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
           }
+
+          const blob = await response.blob()
+          const mainPdfBase64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              const result = reader.result as string
+              resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
+            }
+            reader.readAsDataURL(blob)
+          })
+
+          const mainFilename = `QT-${mainQuotation.quotation_number}_${mainQuotation.client_company_name || "Client"}_Quotation.pdf`
+          allPDFs.push({
+            filename: mainFilename,
+            content: mainPdfBase64,
+          })
+          setPreGeneratedPDF(mainPdfBase64)
+          console.log("[v0] Main PDF pre-generated successfully")
         } catch (error) {
           console.error("[v0] Error generating main PDF:", error)
         }
@@ -111,15 +151,51 @@ export default function ComposeEmailPage() {
           const quotation = uniqueRelatedQuotations[i]
           try {
             console.log(`[v0] Generating PDF ${i + 1}/${uniqueRelatedQuotations.length} for quotation:`, quotation.id)
-            const pdfBase64 = await generateQuotationEmailPDF(quotation, true, userDataForPDF)
-            if (typeof pdfBase64 === "string") {
-              const filename = `QT-${quotation.quotation_number}_${quotation.client_company_name || "Client"}_Quotation_Page_${quotation.page_number || i + 2}.pdf`
-              allPDFs.push({
-                filename,
-                content: pdfBase64,
-              })
-              console.log(`[v0] PDF ${i + 1} generated successfully:`, filename)
+
+            // Create unique quotation number with suffix
+            const baseQuotationNumber = quotation.quotation_number || quotation.id?.slice(-8) || "QT-000"
+            const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+
+            // Create modified quotation with unique number
+            const modifiedQuotation = {
+              ...quotation,
+              quotation_number: uniqueQuotationNumber,
             }
+
+            const response = await fetch('/api/generate-quotation-pdf', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                quotation: modifiedQuotation,
+                companyData: companyDataParam,
+                logoDataUrl,
+              }),
+            })
+
+            if (!response.ok) {
+              const errorText = await response.text()
+              console.error('API Error:', response.status, errorText)
+              throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+            }
+
+            const blob = await response.blob()
+            const pdfBase64 = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => {
+                const result = reader.result as string
+                resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
+              }
+              reader.readAsDataURL(blob)
+            })
+
+            const filename = `QT-${uniqueQuotationNumber}_${quotation.client_company_name || "Client"}_Quotation.pdf`
+            allPDFs.push({
+              filename,
+              content: pdfBase64,
+            })
+            console.log(`[v0] PDF ${i + 1} generated successfully:`, filename)
           } catch (error) {
             console.error(`[v0] Error generating PDF for quotation ${quotation.id}:`, error)
           }
@@ -161,10 +237,27 @@ export default function ComposeEmailPage() {
 
       const id = params.id as string
       const quotation = await getQuotation(id)
+      if (!quotation) {
+        throw new Error("Quotation not found")
+      }
       setQuotation(quotation)
 
+      // Fetch company data
+      let fetchedCompanyData: any = null
+      if (quotation.company_id) {
+        try {
+          const companyDoc = await getDoc(doc(db, "companies", quotation.company_id))
+          if (companyDoc.exists()) {
+            fetchedCompanyData = { id: companyDoc.id, ...companyDoc.data() }
+            setCompanyName(fetchedCompanyData.name || "Company")
+          }
+        } catch (error) {
+          console.error("Error fetching company data:", error)
+        }
+      }
+
       let related: Quotation[] = []
-      if (quotation?.page_id) {
+      if (quotation.page_id) {
         related = await getQuotationsByPageId(quotation.page_id)
         setRelatedQuotations(related)
 
@@ -185,7 +278,7 @@ export default function ComposeEmailPage() {
         ])
       }
 
-      await preGenerateAllPDFs(quotation, related)
+      await preGenerateAllPDFs(quotation, related, fetchedCompanyData)
 
       setToEmail(quotation.client_email || "")
       setCcEmail("")

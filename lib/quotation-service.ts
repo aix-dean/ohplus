@@ -163,6 +163,43 @@ export function generateQuotationNumber(): string {
   return `QT-${year}${month}${day}-${time}`
 }
 
+// Calculate prorated price based on actual calendar months and days
+export function calculateProratedPrice(price: number, startDate: Date, endDate: Date): number {
+  let total = 0;
+  let currentDate = new Date(startDate);
+
+  while (currentDate <= endDate) {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    // Get days in this month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Daily price for this month
+    const dailyRate = price / daysInMonth;
+
+    // Determine start and end days for this month
+    let startDay = (currentDate.getMonth() === startDate.getMonth() && currentDate.getFullYear() === startDate.getFullYear())
+      ? startDate.getDate()
+      : 1;
+
+    let endDay = (currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear())
+      ? endDate.getDate()
+      : daysInMonth;
+
+    // Days counted in this month
+    const daysCounted = (endDay - startDay + 1);
+
+    // Add to total
+    total += dailyRate * daysCounted;
+
+    // Move to next month
+    currentDate = new Date(year, month + 1, 1);
+  }
+
+  return total;
+}
+
 // Calculate total amount based on dates and price
 export function calculateQuotationTotal(
   startDate: string,
@@ -174,18 +211,17 @@ export function calculateQuotationTotal(
 } {
   const start = new Date(startDate)
   const end = new Date(endDate)
-  const durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+  const durationDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
 
   let totalAmount = 0
   const item = items
-  const dailyRate = (item.price || 0) / 30 // Assuming price is monthly
-  const itemTotal = dailyRate * Math.max(1, durationDays)
+  const itemTotal = calculateProratedPrice(item.price || 0, start, end)
   item.item_total_amount = itemTotal // Assign calculated item total amount
-  item.duration_days = Math.max(1, durationDays) // Assign calculated duration days to item
+  item.duration_days = durationDays // Assign calculated duration days to item
   totalAmount += itemTotal
 
   return {
-    durationDays: Math.max(1, durationDays), // Minimum 1 day
+    durationDays,
     totalAmount,
   }
 }
@@ -971,9 +1007,8 @@ export async function createDirectQuotation(
     if (options.startDate && options.endDate) {
       const start = new Date(options.startDate)
       const end = new Date(options.endDate)
-      durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-      const dailyRate = (site.price || 0) / 30
-      totalAmount = dailyRate * durationDays
+      durationDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+      totalAmount = calculateProratedPrice(site.price || 0, start, end)
     }
 
     const pageId = options.page_id || `PAGE-${Date.now()}`
@@ -1056,18 +1091,19 @@ export async function createMultipleQuotations(
 
     // Calculate duration if dates are provided
     let durationDays = 30 // Default duration
+    let start: Date | undefined
+    let end: Date | undefined
     if (options.startDate && options.endDate) {
-      const start = new Date(options.startDate)
-      const end = new Date(options.endDate)
-      durationDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+      start = new Date(options.startDate)
+      end = new Date(options.endDate)
+      durationDays = Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
     }
 
     // Create a separate quotation for each site
     for (let i = 0; i < sitesData.length; i++) {
       const site = sitesData[i]
       const quotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
-      const dailyRate = (site.price || 0) / 30
-      const totalAmount = dailyRate * durationDays
+      const totalAmount = start && end ? calculateProratedPrice(site.price || 0, start, end) : site.price || 0
 
       const quotationData: Omit<Quotation, "id"> = {
         quotation_number: quotationNumber,

@@ -1082,7 +1082,7 @@ function SalesDashboardContent() {
         }
 
         // Navigate to the first quotation
-        router.push(`/sales/quotations/${quotationIds[quotationIds.length - 1]}`)
+        router.push(`/sales/quotations/${quotationIds[0]}`)
       } catch (error) {
         console.error("Error creating quotation:", error)
         toast({

@@ -80,7 +80,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     contactPhone: false,
     email: false,
     phoneFormat: false,
-    companyPhoneFormat: false,
     websiteFormat: false,
     prefix: false,
   })
@@ -128,7 +127,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         company: client?.company || "",
         industry: client?.industry || "",
         website: (client as any)?.website || "",
-        companyPhone: "+02",
+        companyPhone: "",
         address: client?.address || "",
         companyLogoUrl: client?.companyLogoUrl || "",
         prefix: "Mr.",
@@ -153,7 +152,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         contactPhone: false,
         email: false,
         phoneFormat: false,
-        companyPhoneFormat: false,
         websiteFormat: false,
         prefix: false,
       })
@@ -203,7 +201,13 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     // Skip contactPhone as it's handled by handlePhoneInput
     if (name === 'contactPhone') return
 
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    // For companyPhone, allow only numbers
+    if (name === 'companyPhone') {
+      const numericValue = value.replace(/\D/g, '') // Remove non-digits
+      setFormData((prev) => ({ ...prev, [name]: numericValue }))
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }))
+    }
 
     // Clear validation error when field is filled
     if (value.trim() && validationErrors[name as keyof typeof validationErrors]) {
@@ -230,11 +234,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     return phoneRegex.test(phone.replace(/\s/g, ''))
   }
 
-  const validateCompanyPhoneFormat = (phone: string): boolean => {
-    // Check if phone is exactly +02 followed by 7 digits (Philippines landline format)
-    const phoneRegex = /^\+02\d{7}$/
-    return phoneRegex.test(phone.replace(/\s/g, ''))
-  }
 
   const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\s/g, '') // Remove spaces
@@ -267,32 +266,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     }
   }
 
-  const handleCompanyPhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\s/g, '') // Remove spaces
-
-    // Always ensure +02 prefix is present
-    if (!value.startsWith('+02')) {
-      if (value && /^\d/.test(value)) {
-        // If user types digits, add +02 prefix
-        value = '+02' + value.replace(/\D/g, '').substring(0, 7)
-      } else {
-        // If empty or doesn't start with digits, set to +02
-        value = '+02'
-      }
-    } else {
-      // If it starts with +02, ensure only digits after and limit to 7
-      const digitsAfterPrefix = value.substring(3).replace(/\D/g, '') // Remove non-digits
-      value = '+02' + digitsAfterPrefix.substring(0, 7) // Limit to 7 digits
-    }
-
-    // Update form data
-    setFormData((prev) => ({ ...prev, companyPhone: value }))
-
-    // Clear validation error when user types
-    if (validationErrors.companyPhoneFormat) {
-      setValidationErrors((prev) => ({ ...prev, companyPhoneFormat: false }))
-    }
-  }
 
   const scrollToFirstError = () => {
     // Define the order of fields to check for errors
@@ -358,7 +331,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         clientType: "",
         partnerType: "",
         website: "",
-        companyPhone: "+02",
+        companyPhone: "",
         companyLogoUrl: "",
       }))
       setLogoPreviewUrl(null)
@@ -577,34 +550,17 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       newValidationErrors.phoneFormat = false
     }
 
-    // Validate company phone format (only if provided)
-    if (formData.companyPhone.trim()) {
-      if (formData.companyPhone === '+02') {
-        // If only +02 is entered, it's incomplete
-        newValidationErrors.companyPhoneFormat = true
+    // Validate website URL format (only if provided)
+    if (formData.website.trim()) {
+      const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/
+      if (!urlRegex.test(formData.website)) {
+        newValidationErrors.websiteFormat = true
         hasErrors = true
-      } else if (!validateCompanyPhoneFormat(formData.companyPhone)) {
-        // If format is invalid
-        newValidationErrors.companyPhoneFormat = true
-        hasErrors = true
-      } else {
-        newValidationErrors.companyPhoneFormat = false
-      }
- 
-      // Validate website URL format (only if provided)
-      if (formData.website.trim()) {
-        const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/
-        if (!urlRegex.test(formData.website)) {
-          newValidationErrors.websiteFormat = true
-          hasErrors = true
-        } else {
-          newValidationErrors.websiteFormat = false
-        }
       } else {
         newValidationErrors.websiteFormat = false
       }
     } else {
-      newValidationErrors.companyPhoneFormat = false
+      newValidationErrors.websiteFormat = false
     }
 
     setValidationErrors(newValidationErrors)
@@ -807,13 +763,10 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                       id="companyPhone"
                       name="companyPhone"
                       value={formData.companyPhone}
-                      onChange={handleCompanyPhoneInput}
-                      placeholder="+02 1234567"
-                      className={`h-10 border-[#c4c4c4] ${validationErrors.companyPhoneFormat ? 'border-[#f95151]' : ''}`}
+                      onChange={handleChange}
+                      placeholder="Enter company landline"
+                      className="h-10 border-[#c4c4c4]"
                     />
-                    {validationErrors.companyPhoneFormat && (
-                      <p className="text-sm text-[#f95151]">Please enter exactly 7 digits after +02</p>
-                    )}
                   </div>
 
                   <div className="space-y-2">

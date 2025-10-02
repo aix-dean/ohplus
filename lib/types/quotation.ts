@@ -39,6 +39,9 @@ export interface QuotationProduct {
   width?: number
   content_type?: string
   site_type?: string
+  site_notes?: string
+  price_notes?: string
+  illumination?: string
 }
 
 export interface ClientComplianceItem {
@@ -110,6 +113,12 @@ export interface Quotation {
   client_compliance?: ClientCompliance // Added client compliance
   signature_position?: string // Position of the person signing the quotation
   signature_name?: string // Name of the person signing the quotation
+  template?: {
+    salutation?: string // Salutation title (Mr., Ms., Mrs., Miss)
+    greeting?: string // Custom greeting text
+    terms_and_conditions?: string[] // Array of terms and conditions
+    closing_message?: string // Optional closing message
+  }
   size?: string // Size specification
   costEstimateNumber?: string // Reference to the source cost estimate number
 }
