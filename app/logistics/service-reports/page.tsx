@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Search, MoreVertical, Plus, Bell } from "lucide-react"
+import { ArrowLeft, Search, MoreVertical, Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -178,14 +178,14 @@ export default function ServiceReportsPage() {
       <div className="px-6 pb-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-4 flex-1">
-            <div className="relative flex-1 max-w-md">
-              <div className="bg-white rounded-[15px] border-2 border-gray-300 px-4 py-2 flex items-center">
-                <Search className="h-4 w-4 text-gray-400 mr-2" />
+            <div className="relative flex-1 max-w-sm">
+              <div className="bg-white rounded-[15px] border-2 border-gray-300 px-4 flex items-center h-10">
+                <Search className="h-4 w-4 text-gray-400 mr-2 border-none" />
                 <Input
                   placeholder="Search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="border-0 p-0 focus:ring-0 text-gray-400"
+                  className="border-0 p-0 focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-transparent text-gray-400 h-[90%] rounded-none"
                 />
               </div>
             </div>
@@ -214,30 +214,30 @@ export default function ServiceReportsPage() {
 
       {/* Reports Table */}
       <div className="bg-white mx-6 rounded-t-lg border border-gray-200 overflow-hidden">
-        <div>
-          <table className="w-full">
+        <div className="overflow-x-auto">
+          <table className="w-full table-fixed min-w-[800px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                   Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                   Report ID
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Site</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                   Campaign Name
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                   Type
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                   Sender
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                   Attachments
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                   Actions
                 </th>
               </tr>
@@ -245,7 +245,7 @@ export default function ServiceReportsPage() {
             <tbody className="bg-white">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                       <span className="ml-2">Loading reports...</span>
@@ -254,7 +254,7 @@ export default function ServiceReportsPage() {
                 </tr>
               ) : filteredReports.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                     No reports found
                   </td>
                 </tr>
@@ -262,31 +262,31 @@ export default function ServiceReportsPage() {
                 filteredReports.map((report, index) => (
                   <>
                     <tr key={report.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-20">
                         {formatDate(report.date || report.created)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 w-24">
                         {generateReportNumber(report.id || "")}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-32 truncate">
                         {report.siteName || "Unknown Site"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-40 truncate">
                         {report.client || "N/A"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-28 truncate">
                         {getReportTypeDisplay(report.reportType)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-32 truncate">
                         LOG- {report.createdByName || "Unknown User"}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-40">
                         {report.attachments.length > 0 ? (
                           <a
                             href={report.attachments[0].fileUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 underline"
+                            className="text-blue-600 underline truncate block max-w-full"
                           >
                             {report.attachments[0].fileName}
                           </a>
@@ -294,7 +294,7 @@ export default function ServiceReportsPage() {
                           "N/A"
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 w-20">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="p-1">
@@ -318,7 +318,7 @@ export default function ServiceReportsPage() {
                     {index < filteredReports.length - 1 && (
                       <tr>
                         <td colSpan={8} className="p-0">
-                          <hr className="border-gray-200" />
+                          <hr className="border-gray-200 mx-4" />
                         </td>
                       </tr>
                     )}
@@ -330,16 +330,6 @@ export default function ServiceReportsPage() {
         </div>
       </div>
 
-      {/* Create New Report Button */}
-      <div className="fixed bottom-6 right-6">
-        <Button
-          onClick={() => router.push("/logistics/dashboard")}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2"
-        >
-          <Plus className="h-5 w-5" />
-          Create New Report
-        </Button>
-      </div>
 
       {/* Report Post Success Dialog */}
       <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />
