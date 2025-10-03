@@ -230,8 +230,8 @@ export default function BusinessProductDetailPage() {
                     color: '#333333'
                   }}
                 >
-                  {product.specs_rental?.width && product.specs_rental?.height
-                    ? `${product.specs_rental.width}ft x ${product.specs_rental.height}ft`
+                  {product.specs_rental?.height && product.specs_rental?.width
+                    ? `${product.specs_rental.height}ft x ${product.specs_rental.width}ft`
                     : "Not specified"}
                 </span>
               </div>
