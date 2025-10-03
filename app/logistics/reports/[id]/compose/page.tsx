@@ -14,7 +14,7 @@ import { ArrowLeft, Paperclip, Send, Plus, Smile, X, AlertCircle } from "lucide-
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
-import { getReports, type ReportData } from "@/lib/report-service"
+import { getReportsLegacy as getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 

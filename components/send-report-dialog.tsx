@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
@@ -142,7 +142,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
       <DialogContent className="sm:max-w-[400px] p-0">
         {/* Header */}
         <div className="flex items-center justify-between p-6 pb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Send Report To</h2>
+          <DialogTitle className="text-lg font-semibold text-gray-900">Send Report To</DialogTitle>
         </div>
 
         {/* Report Preview */}

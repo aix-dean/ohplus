@@ -229,6 +229,7 @@ export async function getReports(options: {
   lastDoc?: any
 }): Promise<{ reports: ReportData[], hasNextPage: boolean, lastDoc: any }> {
   try {
+    console.log("getReports called with options:", options)
     const { page = 1, limit: pageLimit = 10, companyId, status, reportType, searchQuery, lastDoc } = options
 
     // For search queries, we need to fetch all and filter client-side
