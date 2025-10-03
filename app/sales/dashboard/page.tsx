@@ -952,7 +952,7 @@ function SalesDashboardContent() {
     setIsDateRangeDialogOpen(true)
   }
 
-  const openCreateQuotationDateDialog = () => {
+  const navigateToQuotationDateSelection = () => {
     if (selectedSites.length === 0) {
       toast({
         title: "No sites selected",
@@ -971,8 +971,11 @@ function SalesDashboardContent() {
       })
       return
     }
-    setActionAfterDateSelection("quotation")
-    setIsDateRangeDialogOpen(true)
+
+    // Navigate to the date selection page with product IDs and client ID
+    const siteIdsParam = encodeURIComponent(JSON.stringify(selectedSites.map(site => site.id)))
+    const clientIdParam = encodeURIComponent(selectedClientForProposal.id)
+    router.push(`/sales/quotations/select-dates?sites=${siteIdsParam}&clientId=${clientIdParam}`)
   }
 
   // Callback from DateRangeCalendarDialog - NOW CREATES THE DOCUMENT
@@ -2082,7 +2085,7 @@ function SalesDashboardContent() {
                   {selectedSites.length} site{selectedSites.length !== 1 ? 's' : ''} selected
                 </div>
                 <Button
-                  onClick={ceMode ? openCreateCostEstimateDateDialog : openCreateQuotationDateDialog}
+                  onClick={ceMode ? openCreateCostEstimateDateDialog : navigateToQuotationDateSelection}
                   disabled={!selectedClientForProposal || selectedSites.length === 0 || isCreatingDocument}
                   className={`flex-1 h-12 rounded-lg text-lg font-semibold transition-all duration-200 ${
                     selectedClientForProposal && selectedSites.length > 0

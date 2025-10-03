@@ -2,7 +2,7 @@
 
 # dependencies
 /node_modules
-
+/.kilocode
 # next.js
 /.next/
 /out/
