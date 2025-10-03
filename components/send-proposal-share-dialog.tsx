@@ -78,7 +78,7 @@ interface SendProposalShareDialogProps {
 export function SendProposalShareDialog({ isOpen, onClose, proposal, templateSettings }: SendProposalShareDialogProps) {
   const { toast } = useToast()
   const router = useRouter()
-  const [proposalUrl] = useState(`https://mrkohlpus.vercel.app/pr/${proposal.id}`)
+  const [proposalUrl] = useState(`https://mrk.ohplus.ph/pr/${proposal.id}`)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const handleCopyLink = async () => {
     try {
