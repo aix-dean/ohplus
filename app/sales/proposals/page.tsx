@@ -25,6 +25,8 @@ import {
   Printer,
   Share,
   History,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getPaginatedProposalsByUserId, getProposalsCountByUserId, downloadProposalPDF } from "@/lib/proposal-service"
@@ -33,7 +35,7 @@ import { useResponsive } from "@/hooks/use-responsive"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { SentHistoryDialog } from "@/components/sent-history-dialog"
-import { SendProposalOptionsDialog } from "@/components/send-proposal-options-dialog"
+import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -56,6 +58,7 @@ function ProposalsPageContent() {
   const [selectedProposalForHistory, setSelectedProposalForHistory] = useState<Proposal | null>(null)
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [selectedProposalForShare, setSelectedProposalForShare] = useState<Proposal | null>(null)
+  const [expandedProposals, setExpandedProposals] = useState<Set<string>>(new Set())
 
   let content;
   if (loading) {
@@ -142,78 +145,108 @@ function ProposalsPageContent() {
           </TableHeader>
           <TableBody>
             {filteredProposals.map((proposal) => (
-              <TableRow
-                key={proposal.id}
-                className="cursor-pointer border-b border-gray-200"
-                onClick={() => handleViewProposal(proposal.id)}
-              >
-                <TableCell className="py-3">
-                  <div className="text-sm text-gray-600">
-                    {(() => {
-                      if (!proposal.createdAt || !(proposal.createdAt instanceof Date) || isNaN(proposal.createdAt.getTime())) {
-                        return "N/A"
-                      }
-                      return format(proposal.createdAt, "MMM d, yyyy")
-                    })()}
-                  </div>
-                </TableCell>
-                <TableCell className="py-3">
-                  <div className="font-medium text-gray-900">{proposal.id.slice(0, 8)}...</div>
-                </TableCell>
-                <TableCell className="py-3">
-                  <div className="font-medium text-gray-900">{proposal.client.company}</div>
-                </TableCell>
-                <TableCell className="py-3">
-                  <div className="text-sm text-gray-600">{proposal.client.contactPerson}</div>
-                </TableCell>
-                <TableCell className="py-3">
-                  <div className="text-sm text-gray-600">{proposal.products?.[0]?.name || "—"}</div>
-                </TableCell>
-                <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-gray-400 hover:text-gray-600"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Download
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleShareProposal(proposal)}>
-                        <Share className="mr-2 h-4 w-4" />
-                        Share
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleCreateQuotation(proposal)}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Create Quotation
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleViewSentHistory(proposal)}>
-                        <History className="mr-2 h-4 w-4" />
-                        View Sent History
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handlePrintProposal(proposal)}>
-                        <Printer className="mr-2 h-4 w-4" />
-                        Print
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
+              <>
+                <TableRow
+                  key={proposal.id}
+                  className="cursor-pointer border-b border-gray-200"
+                  onClick={() => handleViewProposal(proposal.id)}
+                >
+                  <TableCell className="py-3">
+                    <div className="text-sm text-gray-600">
+                      {(() => {
+                        if (!proposal.createdAt || !(proposal.createdAt instanceof Date) || isNaN(proposal.createdAt.getTime())) {
+                          return "N/A"
+                        }
+                        return format(proposal.createdAt, "MMM d, yyyy")
+                      })()}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div className="font-medium text-gray-900">{proposal.id.slice(0, 8)}...</div>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div className="font-medium text-gray-900">{proposal.client.company}</div>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div className="text-sm text-gray-600">{proposal.client.contactPerson}</div>
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">{proposal.products?.length || 0} sites</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleExpanded(proposal.id)
+                          }}
+                          className="h-6 w-6 p-0"
+                        >
+                          {expandedProposals.has(proposal.id) ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                      {expandedProposals.has(proposal.id) && (
+                        <div className="mt-2 text-sm text-gray-700">
+                          <ul className="list-disc list-inside">
+                            {proposal.products?.map((product, index) => (
+                              <li key={index}>{product.name || product.name}</li>
+                            )) || <li>No sites</li>}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-gray-400 hover:text-gray-600"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => handleViewProposal(proposal.id)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleDownloadPDF(proposal)}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleShareProposal(proposal)}>
+                          <Share className="mr-2 h-4 w-4" />
+                          Share
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleCreateQuotation(proposal)}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Create Quotation
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleViewSentHistory(proposal)}>
+                          <History className="mr-2 h-4 w-4" />
+                          View Sent History
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handlePrintProposal(proposal)}>
+                          <Printer className="mr-2 h-4 w-4" />
+                          Print
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              </>
             ))}
           </TableBody>
         </Table>
@@ -350,8 +383,9 @@ function ProposalsPageContent() {
   }
 
   const handleShareProposal = (proposal: Proposal) => {
-    setSelectedProposalForShare(proposal)
-    setShowShareDialog(true)
+    // Navigate to detail page and trigger share there
+    // This ensures the proposal is rendered and can be shared properly
+    router.push(`/sales/proposals/${proposal.id}?action=share`)
   }
 
   const handleCreateQuotation = (proposal: Proposal) => {
@@ -364,13 +398,18 @@ function ProposalsPageContent() {
     setShowSentHistoryDialog(true)
   }
 
-  const handleShareOptionSelect = (option: "email" | "whatsapp" | "viber" | "messenger") => {
-    if (option === "email" && selectedProposalForShare) {
-      setShowShareDialog(false)
-      router.push(`/sales/proposals/${selectedProposalForShare.id}/compose-email`)
-    }
-    // Other options are not implemented yet
+  const toggleExpanded = (proposalId: string) => {
+    setExpandedProposals(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(proposalId)) {
+        newSet.delete(proposalId)
+      } else {
+        newSet.add(proposalId)
+      }
+      return newSet
+    })
   }
+
 
   return (
     <>
@@ -452,11 +491,10 @@ function ProposalsPageContent() {
       />
 
       {selectedProposalForShare && (
-        <SendProposalOptionsDialog
+        <SendProposalShareDialog
           isOpen={showShareDialog}
           onClose={() => setShowShareDialog(false)}
           proposal={selectedProposalForShare}
-          onSelectOption={handleShareOptionSelect}
         />
       )}
     </>
