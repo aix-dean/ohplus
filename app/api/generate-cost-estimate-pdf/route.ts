@@ -72,9 +72,14 @@ const formatCompanyAddress = (companyData: any): string => {
   return parts.join(", ")
 }
 
-const calculateProratedPrice = (price: number, startDate: Date, endDate: Date): number => {
+const calculateProratedPrice = (price: number, startDate: Date | undefined, endDate: Date | undefined): number => {
+  if (!startDate || !endDate) return price;
+
   let total = 0;
   let currentDate = new Date(startDate);
+
+  console.log('Calculating prorated price from', startDate, 'to', endDate, 'for price', price);
+  if (endDate.getTime() === startDate.getTime()) return price;
 
   while (currentDate <= endDate) {
     const year = currentDate.getFullYear();
@@ -156,12 +161,7 @@ export async function POST(request: NextRequest) {
           ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 50px; margin-right: 10px;">` : ''}
         </div>
       `,
-      footerTemplate: `
-        <div style="font-size: 10px; text-align: center; width: 100%; padding: 5px;">
-          <div>${companyData?.company_name || 'Company Name'}</div>
-          <div>${formatCompanyAddress(companyData)}</div>
-          <div>Tel: ${companyData?.phone || 'N/A'} | Email: ${companyData?.email || 'N/A'}</div>
-        </div>
+      footerTemplate: `<div> </div>
       `,
       margin: {
         top: '25mm',
@@ -247,29 +247,41 @@ function generateCostEstimateHTML(
     <meta charset="UTF-8">
     <title>${costEstimate.costEstimateNumber}</title>
     <style>
+  @page {
+  margin: 25mm 15mm 30mm 15mm; /* extra bottom space */
+}
     *{
       border-size: border-box;
       margin: 0;
       padding:0;
+    }
+      .page-footer {
+        position: fixed;
+          bottom: 0mm;
+          left: 5mm;             /* match @page left margin */
+          right: 15mm;            /* match @page right margin */
+          text-align: center;
+          font-size: 10px;
+          color: #555;
+          box-sizing: border-box;
     }
       body {
         font-family: Arial, sans-serif;
         background: #fff;
         color: #333;
         line-height: 1.5;
-        page-break-after: always;
       }
       .date-ref {
         display: flex;
         justify-content: space-between;
-        margin-bottom: 10px;
+        margin-bottom: 15px;
         font-size: 14px;
       }
       .client-info {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 10px;
+        margin-bottom: 15px;
       }
       .client-left p {
         margin: 2px 0;
@@ -280,7 +292,7 @@ function generateCostEstimateHTML(
         font-size: 14px;
         text-align: right;
       }
-      .closing-message{
+        .closing-message{
         font-size: 14px;
           margin-top: 10px;
         }
@@ -288,14 +300,14 @@ function generateCostEstimateHTML(
         text-align: center;
         font-size: 18px;
         font-weight: bold;
-        margin-bottom: 10px;
+        margin-bottom: 15px;
       }
       .salutation {
-        margin-bottom: 8px;
+        margin-bottom: 10px;
         font-size: 14px;
       }
       .greeting {
-        margin-bottom: 10px;
+        margin-bottom: 15px;
         font-size: 14px;
       }
       .details-header {
@@ -319,7 +331,8 @@ function generateCostEstimateHTML(
         font-size: 14px;
       }
       .price-breakdown {
-        margin-bottom: 10px;
+        margin-bottom: 15px;
+        page-break-inside: avoid;
       }
       .price-row {
         display: flex;
@@ -345,30 +358,34 @@ function generateCostEstimateHTML(
       .price-notes p {
         font-style: italic;
       }
-      .site-details {
-        margin-bottom: 10px;
-        font-size: 14px;
-        page-break-inside: avoid;
-      }
-      .details-row {
-        display: flex;
-        margin-bottom: 4px;
-      }
-      .details-label {
-        width: 180px;
-      }
-      .details-value {
-        flex: 1;
-      }
-      .site-details ul {
-        list-style-type: disc;
-        padding-left: 20px;
-      }
-      .site-details li {
-        margin-bottom: 6px;
-      }
+        .site-details {
+  margin-bottom: 15px;
+  font-size: 14px;
+  page-break-inside: avoid;
+}
+
+.details-row {
+  display: flex;
+  margin-bottom: 4px;
+}
+
+.details-label {
+  width: 180px; /* fixed width so values align neatly */
+}
+
+.details-value {
+  flex: 1;
+}
+  .site-details ul {
+  list-style-type: disc;  /* or circle/square */
+  padding-left: 20px;     /* space for bullets */
+}
+
+.site-details li {
+  margin-bottom: 6px;
+}
       .terms {
-        margin-top: 10px;
+        margin-top: 15px;
         font-size: 13px;
         page-break-inside: avoid;
       }
@@ -393,8 +410,8 @@ function generateCostEstimateHTML(
         border-bottom: 1px solid #000;
         margin-top: 10px;
         padding-top: 20px;
-        max-width: 200px;
-        margin-right: 0;
+        max-width: 200px; /* 👈 shorten the line */
+        margin-right: 0; 
       }
     </style>
   </head>
@@ -421,7 +438,7 @@ function generateCostEstimateHTML(
     </div>
 
     <div class="greeting">
-      Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.
+      ${costEstimate.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
     </div>
 
     <div class="details-header">Site details:</div>
@@ -466,7 +483,7 @@ function generateCostEstimateHTML(
         <li>
           <div class="details-row">
             <div class="details-label">Total Lease:</div>
-            <div class="details-value">PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate) || new Date(), getDateObject(endDate) || new Date()).toLocaleString()} (Exclusive of VAT)</div>
+            <div class="details-value">PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)).toLocaleString()} (Exclusive of VAT)</div>
           </div>
         </li>
       </ul>
@@ -477,18 +494,11 @@ function generateCostEstimateHTML(
       <p><strong>Site Notes:</strong> ${costEstimate.items.site_notes}</p>
     </div>
     ` : ''}
-
-    ${costEstimate.notes ? `
-    <div class="price-notes">
-      <p><strong>Note:</strong> ${costEstimate.notes}</p>
-    </div>
-    ` : ''}
-
     <div class="price-breakdown-title">Price breakdown:</div>
     <div class="price-breakdown">
       <div class="price-row">
         <span>Lease rate per month</span>
-        <span>PHP ${(monthlyRate).toLocaleString()}</span>
+        <span>PHP ${(costEstimate.lineItems[0].total).toLocaleString()}</span>
       </div>
       <div class="price-row">
         <span>Contract duration</span>
@@ -496,49 +506,56 @@ function generateCostEstimateHTML(
       </div>
       <div class="price-row">
         <span>Total lease</span>
-        <span>PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate) || new Date(), getDateObject(endDate) || new Date()).toLocaleString()}</span>
+        <span>PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)).toLocaleString()}</span>
       </div>
       <div class="price-row">
         <span>Add: VAT</span>
-        <span>PHP ${(calculateProratedPrice(monthlyRate, getDateObject(startDate) || new Date(), getDateObject(endDate) || new Date()) * 0.12).toLocaleString()}</span>
+        <span>PHP ${(calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)) * 0.12).toLocaleString()}</span>
       </div>
       <div class="price-row price-total">
         <span>Total</span>
         <span>PHP ${(
-          calculateProratedPrice(monthlyRate, getDateObject(startDate) || new Date(), getDateObject(endDate) || new Date()) * 1.12
+          calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)) * 1.12
         ).toLocaleString()}</span>
       </div>
+    </div>
 
-      ${costEstimate.items?.price_notes ? `
-      <div class="price-notes">
-        <p><strong>Price Notes:</strong> ${costEstimate.items.price_notes}</p>
-      </div>
-      ` : ''}
+    ${costEstimate.items?.price_notes ? `
+    <div class="price-notes">
+      <p><strong>Price Notes:</strong> ${costEstimate.items.price_notes}</p>
+    </div>
+    ` : ''}
 
-      <div class="terms">
-        <div class="terms-title">Terms and Conditions:</div>
-        <div class="term-item">1. Cost Estimate validity: 5 working days.</div>
-        <div class="term-item">2. Availability of the site is on first-come-first-served-basis only. Only official documents such as P.O's, Media Orders, signed cost estimate, & contracts are accepted in order to booked the site.</div>
-        <div class="term-item">3. To book the site, one (1) month advance and one (2) months security deposit payment dated 7 days before the start of rental is required.</div>
-        <div class="term-item">4. Final artwork should be approved ten (10) days before the contract period</div>
-        <div class="term-item">5. Print is exclusively for ${companyData?.company_name || "Golden Touch Imaging Specialist"} Only.</div>
-      </div>
+    <div class="terms">
+      <div class="terms-title">Terms and Conditions:</div>
+      ${(costEstimate.template?.terms_and_conditions || [
+        "Quotation validity: 5 working days.",
+      "Site availability: First-come-first-served basis. Official documents required.",
+      "Payment terms: One month advance and two months security deposit.",
+      "Payment deadline: 7 days before rental start."
+      ])
+    .map((term, index) => `<div class="term-item">${index + 1}. ${term}</div>`).join('')}
+    </div>
 
-      ${costEstimate.template?.closing_message ? `
-      <div class="closing-message">
-        <p>${costEstimate.template.closing_message}</p>
-      </div>
-      ` : ''}
+    ${costEstimate.template?.closing_message ? `
+    <div class="closing-message" style="page-break-inside: avoid;">
+      <p>${costEstimate.template.closing_message}</p>
+    </div>
+    ` : ''}
 
-      <div class="signatures">
-        <div class="signature-section">
-          <div>Very truly yours,</div>
-          <div class="signature-line"></div>
-          <div>${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : companyData?.company_name || "Golden Touch Imaging Specialist"}</div>
-          <div>${costEstimate.signature_position || "Account Manager"}</div>
-        </div>
+    <div class="signatures">
+      <div class="signature-section">
+        <div>Very truly yours,</div>
+        <div class="signature-line"></div>
+        <div>${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : companyData?.company_name || "Golden Touch Imaging Specialist"}</div>
+        <div>${costEstimate.signature_position || "Sale Manager"}</div>
       </div>
     </div>
+        <div class="page-footer" style="font-size:8px; width:100%; text-align:center; padding:2px 0; color: #444;">
+          <div>${companyData?.name || 'Company Name'}</div>
+          <div>${formatCompanyAddress(companyData)}</div>
+          <div>Tel: ${companyData?.phone || 'N/A'} | Email: ${companyData?.email || 'N/A'}</div>
+        </div>
   </body>
   </html>
   `
