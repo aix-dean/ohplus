@@ -11,6 +11,7 @@ import {
   getCostEstimatesByClientId, // Import new function
   getCostEstimatesByProductIdAndCompanyId, // Import new function
   updateCostEstimateStatus, // Import updateCostEstimateStatus
+  generateAndUploadCostEstimatePDF,
 } from "@/lib/cost-estimate-service"
 import type {
   CostEstimate,
@@ -655,6 +656,26 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           }
           const ceActivities = await getProposalActivities(costEstimateId)
           setActivities(ceActivities)
+
+          // Check if PDF needs to be generated
+          if (!ce.pdf || ce.pdf.trim() === "") {
+            setTimeout(async () => {
+              try {
+                const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(ce, userData ? {
+                  first_name: userData.first_name || undefined,
+                  last_name: userData.last_name || undefined,
+                  email: userData.email || undefined,
+                  company_id: userData.company_id || undefined,
+                } : undefined)
+                await updateCostEstimate(ce.id, { pdf: pdfUrl, password: password })
+                setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+                console.log("Cost estimate PDF generated and uploaded successfully:", pdfUrl)
+              } catch (error) {
+                console.error("Error generating cost estimate PDF:", error)
+                toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" })
+              }
+            }, 2000)
+          }
         } else {
           toast({
             title: "Cost Estimate Not Found",

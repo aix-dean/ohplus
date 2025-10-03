@@ -50,5 +50,7 @@ export interface CostEstimate {
     terms_and_conditions?: string[] // Array of terms and conditions
     closing_message?: string // Optional closing message
   }
+  pdf?: string // PDF URL field
+  password?: string // 8-digit password field
 }
 

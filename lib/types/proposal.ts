@@ -92,6 +92,8 @@ export type Proposal = {
    templateOrientation?: string
    templateLayout?: string
    templateBackground?: string
+   pdf?: string // PDF URL field
+   password?: string // 8-digit password field
    status:
      | "draft"
      | "sent"
