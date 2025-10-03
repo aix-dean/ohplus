@@ -124,15 +124,16 @@ const getDateObject = (date: any): Date | undefined => {
 }
 
 export async function POST(request: NextRequest) {
-  const { quotation, companyData, logoDataUrl, format = 'pdf' }: { quotation: Quotation; companyData: any; logoDataUrl: string | null; format?: 'pdf' | 'image' } = await request.json()
+  const { quotation, companyData, logoDataUrl, userData, format = 'pdf' }: { quotation: Quotation; companyData: any; logoDataUrl: string | null; userData?: any; format?: 'pdf' | 'image' } = await request.json()
   console.log('Received quotation:', quotation)
   console.log('Received companyData:', companyData)
   console.log('Received logoDataUrl:', !!logoDataUrl)
+  console.log('Received userData:', userData)
   console.log('Format:', format)
 
   try {
     // Generate HTML content
-    const htmlContent = generateQuotationHTML(quotation, companyData)
+    const htmlContent = generateQuotationHTML(quotation, companyData, userData)
 
     // Launch puppeteer
     const browser = await puppeteer.launch({
@@ -181,7 +182,8 @@ export async function POST(request: NextRequest) {
 
 function generateQuotationHTML(
   quotation: Quotation,
-  companyData: any
+  companyData: any,
+  userData?: any
 ): string {
   const item = quotation.items
 
@@ -509,8 +511,8 @@ function generateQuotationHTML(
       <div class="signature-section">
         <div>Very truly yours,</div>
         <div class="signature-line"></div>
-        <div>${quotation.signature_name || "AIX Xymbiosis"}</div>
-        <div>${quotation.signature_position || "Account Manager"}</div>
+        <div>${userData?.first_name || quotation.signature_name || "AIX Xymbiosis"}</div>
+        <div>${quotation.signature_position || "Sales Manager"}</div>
       </div>
       <div class="signature-section">
         <div>Conforme:</div>

@@ -91,6 +91,7 @@ export default function QuotationsListPage() {
   const [selectedQuotationForHistory, setSelectedQuotationForHistory] = useState<any>(null)
   const [showComplianceDialog, setShowComplianceDialog] = useState(false)
   const [selectedQuotationForCompliance, setSelectedQuotationForCompliance] = useState<any>(null)
+  const [companyData, setCompanyData] = useState<any>(null)
 
   const handleProjectNameDialogClose = (open: boolean) => {
     if (!open) {
@@ -656,6 +657,98 @@ export default function QuotationsListPage() {
   }
   
 
+  const handleDownloadPDF = async (quotationId: string) => {
+    setGeneratingPDFs((prev) => new Set(prev).add(quotationId))
+
+    try {
+      // Get the full quotation data
+      const quotation = await getQuotationById(quotationId)
+      if (!quotation) {
+        throw new Error("Quotation not found")
+      }
+
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      // Prepare quotation data for API (convert Timestamps to serializable format)
+      const serializableQuotation = {
+        ...quotation,
+        created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
+        updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
+        valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
+        start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
+        end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+      }
+
+      // Call the generate-quotation-pdf API
+      const response = await fetch('/api/generate-quotation-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quotation: serializableQuotation,
+          companyData,
+          logoDataUrl,
+          userData,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
+
+      // Create download link
+      const url = URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      // Clean up the URL
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Success",
+        description: "Quotation PDF downloaded successfully",
+      })
+    } catch (error: any) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Download Failed",
+        description: error.message || "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(quotationId)
+        return newSet
+      })
+    }
+  }
+
   const handlePrintQuotation = async (quotationId: string) => {
     setGeneratingPDFs((prev) => new Set(prev).add(quotationId))
 
@@ -705,6 +798,7 @@ export default function QuotationsListPage() {
           quotation: serializableQuotation,
           companyData,
           logoDataUrl,
+          userData,
         }),
       })
 
@@ -763,25 +857,76 @@ export default function QuotationsListPage() {
         throw new Error("Quotation not found")
       }
 
-      // Generate the PDF blob
-      const pdfBlob = await generateQuotationPDF(quotation, true) as Blob // Pass true to get blob instead of downloading
-
-      // Create a blob URL and open in new window for printing
-      const pdfUrl = URL.createObjectURL(pdfBlob)
-      const printWindow = window.open(pdfUrl, '_blank')
-
-      if (printWindow) {
-        // Wait a bit for the PDF to load, then trigger print
-        printWindow.onload = () => {
-          setTimeout(() => {
-            printWindow.print()
-          }, 1000)
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
         }
+      }
+
+      // Prepare quotation data for API (convert Timestamps to serializable format)
+      const serializableQuotation = {
+        ...quotation,
+        created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
+        updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
+        valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
+        start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
+        end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+      }
+
+      // Call the generate-quotation-pdf API
+      const response = await fetch('/api/generate-quotation-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quotation: serializableQuotation,
+          companyData,
+          logoDataUrl,
+          userData,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+
+      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+
+      // Open PDF in new window and trigger print
+      const printWindow = window.open(pdfUrl)
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print()
+          // Clean up the URL after printing
+          printWindow.onafterprint = () => {
+            URL.revokeObjectURL(pdfUrl)
+          }
+        }
+      } else {
+        console.error("Failed to open print window")
+        URL.revokeObjectURL(pdfUrl)
       }
 
       toast({
         title: "Success",
-        description: "Quotation PDF opened in print window",
+        description: "Quotation PDF opened for printing",
       })
     } catch (error: any) {
       console.error("Error generating PDF for printing:", error)
@@ -1357,7 +1502,11 @@ export default function QuotationsListPage() {
                   const compliance = getProjectCompliance(quotation)
 
                   return (
-                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200" onClick={() => router.push(`/sales/quotations/${quotation.id}`)}>
+                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200" 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      router.push(`/sales/quotations/${quotation.id}`)
+                      }}>
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600">
                           {(() => {
@@ -1395,7 +1544,10 @@ export default function QuotationsListPage() {
                       <TableCell className="py-3">
                         <span
                           className="font-bold text-[#2d3fff] font-medium underline leading-[0.5] cursor-pointer"
-                          onClick={() => handleViewCompliance(quotation)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleViewCompliance(quotation)
+                          }}
                         >
                           ({compliance.completed}/{compliance.total})
                         </span>
@@ -1420,7 +1572,7 @@ export default function QuotationsListPage() {
                             <DropdownMenuItem
                               onClick={(e) => {
                                  e.stopPropagation()
-                                handlePrintQuotation(quotation.id)
+                                handleDownloadPDF(quotation.id)
                               }}
                               disabled={generatingPDFs.has(quotation.id)}
                             >

@@ -35,11 +35,12 @@ import {
   MessageSquare,
   MessageCircle,
   History,
+  Loader2,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy, getCostEstimate } from "@/lib/cost-estimate-service" // Import CostEstimate service
 import type { CostEstimate, CostEstimateStatus, CostEstimateLineItem } from "@/lib/types/cost-estimate" // Import CostEstimate type
-import { generateCostEstimatePDF, printCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
+import { generateCostEstimatePDF, printCostEstimatePDF, generateCostEstimatePDFBlob } from "@/lib/cost-estimate-pdf-service"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
@@ -73,6 +74,9 @@ function CostEstimatesPageContent() {
   const [lastDocId, setLastDocId] = useState<string | null>(null)
   const [hasMorePages, setHasMorePages] = useState(true)
   const itemsPerPage = 10
+
+  // PDF generation states
+  const [generatingPDFs, setGeneratingPDFs] = useState<Set<string>>(new Set())
 
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
@@ -235,7 +239,7 @@ function CostEstimatesPageContent() {
     router.push(`/sales/cost-estimates/${costEstimateId}`)
   }
 
-  const handleDownloadPDF = async (costEstimate: CostEstimate) => {
+  const handleDownloadPDF = async (costEstimate: CostEstimate, userData) => {
     try {
       // Fetch the full cost estimate data first
       const costEstimateId = costEstimate.id || (costEstimate as any).objectID
@@ -245,12 +249,7 @@ function CostEstimatesPageContent() {
       }
 
       // Generate PDF using the same function as the detail page
-      await generateCostEstimatePDF(fullCostEstimate, undefined, false, false, {
-        first_name: user?.displayName?.split(' ')[0] || "",
-        last_name: user?.displayName?.split(' ').slice(1).join(' ') || "",
-        email: user?.email || "",
-        company_id: userData?.company_id || "",
-      })
+      await generateCostEstimatePDF(fullCostEstimate, undefined, false, false, userData)
     } catch (error) {
       console.error("Error downloading PDF:", error)
       alert("Failed to download PDF. Please try again.")
@@ -335,6 +334,7 @@ function CostEstimatesPageContent() {
           costEstimate: serializableCostEstimate,
           companyData,
           logoDataUrl,
+          userData,
         }),
       })
 
@@ -367,6 +367,58 @@ function CostEstimatesPageContent() {
       })
     } catch (error: any) {
       console.error("Error generating PDF:", error)
+      toast({
+        title: "Print Failed",
+        description: error.message || "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(costEstimateId)
+        return newSet
+      })
+    }
+  }
+
+  const handlePrintCostEstimateWindow = async (costEstimate: CostEstimate) => {
+    const costEstimateId = costEstimate.id || (costEstimate as any).objectID
+    setGeneratingPDFs((prev) => new Set(prev).add(costEstimateId))
+
+    try {
+      // Get the full cost estimate data
+      const fullCostEstimate = await getCostEstimate(costEstimateId)
+      if (!fullCostEstimate) {
+        throw new Error("Cost estimate not found")
+      }
+
+      // Generate the PDF blob using client-side jsPDF
+      const pdfBlob = await generateCostEstimatePDFBlob(fullCostEstimate, {
+        first_name: user?.displayName?.split(' ')[0] || "",
+        last_name: user?.displayName?.split(' ').slice(1).join(' ') || "",
+        email: user?.email || "",
+        company_id: userData?.company_id || "",
+      })
+
+      // Create a blob URL and open in new window for printing
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      const printWindow = window.open(pdfUrl, '_blank')
+
+      if (printWindow) {
+        // Wait a bit for the PDF to load, then trigger print
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print()
+          }, 1000)
+        }
+      }
+
+      toast({
+        title: "Success",
+        description: "Cost estimate PDF opened in print window",
+      })
+    } catch (error: any) {
+      console.error("Error generating PDF for printing:", error)
       toast({
         title: "Print Failed",
         description: error.message || "Failed to generate PDF. Please try again.",
@@ -677,7 +729,7 @@ function CostEstimatesPageContent() {
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadPDF(costEstimate as CostEstimate)}>
+                            <DropdownMenuItem onClick={() => handleDownloadPDF(costEstimate as CostEstimate, userData)}>
                               <Download className="mr-2 h-4 w-4" />
                               Download PDF
                             </DropdownMenuItem>
