@@ -403,7 +403,7 @@ ${contactDetails}`,
         setEmailData((prev) => ({
           ...prev,
           to: proposalData.client.email,
-          cc: "",
+          cc: userData?.email || user?.email || "",
           replyTo: userData?.email || user?.email || "",
           subject: "",
           message: "",
