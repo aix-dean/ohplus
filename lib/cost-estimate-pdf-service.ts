@@ -632,6 +632,233 @@ export async function generateCostEstimateEmailPDF(
 }
 
 /**
+ * Generate a cost estimate PDF blob for printing (client-side generation)
+ * Returns a Blob that can be opened in a new window for printing
+ */
+export async function generateCostEstimatePDFBlob(
+  costEstimate: CostEstimate,
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
+): Promise<Blob> {
+  const pdf = new jsPDF("p", "mm", "a4")
+  const pageWidth = pdf.internal.pageSize.getWidth()
+  const pageHeight = pdf.internal.pageSize.getHeight()
+  const margin = 15
+  const contentWidth = pageWidth - margin * 2
+  let yPosition = margin
+
+  // Convert dates safely
+  const createdAt = safeToDate(costEstimate.createdAt)
+  const validUntil = safeToDate(costEstimate.validUntil)
+  const startDate = costEstimate.startDate ? safeToDate(costEstimate.startDate) : null
+  const endDate = costEstimate.endDate ? safeToDate(costEstimate.endDate) : null
+
+  let companyData = null
+  let logoDataUrl = null
+
+  if (userData?.company_id || costEstimate.company_id) {
+    const companyId = userData?.company_id || costEstimate.company_id
+    if (companyId) {
+      companyData = await fetchCompanyData(companyId)
+
+      // Fetch company logo if available
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            const logoArrayBuffer = await logoBlob.arrayBuffer()
+            const logoBase64 = Buffer.from(logoArrayBuffer).toString('base64')
+            const mimeType = logoBlob.type || 'image/png'
+            logoDataUrl = `data:${mimeType};base64,${logoBase64}`
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+    }
+  }
+
+  // Header with company name
+  const headerContentWidth = contentWidth - 22
+  pdf.setFontSize(16)
+  pdf.setFont("helvetica", "bold")
+  pdf.setTextColor(0, 0, 0)
+  const companyName = companyData?.company_name || "Golden Touch Imaging Specialist"
+  const companyNameWidth = pdf.getTextWidth(companyName)
+  const companyNameX = pageWidth / 2 - companyNameWidth / 2
+  pdf.text(companyName, companyNameX, yPosition)
+  yPosition += 15
+
+  // Cost Estimate title
+  pdf.setFontSize(24)
+  pdf.setFont("helvetica", "bold")
+  pdf.text("COST ESTIMATE", margin, yPosition)
+  yPosition += 12
+
+  pdf.setFontSize(16)
+  pdf.setFont("helvetica", "normal")
+  const titleLines = pdf.splitTextToSize(costEstimate.title || "Untitled Cost Estimate", headerContentWidth)
+  pdf.text(titleLines, margin, yPosition)
+  yPosition += titleLines.length * 6 + 3
+
+  // Date and validity
+  pdf.setFontSize(10)
+  pdf.setTextColor(100, 100, 100)
+  pdf.text(`Created: ${createdAt.toLocaleDateString()}`, margin, yPosition)
+  pdf.text(`Estimate #: ${costEstimate.costEstimateNumber || costEstimate.id}`, margin, yPosition + 5)
+  yPosition += 15
+
+  // Reset text color
+  pdf.setTextColor(0, 0, 0)
+
+  // Client Information Section
+  pdf.setFontSize(14)
+  pdf.setFont("helvetica", "bold")
+  pdf.text("CLIENT INFORMATION", margin, yPosition)
+  yPosition += 6
+
+  // Draw line under section header
+  pdf.setLineWidth(0.5)
+  pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+  yPosition += 8
+
+  pdf.setFontSize(10)
+  pdf.setFont("helvetica", "normal")
+
+  // Client details in two columns
+  const leftColumn = margin
+  const rightColumn = margin + contentWidth / 2
+
+  // Left column
+  pdf.setFont("helvetica", "bold")
+  pdf.text("Company:", leftColumn, yPosition)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(costEstimate.client?.company || "N/A", leftColumn + 25, yPosition)
+
+  // Right column
+  pdf.setFont("helvetica", "bold")
+  pdf.text("Contact Person:", rightColumn, yPosition)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(costEstimate.client?.name || "N/A", rightColumn + 35, yPosition)
+  yPosition += 6
+
+  // Second row
+  pdf.setFont("helvetica", "bold")
+  pdf.text("Email:", leftColumn, yPosition)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(costEstimate.client?.email || "N/A", leftColumn + 25, yPosition)
+
+  pdf.setFont("helvetica", "bold")
+  pdf.text("Phone:", rightColumn, yPosition)
+  pdf.setFont("helvetica", "normal")
+  pdf.text(costEstimate.client?.phone || "N/A", rightColumn + 35, yPosition)
+  yPosition += 6
+
+  // Address (full width if present)
+  if (costEstimate.client?.address) {
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Address:", leftColumn, yPosition)
+    pdf.setFont("helvetica", "normal")
+    const addressLines = pdf.splitTextToSize(costEstimate.client.address, contentWidth - 25)
+    pdf.text(addressLines, leftColumn + 25, yPosition)
+    yPosition += addressLines.length * 5 + 3
+  }
+
+  yPosition += 8
+
+  // Cost Summary Section
+  pdf.setFontSize(14)
+  pdf.setFont("helvetica", "bold")
+  pdf.text("COST SUMMARY", margin, yPosition)
+  yPosition += 6
+
+  pdf.setLineWidth(0.5)
+  pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+  yPosition += 8
+
+  // Calculate totals
+  const subtotal = costEstimate.lineItems.reduce((sum, item) => sum + item.total, 0)
+  const vatRate = 0.12
+  const vatAmount = subtotal * vatRate
+  const totalWithVat = subtotal + vatAmount
+
+  pdf.setFontSize(10)
+  pdf.setFont("helvetica", "normal")
+
+  // Summary items
+  const summaryItems = [
+    { label: "Number of Items:", value: `${costEstimate.lineItems?.length || 0} line items` },
+    { label: "Duration:", value: `${costEstimate.durationDays || 0} days` },
+    { label: "Start Date:", value: startDate ? startDate.toLocaleDateString() : "TBD" },
+    { label: "End Date:", value: endDate ? endDate.toLocaleDateString() : "TBD" },
+  ]
+
+  summaryItems.forEach((item) => {
+    pdf.setFont("helvetica", "bold")
+    pdf.text(item.label, margin, yPosition)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(item.value, margin + 40, yPosition)
+    yPosition += 6
+  })
+
+  yPosition += 8
+
+  // Financial Summary with better formatting
+  pdf.setFontSize(12)
+  pdf.setFont("helvetica", "bold")
+  pdf.text("FINANCIAL SUMMARY", margin, yPosition)
+  yPosition += 8
+
+  pdf.setFontSize(10)
+  pdf.setFont("helvetica", "normal")
+  pdf.text("Subtotal:", margin + 5, yPosition)
+  pdf.text(`₱${subtotal.toLocaleString()}`, pageWidth - margin - 40, yPosition)
+  yPosition += 6
+
+  pdf.text(`VAT (${(vatRate * 100).toFixed(0)}%):`, margin + 5, yPosition)
+  pdf.text(`₱${vatAmount.toLocaleString()}`, pageWidth - margin - 40, yPosition)
+  yPosition += 8
+
+  // Total amount with better formatting
+  pdf.setFontSize(16)
+  pdf.setFont("helvetica", "bold")
+  const totalText = `TOTAL AMOUNT: ₱${totalWithVat.toLocaleString()}`
+  pdf.setFillColor(245, 245, 245)
+  pdf.rect(margin, yPosition - 4, contentWidth, 12, "F")
+  pdf.text(totalText, margin + 5, yPosition + 3)
+  yPosition += 15
+
+  // Notes section
+  if (costEstimate.notes) {
+    pdf.setFontSize(14)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("ADDITIONAL NOTES", margin, yPosition)
+    yPosition += 6
+
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 8
+
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    const noteLines = pdf.splitTextToSize(costEstimate.notes, contentWidth)
+    pdf.text(noteLines, margin, yPosition)
+    yPosition += noteLines.length * 5 + 10
+  }
+
+  // Footer
+  const footerY = pageHeight - 15
+  pdf.setFontSize(8)
+  pdf.setTextColor(100, 100, 100)
+  pdf.text("Generated by OH Plus Platform", margin, footerY)
+  pdf.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth - margin - 50, footerY)
+
+  // Return the PDF as a blob
+  return pdf.output('blob')
+}
+
+/**
  * Generate and print a cost estimate PDF
  * Creates the PDF blob, opens it in a new window, and triggers the print dialog
  */
