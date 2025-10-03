@@ -194,7 +194,7 @@ export default function ComposeEmailPage() {
       await preGenerateAllPDFs(estimate, related)
 
       setToEmail(estimate.client?.email || "")
-      setCcEmail("")
+      setCcEmail(user?.email || "")
       setReplyToEmail(user?.email || "")
       setSubject("")
       setBody("")

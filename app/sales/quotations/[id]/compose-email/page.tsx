@@ -283,7 +283,8 @@ export default function ComposeEmailPage() {
       await preGenerateAllPDFs(quotation, related, fetchedCompanyData)
 
       setToEmail(quotation.client_email || "")
-      setCcEmail("")
+      setCcEmail(user?.email || "")
+      setReplyToEmail(user?.email || "")
 
       const companyId = currentUserData?.company_id || quotation?.company_id
       console.log("[v0] Final companyId being used:", companyId)
