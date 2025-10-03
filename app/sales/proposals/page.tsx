@@ -162,7 +162,7 @@ function ProposalsPageContent() {
                     </div>
                   </TableCell>
                   <TableCell className="py-3">
-                    <div className="font-medium text-gray-900">{proposal.id.slice(0, 8)}...</div>
+                    <div className="font-medium text-gray-900">{proposal.proposalNumber}</div>
                   </TableCell>
                   <TableCell className="py-3">
                     <div className="font-medium text-gray-900">{proposal.client.company}</div>
