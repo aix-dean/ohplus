@@ -33,6 +33,7 @@ import { useResponsive } from "@/hooks/use-responsive"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { SentHistoryDialog } from "@/components/sent-history-dialog"
+import { SendProposalOptionsDialog } from "@/components/send-proposal-options-dialog"
 
 function ProposalsPageContent() {
   const [proposals, setProposals] = useState<Proposal[]>([])
@@ -53,6 +54,8 @@ function ProposalsPageContent() {
   const [isSearching, setIsSearching] = useState(false)
   const [showSentHistoryDialog, setShowSentHistoryDialog] = useState(false)
   const [selectedProposalForHistory, setSelectedProposalForHistory] = useState<Proposal | null>(null)
+  const [showShareDialog, setShowShareDialog] = useState(false)
+  const [selectedProposalForShare, setSelectedProposalForShare] = useState<Proposal | null>(null)
 
   let content;
   if (loading) {
@@ -347,8 +350,8 @@ function ProposalsPageContent() {
   }
 
   const handleShareProposal = (proposal: Proposal) => {
-    // TODO: Implement share functionality
-    console.log('Share proposal', proposal.id)
+    setSelectedProposalForShare(proposal)
+    setShowShareDialog(true)
   }
 
   const handleCreateQuotation = (proposal: Proposal) => {
@@ -359,6 +362,14 @@ function ProposalsPageContent() {
   const handleViewSentHistory = (proposal: Proposal) => {
     setSelectedProposalForHistory(proposal)
     setShowSentHistoryDialog(true)
+  }
+
+  const handleShareOptionSelect = (option: "email" | "whatsapp" | "viber" | "messenger") => {
+    if (option === "email" && selectedProposalForShare) {
+      setShowShareDialog(false)
+      router.push(`/sales/proposals/${selectedProposalForShare.id}/compose-email`)
+    }
+    // Other options are not implemented yet
   }
 
   return (
@@ -439,6 +450,15 @@ function ProposalsPageContent() {
         onOpenChange={setShowSentHistoryDialog}
         proposalId={selectedProposalForHistory?.id || ""}
       />
+
+      {selectedProposalForShare && (
+        <SendProposalOptionsDialog
+          isOpen={showShareDialog}
+          onClose={() => setShowShareDialog(false)}
+          proposal={selectedProposalForShare}
+          onSelectOption={handleShareOptionSelect}
+        />
+      )}
     </>
   )
 }
