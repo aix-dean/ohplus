@@ -518,20 +518,18 @@ function CostEstimatesPageContent() {
     }
   }
 
-  const handleShareCostEstimate = async (costEstimateId: string) => {
-    // Find the cost estimate from the current list
-    const costEstimate = (isSearching ? searchResults : costEstimates).find((ce: any) => ce.id === costEstimateId || ce.objectID === costEstimateId)
-    if (costEstimate) {
-      console.log(`cost estimate data: ${JSON.stringify(costEstimate)}`)
-      setSelectedCostEstimateForShare(costEstimate)
-      setShareDialogOpen(true)
-    }
+  const handleShareCostEstimate = (costEstimateId: string) => {
+    // Navigate to detail page and trigger share there
+    // This ensures the cost estimate is rendered and can be shared properly
+    setSelectedCostEstimateForShare(costEstimateId)
+    setShareDialogOpen(true)
+    
   }
 
 
 
   const generateShareableLink = (costEstimate: any) => {
-    return `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}`
+    return `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}/compose-email`
   }
 
   const copyToClipboard = async (text: string) => {
@@ -733,7 +731,7 @@ function CostEstimatesPageContent() {
                               <Download className="mr-2 h-4 w-4" />
                               Download PDF
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleShareCostEstimate(costEstimate.id || costEstimate.objectID)}>
+                            <DropdownMenuItem onClick={() => handleShareCostEstimate(costEstimate)}>
                               <Share2 className="mr-2 h-4 w-4" />
                               Share
                             </DropdownMenuItem>

@@ -384,7 +384,7 @@ export default function ProposalDetailsPage() {
     fetchProposal()
   }, [params.id])
 
-  // Handle automatic download/print when page loads with action parameter
+  // Handle automatic download/print/share when page loads with action parameter
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
     const action = searchParams.get("action")
@@ -448,6 +448,15 @@ export default function ProposalDetailsPage() {
         url.searchParams.delete("action")
         window.history.replaceState({}, "", url.toString())
       }, 1000) // Initial delay before starting
+    } else if (action === "share" && proposal && !loading) {
+      // Small delay to ensure the proposal is fully rendered
+      setTimeout(() => {
+        setIsSendOptionsDialogOpen(true)
+        // Clean up the URL parameter
+        const url = new URL(window.location.href)
+        url.searchParams.delete("action")
+        window.history.replaceState({}, "", url.toString())
+      }, 1000)
     }
   }, [proposal, loading])
 

@@ -48,6 +48,7 @@ import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog" // Use quotation options dialog
 import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
 import { generateSeparateQuotationPDFs } from "@/lib/quotation-pdf-service"
+import { Timestamp } from "firebase/firestore"
 
 interface CompanyData {
   id: string
@@ -220,7 +221,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
         setEditableQuotation({
           ...editableQuotation,
           duration_days: durationDays,
-          end_date: endDate.toISOString(),
+          end_date: Timestamp.fromDate(endDate),
           items: { ...editableQuotation.items, duration_days: durationDays, item_total_amount: newTotalAmount },
         })
 
@@ -246,7 +247,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
 
         setEditableQuotation({
           ...editableQuotation,
-          [fieldName]: newValue.toISOString(),
+          [fieldName]: Timestamp.fromDate(newValue),
           duration_days: durationDays,
           items: { ...editableQuotation.items, duration_days: durationDays, item_total_amount: newTotalAmount },
         })
@@ -434,6 +435,23 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
       fetchQuotationHistory()
     }
   }, [fetchQuotationHistory])
+
+  // Handle automatic share when page loads with action parameter
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const action = searchParams.get("action")
+
+    if (action === "share" && quotation && !loading) {
+      // Small delay to ensure the quotation is fully rendered
+      setTimeout(() => {
+        setIsSendOptionsDialogOpen(true)
+        // Clean up the URL parameter
+        const url = new URL(window.location.href)
+        url.searchParams.delete("action")
+        window.history.replaceState({}, "", url.toString())
+      }, 1000)
+    }
+  }, [quotation, loading])
 
   useEffect(() => {
     if (isSendEmailDialogOpen && quotation) {

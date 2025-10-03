@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { ArrowLeft, FileText, ImageIcon, Video, File, X, Download, ZoomIn, Send, ExternalLink } from "lucide-react"
-import { getReports, type ReportData } from "@/lib/report-service"
+import { getReportsLegacy as getReports, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
@@ -270,7 +270,7 @@ export default function ReportPreviewPage() {
 
     if (isImageFile(attachment.fileName || "")) {
       return (
-        <div className="w-full h-full relative">
+        <div className="w-full h-full relative flex items-center justify-center">
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
