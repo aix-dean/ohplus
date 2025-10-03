@@ -435,6 +435,23 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
     }
   }, [fetchQuotationHistory])
 
+  // Handle automatic share when page loads with action parameter
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const action = searchParams.get("action")
+
+    if (action === "share" && quotation && !loading) {
+      // Small delay to ensure the quotation is fully rendered
+      setTimeout(() => {
+        setIsSendOptionsDialogOpen(true)
+        // Clean up the URL parameter
+        const url = new URL(window.location.href)
+        url.searchParams.delete("action")
+        window.history.replaceState({}, "", url.toString())
+      }, 1000)
+    }
+  }, [quotation, loading])
+
   useEffect(() => {
     if (isSendEmailDialogOpen && quotation) {
       setEmailSubject(`Quotation: ${quotation.quotation_number || "Custom Quotation"} - OH Plus`) // Updated subject

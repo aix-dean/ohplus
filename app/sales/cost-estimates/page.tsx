@@ -466,14 +466,10 @@ function CostEstimatesPageContent() {
     }
   }
 
-  const handleShareCostEstimate = async (costEstimateId: string) => {
-    // Find the cost estimate from the current list
-    const costEstimate = (isSearching ? searchResults : costEstimates).find((ce: any) => ce.id === costEstimateId || ce.objectID === costEstimateId)
-    if (costEstimate) {
-      console.log(`cost estimate data: ${JSON.stringify(costEstimate)}`)
-      setSelectedCostEstimateForShare(costEstimate)
-      setShareDialogOpen(true)
-    }
+  const handleShareCostEstimate = (costEstimateId: string) => {
+    // Navigate to detail page and trigger share there
+    // This ensures the cost estimate is rendered and can be shared properly
+    router.push(`/sales/cost-estimates/${costEstimateId}?action=share`)
   }
 
 

@@ -794,17 +794,9 @@ export default function QuotationsListPage() {
   }
 
   const handleShareQuotation = (quotationId: string) => {
-    const quotation = quotations.find(q => q.id === quotationId)
-    if (quotation) {
-      setSelectedQuotationForShare(quotation)
-      setShareDialogOpen(true)
-    } else {
-      toast({
-        title: "Error",
-        description: "Quotation not found",
-        variant: "destructive",
-      })
-    }
+    // Navigate to detail page and trigger share there
+    // This ensures the quotation is rendered and can be shared properly
+    router.push(`/sales/quotations/${quotationId}?action=share`)
   }
 
 
