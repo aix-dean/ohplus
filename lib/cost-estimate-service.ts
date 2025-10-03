@@ -1,4 +1,5 @@
 import { db } from "@/lib/firebase"
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import {
   collection,
   addDoc,
@@ -137,14 +138,9 @@ interface CostEstimateSiteData {
   specs_rental?: any // Added specs_rental field to match quotation structure
 }
 
-// Generate a secure password for cost estimate access
+// Generate an 8-digit password for cost estimate PDF access
 function generateCostEstimatePassword(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let password = ""
-  for (let i = 0; i < 8; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  return password
+  return Math.floor(10000000 + Math.random() * 90000000).toString()
 }
 
 // Calculate duration in days
@@ -526,6 +522,9 @@ export async function updateCostEstimate(costEstimateId: string, updates: Partia
     if (processedUpdates.endDate instanceof Date) {
       processedUpdates.endDate = Timestamp.fromDate(processedUpdates.endDate)
     }
+
+    if (processedUpdates.pdf !== undefined) processedUpdates.pdf = processedUpdates.pdf
+    if (processedUpdates.password !== undefined) processedUpdates.password = processedUpdates.password
 
     const costEstimateRef = doc(db, COST_ESTIMATES_COLLECTION, costEstimateId)
     await updateDoc(costEstimateRef, {
@@ -1025,5 +1024,54 @@ export async function getCostEstimatesByProductIdAndCompanyId(productId: string,
   } catch (error) {
     console.error("Error fetching cost estimates by product ID and company ID:", error)
     return []
+  }
+}
+
+// Generate PDF and upload to Firebase storage with password protection
+export async function generateAndUploadCostEstimatePDF(
+  costEstimate: CostEstimate,
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string }
+): Promise<{ pdfUrl: string; password: string }> {
+  try {
+    // Generate the PDF blob using the API
+    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/generate-cost-estimate-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        costEstimate,
+        companyData: null,
+        logoDataUrl: null,
+        format: 'pdf',
+        userData
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to generate PDF: ${response.statusText}`)
+    }
+
+    const buffer = await response.arrayBuffer()
+    const blob = new Blob([buffer], { type: 'application/pdf' })
+
+    // Generate password
+    const password = generateCostEstimatePassword()
+
+    // Create a unique filename
+    const timestamp = Date.now()
+    const filename = `cost-estimate_${costEstimate.id}_${timestamp}.pdf`
+
+    // Convert blob to File object for upload
+    const pdfFile = new File([blob], filename, { type: 'application/pdf' })
+
+    // Upload to Firebase storage
+    const uploadPath = `cost-estimates/pdfs/${filename}`
+    const pdfUrl = await uploadFileToFirebaseStorage(pdfFile, uploadPath)
+
+    return { pdfUrl, password }
+  } catch (error) {
+    console.error("Error generating and uploading cost estimate PDF:", error)
+    throw error
   }
 }

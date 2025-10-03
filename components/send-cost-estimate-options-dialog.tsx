@@ -38,7 +38,7 @@ export function SendCostEstimateOptionsDialog({
     }
   }, [copied])
 
-  const publicViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}`
+  const publicViewUrl = `https://mrkohlpus.vercel.app/ce/${costEstimate.id}`
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(publicViewUrl)

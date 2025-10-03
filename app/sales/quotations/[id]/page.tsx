@@ -12,6 +12,7 @@ import {
   updateQuotation,
   getQuotationsByProductIdAndCompanyId,
   calculateProratedPrice,
+  generateAndUploadQuotationPDF,
 } from "@/lib/quotation-service"
 import type { Quotation, QuotationProduct } from "@/lib/types/quotation"
 import { format } from "date-fns"
@@ -375,6 +376,36 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
           if (q.proposalId) {
             const linkedProposal = await getProposal(q.proposalId)
             setProposal(linkedProposal)
+          }
+
+          // Check if PDF needs to be generated
+          if (!q.pdf || q.pdf.trim() === "") {
+            // Generate PDF and upload to Firebase storage
+            setTimeout(async () => {
+              try {
+                const { pdfUrl, password } = await generateAndUploadQuotationPDF(q)
+
+                // Update quotation with PDF URL and password
+                await updateQuotation(
+                  q.id!,
+                  { pdf: pdfUrl, password: password },
+                  userData?.uid || "system",
+                  userData?.displayName || "System"
+                )
+
+                // Update local state
+                setQuotation(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+
+                console.log("Quotation PDF generated and uploaded successfully:", pdfUrl)
+              } catch (error) {
+                console.error("Error generating quotation PDF:", error)
+                toast({
+                  title: "Error",
+                  description: "Failed to generate PDF",
+                  variant: "destructive",
+                })
+              }
+            }, 2000) // Small delay to ensure the page is fully rendered
           }
 
           // Fetch related quotations if this quotation has a page_id
@@ -1524,7 +1555,7 @@ The OH Plus Team`,
                       {historyItem.quotation_number || historyItem.id?.slice(-8) || "N/A"}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {safeFormatNumber(historyItem.items?.price || historyItem.price || 0)}
+                      PHP {safeFormatNumber(historyItem.items?.price || 0)}
                       /month
                     </div>
                     <div className="flex justify-end">
