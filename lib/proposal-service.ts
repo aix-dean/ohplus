@@ -110,6 +110,8 @@ export async function createProposal(
         : null,
       description: product.description || "",
       health_percentage: product.health_percentage || 0,
+      categories: product.categories || [], // Include categories from product
+      category_names: product.category_names || [], // Include category names from product
     }))
 
     // Generate proposal number
