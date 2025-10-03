@@ -142,7 +142,7 @@ export default function BusinessEditProductPage() {
           name: productData.name || "",
           description: productData.description || "",
           price: productData.price ? String(productData.price) : "",
-          content_type: productData.content_type === "Dynamic" ? "Dynamic" : productData.content_type || "Static",
+          content_type: productData.content_type === "Dynamic" ? "digital" : productData.content_type || "Static",
           cms: {
             start_time: productData.cms?.start_time || "",
             end_time: productData.cms?.end_time || "",
@@ -230,7 +230,7 @@ export default function BusinessEditProductPage() {
   }, [])
 
   useEffect(() => {
-    if (formData.content_type === "Dynamic") {
+    if (formData.content_type === "digital") {
       validateDynamicContent()
     }
   }, [
@@ -435,7 +435,7 @@ export default function BusinessEditProductPage() {
 
   // Enhanced validation function for dynamic content with detailed calculations
   const validateDynamicContent = () => {
-    if (formData.content_type !== "Dynamic") {
+    if (formData.content_type !== "digital") {
       setValidationError(null)
       return true
     }
@@ -558,7 +558,7 @@ export default function BusinessEditProductPage() {
         return true
 
       case 2: // Dynamic Settings (only if Dynamic type)
-        if (formData.content_type === "Dynamic") {
+        if (formData.content_type === "digital") {
           return validateDynamicContent()
         }
         return true
@@ -638,7 +638,7 @@ export default function BusinessEditProductPage() {
       // Combine existing and new media
       const combinedMedia = [...(existingMedia || []), ...newMediaData]
 
-      const contentType = formData.content_type === "Dynamic" ? "Dynamic" : formData.content_type
+      const contentType = formData.content_type === "digital" ? "Dynamic" : formData.content_type
 
       const productData = {
         name: productName,
@@ -774,7 +774,7 @@ export default function BusinessEditProductPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Static">Static</SelectItem>
-                  <SelectItem value="Dynamic">Dynamic</SelectItem>
+                  <SelectItem value="digital">Digital</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -784,7 +784,7 @@ export default function BusinessEditProductPage() {
       case 2: // Dynamic Settings
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-800">Dynamic Content Settings</h3>
+            <h3 className="text-lg font-semibold text-gray-800">Digital Content Settings</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
