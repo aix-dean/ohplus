@@ -28,7 +28,7 @@ export function SendQuotationOptionsDialog({
 }: SendQuotationOptionsDialogProps) {
   const { toast } = useToast()
 
-  const publicViewUrl = `${process.env.NEXT_PUBLIC_APP_URL}/quotations/${quotation.id}`
+  const publicViewUrl = `https://mrk.ohplus.ph/q/${quotation.id}`
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(publicViewUrl)

@@ -3,8 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { useRouter, useParams, useSearchParams } from "next/navigation"
-import Image from "next/image"
+import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,18 +16,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Paperclip, Edit, Trash2 } from "lucide-react"
+import { ArrowLeft, Paperclip, Edit, Trash2, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { getQuotation, getQuotationsByPageId } from "@/lib/quotation-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { Quotation } from "@/lib/types/quotation"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
-import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
+import { ProposalSentSuccessDialog } from "@/components/proposal-sent-success-dialog"
 
 export default function ComposeEmailPage() {
   const router = useRouter()
   const params = useParams()
-  const searchParams = useSearchParams()
   const { toast } = useToast()
   const { user, userData } = useAuth()
 
@@ -62,7 +60,6 @@ export default function ComposeEmailPage() {
   const [pdfAttachments, setPdfAttachments] = useState<string[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [companyName, setCompanyName] = useState<string>("")
 
   useEffect(() => {
     userDataRef.current = userData
@@ -238,7 +235,12 @@ export default function ComposeEmailPage() {
       const id = params.id as string
       const quotation = await getQuotation(id)
       if (!quotation) {
-        throw new Error("Quotation not found")
+        toast({
+          title: "Error",
+          description: "Quotation not found",
+          variant: "destructive",
+        })
+        return
       }
       setQuotation(quotation)
 
@@ -281,7 +283,8 @@ export default function ComposeEmailPage() {
       await preGenerateAllPDFs(quotation, related, fetchedCompanyData)
 
       setToEmail(quotation.client_email || "")
-      setCcEmail("")
+      setCcEmail(user?.email || "")
+      setReplyToEmail(user?.email || "")
 
       const companyId = currentUserData?.company_id || quotation?.company_id
       console.log("[v0] Final companyId being used:", companyId)
@@ -290,13 +293,10 @@ export default function ComposeEmailPage() {
         try {
           console.log("[v0] Using company_id:", companyId)
           const userTemplates = await emailService.getEmailTemplates(companyId)
-          if (userTemplates.length === 0) {
-            await emailService.createDefaultTemplates(companyId)
-            const newTemplates = await emailService.getEmailTemplates(companyId)
-            setTemplates(newTemplates)
-          } else {
-            setTemplates(userTemplates)
-          }
+          console.log("[v0] Fetched user templates:", userTemplates)
+          const ceTemplates = userTemplates.filter(template => 'template_type' in template && template.template_type === "CE")
+          setTemplates(ceTemplates)
+
         } catch (error) {
           console.error("Error fetching templates:", error)
           setTemplates([])
@@ -333,82 +333,15 @@ export default function ComposeEmailPage() {
     }
   }, [userData, isInitialized, fetchData])
 
-  // Set subject and body when quotation and company name are available
-  useEffect(() => {
-    if (quotation && companyName && userData) {
-      setSubject(`Quotation: ${quotation.items?.name || "Custom Quotation"} - ${companyName}`)
-      setBody(`Hi ${quotation.client_name || "Valued Client"},
 
-I hope you're doing well!
 
-Please find attached the quotation for your upcoming billboard campaign. The proposal includes the site location, duration, and pricing details based on our recent discussion.
-
-If you have any questions or would like to explore other options, feel free to reach out. I'll be happy to assist you further. Looking forward to your feedback!
-
-Best regards,
-${user?.displayName || "Sales Executive"}
-Sales Executive
-${companyName}
-${userData?.phone_number || ""}
-${user?.email || ""}`)
-    }
-  }, [quotation, companyName, userData, user?.displayName, user?.email])
-
-  // Query company name from Firebase
-  useEffect(() => {
-    const fetchCompanyName = async () => {
-      if (!user || !userData) {
-        console.log("[v0] fetchCompanyName: Missing user or userData", { user: !!user, userData: !!userData })
-        return
-      }
-
-      try {
-        console.log("[v0] fetchCompanyName: userData:", userData)
-        console.log("[v0] fetchCompanyName: userData.company_id:", userData.company_id)
-
-        if (!userData.company_id) {
-          console.warn("[v0] No company_id found in userData:", userData)
-          return
-        }
-
-        console.log("[v0] Fetching company name for company_id:", userData.company_id)
-        const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
-
-        if (companyDoc.exists()) {
-          const companyData = companyDoc.data()
-          const companyNameValue = companyData?.name || "Company"
-          setCompanyName(companyNameValue)
-          console.log("[v0] Company name loaded from Firebase:", companyNameValue)
-        } else {
-          console.warn("[v0] No company document found for company_id:", userData.company_id)
-          setCompanyName("Company")
-        }
-      } catch (error) {
-        console.error("[v0] Error fetching company name from Firebase:", error)
-        setCompanyName("Company")
-      }
-    }
-
-    if (user && userData) {
-      fetchCompanyName()
-    }
-  }, [user, userData])
-
-  useEffect(() => {
-    if (showSuccessDialog) {
-      const timer = setTimeout(() => {
-        handleSuccessDialogClose()
-      }, 3000) // Auto-dismiss after 3 seconds
-      return () => clearTimeout(timer)
-    }
-  }, [showSuccessDialog])
 
   const applyTemplate = (template: EmailTemplate) => {
     const replacements = {
       "{title}": quotation?.items?.name || "Custom Quotation",
-      "{clientName}": quotation?.client_name || "Valued Client",
+      "{clientName}": quotation?.client_name || quotation?.client_company_name || "Valued Client",
       "{userName}": user?.displayName || "Sales Executive",
-      "{companyName}": companyName || "Company",
+      "{companyName}": "OH Plus",
       "{userContact}": user?.phoneNumber || "",
       "{userEmail}": user?.email || "",
     }
@@ -448,13 +381,25 @@ ${user?.email || ""}`)
 
     setSavingTemplate(true)
     try {
-      const newTemplate = await emailService.createEmailTemplate({
+      const templateId = await emailService.createEmailTemplate({
         name: newTemplateName.trim(),
         subject: newTemplateSubject.trim(),
         body: newTemplateBody.trim(),
+        userId: user!.uid,
+        company_id: companyId,
+        template_type: "CE",
+        deleted: false,
+      } as any)
+
+      const newTemplate: EmailTemplate = {
+        id: templateId,
+        name: newTemplateName.trim(),
+        subject: newTemplateSubject.trim(),
+        body: newTemplateBody.trim(),
+        userId: user!.uid,
         company_id: companyId,
         deleted: false,
-      })
+      }
 
       setTemplates((prev) => [...prev, newTemplate])
       setShowAddTemplateDialog(false)
@@ -479,6 +424,7 @@ ${user?.email || ""}`)
   }
 
   const handleDeleteTemplate = async (templateId: string) => {
+    if (!templateId) return
     try {
       await emailService.softDeleteEmailTemplate(templateId)
       setTemplates((prev) => prev.filter((template) => template.id !== templateId))
@@ -516,7 +462,7 @@ ${user?.email || ""}`)
 
     setSavingTemplate(true)
     try {
-      const updatedTemplate = await emailService.updateEmailTemplate(editingTemplate.id, {
+      const updatedTemplate = await emailService.updateEmailTemplate(editingTemplate.id!, {
         name: newTemplateName.trim(),
         subject: newTemplateSubject.trim(),
         body: newTemplateBody.trim(),
@@ -618,12 +564,12 @@ ${user?.email || ""}`)
         currentUserEmail: user?.email,
         ccEmail: ccEmail,
         replyToEmail: replyToEmail,
-        companyName: companyName,
         subject: subject,
         body: body,
         attachments: allAttachments,
         preGeneratedPDFs: preGeneratedPDFs,
         uploadedFiles: uploadedFilesData,
+        userData: userData, // Send userData for PDF generation fallback
       }
 
       console.log("[v0] Sending request with body:", {
@@ -715,6 +661,14 @@ ${user?.email || ""}`)
     router.push("/sales/quotations-list")
   }
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes"
+    const k = 1024
+    const sizes = ["Bytes", "KB", "MB", "GB"]
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  }
+
   if (loading || userData === undefined) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -727,199 +681,198 @@ ${user?.email || ""}`)
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b px-6 py-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <h1 className="text-xl font-semibold">Compose Email</h1>
-          {pdfGenerating && (
-            <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-              Preparing {relatedQuotations.length} PDF(s)...
-            </div>
-          )}
-          {preGeneratedPDFs.length > 0 && !pdfGenerating && (
-            <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
-              {preGeneratedPDFs.length} PDF(s) Ready
-            </div>
-          )}
-        </div>
+    <div className="min-h-screen bg-neutral-50">
+      <div className="flex items-center space-x-4 mb-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.back()}
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
+        </Button>
+        <h1 className="text-3xl font-bold text-gray-900">Compose email</h1>
+        {pdfGenerating && (
+          <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+            Preparing {relatedQuotations.length} PDF(s)...
+          </div>
+        )}
+        {preGeneratedPDFs.length > 0 && !pdfGenerating && (
+          <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+            {preGeneratedPDFs.length} PDF(s) Ready
+          </div>
+        )}
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="flex flex-col lg:flex-row space-y-6 lg:space-y-0 lg:space-x-6">
           {/* Email Form */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border p-6">
+          <div className="flex-1">
             <div className="space-y-4">
               {/* To Field */}
-              <div className="flex items-center gap-4">
-                <Label className="w-12 text-sm font-medium">To:</Label>
-                <div className="flex-1">
-                  <Input
-                    value={toEmail}
-                    onChange={(e) => setToEmail(e.target.value)}
-                    placeholder="recipient@example.com"
-                  />
-                </div>
+              <div className="flex items-center space-x-4">
+                <label className="text-lg font-medium text-gray-900 w-20">To:</label>
+                <Input
+                  value={toEmail}
+                  onChange={(e) => setToEmail(e.target.value)}
+                  placeholder="recipient@example.com"
+                  className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
+                />
               </div>
 
               {/* CC Field */}
-              <div className="flex items-center gap-4">
-                <Label className="w-12 text-sm font-medium">Cc:</Label>
-                <div className="flex-1">
-                  <Input value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="cc@example.com" />
-                </div>
+              <div className="flex items-center space-x-4">
+                <label className="text-lg font-medium text-gray-900 w-20">CC:</label>
+                <Input value={ccEmail} onChange={(e) => setCcEmail(e.target.value)} placeholder="cc@example.com" className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1" />
               </div>
 
-              {/* Reply To Field */}
-              <div className="flex items-center gap-4">
-                <Label className="w-12 text-sm font-medium">Reply to:</Label>
-                <div className="flex-1">
-                  <Input
-                    value={replyToEmail}
-                    onChange={(e) => setReplyToEmail(e.target.value)}
-                    placeholder="reply@example.com"
-                  />
-                </div>
+              {/* Reply-To Field */}
+              <div className="flex items-center space-x-4">
+                <label className="text-lg font-medium text-gray-900 w-20">Reply-To:</label>
+                <Input
+                  value={replyToEmail}
+                  onChange={(e) => setReplyToEmail(e.target.value)}
+                  placeholder="reply-to@example.com"
+                  className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
+                />
               </div>
 
               {/* Subject Field */}
-              <div className="flex items-center gap-4">
-                <Label className="w-12 text-sm font-medium">Subject:</Label>
-                <div className="flex-1">
-                  <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Email subject" />
-                </div>
+              <div className="flex items-center space-x-4">
+                <label className="text-lg font-medium text-gray-900 w-20">Subject:</label>
+                <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Enter your cost estimate subject here..." className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1" />
               </div>
 
               {/* Body Field */}
-              <div className="space-y-2">
-                <div className="relative">
-                  <Textarea
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    placeholder="Email body..."
-                    className="min-h-[300px] border-2 border-purple-300 focus:border-purple-500"
-                  />
-                </div>
+              <div>
+                <Textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  placeholder="Enter your cost estimate content here..."
+                  className="bg-white rounded-[10px] border-2 border-[#c4c4c4] w-full h-[543px] resize-none"
+                />
               </div>
 
               {/* Attachments */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Attachments:</Label>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
+
                 <div className="space-y-2">
                   {preGeneratedPDFs.map((pdf, index) => (
-                    <div
-                      key={`pdf-${index}`}
-                      className="flex items-center gap-2 p-2 bg-green-50 rounded border border-green-200"
-                    >
-                      <Paperclip className="h-4 w-4 text-green-600" />
-                      <button
-                        className="flex-1 text-sm text-left text-green-800 hover:text-green-900 hover:underline"
-                        onClick={() => handleDownloadAttachment(pdf.filename, index)}
-                        disabled={downloadingPDF === index}
-                      >
-                        {downloadingPDF === index ? "Opening..." : pdf.filename}
-                      </button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setPreGeneratedPDFs((prev) => prev.filter((_, i) => i !== index))
-                          setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
-                        }}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                    <div key={`pdf-${index}`} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <Paperclip className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm text-gray-700">{pdf.filename}</span>
+                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">PDF</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDownloadAttachment(pdf.filename, index)}
+                          title="View attachment"
+                          disabled={downloadingPDF === index}
+                        >
+                          {downloadingPDF === index ? "Opening..." : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setPreGeneratedPDFs((prev) => prev.filter((_, i) => i !== index))
+                            setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
 
                   {uploadedFiles.map((file, index) => (
-                    <div key={`upload-${index}`} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
-                      <Paperclip className="h-4 w-4 text-gray-500" />
-                      <button
-                        className="flex-1 text-sm text-left text-gray-700 hover:text-blue-600 hover:underline"
-                        onClick={() => handleViewUploadedFile(file)}
-                      >
-                        {file.name}
-                      </button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeUploadedFile(index)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                    <div key={`upload-${index}`} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center space-x-2">
+                        <Paperclip className="h-4 w-4 text-gray-500" />
+                        <span className="text-sm text-gray-700">{file.name}</span>
+                        <span className="text-xs text-gray-500">({formatFileSize(file.size)})</span>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewUploadedFile(file)}
+                          title="View attachment"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => removeUploadedFile(index)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
+                </div>
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="file"
-                      id="file-upload"
-                      multiple
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => document.getElementById("file-upload")?.click()}
-                      className="text-blue-500 border-blue-200 hover:bg-blue-50"
-                    >
-                      <Paperclip className="h-4 w-4 mr-2" />
-                      Add Attachment
-                    </Button>
-                  </div>
+                <div className="mt-4">
+                  <input
+                    type="file"
+                    id="file-upload"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                  />
+                  <button onClick={() => document.getElementById("file-upload")?.click()} className="text-[#2d3fff] underline text-lg font-medium">+Add attachment</button>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Templates Sidebar */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="font-medium mb-4">Templates:</h3>
-            <div className="space-y-3">
-              {templates.map((template) => (
-                <div
-                  key={template.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                >
-                  <button
-                    className="text-sm text-left flex-1 hover:text-blue-600"
-                    onClick={() => applyTemplate(template)}
-                  >
-                    {template.name}
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditTemplate(template)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteTemplate(template.id)}
-                      className="h-6 w-6 p-0"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+          <div className="w-[346px]">
+            <div className="bg-white rounded-[20px] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] p-4">
+              <h3 className="font-semibold text-lg text-black mb-4">Templates</h3>
+              {templates.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No email templates available.</p>
+                  <p className="text-xs text-gray-400 mt-1">Create your first template to get started.</p>
                 </div>
-              ))}
-              <Button
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                onClick={() => setShowAddTemplateDialog(true)}
-              >
+              ) : (
+                <div className="space-y-2">
+                  {templates.map((template) => (
+                    <div key={template.id} className="bg-[#c4c4c4] bg-opacity-20 h-[56px] rounded-[10px] flex items-center justify-between px-4">
+                      <span
+                        className="text-lg font-medium text-gray-900 cursor-pointer"
+                        onClick={() => applyTemplate(template)}
+                        title="Apply template"
+                      >
+                        {template.name}
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditTemplate(template)}
+                          className="p-0"
+                        >
+                          <Edit className="h-6 w-6 opacity-50" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => template.id && handleDeleteTemplate(template.id)}
+                          className="p-0"
+                        >
+                          <Trash2 className="h-6 w-6 opacity-50" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Button onClick={() => setShowAddTemplateDialog(true)} className="w-full mt-4 bg-white border-2 border-[#c4c4c4] rounded-[10px] text-gray-900 font-medium text-lg h-[39px]">
                 +Add Template
               </Button>
             </div>
@@ -927,14 +880,13 @@ ${user?.email || ""}`)
         </div>
 
         {/* Send Button */}
-        <div className="flex justify-end mt-6">
-          <Button
-            onClick={handleSendEmail}
-            disabled={sending || !toEmail || !subject || pdfGenerating}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-2"
-          >
-            {sending ? "Sending..." : pdfGenerating ? `Preparing ${relatedQuotations.length} PDF(s)...` : "Send Email"}
-          </Button>
+        <div className="flex justify-center mt-6">
+          <div className="bg-white rounded-[50px] border-[1.5px] border-[#c4c4c4] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] w-[440px] h-[61px] flex items-center justify-between px-4">
+            <button onClick={() => router.back()} className="text-gray-900 underline text-lg">Cancel</button>
+            <Button onClick={handleSendEmail} disabled={sending || !toEmail || !subject || pdfGenerating} className="bg-[#1d0beb] text-white rounded-[15px] px-6 py-2 text-2xl font-bold">
+              {sending ? "Sending..." : pdfGenerating ? `Preparing ${relatedQuotations.length} PDF(s)...` : "Send email"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1043,13 +995,10 @@ ${user?.email || ""}`)
       </Dialog>
 
       {/* Success Dialog */}
-      <Dialog open={showSuccessDialog} onOpenChange={handleSuccessDialogClose}>
-        <DialogContent className="sm:max-w-[425px] flex flex-col items-center justify-center text-center p-8">
-          <h2 className="text-3xl font-bold mb-4">Congratulations!</h2>
-          <Image src="/party-popper.png" alt="Party Popper" width={120} height={120} className="mb-6" />
-          <p className="text-lg text-gray-700">You have successfully sent a quotation!</p>
-        </DialogContent>
-      </Dialog>
+      <ProposalSentSuccessDialog
+        isOpen={showSuccessDialog}
+        onDismissAndNavigate={handleSuccessDialogClose}
+      />
     </div>
   )
 }

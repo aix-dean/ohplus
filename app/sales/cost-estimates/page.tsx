@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -34,15 +34,18 @@ import {
   Mail,
   MessageSquare,
   MessageCircle,
+  History,
+  Loader2,
 } from "lucide-react"
 import { format } from "date-fns"
 import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy, getCostEstimate } from "@/lib/cost-estimate-service" // Import CostEstimate service
 import type { CostEstimate, CostEstimateStatus, CostEstimateLineItem } from "@/lib/types/cost-estimate" // Import CostEstimate type
-import { generateCostEstimatePDF, printCostEstimatePDF } from "@/lib/cost-estimate-pdf-service"
+import { generateCostEstimatePDF, printCostEstimatePDF, generateCostEstimatePDFBlob } from "@/lib/cost-estimate-pdf-service"
 import { useResponsive } from "@/hooks/use-responsive"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { CostEstimatesList } from "@/components/cost-estimates-list" // Import CostEstimatesList
 import { SendCostEstimateOptionsDialog } from "@/components/send-cost-estimate-options-dialog" // Import SendCostEstimateOptionsDialog
+import { SentHistoryDialog } from "@/components/sent-history-dialog"
 import { searchCostEstimates, SearchResult } from "@/lib/algolia-service"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Timestamp } from "firebase/firestore"
@@ -58,6 +61,8 @@ function CostEstimatesPageContent() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [selectedCostEstimateForShare, setSelectedCostEstimateForShare] = useState<any>(null)
   const [copiedToClipboard, setCopiedToClipboard] = useState(false)
+  const [showSentHistoryDialog, setShowSentHistoryDialog] = useState(false)
+  const [selectedCostEstimateForHistory, setSelectedCostEstimateForHistory] = useState<any>(null)
 
   // Algolia search states
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
@@ -69,6 +74,9 @@ function CostEstimatesPageContent() {
   const [lastDocId, setLastDocId] = useState<string | null>(null)
   const [hasMorePages, setHasMorePages] = useState(true)
   const itemsPerPage = 10
+
+  // PDF generation states
+  const [generatingPDFs, setGeneratingPDFs] = useState<Set<string>>(new Set())
 
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
@@ -231,7 +239,7 @@ function CostEstimatesPageContent() {
     router.push(`/sales/cost-estimates/${costEstimateId}`)
   }
 
-  const handleDownloadPDF = async (costEstimate: CostEstimate) => {
+  const handleDownloadPDF = async (costEstimate: CostEstimate, userData) => {
     try {
       // Fetch the full cost estimate data first
       const costEstimateId = costEstimate.id || (costEstimate as any).objectID
@@ -241,12 +249,7 @@ function CostEstimatesPageContent() {
       }
 
       // Generate PDF using the same function as the detail page
-      await generateCostEstimatePDF(fullCostEstimate, undefined, false, false, {
-        first_name: user?.displayName?.split(' ')[0] || "",
-        last_name: user?.displayName?.split(' ').slice(1).join(' ') || "",
-        email: user?.email || "",
-        company_id: userData?.company_id || "",
-      })
+      await generateCostEstimatePDF(fullCostEstimate, undefined, false, false, userData)
     } catch (error) {
       console.error("Error downloading PDF:", error)
       alert("Failed to download PDF. Please try again.")
@@ -254,24 +257,179 @@ function CostEstimatesPageContent() {
   }
 
   const handlePrintPDF = async (costEstimate: CostEstimate) => {
+    const costEstimateId = costEstimate.id || (costEstimate as any).objectID
+    setGeneratingPDFs((prev) => new Set(prev).add(costEstimateId))
+
     try {
-      // Fetch the full cost estimate data first
-      const costEstimateId = costEstimate.id || (costEstimate as any).objectID
+      // Get the full cost estimate data
       const fullCostEstimate = await getCostEstimate(costEstimateId)
       if (!fullCostEstimate) {
         throw new Error("Cost estimate not found")
       }
 
-      // Generate and print PDF
-      await printCostEstimatePDF(fullCostEstimate, undefined, {
+      // Fetch company data
+      let companyData = null
+      if (userData?.company_id) {
+        try {
+          const { doc, getDoc } = await import("firebase/firestore")
+          const { db } = await import("@/lib/firebase")
+          const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
+          if (companyDoc.exists()) {
+            const data = companyDoc.data()
+            companyData = {
+              id: companyDoc.id,
+              name: data.name || data.company_name || "",
+              company_location: data.company_location || data.address || "",
+              address: data.address || "",
+              company_website: data.company_website || data.website || "",
+              photo_url: data.photo_url || data.logo_url || null,
+              contact_person: data.contact_person || "",
+              email: data.email || "",
+              phone: data.phone || data.telephone || "",
+              social_media: data.social_media || {},
+              created_by: data.created_by,
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching company data:", error)
+        }
+      }
+
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(logoBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      // Prepare cost estimate data for API (convert Timestamps to serializable format)
+      const serializableCostEstimate = {
+        ...fullCostEstimate,
+        createdAt: (fullCostEstimate as any).createdAt?.toDate ? (fullCostEstimate as any).createdAt.toDate().toISOString() : fullCostEstimate.createdAt?.toISOString(),
+        updatedAt: (fullCostEstimate as any).updatedAt?.toDate ? (fullCostEstimate as any).updatedAt.toDate().toISOString() : fullCostEstimate.updatedAt?.toISOString(),
+        startDate: (fullCostEstimate as any).startDate?.toDate ? (fullCostEstimate as any).startDate.toDate().toISOString() : fullCostEstimate.startDate?.toISOString(),
+        endDate: (fullCostEstimate as any).endDate?.toDate ? (fullCostEstimate as any).endDate.toDate().toISOString() : fullCostEstimate.endDate?.toISOString(),
+        validUntil: (fullCostEstimate as any).validUntil?.toDate ? (fullCostEstimate as any).validUntil.toDate().toISOString() : fullCostEstimate.validUntil?.toISOString(),
+      }
+
+      // Call the generate-cost-estimate-pdf API
+      const response = await fetch('/api/generate-cost-estimate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          costEstimate: serializableCostEstimate,
+          companyData,
+          logoDataUrl,
+          userData,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+
+      // Open PDF in new window and trigger print
+      const printWindow = window.open(pdfUrl)
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print()
+          // Clean up the URL after printing
+          printWindow.onafterprint = () => {
+            URL.revokeObjectURL(pdfUrl)
+          }
+        }
+      } else {
+        console.error("Failed to open print window")
+        URL.revokeObjectURL(pdfUrl)
+      }
+
+      toast({
+        title: "Success",
+        description: "Cost estimate PDF opened for printing",
+      })
+    } catch (error: any) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Print Failed",
+        description: error.message || "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(costEstimateId)
+        return newSet
+      })
+    }
+  }
+
+  const handlePrintCostEstimateWindow = async (costEstimate: CostEstimate) => {
+    const costEstimateId = costEstimate.id || (costEstimate as any).objectID
+    setGeneratingPDFs((prev) => new Set(prev).add(costEstimateId))
+
+    try {
+      // Get the full cost estimate data
+      const fullCostEstimate = await getCostEstimate(costEstimateId)
+      if (!fullCostEstimate) {
+        throw new Error("Cost estimate not found")
+      }
+
+      // Generate the PDF blob using client-side jsPDF
+      const pdfBlob = await generateCostEstimatePDFBlob(fullCostEstimate, {
         first_name: user?.displayName?.split(' ')[0] || "",
         last_name: user?.displayName?.split(' ').slice(1).join(' ') || "",
         email: user?.email || "",
         company_id: userData?.company_id || "",
       })
-    } catch (error) {
-      console.error("Error printing PDF:", error)
-      alert("Failed to print PDF. Please try again.")
+
+      // Create a blob URL and open in new window for printing
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      const printWindow = window.open(pdfUrl, '_blank')
+
+      if (printWindow) {
+        // Wait a bit for the PDF to load, then trigger print
+        printWindow.onload = () => {
+          setTimeout(() => {
+            printWindow.print()
+          }, 1000)
+        }
+      }
+
+      toast({
+        title: "Success",
+        description: "Cost estimate PDF opened in print window",
+      })
+    } catch (error: any) {
+      console.error("Error generating PDF for printing:", error)
+      toast({
+        title: "Print Failed",
+        description: error.message || "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(costEstimateId)
+        return newSet
+      })
     }
   }
 
@@ -360,20 +518,18 @@ function CostEstimatesPageContent() {
     }
   }
 
-  const handleShareCostEstimate = async (costEstimateId: string) => {
-    // Find the cost estimate from the current list
-    const costEstimate = (isSearching ? searchResults : costEstimates).find((ce: any) => ce.id === costEstimateId || ce.objectID === costEstimateId)
-    if (costEstimate) {
-      console.log(`cost estimate data: ${JSON.stringify(costEstimate)}`)
-      setSelectedCostEstimateForShare(costEstimate)
-      setShareDialogOpen(true)
-    }
+  const handleShareCostEstimate = (costEstimateId: string) => {
+    // Navigate to detail page and trigger share there
+    // This ensures the cost estimate is rendered and can be shared properly
+    setSelectedCostEstimateForShare(costEstimateId)
+    setShareDialogOpen(true)
+    
   }
 
 
 
   const generateShareableLink = (costEstimate: any) => {
-    return `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}`
+    return `${process.env.NEXT_PUBLIC_APP_URL}/cost-estimates/view/${costEstimate.id}/compose-email`
   }
 
   const copyToClipboard = async (text: string) => {
@@ -409,6 +565,11 @@ function CostEstimatesPageContent() {
   const shareViaMessenger = (costEstimate: any) => {
     const message = encodeURIComponent(`Please review our cost estimate: ${generateShareableLink(costEstimate)}`)
     window.open(`https://m.me/?text=${message}`)
+  }
+
+  const handleViewSentHistory = (costEstimate: any) => {
+    setSelectedCostEstimateForHistory(costEstimate)
+    setShowSentHistoryDialog(true)
   }
 
   return (
@@ -566,21 +727,27 @@ function CostEstimatesPageContent() {
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadPDF(costEstimate as CostEstimate)}>
+                            <DropdownMenuItem onClick={() => handleDownloadPDF(costEstimate as CostEstimate, userData)}>
                               <Download className="mr-2 h-4 w-4" />
                               Download PDF
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handlePrintPDF(costEstimate as CostEstimate)}>
-                              <Printer className="mr-2 h-4 w-4" />
-                              Print
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleShareCostEstimate(costEstimate.id || costEstimate.objectID)}>
+                            <DropdownMenuItem onClick={() => handleShareCostEstimate(costEstimate)}>
                               <Share2 className="mr-2 h-4 w-4" />
                               Share
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleCreateQuotation(costEstimate.id || costEstimate.objectID)}>
                               <Calculator className="mr-2 h-4 w-4" />
                               Create Quotation
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleViewSentHistory(costEstimate)}>
+                              <History className="mr-2 h-4 w-4" />
+                              View Sent History
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handlePrintPDF(costEstimate as CostEstimate)}>
+                              <Printer className="mr-2 h-4 w-4" />
+                              Print
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -664,6 +831,13 @@ function CostEstimatesPageContent() {
           }}
         />
       )}
+
+      <SentHistoryDialog
+        open={showSentHistoryDialog}
+        onOpenChange={setShowSentHistoryDialog}
+        proposalId={selectedCostEstimateForHistory?.id || selectedCostEstimateForHistory?.objectID || ""}
+        emailType="cost_estimate"
+      />
     </div>
   )
 }

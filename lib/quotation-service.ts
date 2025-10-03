@@ -19,10 +19,16 @@ import { db } from "@/lib/firebase"
 import { addQuotationToCampaign } from "@/lib/campaign-service"
 import { jsPDF } from "jspdf"
 import { loadImageAsBase64, generateQRCode, getImageDimensions } from "@/lib/pdf-service"
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import type { QuotationProduct, Quotation } from "@/lib/types/quotation" // Import the updated Quotation type
 import { getProductById as getProductFromFirebase } from "@/lib/firebase-service" // Import the product fetching function
 
 export type { QuotationProduct, Quotation } from "@/lib/types/quotation"
+
+// Generate an 8-digit password for quotation PDF access
+export function generateQuotationPassword(): string {
+  return Math.floor(10000000 + Math.random() * 90000000).toString()
+}
 
 // Create a new quotation
 export async function createQuotation(quotationData: Omit<Quotation, "id">): Promise<string> {
@@ -140,11 +146,64 @@ export async function updateQuotation(
 ): Promise<void> {
   try {
     const quotationRef = doc(db, "quotations", quotationId)
-    await updateDoc(quotationRef, {
-      ...updatedData,
+
+    // Prepare data for Firestore update, handling nested objects
+    const updateData: { [key: string]: any } = {
       updated: serverTimestamp(),
       updated_by: userName, // Or userId if you prefer to store ID
-    })
+    }
+
+    if (updatedData.quotation_number !== undefined) updateData.quotation_number = updatedData.quotation_number
+    if (updatedData.client_name !== undefined) updateData.client_name = updatedData.client_name
+    if (updatedData.client_email !== undefined) updateData.client_email = updatedData.client_email
+    if (updatedData.client_id !== undefined) updateData.client_id = updatedData.client_id
+    if (updatedData.client_company_name !== undefined) updateData.client_company_name = updatedData.client_company_name
+    if (updatedData.client_phone !== undefined) updateData.client_phone = updatedData.client_phone
+    if (updatedData.client_address !== undefined) updateData.client_address = updatedData.client_address
+    if (updatedData.client_designation !== undefined) updateData.client_designation = updatedData.client_designation
+    if (updatedData.client_company_id !== undefined) updateData.client_company_id = updatedData.client_company_id
+    if (updatedData.status !== undefined) updateData.status = updatedData.status
+    if (updatedData.created_by !== undefined) updateData.created_by = updatedData.created_by
+    if (updatedData.seller_id !== undefined) updateData.seller_id = updatedData.seller_id
+    if (updatedData.company_id !== undefined) updateData.company_id = updatedData.company_id
+    if (updatedData.created_by_first_name !== undefined) updateData.created_by_first_name = updatedData.created_by_first_name
+    if (updatedData.created_by_last_name !== undefined) updateData.created_by_last_name = updatedData.created_by_last_name
+    if (updatedData.start_date !== undefined) updateData.start_date = updatedData.start_date
+    if (updatedData.end_date !== undefined) updateData.end_date = updatedData.end_date
+    if (updatedData.duration_days !== undefined) updateData.duration_days = updatedData.duration_days
+    if (updatedData.total_amount !== undefined) updateData.total_amount = updatedData.total_amount
+    if (updatedData.valid_until !== undefined) updateData.valid_until = updatedData.valid_until
+    if (updatedData.notes !== undefined) updateData.notes = updatedData.notes
+    if (updatedData.campaignId !== undefined) updateData.campaignId = updatedData.campaignId
+    if (updatedData.proposalId !== undefined) updateData.proposalId = updatedData.proposalId
+    if (updatedData.page_id !== undefined) updateData.page_id = updatedData.page_id
+    if (updatedData.page_number !== undefined) updateData.page_number = updatedData.page_number
+    if (updatedData.size !== undefined) updateData.size = updatedData.size
+    if (updatedData.costEstimateNumber !== undefined) updateData.costEstimateNumber = updatedData.costEstimateNumber
+
+    if (updatedData.pdf !== undefined) updateData.pdf = updatedData.pdf
+    if (updatedData.password !== undefined) updateData.password = updatedData.password
+
+    if (updatedData.items !== undefined) {
+      updateData.items = updatedData.items
+    }
+
+    if (updatedData.projectCompliance !== undefined) {
+      updateData.projectCompliance = updatedData.projectCompliance
+    }
+
+    if (updatedData.client_compliance !== undefined) {
+      updateData.client_compliance = updatedData.client_compliance
+    }
+
+    if (updatedData.signature_position !== undefined) updateData.signature_position = updatedData.signature_position
+    if (updatedData.signature_name !== undefined) updateData.signature_name = updatedData.signature_name
+
+    if (updatedData.template !== undefined) {
+      updateData.template = updatedData.template
+    }
+
+    await updateDoc(quotationRef, updateData)
     console.log(`Quotation ${quotationId} updated successfully.`)
   } catch (error) {
     console.error("Error updating quotation:", error)
@@ -322,7 +381,7 @@ const calculateTextHeight = (text: string, maxWidth: number, fontSize = 10): num
 }
 
 // Generate PDF for quotation
-export async function generateQuotationPDF(quotation: Quotation): Promise<void> {
+export async function generateQuotationPDF(quotation: Quotation, returnBlob: boolean = false): Promise<void | Blob> {
   const pdf = new jsPDF("p", "mm", "a4")
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
@@ -772,8 +831,41 @@ export async function generateQuotationPDF(quotation: Quotation): Promise<void> 
     { align: "center" },
   )
 
-  // Download the PDF
-  pdf.save(`Quotation-${quotation.quotation_number}.pdf`)
+  // Download the PDF or return blob
+  if (returnBlob) {
+    return pdf.output('blob')
+  } else {
+    pdf.save(`Quotation-${quotation.quotation_number}.pdf`)
+  }
+}
+
+// Generate PDF and upload to Firebase storage with password protection
+export async function generateAndUploadQuotationPDF(
+  quotation: Quotation
+): Promise<{ pdfUrl: string; password: string }> {
+  try {
+    // Generate the PDF blob
+    const blob = await generateQuotationPDF(quotation, true) as Blob
+
+    // Generate password
+    const password = generateQuotationPassword()
+
+    // Create a unique filename
+    const timestamp = Date.now()
+    const filename = `quotation_${quotation.id}_${timestamp}.pdf`
+
+    // Convert blob to File object for upload
+    const pdfFile = new File([blob], filename, { type: 'application/pdf' })
+
+    // Upload to Firebase storage
+    const uploadPath = `quotations/pdfs/${filename}`
+    const pdfUrl = await uploadFileToFirebaseStorage(pdfFile, uploadPath)
+
+    return { pdfUrl, password }
+  } catch (error) {
+    console.error("Error generating and uploading quotation PDF:", error)
+    throw error
+  }
 }
 
 // Send quotation email to client

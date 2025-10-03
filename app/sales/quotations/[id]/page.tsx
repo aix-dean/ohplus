@@ -12,6 +12,7 @@ import {
   updateQuotation,
   getQuotationsByProductIdAndCompanyId,
   calculateProratedPrice,
+  generateAndUploadQuotationPDF,
 } from "@/lib/quotation-service"
 import type { Quotation, QuotationProduct } from "@/lib/types/quotation"
 import { format } from "date-fns"
@@ -48,6 +49,7 @@ import { QuotationSentSuccessDialog } from "@/components/quotation-sent-success-
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog" // Use quotation options dialog
 import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
 import { generateSeparateQuotationPDFs } from "@/lib/quotation-pdf-service"
+import { Timestamp } from "firebase/firestore"
 
 interface CompanyData {
   id: string
@@ -220,7 +222,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
         setEditableQuotation({
           ...editableQuotation,
           duration_days: durationDays,
-          end_date: endDate.toISOString(),
+          end_date: Timestamp.fromDate(endDate),
           items: { ...editableQuotation.items, duration_days: durationDays, item_total_amount: newTotalAmount },
         })
 
@@ -246,7 +248,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
 
         setEditableQuotation({
           ...editableQuotation,
-          [fieldName]: newValue.toISOString(),
+          [fieldName]: Timestamp.fromDate(newValue),
           duration_days: durationDays,
           items: { ...editableQuotation.items, duration_days: durationDays, item_total_amount: newTotalAmount },
         })
@@ -377,6 +379,36 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
             setProposal(linkedProposal)
           }
 
+          // Check if PDF needs to be generated
+          if (!q.pdf || q.pdf.trim() === "") {
+            // Generate PDF and upload to Firebase storage
+            setTimeout(async () => {
+              try {
+                const { pdfUrl, password } = await generateAndUploadQuotationPDF(q)
+
+                // Update quotation with PDF URL and password
+                await updateQuotation(
+                  q.id!,
+                  { pdf: pdfUrl, password: password },
+                  userData?.uid || "system",
+                  userData?.displayName || "System"
+                )
+
+                // Update local state
+                setQuotation(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+
+                console.log("Quotation PDF generated and uploaded successfully:", pdfUrl)
+              } catch (error) {
+                console.error("Error generating quotation PDF:", error)
+                toast({
+                  title: "Error",
+                  description: "Failed to generate PDF",
+                  variant: "destructive",
+                })
+              }
+            }, 2000) // Small delay to ensure the page is fully rendered
+          }
+
           // Fetch related quotations if this quotation has a page_id
           if (q.page_id) {
             console.log("[v0] Fetching related quotations for page_id:", q.page_id)
@@ -434,6 +466,23 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
       fetchQuotationHistory()
     }
   }, [fetchQuotationHistory])
+
+  // Handle automatic share when page loads with action parameter
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    const action = searchParams.get("action")
+
+    if (action === "share" && quotation && !loading) {
+      // Small delay to ensure the quotation is fully rendered
+      setTimeout(() => {
+        setIsSendOptionsDialogOpen(true)
+        // Clean up the URL parameter
+        const url = new URL(window.location.href)
+        url.searchParams.delete("action")
+        window.history.replaceState({}, "", url.toString())
+      }, 1000)
+    }
+  }, [quotation, loading])
 
   useEffect(() => {
     if (isSendEmailDialogOpen && quotation) {
@@ -553,6 +602,24 @@ The OH Plus Team`,
 
     setDownloadingPDF(true)
     try {
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl: string | null = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
       // Check if there are multiple related quotations (same page_id)
       if (relatedQuotations.length > 1) {
         console.log("[v0] Downloading multiple quotation PDFs:", relatedQuotations.length)
@@ -571,7 +638,45 @@ The OH Plus Team`,
             quotation_number: uniqueQuotationNumber,
           }
 
-          await generateQuotationPDF(modifiedQuotation, companyData)
+          // Prepare quotation data for API (convert Timestamps to serializable format)
+          const serializableQuotation = {
+            ...modifiedQuotation,
+            created: modifiedQuotation.created?.toDate ? modifiedQuotation.created.toDate().toISOString() : modifiedQuotation.created,
+            updated: modifiedQuotation.updated?.toDate ? modifiedQuotation.updated.toDate().toISOString() : modifiedQuotation.updated,
+            valid_until: modifiedQuotation.valid_until?.toDate ? modifiedQuotation.valid_until.toDate().toISOString() : modifiedQuotation.valid_until,
+            start_date: modifiedQuotation.start_date?.toDate ? modifiedQuotation.start_date.toDate().toISOString() : modifiedQuotation.start_date,
+            end_date: modifiedQuotation.end_date?.toDate ? modifiedQuotation.end_date.toDate().toISOString() : modifiedQuotation.end_date,
+          }
+
+          // Call the generate-quotation-pdf API
+          const response = await fetch('/api/generate-quotation-pdf', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              quotation: serializableQuotation,
+              companyData,
+              logoDataUrl,
+              userData,
+            }),
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error('API Error:', response.status, errorText)
+            throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+          }
+
+          const blob = await response.blob()
+          const url = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `${uniqueQuotationNumber}.pdf`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          window.URL.revokeObjectURL(url)
 
           // Add small delay between downloads to ensure proper file naming
           if (i < relatedQuotations.length - 1) {
@@ -584,9 +689,47 @@ The OH Plus Team`,
           description: `${relatedQuotations.length} PDF files have been downloaded for all pages.`,
         })
       } else {
-        // Single quotation - check if it has multiple items
-        // Single quotation with single item
-        await generateQuotationPDF(quotation, companyData)
+        // Single quotation
+        // Prepare quotation data for API (convert Timestamps to serializable format)
+        const serializableQuotation = {
+          ...quotation,
+          created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
+          updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
+          valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
+          start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
+          end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+        }
+
+        // Call the generate-quotation-pdf API
+        const response = await fetch('/api/generate-quotation-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            quotation: serializableQuotation,
+            companyData,
+            logoDataUrl,
+            userData,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('API Error:', response.status, errorText)
+          throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(url)
+
         toast({
           title: "Success",
           description: "PDF downloaded successfully",
@@ -604,7 +747,7 @@ The OH Plus Team`,
     }
   }
 
-  const handleDownloadImage = async () => {
+  const handleDownloadImage = async (userData: any) => {
     if (!quotation) return
 
     setDownloadingImage(true)
@@ -652,6 +795,7 @@ The OH Plus Team`,
               quotation: modifiedQuotation,
               companyData,
               logoDataUrl,
+              userData,
             }),
           })
 
@@ -1421,7 +1565,7 @@ The OH Plus Team`,
           </Button>
           <Button
             variant="ghost"
-            onClick={handleDownloadImage}
+            onClick={ () => handleDownloadImage(userData)}
             disabled={downloadingImage}
             className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
           >
@@ -1507,7 +1651,7 @@ The OH Plus Team`,
                       {historyItem.quotation_number || historyItem.id?.slice(-8) || "N/A"}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {safeFormatNumber(historyItem.items?.price || historyItem.price || 0)}
+                      PHP {safeFormatNumber(historyItem.items?.price || 0)}
                       /month
                     </div>
                     <div className="flex justify-end">
@@ -1628,7 +1772,7 @@ The OH Plus Team`,
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <Button
             onClick={handleSendClick}
-            className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium invisible" 
+            className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium" 
           >
             Send
           </Button>

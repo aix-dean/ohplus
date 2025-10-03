@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import puppeteer from 'puppeteer'
-import type { Quotation } from '@/lib/types/quotation'
+import type { CostEstimate } from '@/lib/types/cost-estimate'
 
+// Helper functions from quotation PDF
 const formatDate = (date: any) => {
   const dateObj = getDateObject(date)
   if (!dateObj) return "N/A"
@@ -47,7 +48,7 @@ const formatDuration = (days: number, startDate?: any, endDate?: any): string =>
   }
 
   // Fallback to the old method if no dates provided
-  if (days <= 0) return "0 days"
+  if (days <= 0) return "1 month"
 
   const months = Math.floor(days / 30)
   const remainingDays = days % 30
@@ -64,15 +65,21 @@ const formatDuration = (days: number, startDate?: any, endDate?: any): string =>
 const formatCompanyAddress = (companyData: any): string => {
   if (!companyData) return ""
   const parts = []
-  if (companyData.address?.street) parts.push(companyData.address.street)
-  if (companyData.address?.city) parts.push(companyData.address.city)
-  if (companyData.address?.province) parts.push(companyData.address.province)
+  if (companyData.company_location?.street) parts.push(companyData.company_location.street)
+  if (companyData.company_location?.city) parts.push(companyData.company_location.city)
+  if (companyData.company_location?.province) parts.push(companyData.company_location.province)
   if (companyData.zip) parts.push(companyData.zip)
   return parts.join(", ")
 }
-const calculateProratedPrice = (price: number, startDate: Date, endDate: Date): number => {
+
+const calculateProratedPrice = (price: number, startDate: Date | undefined, endDate: Date | undefined): number => {
+  if (!startDate || !endDate) return price;
+
   let total = 0;
   let currentDate = new Date(startDate);
+
+  console.log('Calculating prorated price from', startDate, 'to', endDate, 'for price', price);
+  if (endDate.getTime() === startDate.getTime()) return price;
 
   while (currentDate <= endDate) {
     const year = currentDate.getFullYear();
@@ -124,8 +131,8 @@ const getDateObject = (date: any): Date | undefined => {
 }
 
 export async function POST(request: NextRequest) {
-  const { quotation, companyData, logoDataUrl, userData, format = 'pdf' }: { quotation: Quotation; companyData: any; logoDataUrl: string | null; userData?: any; format?: 'pdf' | 'image' } = await request.json()
-  console.log('Received quotation:', quotation)
+  const { costEstimate, companyData, logoDataUrl, format = 'pdf', userData }: { costEstimate: CostEstimate; companyData: any; logoDataUrl: string | null; format?: 'pdf' | 'image'; userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string } } = await request.json()
+  console.log('Received cost estimate:', costEstimate)
   console.log('Received companyData:', companyData)
   console.log('Received logoDataUrl:', !!logoDataUrl)
   console.log('Received userData:', userData)
@@ -133,7 +140,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Generate HTML content
-    const htmlContent = generateQuotationHTML(quotation, companyData, userData)
+    const htmlContent = generateCostEstimateHTML(costEstimate, companyData, userData)
 
     // Launch puppeteer
     const browser = await puppeteer.launch({
@@ -150,11 +157,12 @@ export async function POST(request: NextRequest) {
       printBackground: true,
       displayHeaderFooter: true,
       headerTemplate: `
-        <div style="text-align: center; width: 100%; padding: 5px;">
+        <div class="header" style="text-align: center; width: 100%; padding: 5px;">
           ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 50px; margin-right: 10px;">` : ''}
         </div>
       `,
-       footerTemplate: `<div></div>`,
+      footerTemplate: `<div> </div>
+      `,
       margin: {
         top: '25mm',
         right: '10mm',
@@ -163,7 +171,7 @@ export async function POST(request: NextRequest) {
       }
     })
     const contentType = 'application/pdf'
-    const filename = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
+    const filename = `${costEstimate.costEstimateNumber || costEstimate.id || 'cost-estimate'}.pdf`
 
     await browser.close()
 
@@ -180,24 +188,66 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function generateQuotationHTML(
-  quotation: Quotation,
+function generateCostEstimateHTML(
+  costEstimate: CostEstimate,
   companyData: any,
-  userData?: any
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string }
 ): string {
-  const item = quotation.items
+  // Group line items by site
+  const groupLineItemsBySite = (lineItems: any[]) => {
+    const siteGroups: { [key: string]: any[] } = {}
 
-  const startDate = quotation.start_date || (quotation as any).contract_period?.start_date
-  const endDate = quotation.end_date || (quotation as any).contract_period?.end_date
+    lineItems.forEach((item) => {
+      if (item.category.includes("Billboard Rental")) {
+        const siteName = item.description
+        if (!siteGroups[siteName]) {
+          siteGroups[siteName] = []
+        }
+        siteGroups[siteName].push(item)
+
+        const siteId = item.id
+        const relatedItems = lineItems.filter(
+          (relatedItem) => relatedItem.id.includes(siteId) && relatedItem.id !== siteId,
+        )
+        siteGroups[siteName].push(...relatedItems)
+      }
+    })
+
+    if (Object.keys(siteGroups).length === 0) {
+      siteGroups["Single Site"] = lineItems
+    }
+
+    return siteGroups
+  }
+
+  const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
+  const sites = Object.keys(siteGroups)
+  const isMultipleSites = sites.length > 1
+
+  // Get the first site for main details
+  const primarySite = sites[0]
+  const siteLineItems = siteGroups[primarySite] || []
+  const primaryRentalItem = siteLineItems.find((item) => item.category.includes("Billboard Rental"))
+
+  const startDate = costEstimate.startDate || (costEstimate as any).contract_period?.start_date
+  const endDate = costEstimate.endDate || (costEstimate as any).contract_period?.end_date
+
+  // Calculate totals
+  const subtotal = costEstimate.lineItems.reduce((sum, item) => sum + item.total, 0)
+  const vatRate = 0.12
+  const vatAmount = subtotal * vatRate
+  const totalWithVat = subtotal + vatAmount
+
+  const monthlyRate = primaryRentalItem ? primaryRentalItem.unitPrice : 0
 
   return `
   <!DOCTYPE html>
   <html>
   <head>
     <meta charset="UTF-8">
-    <title>${quotation.quotation_number}</title>
+    <title>${costEstimate.costEstimateNumber}</title>
     <style>
-    @page {
+  @page {
   margin: 25mm 15mm 30mm 15mm; /* extra bottom space */
 }
     *{
@@ -220,9 +270,6 @@ function generateQuotationHTML(
         background: #fff;
         color: #333;
         line-height: 1.5;
-        page-break-after: always;
-    position: relative;
-    height: 297mm; /* A4 height */
       }
       .date-ref {
         display: flex;
@@ -375,157 +422,136 @@ function generateQuotationHTML(
 
     <div class="client-info">
       <div class="client-left">
-        <p>${quotation.client_name || "Client Name"}</p>
-        <p>${quotation.client_designation || "Position"}</p>
-        <p><strong>${quotation.client_company_name || "COMPANY NAME"}</strong></p>
+        <p>${costEstimate.client?.name || "Client Name"}</p>
+        <p>${costEstimate.client?.designation || "Position"}</p>
+        <p><strong>${costEstimate.client?.company || "COMPANY NAME"}</strong></p>
       </div>
       <div class="client-right">
-        <p>RFQ. No. ${quotation.quotation_number}</p>
+        <p>CE. No. ${costEstimate.costEstimateNumber}</p>
       </div>
     </div>
 
-    <div class="title">${item?.name || "Site Name"} - Quotation</div>
+    <div class="title">${isMultipleSites ? `Cost Estimate for ${primarySite}` : costEstimate.title || "Cost Estimate"}</div>
 
     <div class="salutation">
-      Dear ${quotation.template?.salutation || "Mr."} ${quotation.client_name?.split(" ").pop() || "Client"
-    },
+      Dear ${costEstimate.client?.name?.split(" ").pop() || "Client"},
     </div>
 
     <div class="greeting">
-      ${quotation.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
+      ${costEstimate.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
     </div>
 
-<div class="details-header">Site details:</div>
-<div class="site-details">
-  <ul>
-    <li>
-      <div class="details-row">
-        <div class="details-label">Type:</div>
-        <div class="details-value">${item?.type || "Rental"}</div>
-      </div>
-    </li>
-    <li>
-      <div class="details-row">
-        <div class="details-label">Size:</div>
-        <div class="details-value">${item?.specs?.height ? `${item.specs.height}ft (H)` : "N/A"
-        } x ${item?.specs?.width ? `${item.specs.width}ft (W)` : "N/A"}</div>
-      </div>
-    </li>
-    <li>
-      <div class="details-row">
-        <div class="details-label">Contract Duration:</div>
-        <div class="details-value">${quotation.duration_days || 0} days</div>
-      </div>
-    </li>
-     <li>
-      <div class="details-row">
-        <div class="details-label">Contract Period:</div>
-        <div class="details-value">${startDate ? formatDate(startDate) : ""
-        }${startDate && endDate ? " - " : ""}${endDate ? formatDate(endDate) : ""}</div>
-      </div>
-    </li>
-     <li>
-     <div class="details-row">
-        <div class="details-label">Proposal to:</div>
-        <div class="details-value">${quotation.client_company_name || "CLIENT COMPANY NAME"}</div>
-      </div>
-    </li>
-     <li>
-      <div class="details-row">
-        <div class="details-label">Lease rate per month:</div>
-        <div class="details-value">PHP ${item?.price ? item.price.toLocaleString() : "0"} (Exclusive of VAT)</div>
-      </div>
-    </li>
-    <li>
-      <div class="details-row">
-        <div class="details-label">Total Lease:</div>
-        <div class="details-value">PHP ${calculateProratedPrice(item?.price || 0, getDateObject(startDate) || new Date(), getDateObject(endDate) || new Date()).toLocaleString()} (Exclusive of VAT)</div>
-      </div>
-    </li>
-  </ul>
-</div>
-  ${item?.site_notes ? `
-  <div class="price-notes">
-    <p><strong>Note:</strong> ${item.site_notes}</p>
-  </div>
-  ` : ''}
+    <div class="details-header">Site details:</div>
+    <div class="site-details">
+      <ul>
+        <li>
+          <div class="details-row">
+            <div class="details-label">Type:</div>
+            <div class="details-value">${primaryRentalItem?.content_type || "Rental"}</div>
+          </div>
+        </li>
+        <li>
+          <div class="details-row">
+            <div class="details-label">Size:</div>
+            <div class="details-value">${primaryRentalItem?.specs?.height ? `${primaryRentalItem.specs.height}ft (H)` : "N/A"} x ${primaryRentalItem?.specs?.width ? `${primaryRentalItem.specs.width}ft (W)` : "N/A"}</div>
+          </div>
+        </li>
+        <li>
+          <div class="details-row">
+            <div class="details-label">Contract Duration:</div>
+            <div class="details-value">${ costEstimate.durationDays ? `${costEstimate.durationDays} days` : "—"} </div>
+          </div>
+        </li>
+        <li>
+          <div class="details-row">
+            <div class="details-label">Contract Period:</div>
+            <div class="details-value">${startDate ? formatDate(startDate) : ""}${startDate && endDate ? " - " : ""}${endDate ? formatDate(endDate) : "—"}</div>
+          </div>
+        </li>
+        <li>
+          <div class="details-row">
+            <div class="details-label">Proposal to:</div>
+            <div class="details-value">${costEstimate.client?.company || "CLIENT COMPANY NAME"}</div>
+          </div>
+        </li>
+        <li>
+          <div class="details-row">
+            <div class="details-label">Lease rate per month:</div>
+            <div class="details-value">PHP ${monthlyRate.toLocaleString()} (Exclusive of VAT)</div>
+          </div>
+        </li>
+        <li>
+          <div class="details-row">
+            <div class="details-label">Total Lease:</div>
+            <div class="details-value">PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)).toLocaleString()} (Exclusive of VAT)</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+
+    ${costEstimate.items?.site_notes ? `
+    <div class="price-notes">
+      <p><strong>Site Notes:</strong> ${costEstimate.items.site_notes}</p>
+    </div>
+    ` : ''}
     <div class="price-breakdown-title">Price breakdown:</div>
     <div class="price-breakdown">
       <div class="price-row">
         <span>Lease rate per month</span>
-        <span>PHP ${(item?.price || 0).toLocaleString()}</span>
+        <span>PHP ${(costEstimate.lineItems[0].total).toLocaleString()}</span>
       </div>
       <div class="price-row">
         <span>Contract duration</span>
-        <span>x ${formatDuration(quotation.duration_days || 0, startDate, endDate)}</span>
+        <span>x ${costEstimate.durationDays ? `${costEstimate.durationDays} days` : "1 month"}</span>
       </div>
       <div class="price-row">
         <span>Total lease</span>
-        <span>PHP ${calculateProratedPrice(
-      item?.price || 0,
-      getDateObject(startDate) || new Date(),
-      getDateObject(endDate) || new Date()
-    ).toLocaleString()}</span>
+        <span>PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)).toLocaleString()}</span>
       </div>
       <div class="price-row">
         <span>Add: VAT</span>
-        <span>PHP ${(calculateProratedPrice(
-      item?.price || 0,
-      getDateObject(startDate) || new Date(),
-      getDateObject(endDate) || new Date()
-    ) * 0.12).toLocaleString()}</span>
+        <span>PHP ${(calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)) * 0.12).toLocaleString()}</span>
       </div>
       <div class="price-row price-total">
         <span>Total</span>
         <span>PHP ${(
-      calculateProratedPrice(
-        item?.price || 0,
-        getDateObject(startDate) || new Date(),
-        getDateObject(endDate) || new Date()
-      ) * 1.12
-    ).toLocaleString()}</span>
+          calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)) * 1.12
+        ).toLocaleString()}</span>
       </div>
     </div>
 
-    ${item?.price_notes ? `
+    ${costEstimate.items?.price_notes ? `
     <div class="price-notes">
-      <p><strong>Note:</strong> ${item.price_notes}</p>
+      <p><strong>Price Notes:</strong> ${costEstimate.items.price_notes}</p>
     </div>
     ` : ''}
 
     <div class="terms">
       <div class="terms-title">Terms and Conditions:</div>
-      ${(quotation.template?.terms_and_conditions || [
-      "Quotation validity: 5 working days.",
+      ${(costEstimate.template?.terms_and_conditions || [
+        "Quotation validity: 5 working days.",
       "Site availability: First-come-first-served basis. Official documents required.",
       "Payment terms: One month advance and two months security deposit.",
       "Payment deadline: 7 days before rental start."
-    ])
-      .map((term, index) => `<div class="term-item">${index + 1}. ${term}</div>`)
-      .join("")}
+      ])
+    .map((term, index) => `<div class="term-item">${index + 1}. ${term}</div>`).join('')}
     </div>
 
-    ${quotation.template?.closing_message ? `<div class="closing-message" style="page-break-inside: avoid;"><p>${quotation.template.closing_message}</p></div>` : ''}
+    ${costEstimate.template?.closing_message ? `
+    <div class="closing-message" style="page-break-inside: avoid;">
+      <p>${costEstimate.template.closing_message}</p>
+    </div>
+    ` : ''}
 
     <div class="signatures">
       <div class="signature-section">
         <div>Very truly yours,</div>
         <div class="signature-line"></div>
-        <div>${userData?.first_name || quotation.signature_name || "AIX Xymbiosis"}</div>
-        <div>${quotation.signature_position || "Sales Manager"}</div>
-      </div>
-      <div class="signature-section">
-        <div>Conforme:</div>
-        <div class="signature-line"></div>
-        <div>${quotation.client_name || "Client Name"}</div>
-        <div>${quotation.client_designation || "Client Designation"}</div>
-        <div style="font-size: 10px; margin-top: 10px; color: gray; font-style: italic;">
-          This signed quotation serves as an<br/>official document for billing purposes
-        </div>
+        <div>${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : companyData?.company_name || "Golden Touch Imaging Specialist"}</div>
+        <div>${costEstimate.signature_position || "Sale Manager"}</div>
       </div>
     </div>
-
-      <div class="page-footer" style="font-size:8px; width:100%; text-align:center; padding:2px 0; color: #444;">
+        <div class="page-footer" style="font-size:8px; width:100%; text-align:center; padding:2px 0; color: #444;">
           <div>${companyData?.name || 'Company Name'}</div>
           <div>${formatCompanyAddress(companyData)}</div>
           <div>Tel: ${companyData?.phone || 'N/A'} | Email: ${companyData?.email || 'N/A'}</div>
@@ -534,4 +560,3 @@ function generateQuotationHTML(
   </html>
   `
 }
-

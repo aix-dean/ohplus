@@ -39,4 +39,18 @@ export interface CostEstimate {
   endDate?: Date | null // New field
   durationDays?: number | null // New field for duration in days
   validUntil?: Date | null // Add this new field
+  signature_position?: string // Position of the person signing the cost estimate
+  items?: {
+    site_notes?: string
+    price_notes?: string
+  }
+  template?: {
+    salutation?: string // Salutation title (Mr., Ms., Mrs., Miss)
+    greeting?: string // Custom greeting text
+    terms_and_conditions?: string[] // Array of terms and conditions
+    closing_message?: string // Optional closing message
+  }
+  pdf?: string // PDF URL field
+  password?: string // 8-digit password field
 }
+

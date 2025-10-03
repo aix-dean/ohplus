@@ -21,10 +21,14 @@ import {
   getCountFromServer,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import type { Proposal, ProposalProduct, ProposalClient } from "@/lib/types/proposal"
 import { logProposalCreated, logProposalStatusChanged, logProposalEmailSent } from "@/lib/proposal-activity-service"
 
-// Removed generateProposalPassword function
+// Generate an 8-digit password for proposal PDF access
+export function generateProposalPassword(): string {
+  return Math.floor(10000000 + Math.random() * 90000000).toString()
+}
 
 // Create a new proposal
 export async function createProposal(
@@ -110,6 +114,8 @@ export async function createProposal(
         : null,
       description: product.description || "",
       health_percentage: product.health_percentage || 0,
+      categories: product.categories || [], // Include categories from product
+      category_names: product.category_names || [], // Include category names from product
     }))
 
     // Generate proposal number
@@ -434,6 +440,9 @@ export async function updateProposal(
     if (data.templateOrientation !== undefined) updateData.templateOrientation = data.templateOrientation
     if (data.templateLayout !== undefined) updateData.templateLayout = data.templateLayout
     if (data.templateBackground !== undefined) updateData.templateBackground = data.templateBackground
+
+    if (data.pdf !== undefined) updateData.pdf = data.pdf
+    if (data.password !== undefined) updateData.password = data.password
 
     if (data.products !== undefined) {
       updateData.products = data.products
@@ -891,4 +900,81 @@ export async function generateProposalPDFBlob(
   const filename = `OH_PROP_${proposal.id}_${proposal.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`
 
   return { blob: pdfBlob, filename }
+}
+
+// Generate PDF and upload to Firebase storage with password protection
+export async function generateAndUploadProposalPDF(
+  proposal: Proposal,
+  selectedSize: string = "A4",
+  selectedOrientation: string = "Portrait"
+): Promise<{ pdfUrl: string; password: string }> {
+  try {
+    // Generate the PDF blob
+    const { blob } = await generateProposalPDFBlob(proposal, selectedSize, selectedOrientation)
+
+    // Generate password
+    const password = generateProposalPassword()
+
+    // Create a unique filename
+    const timestamp = Date.now()
+    const filename = `proposal_${proposal.id}_${timestamp}.pdf`
+
+    // Convert blob to File object for upload
+    const pdfFile = new File([blob], filename, { type: 'application/pdf' })
+
+    // Upload to Firebase storage
+    const uploadPath = `proposals/pdfs/${filename}`
+    const pdfUrl = await uploadFileToFirebaseStorage(pdfFile, uploadPath)
+
+    return { pdfUrl, password }
+  } catch (error) {
+    console.error("Error generating and uploading proposal PDF:", error)
+    throw error
+  }
+}
+
+// Get sent emails for a proposal, cost estimate, or quotation
+export async function getSentEmailsForProposal(proposalId: string, emailType: "proposal" | "cost_estimate" | "quotation" = "proposal"): Promise<any[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const emailsRef = collection(db, "emails")
+    let idField: string
+    if (emailType === "quotation") {
+      idField = "quotationId"
+    } else if (emailType === "cost_estimate") {
+      idField = "costEstimateId"
+    } else {
+      idField = "proposalId"
+    }
+
+    const q = query(
+      emailsRef,
+      where(idField, "==", proposalId),
+      where("email_type", "==", emailType),
+      where("status", "==", "sent"),
+      orderBy("sentAt", "desc")
+    )
+
+    const querySnapshot = await getDocs(q)
+    const emails: any[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      emails.push({
+        id: doc.id,
+        ...data,
+        sentAt: data.sentAt instanceof Timestamp ? data.sentAt.toDate() : new Date(data.sentAt),
+        created: data.created instanceof Timestamp ? data.created.toDate() : new Date(data.created),
+        updated: data.updated instanceof Timestamp ? data.updated.toDate() : new Date(data.updated),
+      })
+    })
+
+    return emails
+  } catch (error) {
+    console.error("Error fetching sent emails for proposal:", error)
+    return []
+  }
 }

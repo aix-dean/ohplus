@@ -121,4 +121,6 @@ export interface Quotation {
   }
   size?: string // Size specification
   costEstimateNumber?: string // Reference to the source cost estimate number
+  pdf?: string // PDF URL field
+  password?: string // 8-digit password field
 }

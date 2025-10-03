@@ -850,6 +850,8 @@ function SalesDashboardContent() {
         light: (product as any).light || null,
         description: product.description || "",
         health_percentage: 0, // Default value
+        categories: product.categories || [], // Include categories from product
+        category_names: product.category_names || [], // Include category names from product
       }));
 
       const proposalId = await createProposal(proposalTitle, selectedClientForProposal, proposalProducts as ProposalProduct[], user.uid, {

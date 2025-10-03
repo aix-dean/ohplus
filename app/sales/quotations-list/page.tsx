@@ -34,26 +34,27 @@ import {
   Search,
   X,
   MoreVertical,
-  ChevronDown,
-  ChevronRight,
   Upload,
   FileText,
   Loader2,
   Share2,
-  Copy,
-  Mail,
-  MessageSquare,
-  Facebook,
-  Twitter,
-  Linkedin,
-  Check,
   Plus,
+  EyeIcon,
+  FilePen,
+  Eye,
+  Download,
+  History,
+  Printer,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quotation-service"
+import { SentHistoryDialog } from "@/components/sent-history-dialog"
+import { ComplianceDialog } from "@/components/compliance-dialog"
+import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog"
 import { bookingService } from "@/lib/booking-service"
 import { searchQuotations } from "@/lib/algolia-service"
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
 export default function QuotationsListPage() {
   const router = useRouter()
@@ -69,18 +70,21 @@ export default function QuotationsListPage() {
   const [hasMorePages, setHasMorePages] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
   const [signingQuotes, setSigningQuotes] = useState<Set<string>>(new Set())
-  const [expandedCompliance, setExpandedCompliance] = useState<Set<string>>(new Set())
   const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set())
   const [copyingQuotations, setCopyingQuotations] = useState<Set<string>>(new Set())
   const [generatingPDFs, setGeneratingPDFs] = useState<Set<string>>(new Set())
   const [searchLoading, setSearchLoading] = useState(false)
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [selectedQuotationForShare, setSelectedQuotationForShare] = useState<any>(null)
-  const [copiedToClipboard, setCopiedToClipboard] = useState(false)
   const [projectNameDialogOpen, setProjectNameDialogOpen] = useState(false)
   const [selectedQuotationForProject, setSelectedQuotationForProject] = useState<any>(null)
   const [projectName, setProjectName] = useState("")
   const [creatingReservation, setCreatingReservation] = useState(false)
+  const [showSentHistoryDialog, setShowSentHistoryDialog] = useState(false)
+  const [selectedQuotationForHistory, setSelectedQuotationForHistory] = useState<any>(null)
+  const [showComplianceDialog, setShowComplianceDialog] = useState(false)
+  const [selectedQuotationForCompliance, setSelectedQuotationForCompliance] = useState<any>(null)
+  const [companyData, setCompanyData] = useState<any>(null)
 
   const handleProjectNameDialogClose = (open: boolean) => {
     if (!open) {
@@ -218,6 +222,12 @@ export default function QuotationsListPage() {
       fetchQuotations(1, true)
     }
   }, [user?.uid])
+
+  useEffect(() => {
+    if (user && userData) {
+      fetchCompanyData()
+    }
+  }, [user, userData])
 
   useEffect(() => {
     const resetPagination = async () => {
@@ -433,30 +443,6 @@ export default function QuotationsListPage() {
         throw new Error("File size must be less than 10MB")
       }
 
-      // Special handling for signed contract - don't upload yet, show dialog first
-      if (complianceType === "signedContract") {
-        // For signed contract, store the file locally and show dialog
-        // Don't upload to Firebase Storage yet
-        const quotationRef = doc(db, "quotations", quotationId)
-        const currentQuotationDoc = await getDoc(quotationRef)
-        if (!currentQuotationDoc.exists()) {
-          throw new Error("Quotation not found")
-        }
-        const currentQuotationData = { id: quotationId, ...currentQuotationDoc.data() }
-
-        console.log("[DEBUG] Preparing signed contract upload for quotation:", quotationId)
-        console.log("[DEBUG] User UID:", user?.uid, "User Company ID:", userData?.company_id)
-
-        // Show project name dialog with the file stored temporarily
-        setSelectedQuotationForProject({
-          ...currentQuotationData,
-          tempFile: file, // Store the file locally
-          tempComplianceType: complianceType
-        })
-        setProjectName("")
-        setProjectNameDialogOpen(true)
-        return // Exit early, don't continue with normal upload flow
-      }
 
       // Normal upload flow for other compliance types
       // Create storage reference
@@ -471,7 +457,7 @@ export default function QuotationsListPage() {
       const quotationRef = doc(db, "quotations", quotationId)
       const updateData: { [key: string]: any } = {
         [`projectCompliance.${complianceType}`]: {
-          status: "completed",
+          status: "uploaded",
           fileUrl: downloadURL,
           fileName: file.name,
           uploadedAt: serverTimestamp(),
@@ -508,6 +494,25 @@ export default function QuotationsListPage() {
 
       // Refresh quotations list
       await fetchQuotations(1, true)
+
+      // Update the selected quotation for compliance dialog
+      if (selectedQuotationForCompliance && selectedQuotationForCompliance.id === quotationId) {
+        const updatedQuotation = quotations.find(q => q.id === quotationId) || selectedQuotationForCompliance
+        setSelectedQuotationForCompliance({
+          ...updatedQuotation,
+          projectCompliance: {
+            ...updatedQuotation.projectCompliance,
+            [complianceType]: {
+              ...updatedQuotation.projectCompliance?.[complianceType],
+              status: "uploaded",
+              fileUrl: downloadURL,
+              fileName: file.name,
+              uploadedAt: serverTimestamp(),
+              uploadedBy: user?.uid,
+            }
+          }
+        })
+      }
 
       toast({
         title: "Success",
@@ -584,17 +589,6 @@ export default function QuotationsListPage() {
     }
   }
 
-  const toggleComplianceExpansion = (quotationId: string) => {
-    setExpandedCompliance((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(quotationId)) {
-        newSet.delete(quotationId)
-      } else {
-        newSet.add(quotationId)
-      }
-      return newSet
-    })
-  }
 
   const triggerFileUpload = (quotationId: string, complianceType: string) => {
     const input = document.createElement("input")
@@ -654,6 +648,99 @@ export default function QuotationsListPage() {
       })
     }
   }
+  
+
+  const handleDownloadPDF = async (quotationId: string) => {
+    setGeneratingPDFs((prev) => new Set(prev).add(quotationId))
+
+    try {
+      // Get the full quotation data
+      const quotation = await getQuotationById(quotationId)
+      if (!quotation) {
+        throw new Error("Quotation not found")
+      }
+
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      // Prepare quotation data for API (convert Timestamps to serializable format)
+      const serializableQuotation = {
+        ...quotation,
+        created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
+        updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
+        valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
+        start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
+        end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+      }
+
+      // Call the generate-quotation-pdf API
+      const response = await fetch('/api/generate-quotation-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quotation: serializableQuotation,
+          companyData,
+          logoDataUrl,
+          userData,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
+
+      // Create download link
+      const url = URL.createObjectURL(pdfBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+
+      // Clean up the URL
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Success",
+        description: "Quotation PDF downloaded successfully",
+      })
+    } catch (error: any) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Download Failed",
+        description: error.message || "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(quotationId)
+        return newSet
+      })
+    }
+  }
 
   const handlePrintQuotation = async (quotationId: string) => {
     setGeneratingPDFs((prev) => new Set(prev).add(quotationId))
@@ -665,15 +752,177 @@ export default function QuotationsListPage() {
         throw new Error("Quotation not found")
       }
 
-      // Generate and download the PDF
-      await generateQuotationPDF(quotation)
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      // Prepare quotation data for API (convert Timestamps to serializable format)
+      const serializableQuotation = {
+        ...quotation,
+        created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
+        updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
+        valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
+        start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
+        end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+      }
+
+      // Call the generate-quotation-pdf API
+      const response = await fetch('/api/generate-quotation-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quotation: serializableQuotation,
+          companyData,
+          logoDataUrl,
+          userData,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+
+
+      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+
+      // Open PDF in new window and trigger print
+      const printWindow = window.open(pdfUrl)
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print()
+          // Clean up the URL after printing
+          printWindow.onafterprint = () => {
+            URL.revokeObjectURL(pdfUrl)
+          }
+        }
+      } else {
+        console.error("Failed to open print window")
+        URL.revokeObjectURL(pdfUrl)
+      }
 
       toast({
         title: "Success",
-        description: "Quotation PDF generated and downloaded successfully",
+        description: "Quotation PDF opened for printing",
       })
     } catch (error: any) {
       console.error("Error generating PDF:", error)
+      toast({
+        title: "Download Failed",
+        description: error.message || "Failed to generate PDF. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFs((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(quotationId)
+        return newSet
+      })
+    }
+  }
+
+  const handlePrintQuotationWindow = async (quotationId: string) => {
+    setGeneratingPDFs((prev) => new Set(prev).add(quotationId))
+
+    try {
+      // Get the full quotation data
+      const quotation = await getQuotationById(quotationId)
+      if (!quotation) {
+        throw new Error("Quotation not found")
+      }
+
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      // Prepare quotation data for API (convert Timestamps to serializable format)
+      const serializableQuotation = {
+        ...quotation,
+        created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
+        updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
+        valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
+        start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
+        end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+      }
+
+      // Call the generate-quotation-pdf API
+      const response = await fetch('/api/generate-quotation-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          quotation: serializableQuotation,
+          companyData,
+          logoDataUrl,
+          userData,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+      }
+
+      const buffer = await response.arrayBuffer()
+
+      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+
+      // Open PDF in new window and trigger print
+      const printWindow = window.open(pdfUrl)
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print()
+          // Clean up the URL after printing
+          printWindow.onafterprint = () => {
+            URL.revokeObjectURL(pdfUrl)
+          }
+        }
+      } else {
+        console.error("Failed to open print window")
+        URL.revokeObjectURL(pdfUrl)
+      }
+
+      toast({
+        title: "Success",
+        description: "Quotation PDF opened for printing",
+      })
+    } catch (error: any) {
+      console.error("Error generating PDF for printing:", error)
       toast({
         title: "Print Failed",
         description: error.message || "Failed to generate PDF. Please try again.",
@@ -688,147 +937,12 @@ export default function QuotationsListPage() {
     }
   }
 
-  const handleShareQuotation = async (quotationId: string) => {
-    try {
-      const quotation = await getQuotationById(quotationId)
-      if (!quotation) {
-        throw new Error("Quotation not found")
-      }
-      setSelectedQuotationForShare(quotation)
-      setShareDialogOpen(true)
-    } catch (error: any) {
-      console.error("Error loading quotation for sharing:", error)
-      toast({
-        title: "Error",
-        description: "Failed to load quotation details for sharing",
-        variant: "destructive",
-      })
-    }
+  const handleShareQuotation = (quotationId: string) => {
+    // Navigate to detail page and trigger share there
+    // This ensures the quotation is rendered and can be shared properly
+    router.push(`/sales/quotations/${quotationId}?action=share`)
   }
 
-  const generateShareableLink = (quotation: any) => {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
-    return `${baseUrl}/sales/quotations/${quotation.id}`
-  }
-
-  const generateShareText = (quotation: any) => {
-    return `Check out this quotation: ${quotation.quotation_number || "Quotation"} for ${quotation.client_name || "Client"} - ${quotation.items?.name || "Service"}`
-  }
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopiedToClipboard(true)
-      setTimeout(() => setCopiedToClipboard(false), 2000)
-      toast({
-        title: "Copied!",
-        description: "Link copied to clipboard successfully",
-      })
-    } catch (error) {
-      console.error("Failed to copy to clipboard:", error)
-      toast({
-        title: "Copy Failed",
-        description: "Failed to copy to clipboard. Please try again.",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const shareViaEmail = (quotation: any) => {
-    const subject = encodeURIComponent(`Quotation: ${quotation.quotation_number || "New Quotation"}`)
-    const body = encodeURIComponent(
-      `${generateShareText(quotation)}\n\nView details: ${generateShareableLink(quotation)}`,
-    )
-    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`
-    window.open(mailtoUrl, "_blank")
-
-    toast({
-      title: "Email Client Opened",
-      description: "Your email client has been opened with the quotation details",
-    })
-  }
-
-  const shareViaSMS = (quotation: any) => {
-    const text = encodeURIComponent(`${generateShareText(quotation)} ${generateShareableLink(quotation)}`)
-    const smsUrl = `sms:?body=${text}`
-    window.open(smsUrl, "_blank")
-
-    toast({
-      title: "SMS App Opened",
-      description: "Your SMS app has been opened with the quotation details",
-    })
-  }
-
-  const shareViaWhatsApp = (quotation: any) => {
-    const text = encodeURIComponent(`${generateShareText(quotation)} ${generateShareableLink(quotation)}`)
-    const whatsappUrl = `https://wa.me/?text=${text}`
-    window.open(whatsappUrl, "_blank")
-
-    toast({
-      title: "WhatsApp Opened",
-      description: "WhatsApp has been opened with the quotation details",
-    })
-  }
-
-  const shareViaFacebook = (quotation: any) => {
-    const url = encodeURIComponent(generateShareableLink(quotation))
-    const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`
-    window.open(facebookUrl, "_blank", "width=600,height=400")
-
-    toast({
-      title: "Facebook Opened",
-      description: "Facebook sharing dialog has been opened",
-    })
-  }
-
-  const shareViaTwitter = (quotation: any) => {
-    const text = encodeURIComponent(generateShareText(quotation))
-    const url = encodeURIComponent(generateShareableLink(quotation))
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${text}&url=${url}`
-    window.open(twitterUrl, "_blank", "width=600,height=400")
-
-    toast({
-      title: "Twitter Opened",
-      description: "Twitter sharing dialog has been opened",
-    })
-  }
-
-  const shareViaLinkedIn = (quotation: any) => {
-    const url = encodeURIComponent(generateShareableLink(quotation))
-    const linkedinUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${url}`
-    window.open(linkedinUrl, "_blank", "width=600,height=400")
-
-    toast({
-      title: "LinkedIn Opened",
-      description: "LinkedIn sharing dialog has been opened",
-    })
-  }
-
-  const shareViaNativeAPI = async (quotation: any) => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `Quotation: ${quotation.quotation_number || "New Quotation"}`,
-          text: generateShareText(quotation),
-          url: generateShareableLink(quotation),
-        })
-
-        toast({
-          title: "Shared Successfully",
-          description: "Quotation has been shared successfully",
-        })
-      } catch (error: any) {
-        if (error.name !== "AbortError") {
-          console.error("Error sharing:", error)
-          toast({
-            title: "Share Failed",
-            description: "Failed to share quotation. Please try another method.",
-            variant: "destructive",
-          })
-        }
-      }
-    }
-  }
 
   const validateComplianceForJO = (quotation: any) => {
     const compliance = quotation.projectCompliance || {}
@@ -891,6 +1005,82 @@ export default function QuotationsListPage() {
   const handleQuotationRoute = (id: string) => {
     router.push(`/sales/quotations/${id}`)
   }
+  const fetchCompanyData = async () => {
+    if (!user?.uid || !userData) return
+
+    try {
+      let companyDoc = null
+      let companyDataResult = null
+
+      // First, try to find company by company_id if it exists in userData
+      if (userData?.company_id) {
+        try {
+          const companyDocRef = doc(db, "companies", userData.company_id)
+          const companyDocSnap = await getDoc(companyDocRef)
+
+          if (companyDocSnap.exists()) {
+            companyDoc = companyDocSnap
+            companyDataResult = companyDocSnap.data()
+          }
+        } catch (error) {
+          console.error("Error fetching company by company_id:", error)
+        }
+      }
+
+      // If no company found by company_id, try other methods
+      if (!companyDoc) {
+        // Try to find company by created_by field
+        let companiesQuery = query(collection(db, "companies"), where("created_by", "==", user.uid))
+        let companiesSnapshot = await getDocs(companiesQuery)
+
+        // If no company found by created_by, try to find by email or other identifiers
+        if (companiesSnapshot.empty && user.email) {
+          companiesQuery = query(collection(db, "companies"), where("email", "==", user.email))
+          companiesSnapshot = await getDocs(companiesQuery)
+        }
+
+        // If still no company found, try to find by contact_person email
+        if (companiesSnapshot.empty && user.email) {
+          companiesQuery = query(collection(db, "companies"), where("contact_person", "==", user.email))
+          companiesSnapshot = await getDocs(companiesQuery)
+        }
+
+        if (!companiesSnapshot.empty) {
+          companyDoc = companiesSnapshot.docs[0]
+          companyDataResult = companyDoc.data()
+        }
+      }
+
+      if (companyDoc && companyDataResult) {
+        const company: any = {
+          id: companyDoc.id,
+          name: companyDataResult.name,
+          company_location: companyDataResult.company_location || companyDataResult.address,
+          address: companyDataResult.address,
+          company_website: companyDataResult.company_website || companyDataResult.website,
+          photo_url: companyDataResult.photo_url,
+          contact_person: companyDataResult.contact_person,
+          email: companyDataResult.email,
+          phone: companyDataResult.phone,
+          social_media: companyDataResult.social_media || {},
+          created_by: companyDataResult.created_by,
+          created: companyDataResult.created?.toDate
+            ? companyDataResult.created.toDate()
+            : companyDataResult.created_at?.toDate(),
+          updated: companyDataResult.updated?.toDate
+            ? companyDataResult.updated.toDate()
+            : companyDataResult.updated_at?.toDate(),
+        }
+
+        setCompanyData(company)
+      } else {
+        setCompanyData(null)
+      }
+    } catch (error) {
+      console.error("Error fetching company data:", error)
+    }
+  }
+
   const handleProjectNameSubmit = async () => {
     if (!selectedQuotationForProject || !user?.uid || !userData?.company_id || !projectName.trim()) {
       toast({
@@ -975,6 +1165,108 @@ export default function QuotationsListPage() {
     }
   }
 
+  const handleViewSentHistory = (quotation: any) => {
+    setSelectedQuotationForHistory(quotation)
+    setShowSentHistoryDialog(true)
+  }
+
+  const handleAcceptCompliance = async (quotationId: string, complianceType: string) => {
+    try {
+      const quotationRef = doc(db, "quotations", quotationId)
+      const updateData: { [key: string]: any } = {
+        [`projectCompliance.${complianceType}.status`]: "completed",
+        [`projectCompliance.${complianceType}.completed`]: true,
+        updated: serverTimestamp(),
+      }
+
+      await updateDoc(quotationRef, updateData)
+
+      toast({
+        title: "Success",
+        description: `${complianceType.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())} accepted successfully`,
+      })
+
+      // Refresh quotations list
+      await fetchQuotations(1, true)
+
+      // Update the selected quotation for compliance dialog
+      if (selectedQuotationForCompliance && selectedQuotationForCompliance.id === quotationId) {
+        setSelectedQuotationForCompliance({
+          ...selectedQuotationForCompliance,
+          projectCompliance: {
+            ...selectedQuotationForCompliance.projectCompliance,
+            [complianceType]: {
+              ...selectedQuotationForCompliance.projectCompliance?.[complianceType],
+              status: "completed",
+              completed: true,
+            }
+          }
+        })
+      }
+    } catch (error: any) {
+      console.error("Error accepting compliance:", error)
+      toast({
+        title: "Error",
+        description: "Failed to accept compliance. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeclineCompliance = async (quotationId: string, complianceType: string) => {
+    try {
+      const quotationRef = doc(db, "quotations", quotationId)
+      const updateData: { [key: string]: any } = {
+        [`projectCompliance.${complianceType}.status`]: "declined",
+        [`projectCompliance.${complianceType}.completed`]: false,
+        updated: serverTimestamp(),
+      }
+
+      await updateDoc(quotationRef, updateData)
+
+      toast({
+        title: "Success",
+        description: `${complianceType.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())} declined successfully`,
+      })
+
+      // Refresh quotations list
+      await fetchQuotations(1, true)
+
+      // Update the selected quotation for compliance dialog
+      if (selectedQuotationForCompliance && selectedQuotationForCompliance.id === quotationId) {
+        setSelectedQuotationForCompliance({
+          ...selectedQuotationForCompliance,
+          projectCompliance: {
+            ...selectedQuotationForCompliance.projectCompliance,
+            [complianceType]: {
+              ...selectedQuotationForCompliance.projectCompliance?.[complianceType],
+              status: "declined",
+              completed: false,
+            }
+          }
+        })
+      }
+    } catch (error: any) {
+      console.error("Error declining compliance:", error)
+      toast({
+        title: "Error",
+        description: "Failed to decline compliance. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleViewCompliance = (quotation: any) => {
+    setSelectedQuotationForCompliance(quotation)
+    setShowComplianceDialog(true)
+  }
+
+  const handleMarkAsReserved = (quotation: any) => {
+    setSelectedQuotationForProject(quotation)
+    setProjectNameDialogOpen(true)
+    setShowComplianceDialog(false) // Close the compliance dialog
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
@@ -1007,10 +1299,12 @@ export default function QuotationsListPage() {
               <TableHeader>
                 <TableRow className="border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Quotation Number</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Quotation ID</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Client</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Project Compliance</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Compliance</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1030,7 +1324,13 @@ export default function QuotationsListPage() {
                       <Skeleton className="h-5 w-24" />
                     </TableCell>
                     <TableCell className="py-3">
+                      <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="py-3">
                       <Skeleton className="h-5 w-16" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-5 w-12" />
                     </TableCell>
                     <TableCell className="text-right py-3">
                       <Skeleton className="h-8 w-8 ml-auto" />
@@ -1046,20 +1346,25 @@ export default function QuotationsListPage() {
               <TableHeader>
                 <TableRow className="border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Quotation Number</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Quotation ID</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Client</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Project Compliance</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Status</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Compliance</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {quotations.map((quotation: any) => {
                   const compliance = getProjectCompliance(quotation)
-                  const isExpanded = expandedCompliance.has(quotation.id)
 
                   return (
-                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200" onClick={(e) => router.push(`/sales/quotations/${quotation.id}`)}>
+                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200" 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      router.push(`/sales/quotations/${quotation.id}`)
+                      }}>
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600">
                           {(() => {
@@ -1075,180 +1380,35 @@ export default function QuotationsListPage() {
                         <div className="font-medium text-gray-900"   >{quotation.quotation_number || quotation.id || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
+                        <div className="text-sm text-gray-600">{quotation.client_company_name || "—"}</div>
+                      </TableCell>
+                      <TableCell className="py-3">
                         <div className="font-medium text-gray-900">{quotation.client_name || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600">{quotation.items?.name || quotation.product_name || "—"}</div>
                       </TableCell>
-                      <TableCell className="py-3 text-sm text-gray-700">
-                        <div className="space-y-2">
-                          <div
-                            className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
-                            onClick={() => toggleComplianceExpansion(quotation.id)}
-                          >
-                            <span className="font-medium">
-                              {compliance.completed}/{compliance.total}
-                            </span>
-                            <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                            <div className="transition-transform duration-200 ease-in-out">
-                              {isExpanded ? (
-                                <ChevronDown className="w-3 h-3 text-gray-400" />
-                              ) : (
-                                <ChevronRight className="w-3 h-3 text-gray-400" />
-                              )}
-                            </div>
-                          </div>
-
-                          <div
-                            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                              isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                            }`}
-                          >
-                            <div className="space-y-1 pt-1">
-                                <p className="text-xs font-semibold text-gray-800 mt-2 mb-1">To Reserve</p>
-                                {compliance.toReserve.map((item: any, index: number) => {
-                                  const uploadKey = `${quotation.id}-${item.key}`
-                                  const isUploading = uploadingFiles.has(uploadKey)
-
-                                  return (
-                                    <div
-                                      key={index}
-                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                      style={{
-                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                        animationDuration: "200ms",
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        {item.status === "completed" ? (
-                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                            <CheckCircle className="w-3 h-3 text-white" />
-                                          </div>
-                                        ) : (
-                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                        )}
-                                        <div className="flex flex-col">
-                                          <span className="text-gray-700">{item.name}</span>
-                                          {item.note && <span className="text-xs text-gray-500 italic">{item.note}</span>}
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        {item.file && item.fileUrl ? (
-                                          <a
-                                            href={item.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <FileText className="w-3 h-3" />
-                                            {item.file}
-                                          </a>
-                                        ) : item.status === "upload" ? (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-6 px-2 text-xs bg-transparent"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              triggerFileUpload(quotation.id, item.key)
-                                            }}
-                                            disabled={isUploading}
-                                          >
-                                            {isUploading ? (
-                                              <>
-                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                Uploading...
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Upload className="w-3 h-3 mr-1" />
-                                                Upload
-                                              </>
-                                            )}
-                                          </Button>
-                                        ) : item.status === "confirmation" ? (
-                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                            Pending
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-
-                                <p className="text-xs font-semibold text-gray-800 mt-4 mb-1">Other Requirements</p>
-                                {compliance.otherRequirements.map((item: any, index: number) => {
-                                  const uploadKey = `${quotation.id}-${item.key}`
-                                  const isUploading = uploadingFiles.has(uploadKey)
-
-                                  return (
-                                    <div
-                                      key={index}
-                                      className="flex items-center justify-between text-xs animate-in fade-in-0 slide-in-from-top-1"
-                                      style={{
-                                        animationDelay: isExpanded ? `${index * 50}ms` : "0ms",
-                                        animationDuration: "200ms",
-                                      }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        {item.status === "completed" ? (
-                                          <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
-                                            <CheckCircle className="w-3 h-3 text-white" />
-                                          </div>
-                                        ) : (
-                                          <div className="w-4 h-4 rounded-full border border-gray-300 flex-shrink-0"></div>
-                                        )}
-                                        <span className="text-gray-700">{item.name}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1">
-                                        {item.file && item.fileUrl ? (
-                                          <a
-                                            href={item.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
-                                            onClick={(e) => e.stopPropagation()}
-                                          >
-                                            <FileText className="w-3 h-3" />
-                                            {item.file}
-                                          </a>
-                                        ) : item.status === "upload" ? (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-6 px-2 text-xs bg-transparent"
-                                            onClick={(e) => {
-                                              e.stopPropagation()
-                                              triggerFileUpload(quotation.id, item.key)
-                                            }}
-                                            disabled={isUploading}
-                                          >
-                                            {isUploading ? (
-                                              <>
-                                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                                Uploading...
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Upload className="w-3 h-3 mr-1" />
-                                                Upload
-                                              </>
-                                            )}
-                                          </Button>
-                                        ) : item.status === "confirmation" ? (
-                                          <span className="text-gray-500 bg-gray-100 px-1 py-0.5 rounded text-xs">
-                                            Pending
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-
-                            </div>
-                          </div>
-                        </div>
+                      <TableCell className="py-3">
+                        {quotation.status?.toLowerCase() === "reserved" ? (
+                          <span className="text-[#30C71D] font-bold font-medium leading-[50%]">
+                            Reserved
+                          </span>
+                        ) : (
+                          <span className="text-[#C4C4C4] font-bold leading-[50%]">
+                            Pending
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <span
+                          className="font-bold text-[#2d3fff] font-medium underline leading-[0.5] cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleViewCompliance(quotation)
+                          }}
+                        >
+                          ({compliance.completed}/{compliance.total})
+                        </span>
                       </TableCell>
                       <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
@@ -1262,11 +1422,16 @@ export default function QuotationsListPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => handleCreateJO(quotation.id)}>
-                              Create JO
+                            <DropdownMenuItem onClick={() => router.push(`/sales/quotations/${quotation.id}`)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Details
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => handlePrintQuotation(quotation.id)}
+                              onClick={(e) => {
+                                 e.stopPropagation()
+                                handleDownloadPDF(quotation.id)
+                              }}
                               disabled={generatingPDFs.has(quotation.id)}
                             >
                               {generatingPDFs.has(quotation.id) ? (
@@ -1275,24 +1440,37 @@ export default function QuotationsListPage() {
                                   Generating PDF...
                                 </>
                               ) : (
-                                "Print"
+                                <>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Download PDF
+                                </>
                               )}
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => handleShareQuotation(quotation.id)}>
-                              <Share2 className="w-3 h-3 mr-2" />
+                              <Share2 className="mr-2 h-4 w-4" />
                               Share
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleViewSentHistory(quotation)}>
+                              <History className="mr-2 h-4 w-4" />
+                              View Sent History
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => handleCopyQuotation(quotation.id)}
-                              disabled={copyingQuotations.has(quotation.id)}
+                              onClick={() => handlePrintQuotationWindow(quotation.id)}
+                              disabled={generatingPDFs.has(quotation.id)}
                             >
-                              {copyingQuotations.has(quotation.id) ? (
+                              {generatingPDFs.has(quotation.id) ? (
                                 <>
                                   <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                  Copying...
+                                  Generating PDF...
                                 </>
                               ) : (
-                                "Make a Copy"
+                                <>
+                                  <Printer className="mr-2 h-4 w-4" />
+                                  Print
+                                </>
                               )}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -1355,131 +1533,18 @@ export default function QuotationsListPage() {
         )}
       </div>
 
-      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Share2 className="w-5 h-5" />
-              Share Quotation
-            </DialogTitle>
-            <DialogDescription>Share this quotation with others using various platforms and methods.</DialogDescription>
-          </DialogHeader>
-
-          {selectedQuotationForShare && (
-            <div className="space-y-4">
-              {/* Quotation Info */}
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <div className="text-sm font-medium text-gray-900">
-                  {selectedQuotationForShare.quotation_number || "New Quotation"}
-                </div>
-                <div className="text-xs text-gray-600">
-                  {selectedQuotationForShare.client_name} • {selectedQuotationForShare.items?.name || "Service"}
-                </div>
-              </div>
-
-              {/* Copy Link */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Share Link</label>
-                <div className="flex gap-2">
-                  <Input value={generateShareableLink(selectedQuotationForShare)} readOnly className="flex-1 text-sm" />
-                  <Button
-                    size="sm"
-                    onClick={() => copyToClipboard(generateShareableLink(selectedQuotationForShare))}
-                    className="flex-shrink-0"
-                  >
-                    {copiedToClipboard ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Native Share (if supported) */}
-              {typeof navigator.share === "function" && (
-                <Button
-                  onClick={() => shareViaNativeAPI(selectedQuotationForShare)}
-                  className="w-full"
-                  variant="outline"
-                >
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share via Device
-                </Button>
-              )}
-
-              {/* Share Options */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Share via</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaEmail(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <Mail className="w-4 h-4 mr-2" />
-                    Email
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaSMS(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    SMS
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaWhatsApp(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    WhatsApp
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaFacebook(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <Facebook className="w-4 h-4 mr-2" />
-                    Facebook
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaTwitter(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <Twitter className="w-4 h-4 mr-2" />
-                    Twitter
-                  </Button>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => shareViaLinkedIn(selectedQuotationForShare)}
-                    className="justify-start"
-                  >
-                    <Linkedin className="w-4 h-4 mr-2" />
-                    LinkedIn
-                  </Button>
-                </div>
-              </div>
-
-              {/* Close Button */}
-              <div className="flex justify-end pt-2">
-                <Button variant="outline" onClick={() => setShareDialogOpen(false)}>
-                  Close
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {selectedQuotationForShare && (
+        <SendQuotationOptionsDialog
+          isOpen={shareDialogOpen}
+          onOpenChange={setShareDialogOpen}
+          quotation={selectedQuotationForShare}
+          onEmailClick={() => {
+            setShareDialogOpen(false)
+            router.push(`/sales/quotations/${selectedQuotationForShare.id}/compose-email`)
+          }}
+          companyData={companyData}
+        />
+      )}
 
       <Dialog open={projectNameDialogOpen} onOpenChange={handleProjectNameDialogClose}>
         <DialogContent className="sm:max-w-md">
@@ -1533,6 +1598,25 @@ export default function QuotationsListPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <SentHistoryDialog
+        open={showSentHistoryDialog}
+        onOpenChange={setShowSentHistoryDialog}
+        proposalId={selectedQuotationForHistory?.id || ""}
+        emailType="quotation"
+      />
+
+      <ComplianceDialog
+        open={showComplianceDialog}
+        onOpenChange={setShowComplianceDialog}
+        quotation={selectedQuotationForCompliance}
+        onFileUpload={handleFileUpload}
+        uploadingFiles={uploadingFiles}
+        onAccept={handleAcceptCompliance}
+        onDecline={handleDeclineCompliance}
+        onMarkAsReserved={handleMarkAsReserved}
+        userEmail={user?.email || userData?.email || undefined}
+      />
     </div>
   )
 }
