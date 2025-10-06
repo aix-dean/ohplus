@@ -394,6 +394,16 @@ export default function CreateServiceAssignmentPage() {
   const handleSubmit = async () => {
     if (!user) return
 
+    // Validate that a site is selected
+    if (!formData.projectSite || formData.projectSite.trim() === "") {
+      toast({
+        title: "Site Selection Required",
+        description: "Please select a site before creating the service assignment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
@@ -507,6 +517,16 @@ export default function CreateServiceAssignmentPage() {
   // Add this new function after the handleSubmit function
   const handleSaveDraft = async () => {
     if (!user) return
+
+    // Validate that a site is selected
+    if (!formData.projectSite || formData.projectSite.trim() === "") {
+      toast({
+        title: "Site Selection Required",
+        description: "Please select a site before saving the draft.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setLoading(true)
@@ -736,6 +756,14 @@ export default function CreateServiceAssignmentPage() {
   // Handle product selection
   const handleProductSelect = (product: Product) => {
     handleInputChange("projectSite", product.id || "")
+    // Add the product to the products array if it's not already there
+    setProducts(prev => {
+      const exists = prev.find(p => p.id === product.id)
+      if (!exists) {
+        return [...prev, product]
+      }
+      return prev
+    })
   }
 
   // Handle identify JO
