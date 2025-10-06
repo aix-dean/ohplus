@@ -183,6 +183,12 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
   const [clientHistory, setClientHistory] = useState<Quotation[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [pdfPreviewDialogOpen, setPdfPreviewDialogOpen] = useState(false)
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<Quotation | null>(null)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  const [loadingPdfPreview, setLoadingPdfPreview] = useState(false)
+  const [preparingSend, setPreparingSend] = useState(false)
+  const [preparingDownload, setPreparingDownload] = useState(false)
 
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<Record<string, any>>({})
@@ -357,6 +363,28 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
     }
   }, [user, userData])
 
+  const fetchRelatedQuotations = useCallback(async (currentQuotation: Quotation) => {
+    if (currentQuotation.page_id) {
+      console.log("[v0] Fetching related quotations for page_id:", currentQuotation.page_id)
+      const relatedCEs = await getQuotationsByPageId(currentQuotation.page_id)
+      console.log("[v0] Related quotations found:", relatedCEs.length, relatedCEs)
+
+      // Sort all quotations by page_number (including current)
+      const sortedRelated = relatedCEs.sort((a, b) => (a.page_number || 0) - (b.page_number || 0))
+
+      setRelatedQuotations(sortedRelated)
+
+      // Find current page index based on the current quotation's ID
+      const currentIndex = sortedRelated.findIndex((ce) => ce.id === currentQuotation.id)
+      console.log("[v0] Current page index:", currentIndex)
+      setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
+    } else {
+      console.log("[v0] No page_id found for this quotation")
+      setRelatedQuotations([])
+      setCurrentPageIndex(0)
+    }
+  }, [])
+
   useEffect(() => {
     const fetchQuotationData = async () => {
       if (!quotationId) return
@@ -379,56 +407,8 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
             setProposal(linkedProposal)
           }
 
-          // Check if PDF needs to be generated
-          if (!q.pdf || q.pdf.trim() === "") {
-            // Generate PDF and upload to Firebase storage
-            setTimeout(async () => {
-              try {
-                const { pdfUrl, password } = await generateAndUploadQuotationPDF(q)
-
-                // Update quotation with PDF URL and password
-                await updateQuotation(
-                  q.id!,
-                  { pdf: pdfUrl, password: password },
-                  userData?.uid || "system",
-                  userData?.displayName || "System"
-                )
-
-                // Update local state
-                setQuotation(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
-
-                console.log("Quotation PDF generated and uploaded successfully:", pdfUrl)
-              } catch (error) {
-                console.error("Error generating quotation PDF:", error)
-                toast({
-                  title: "Error",
-                  description: "Failed to generate PDF",
-                  variant: "destructive",
-                })
-              }
-            }, 2000) // Small delay to ensure the page is fully rendered
-          }
-
-          // Fetch related quotations if this quotation has a page_id
-          if (q.page_id) {
-            console.log("[v0] Fetching related quotations for page_id:", q.page_id)
-            const relatedCEs = await getQuotationsByPageId(q.page_id)
-            console.log("[v0] Related quotations found:", relatedCEs.length, relatedCEs)
-
-            // Sort all quotations by page_number (including current)
-            const sortedRelated = relatedCEs.sort((a, b) => (a.page_number || 0) - (b.page_number || 0))
-
-            setRelatedQuotations(sortedRelated)
-
-            // Find current page index based on the current quotation's ID
-            const currentIndex = sortedRelated.findIndex((ce) => ce.id === q.id)
-            console.log("[v0] Current page index:", currentIndex)
-            setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
-          } else {
-            console.log("[v0] No page_id found for this quotation")
-            setRelatedQuotations([])
-            setCurrentPageIndex(0)
-          }
+          // Fetch related quotations
+          await fetchRelatedQuotations(q)
 
         } else {
           toast({
@@ -451,7 +431,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
     }
 
     fetchQuotationData()
-  }, [quotationId, router, toast])
+  }, [quotationId, router, toast, fetchRelatedQuotations])
 
   useEffect(() => {
     console.log("[v0] useEffect triggered - user:", !!user, "userData:", !!userData)
@@ -552,6 +532,31 @@ The OH Plus Team`,
     try {
       console.log("[v0] Saving changes:", editableQuotation)
 
+      // First, generate the PDF before saving the quotation data
+      console.log("[v0] Generating new PDF before saving changes")
+
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl: string | null = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(logoBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(editableQuotation, companyData, logoDataUrl, userData)
+
+      // Only save the quotation data if PDF generation succeeded
       await updateQuotation(
         editableQuotation.id!,
         editableQuotation,
@@ -559,22 +564,34 @@ The OH Plus Team`,
         `${editableQuotation.created_by_first_name || "User"} ${editableQuotation.created_by_last_name || ""}`,
       )
 
+      // Update quotation with new PDF URL and password
+      await updateQuotation(
+        editableQuotation.id!,
+        { pdf: pdfUrl, password: password },
+        userData?.uid || "system",
+        userData?.displayName || "System"
+      )
+
+      // Update local state
       setQuotation(editableQuotation)
       // Update the quotation in relatedQuotations if it exists there
       setRelatedQuotations(prev =>
-        prev.map(q => q.id === editableQuotation.id ? editableQuotation : q)
+        prev.map(q => q.id === editableQuotation.id ? { ...editableQuotation, pdf: pdfUrl, password: password } : q)
       )
+
       setIsEditing(false)
       setHasUnsavedChanges(false)
       toast({
         title: "Success",
         description: "Quotation updated successfully.",
       })
+
+      console.log("[v0] PDF generated and quotation saved successfully:", pdfUrl)
     } catch (error) {
-      console.error("Error saving quotation:", error)
+      console.error("Error saving quotation or generating PDF:", error)
       toast({
         title: "Error",
-        description: "Failed to save changes. Please try again.",
+        description: "Failed to save changes. PDF generation failed. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -602,6 +619,8 @@ The OH Plus Team`,
 
     setDownloadingPDF(true)
     try {
+      // Ensure PDF is generated and saved if not already done
+      await generatePDFIfNeeded(quotation)
       // Prepare logo data URL if company logo exists
       let logoDataUrl: string | null = null
       if (companyData?.photo_url) {
@@ -624,48 +643,31 @@ The OH Plus Team`,
       if (relatedQuotations.length > 1) {
         console.log("[v0] Downloading multiple quotation PDFs:", relatedQuotations.length)
 
-        // Download all related quotations as separate PDFs
+        // Generate PDFs for all related quotations if needed
+        for (const relatedQuotation of relatedQuotations) {
+          await generatePDFIfNeeded(relatedQuotation)
+        }
+        // Refresh related quotations data after updates
+        await fetchRelatedQuotations(quotation)
+
+        // Download all related quotations as separate PDFs from saved URLs
         for (let i = 0; i < relatedQuotations.length; i++) {
           const relatedQuotation = relatedQuotations[i]
+
+          if (!relatedQuotation.pdf) {
+            console.error("PDF not generated for quotation:", relatedQuotation.id)
+            continue
+          }
 
           // Create unique quotation number with suffix
           const baseQuotationNumber = relatedQuotation.quotation_number || relatedQuotation.id?.slice(-8) || "QT-000"
           const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
 
-          // Create modified quotation with unique number
-          const modifiedQuotation = {
-            ...relatedQuotation,
-            quotation_number: uniqueQuotationNumber,
-          }
-
-          // Prepare quotation data for API (convert Timestamps to serializable format)
-          const serializableQuotation = {
-            ...modifiedQuotation,
-            created: modifiedQuotation.created?.toDate ? modifiedQuotation.created.toDate().toISOString() : modifiedQuotation.created,
-            updated: modifiedQuotation.updated?.toDate ? modifiedQuotation.updated.toDate().toISOString() : modifiedQuotation.updated,
-            valid_until: modifiedQuotation.valid_until?.toDate ? modifiedQuotation.valid_until.toDate().toISOString() : modifiedQuotation.valid_until,
-            start_date: modifiedQuotation.start_date?.toDate ? modifiedQuotation.start_date.toDate().toISOString() : modifiedQuotation.start_date,
-            end_date: modifiedQuotation.end_date?.toDate ? modifiedQuotation.end_date.toDate().toISOString() : modifiedQuotation.end_date,
-          }
-
-          // Call the generate-quotation-pdf API
-          const response = await fetch('/api/generate-quotation-pdf', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              quotation: serializableQuotation,
-              companyData,
-              logoDataUrl,
-              userData,
-            }),
-          })
-
+          // Download from the saved PDF URL
+          const response = await fetch(relatedQuotation.pdf)
           if (!response.ok) {
-            const errorText = await response.text()
-            console.error('API Error:', response.status, errorText)
-            throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+            console.error('Failed to download PDF from:', relatedQuotation.pdf)
+            continue
           }
 
           const blob = await response.blob()
@@ -685,39 +687,23 @@ The OH Plus Team`,
         }
 
         toast({
-          title: "PDFs Generated",
+          title: "PDFs Downloaded",
           description: `${relatedQuotations.length} PDF files have been downloaded for all pages.`,
         })
       } else {
         // Single quotation
-        // Prepare quotation data for API (convert Timestamps to serializable format)
-        const serializableQuotation = {
-          ...quotation,
-          created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
-          updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
-          valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
-          start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
-          end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+        // Ensure PDF is generated and saved if not already done
+        await generatePDFIfNeeded(quotation)
+
+        if (!quotation.pdf) {
+          throw new Error("Failed to generate PDF")
         }
 
-        // Call the generate-quotation-pdf API
-        const response = await fetch('/api/generate-quotation-pdf', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            quotation: serializableQuotation,
-            companyData,
-            logoDataUrl,
-            userData,
-          }),
-        })
-
+        // Download from the saved PDF URL
+        const response = await fetch(quotation.pdf)
         if (!response.ok) {
-          const errorText = await response.text()
-          console.error('API Error:', response.status, errorText)
-          throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+          console.error('Failed to download PDF from:', quotation.pdf)
+          throw new Error("Failed to download PDF")
         }
 
         const blob = await response.blob()
@@ -750,59 +736,46 @@ The OH Plus Team`,
   const handleDownloadImage = async (userData: any) => {
     if (!quotation) return
 
+    // Check if any PDFs need to be generated
+    const needsPDFGeneration = relatedQuotations.length > 1
+      ? relatedQuotations.some(q => !q.pdf || q.pdf.trim() === "")
+      : !quotation.pdf || quotation.pdf.trim() === ""
+
+    if (needsPDFGeneration) {
+      setPreparingDownload(true)
+    }
+
     setDownloadingImage(true)
     try {
-      // Load company logo if available
-      let logoDataUrl: string | null = null
-      if (companyData?.photo_url) {
-        try {
-          const response = await fetch(companyData.photo_url)
-          const blob = await response.blob()
-          logoDataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(reader.result as string)
-            reader.readAsDataURL(blob)
-          })
-        } catch (error) {
-          console.error('Error loading company logo:', error)
-        }
-      }
-
       // Check if there are multiple related quotations (same page_id)
       if (relatedQuotations.length > 1) {
         console.log("[v0] Downloading multiple quotation PDFs:", relatedQuotations.length)
 
-        // Download all related quotations as separate PDFs
+        // Generate PDFs for all related quotations if needed
+        for (const relatedQuotation of relatedQuotations) {
+          await generatePDFIfNeeded(relatedQuotation)
+        }
+        // Refresh related quotations data after updates
+        await fetchRelatedQuotations(quotation)
+
+        // Download all related quotations as separate PDFs from saved URLs
         for (let i = 0; i < relatedQuotations.length; i++) {
           const relatedQuotation = relatedQuotations[i]
+
+          if (!relatedQuotation.pdf) {
+            console.error("PDF not generated for quotation:", relatedQuotation.id)
+            continue
+          }
 
           // Create unique quotation number with suffix
           const baseQuotationNumber = relatedQuotation.quotation_number || relatedQuotation.id?.slice(-8) || "QT-000"
           const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
 
-          // Create modified quotation with unique number
-          const modifiedQuotation = {
-            ...relatedQuotation,
-            quotation_number: uniqueQuotationNumber,
-          }
-
-          const response = await fetch('/api/generate-quotation-pdf', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              quotation: modifiedQuotation,
-              companyData,
-              logoDataUrl,
-              userData,
-            }),
-          })
-
+          // Download from the saved PDF URL
+          const response = await fetch(relatedQuotation.pdf)
           if (!response.ok) {
-            const errorText = await response.text()
-            console.error('API Error:', response.status, errorText)
-            throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+            console.error('Failed to download PDF from:', relatedQuotation.pdf)
+            continue
           }
 
           const blob = await response.blob()
@@ -822,27 +795,23 @@ The OH Plus Team`,
         }
 
         toast({
-          title: "PDFs Generated",
+          title: "PDFs Downloaded",
           description: `${relatedQuotations.length} PDF files have been downloaded for all pages.`,
         })
       } else {
         // Single quotation
-        const response = await fetch('/api/generate-quotation-pdf', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            quotation,
-            companyData,
-            logoDataUrl,
-          }),
-        })
+        // Ensure PDF is generated and saved if not already done
+        await generatePDFIfNeeded(quotation)
 
+        if (!quotation.pdf) {
+          throw new Error("Failed to generate PDF")
+        }
+
+        // Download from the saved PDF URL
+        const response = await fetch(quotation.pdf)
         if (!response.ok) {
-          const errorText = await response.text()
-          console.error('API Error:', response.status, errorText)
-          throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+          console.error('Failed to download PDF from:', quotation.pdf)
+          throw new Error("Failed to download PDF")
         }
 
         const blob = await response.blob()
@@ -869,6 +838,9 @@ The OH Plus Team`,
       })
     } finally {
       setDownloadingImage(false)
+      if (needsPDFGeneration) {
+        setPreparingDownload(false)
+      }
     }
   }
 
@@ -928,6 +900,107 @@ The OH Plus Team`,
     if (pageIndex >= 0 && pageIndex < relatedQuotations.length) {
       const selectedQuotation = relatedQuotations[pageIndex]
       router.push(`/sales/quotations/${selectedQuotation.id}`)
+    }
+  }
+
+  const handleHistoryItemClick = async (historyItem: Quotation) => {
+    setSelectedHistoryItem(historyItem)
+    setLoadingPdfPreview(true)
+    setPdfPreviewDialogOpen(true)
+
+    try {
+      // Check if quotation already has a PDF
+      if (historyItem.pdf && historyItem.pdf.trim() !== "") {
+        setPdfPreviewUrl(historyItem.pdf)
+      } else {
+        // If no PDF exists, generate one
+        // Prepare logo data URL if company logo exists
+        let logoDataUrl: string | null = null
+        if (companyData?.photo_url) {
+          try {
+            const logoResponse = await fetch(companyData.photo_url)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              logoDataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.readAsDataURL(logoBlob)
+              })
+            }
+          } catch (error) {
+            console.error('Error fetching company logo:', error)
+          }
+        }
+
+        // Prepare quotation data for API (convert Timestamps to serializable format)
+        const serializableQuotation = {
+          ...historyItem,
+          created: historyItem.created?.toDate ? historyItem.created.toDate().toISOString() : historyItem.created,
+          updated: historyItem.updated?.toDate ? historyItem.updated.toDate().toISOString() : historyItem.updated,
+          valid_until: historyItem.valid_until?.toDate ? historyItem.valid_until.toDate().toISOString() : historyItem.valid_until,
+          start_date: historyItem.start_date?.toDate ? historyItem.start_date.toDate().toISOString() : historyItem.start_date,
+          end_date: historyItem.end_date?.toDate ? historyItem.end_date.toDate().toISOString() : historyItem.end_date,
+        }
+
+        // Call the generate-quotation-pdf API
+        const response = await fetch('/api/generate-quotation-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            quotation: serializableQuotation,
+            companyData,
+            logoDataUrl,
+            userData,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('API Error:', response.status, errorText)
+          throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+
+        // Save the generated PDF URL to the quotation
+        try {
+          const { pdfUrl } = await generateAndUploadQuotationPDF(historyItem)
+          await updateQuotation(
+            historyItem.id!,
+            { pdf: pdfUrl },
+            userData?.uid || "system",
+            userData?.displayName || "System"
+          )
+          console.log("PDF saved to quotation:", pdfUrl)
+        } catch (saveError) {
+          console.error("Error saving PDF to quotation:", saveError)
+          // Continue with preview even if save fails
+        }
+
+        setPdfPreviewUrl(url)
+      }
+    } catch (error) {
+      console.error("Error loading PDF preview:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load PDF preview",
+        variant: "destructive",
+      })
+      setPdfPreviewDialogOpen(false)
+    } finally {
+      setLoadingPdfPreview(false)
+    }
+  }
+
+  const handleClosePdfPreview = () => {
+    setPdfPreviewDialogOpen(false)
+    setSelectedHistoryItem(null)
+    if (pdfPreviewUrl) {
+      window.URL.revokeObjectURL(pdfPreviewUrl)
+      setPdfPreviewUrl(null)
     }
   }
 
@@ -1216,19 +1289,6 @@ The OH Plus Team`,
             )}
           </div>
 
-          <div className="flex">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Total Lease:</span>
-            <span className="text-gray-700">
-              PHP{" "}
-              {safeFormatNumber(
-                isEditing && editableQuotation?.items?.item_total_amount
-                  ? editableQuotation.items.item_total_amount
-                  : item?.item_total_amount || 0,
-              )}{" "}
-              (Exclusive of VAT)
-            </span>
-          </div>
         </div>
 
         {/* Site Notes */}
@@ -1510,14 +1570,112 @@ The OH Plus Team`,
   const currentQuotation = isEditing ? editableQuotation : getCurrentQuotation()
   const hasMultipleSites = false
 
-  const handleSendClick = () => {
-    setIsSendOptionsDialogOpen(true)
+  const generatePDFIfNeeded = async (quotation: Quotation) => {
+    if (quotation.pdf && quotation.pdf.trim() !== "") {
+      return { pdfUrl: quotation.pdf, password: quotation.password }
+    }
+
+    try {
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl: string | null = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(logoBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, companyData, logoDataUrl, userData)
+
+      // Update quotation with PDF URL and password
+      await updateQuotation(
+        quotation.id!,
+        { pdf: pdfUrl, password: password },
+        userData?.uid || "system",
+        userData?.displayName || "System"
+      )
+
+      // Update local state - check if it's the current quotation or a related one
+      const current = getCurrentQuotation()
+      if (current && quotation.id === current.id) {
+        setQuotation(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+      } else {
+        // Update in relatedQuotations
+        setRelatedQuotations(prev =>
+          prev.map(q => q.id === quotation.id ? { ...q, pdf: pdfUrl, password: password } : q)
+        )
+      }
+
+      console.log("Quotation PDF generated and uploaded successfully:", pdfUrl)
+      return { pdfUrl, password }
+    } catch (error) {
+      console.error("Error generating quotation PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      })
+      throw error
+    }
   }
 
-  const handleEmailClick = () => {
+  const handleSendClick = async () => {
+    if (!quotation) return
+
+    // Check if any PDFs need to be generated
+    const needsPDFGeneration = relatedQuotations.length > 1
+      ? relatedQuotations.some(q => !q.pdf || q.pdf.trim() === "")
+      : !quotation.pdf || quotation.pdf.trim() === ""
+
+    if (needsPDFGeneration) {
+      setPreparingSend(true)
+    }
+
+    try {
+      // If there are multiple related quotations, generate PDFs for all of them
+      if (relatedQuotations.length > 1) {
+        for (const relatedQuotation of relatedQuotations) {
+          await generatePDFIfNeeded(relatedQuotation)
+        }
+        // Refresh related quotations data after updates
+        await fetchRelatedQuotations(quotation)
+      } else {
+        // Single quotation
+        await generatePDFIfNeeded(quotation)
+      }
+      setIsSendOptionsDialogOpen(true)
+    } catch (error) {
+      // Error is already handled in generatePDFIfNeeded
+    } finally {
+      if (needsPDFGeneration) {
+        setPreparingSend(false)
+      }
+    }
+  }
+
+  const handleEmailClick = async () => {
+    if (!quotation) return
+
     setIsSendOptionsDialogOpen(false)
-    // Navigate to compose email page
-    router.push(`/sales/quotations/${quotationId}/compose-email`)
+
+    // Ensure PDF is generated and saved before sending
+    try {
+      await generatePDFIfNeeded(quotation)
+      // Navigate to compose email page
+      router.push(`/sales/quotations/${quotationId}/compose-email`)
+    } catch (error) {
+      // Error is already handled in generatePDFIfNeeded
+    }
   }
 
   return (
@@ -1546,85 +1704,102 @@ The OH Plus Team`,
       {/* New Wrapper for Sidebar + Document */}
       <div className="flex justify-center items-start gap-6 mt-6">
         {/* Left Panel */}
-        <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
-          <Button
-            variant="ghost"
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Templates</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={handleEditClick}
-            disabled={isEditing}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <Pencil className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Edit</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={ () => handleDownloadImage(userData)}
-            disabled={downloadingImage}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            {downloadingImage ? (
-              <>
-                <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
-                <span className="text-[10px] text-gray-700">Generating...</span>
-              </>
-            ) : (
-              <>
-                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
-                <span className="text-[10px] text-gray-700">Download</span>
-              </>
-            )}
-          </Button>
-        </div>
+        {quotation.status !== "sent" && (
+          <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
+            <Button
+              variant="ghost"
+              className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            >
+              <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
+              <span className="text-[10px] text-gray-700">Templates</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleEditClick}
+              disabled={isEditing}
+              className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            >
+              <Pencil className="h-8 w-8 text-gray-500 mb-1" />
+              <span className="text-[10px] text-gray-700">Edit</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={ () => handleDownloadImage(userData)}
+              disabled={downloadingImage || preparingDownload}
+              className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            >
+              {preparingDownload ? (
+                <>
+                  <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
+                  <span className="text-[10px] text-gray-700">Preparing...</span>
+                </>
+              ) : downloadingImage ? (
+                <>
+                  <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
+                  <span className="text-[10px] text-gray-700">Generating...</span>
+                </>
+              ) : (
+                <>
+                  <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
+                  <span className="text-[10px] text-gray-700">Download</span>
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
         <div className="flex gap-6 items-start">
-          <div id="quotation-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
-           <div className="text-center mb-8">
-             <div className="flex items-center justify-center mb-4 mt-6">
-                {companyData?.photo_url ? (
-                  <img
-                    src={companyData.photo_url || "/placeholder.svg"}
-                    alt="Company Logo"
-                    className="h-16 w-auto object-contain"
-                  />
-                ) : (
-                  <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Building className="h-8 w-8 text-gray-400" />
-                  </div>
-                )}
-              </div>
+          {quotation.status === "sent" && quotation.pdf ? (
+            <div className="w-[210mm] min-h-[297mm] bg-white shadow-md rounded-sm overflow-hidden">
+              <iframe
+                src={`${quotation.pdf}#view=FitH`}
+                className="w-full h-full min-h-[297mm]"
+                title="Quotation PDF"
+              />
             </div>
-            {currentQuotation?.items && renderQuotationBlock("Single Site", currentQuotation.items, 1)}
+          ) : (
+            <div id="quotation-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
+             <div className="text-left mb-8 ml-8">
+               <div className="flex items-center justify-start mb-6 mt-6">
+                 {companyData?.photo_url ? (
+                   <img
+                     src={companyData.photo_url || "/placeholder.svg"}
+                     alt="Company Logo"
+                     className="h-24 w-auto object-contain"
+                   />
+                 ) : (
+                   <div className="h-24 w-24 bg-gray-100 rounded-lg flex items-center justify-center">
+                     <Building className="h-12 w-12 text-gray-400" />
+                   </div>
+                 )}
+               </div>
+             </div>
+              {currentQuotation?.items && renderQuotationBlock("Single Site", currentQuotation.items, 1)}
 
-            {proposal && (
-              <div className="p-6 sm:p-8 border-t border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  Linked Proposal
-                </h2>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-lg font-semibold">{proposal.title}</p>
-                    <p className="text-gray-600">
-                      Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
-                    </p>
-                    <Button
-                      variant="link"
-                      className="p-0 mt-2"
-                      onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
-                    >
-                      View Proposal
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </div>
+              {proposal && (
+                <div className="p-6 sm:p-8 border-t border-gray-200">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                    Linked Proposal
+                  </h2>
+                  <Card>
+                    <CardContent className="p-4">
+                      <p className="text-lg font-semibold">{proposal.title}</p>
+                      <p className="text-gray-600">
+                        Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
+                      </p>
+                      <Button
+                        variant="link"
+                        className="p-0 mt-2"
+                        onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
+                      >
+                        View Proposal
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Right Sidebar - Updated for quotation history */}
           <div className="w-80 bg-white shadow-md rounded-lg p-4 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto hidden xl:block">
@@ -1644,7 +1819,7 @@ The OH Plus Team`,
                 {clientHistory.map((historyItem) => (
                   <div
                     key={historyItem.id}
-                    onClick={() => router.push(`/sales/quotations/${historyItem.id}`)} // Navigate to quotations
+                    onClick={() => handleHistoryItemClick(historyItem)}
                     className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <div className="text-sm font-medium text-gray-900 mb-1">
@@ -1751,9 +1926,10 @@ The OH Plus Team`,
             {currentPageIndex === relatedQuotations.length - 1 ? (
               <Button
                 onClick={handleSendClick}
-                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
+                disabled={preparingSend}
+                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
               >
-                Send
+                {preparingSend ? "Preparing..." : "Send"}
               </Button>
             ) : (
               <Button
@@ -1772,9 +1948,10 @@ The OH Plus Team`,
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <Button
             onClick={handleSendClick}
-            className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium" 
+            disabled={preparingSend}
+            className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
           >
-            Send
+            {preparingSend ? "Preparing..." : "Send"}
           </Button>
         </div>
       )}
@@ -1888,6 +2065,45 @@ The OH Plus Team`,
         isOpen={showSuccessDialog}
         onDismissAndNavigate={() => setShowSuccessDialog(false)}
       />
+
+      {/* PDF Preview Dialog */}
+      <Dialog open={pdfPreviewDialogOpen} onOpenChange={handleClosePdfPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedHistoryItem ? `Quotation ${selectedHistoryItem.quotation_number || selectedHistoryItem.id?.slice(-8) || "N/A"}` : "PDF Preview"}
+            </DialogTitle>
+            <DialogDescription>
+              Preview of the quotation PDF
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-[600px]">
+            {loadingPdfPreview ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-600">Generating PDF preview...</p>
+                </div>
+              </div>
+            ) : pdfPreviewUrl ? (
+              <iframe
+                src={`${pdfPreviewUrl}#view=FitH&toolbar=0&navpanes=0`}
+                className="w-full h-full min-h-[600px] border-0"
+                title="PDF Preview"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-600">Failed to load PDF preview</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClosePdfPreview}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

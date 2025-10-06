@@ -841,14 +841,46 @@ export async function generateQuotationPDF(quotation: Quotation, returnBlob: boo
 
 // Generate PDF and upload to Firebase storage with password protection
 export async function generateAndUploadQuotationPDF(
-  quotation: Quotation
+  quotation: Quotation,
+  companyData?: any,
+  logoDataUrl?: string | null,
+  userData?: any
 ): Promise<{ pdfUrl: string; password: string }> {
   try {
-    // Generate the PDF blob
-    const blob = await generateQuotationPDF(quotation, true) as Blob
-
     // Generate password
     const password = generateQuotationPassword()
+
+    // Prepare quotation data for API (convert Timestamps to serializable format)
+    const serializableQuotation = {
+      ...quotation,
+      created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
+      updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
+      valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
+      start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
+      end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+    }
+
+    // Call the generate-quotation-pdf API
+    const response = await fetch('/api/generate-quotation-pdf', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        quotation: serializableQuotation,
+        companyData,
+        logoDataUrl,
+        userData,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('API Error:', response.status, errorText)
+      throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+    }
+
+    const blob = await response.blob()
 
     // Create a unique filename
     const timestamp = Date.now()

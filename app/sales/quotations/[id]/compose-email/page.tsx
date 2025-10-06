@@ -18,11 +18,13 @@ import {
 } from "@/components/ui/dialog"
 import { ArrowLeft, Paperclip, Edit, Trash2, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { getQuotation, getQuotationsByPageId } from "@/lib/quotation-service"
+import { getQuotation, getQuotationsByPageId, updateQuotationStatus } from "@/lib/quotation-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { Quotation } from "@/lib/types/quotation"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
 import { ProposalSentSuccessDialog } from "@/components/proposal-sent-success-dialog"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function ComposeEmailPage() {
   const router = useRouter()
@@ -60,121 +62,28 @@ export default function ComposeEmailPage() {
   const [pdfAttachments, setPdfAttachments] = useState<string[]>([])
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [companyName, setCompanyName] = useState("")
 
   useEffect(() => {
     userDataRef.current = userData
   }, [userData])
 
-  const preGenerateAllPDFs = useCallback(
-    async (mainQuotation: Quotation, relatedQuotations: Quotation[], companyDataParam?: any) => {
+  const loadExistingPDFs = useCallback(
+    async (mainQuotation: Quotation, relatedQuotations: Quotation[]) => {
       if (!mainQuotation) return
 
       setPdfGenerating(true)
       try {
-        console.log("[v0] Pre-generating all PDFs for email attachments...")
-        const currentUserData = userDataRef.current
-        const userDataForPDF = currentUserData
-          ? {
-              first_name: currentUserData.first_name || user?.displayName?.split(" ")[0] || "",
-              last_name: currentUserData.last_name || user?.displayName?.split(" ").slice(1).join(" ") || "",
-              email: currentUserData.email || user?.email || "",
-              company_id: currentUserData.company_id,
-            }
-          : undefined
-
-        // Load company logo if available
-        let logoDataUrl: string | null = null
-        if (companyDataParam?.photo_url) {
-          try {
-            const response = await fetch(companyDataParam.photo_url)
-            const blob = await response.blob()
-            logoDataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result as string)
-              reader.readAsDataURL(blob)
-            })
-          } catch (error) {
-            console.error('Error loading company logo:', error)
-          }
-        }
-
+        console.log("[v0] Loading existing PDFs for email attachments...")
         const allPDFs: Array<{ filename: string; content: string }> = []
 
-        // Generate PDF for main quotation using the same API as download button
-        try {
-          const response = await fetch('/api/generate-quotation-pdf', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              quotation: mainQuotation,
-              companyData: companyDataParam,
-              logoDataUrl,
-            }),
-          })
-
-          if (!response.ok) {
-            const errorText = await response.text()
-            console.error('API Error:', response.status, errorText)
-            throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
-          }
-
-          const blob = await response.blob()
-          const mainPdfBase64 = await new Promise<string>((resolve) => {
-            const reader = new FileReader()
-            reader.onload = () => {
-              const result = reader.result as string
-              resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
-            }
-            reader.readAsDataURL(blob)
-          })
-
-          const mainFilename = `QT-${mainQuotation.quotation_number}_${mainQuotation.client_company_name || "Client"}_Quotation.pdf`
-          allPDFs.push({
-            filename: mainFilename,
-            content: mainPdfBase64,
-          })
-          setPreGeneratedPDF(mainPdfBase64)
-          console.log("[v0] Main PDF pre-generated successfully")
-        } catch (error) {
-          console.error("[v0] Error generating main PDF:", error)
-        }
-
-        const uniqueRelatedQuotations = relatedQuotations.filter((quotation) => quotation.id !== mainQuotation.id)
-
-        // Generate PDFs for unique related quotations only
-        for (let i = 0; i < uniqueRelatedQuotations.length; i++) {
-          const quotation = uniqueRelatedQuotations[i]
+        // Process main quotation PDF
+        if (mainQuotation.pdf) {
           try {
-            console.log(`[v0] Generating PDF ${i + 1}/${uniqueRelatedQuotations.length} for quotation:`, quotation.id)
-
-            // Create unique quotation number with suffix
-            const baseQuotationNumber = quotation.quotation_number || quotation.id?.slice(-8) || "QT-000"
-            const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
-
-            // Create modified quotation with unique number
-            const modifiedQuotation = {
-              ...quotation,
-              quotation_number: uniqueQuotationNumber,
-            }
-
-            const response = await fetch('/api/generate-quotation-pdf', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                quotation: modifiedQuotation,
-                companyData: companyDataParam,
-                logoDataUrl,
-              }),
-            })
-
+            console.log("[v0] Loading PDF for main quotation:", mainQuotation.id)
+            const response = await fetch(mainQuotation.pdf)
             if (!response.ok) {
-              const errorText = await response.text()
-              console.error('API Error:', response.status, errorText)
-              throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+              throw new Error(`Failed to fetch PDF: ${response.status}`)
             }
 
             const blob = await response.blob()
@@ -187,39 +96,99 @@ export default function ComposeEmailPage() {
               reader.readAsDataURL(blob)
             })
 
-            const filename = `QT-${uniqueQuotationNumber}_${quotation.client_company_name || "Client"}_Quotation.pdf`
+            const mainFilename = `QT-${mainQuotation.quotation_number}_${mainQuotation.client_company_name || "Client"}_Quotation.pdf`
             allPDFs.push({
-              filename,
+              filename: mainFilename,
               content: pdfBase64,
             })
-            console.log(`[v0] PDF ${i + 1} generated successfully:`, filename)
+            setPreGeneratedPDF(pdfBase64)
+            console.log("[v0] Main PDF loaded successfully")
           } catch (error) {
-            console.error(`[v0] Error generating PDF for quotation ${quotation.id}:`, error)
+            console.error("[v0] Error loading main PDF:", error)
+            toast({
+              title: "PDF Loading Warning",
+              description: `Could not load PDF for main quotation. ${error instanceof Error ? error.message : 'Unknown error'}`,
+              variant: "destructive",
+            })
+          }
+        } else {
+          console.warn("[v0] Main quotation does not have a PDF field")
+          toast({
+            title: "PDF Missing",
+            description: "Main quotation does not have an existing PDF. Email will be sent without PDF attachment.",
+            variant: "destructive",
+          })
+        }
+
+        const uniqueRelatedQuotations = relatedQuotations.filter((quotation) => quotation.id !== mainQuotation.id)
+
+        // Load PDFs for unique related quotations only
+        for (let i = 0; i < uniqueRelatedQuotations.length; i++) {
+          const quotation = uniqueRelatedQuotations[i]
+          if (quotation.pdf) {
+            try {
+              console.log(`[v0] Loading PDF ${i + 1}/${uniqueRelatedQuotations.length} for quotation:`, quotation.id)
+
+              const response = await fetch(quotation.pdf)
+              if (!response.ok) {
+                throw new Error(`Failed to fetch PDF: ${response.status}`)
+              }
+
+              const blob = await response.blob()
+              const pdfBase64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => {
+                  const result = reader.result as string
+                  resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
+                }
+                reader.readAsDataURL(blob)
+              })
+
+              // Create unique quotation number with suffix
+              const baseQuotationNumber = quotation.quotation_number || quotation.id?.slice(-8) || "QT-000"
+              const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+
+              const filename = `QT-${uniqueQuotationNumber}_${quotation.client_company_name || "Client"}_Quotation.pdf`
+              allPDFs.push({
+                filename,
+                content: pdfBase64,
+              })
+              console.log(`[v0] PDF ${i + 1} loaded successfully:`, filename)
+            } catch (error) {
+              console.error(`[v0] Error loading PDF for quotation ${quotation.id}:`, error)
+              toast({
+                title: "PDF Loading Warning",
+                description: `Could not load PDF for related quotation ${quotation.quotation_number || quotation.id?.slice(-8)}. ${error instanceof Error ? error.message : 'Unknown error'}`,
+                variant: "destructive",
+              })
+            }
+          } else {
+            console.warn(`[v0] Related quotation ${quotation.id} does not have a PDF field`)
           }
         }
 
         setPreGeneratedPDFs(allPDFs)
-        console.log(`[v0] All PDFs pre-generated successfully. Total: ${allPDFs.length}`)
+        console.log(`[v0] All existing PDFs loaded successfully. Total: ${allPDFs.length}`)
 
         if (allPDFs.length === 0) {
           toast({
-            title: "PDF Generation Warning",
-            description: "No PDFs could be generated. Email will be sent without PDF attachments.",
+            title: "PDF Loading Warning",
+            description: "No existing PDFs could be loaded. Email will be sent without PDF attachments.",
             variant: "destructive",
           })
         }
       } catch (error) {
-        console.error("[v0] Error pre-generating PDFs:", error)
+        console.error("[v0] Error loading existing PDFs:", error)
         toast({
-          title: "PDF Generation Warning",
-          description: "Some PDFs could not be generated. Email may be sent with fewer attachments.",
+          title: "PDF Loading Error",
+          description: "Failed to load existing PDFs. Email may be sent with fewer attachments.",
           variant: "destructive",
         })
       } finally {
         setPdfGenerating(false)
       }
     },
-    [user, toast],
+    [toast],
   )
 
   const fetchData = useCallback(async () => {
@@ -280,7 +249,7 @@ export default function ComposeEmailPage() {
         ])
       }
 
-      await preGenerateAllPDFs(quotation, related, fetchedCompanyData)
+      await loadExistingPDFs(quotation, related)
 
       setToEmail(quotation.client_email || "")
       setCcEmail(user?.email || "")
@@ -322,7 +291,7 @@ export default function ComposeEmailPage() {
     } finally {
       setLoading(false)
     }
-  }, [params.id, user, toast, preGenerateAllPDFs])
+  }, [params.id, user, toast, loadExistingPDFs])
 
   useEffect(() => {
     if (userData && !isInitialized && !dataFetched.current) {
@@ -598,6 +567,28 @@ export default function ComposeEmailPage() {
       }
 
       console.log("[v0] Email sent successfully!")
+
+      // Update status of all quotations in the same page to "sent"
+      const quotationsToUpdate = [quotation, ...relatedQuotations]
+      console.log("[v0] Updating status to 'sent' for", quotationsToUpdate.length, "quotations")
+
+      for (const quot of quotationsToUpdate) {
+        if (quot.id) {
+          try {
+            console.log(`[v0] Updating quotation ${quot.id} status to 'sent'...`)
+            await updateQuotationStatus(quot.id, "sent")
+            console.log(`[v0] Quotation ${quot.id} status updated to 'sent' successfully`)
+          } catch (statusError) {
+            console.error(`[v0] Failed to update quotation ${quot.id} status:`, statusError)
+            // Continue with other quotations even if one fails
+          }
+        }
+      }
+
+      // Update local state to reflect the changes
+      setQuotation(prev => prev ? { ...prev, status: "sent" } : null)
+      setRelatedQuotations(prev => prev.map(quot => ({ ...quot, status: "sent" })))
+
       setShowSuccessDialog(true)
     } catch (error) {
       console.error("[v0] Error sending email:", error)
@@ -674,7 +665,7 @@ export default function ComposeEmailPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-4">
           <div className="text-lg">Loading...</div>
-          {pdfGenerating && <div className="text-sm text-gray-600">Preparing PDF for email attachment...</div>}
+          {pdfGenerating && <div className="text-sm text-gray-600">Loading existing PDFs for email attachment...</div>}
         </div>
       </div>
     )
@@ -695,12 +686,12 @@ export default function ComposeEmailPage() {
         <h1 className="text-3xl font-bold text-gray-900">Compose email</h1>
         {pdfGenerating && (
           <div className="text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-            Preparing {relatedQuotations.length} PDF(s)...
+            Loading {relatedQuotations.length} PDF(s)...
           </div>
         )}
         {preGeneratedPDFs.length > 0 && !pdfGenerating && (
           <div className="text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
-            {preGeneratedPDFs.length} PDF(s) Ready
+            {preGeneratedPDFs.length} PDF(s) Loaded
           </div>
         )}
       </div>
@@ -775,16 +766,6 @@ export default function ComposeEmailPage() {
                           disabled={downloadingPDF === index}
                         >
                           {downloadingPDF === index ? "Opening..." : <Eye className="h-4 w-4" />}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setPreGeneratedPDFs((prev) => prev.filter((_, i) => i !== index))
-                            setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -884,7 +865,7 @@ export default function ComposeEmailPage() {
           <div className="bg-white rounded-[50px] border-[1.5px] border-[#c4c4c4] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] w-[440px] h-[61px] flex items-center justify-between px-4">
             <button onClick={() => router.back()} className="text-gray-900 underline text-lg">Cancel</button>
             <Button onClick={handleSendEmail} disabled={sending || !toEmail || !subject || pdfGenerating} className="bg-[#1d0beb] text-white rounded-[15px] px-6 py-2 text-2xl font-bold">
-              {sending ? "Sending..." : pdfGenerating ? `Preparing ${relatedQuotations.length} PDF(s)...` : "Send email"}
+              {sending ? "Sending..." : pdfGenerating ? `Loading ${relatedQuotations.length} PDF(s)...` : "Send email"}
             </Button>
           </div>
         </div>

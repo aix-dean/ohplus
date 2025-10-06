@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
 import { emailService, type EmailAttachment } from "@/lib/email-service"
-import { Timestamp } from "firebase/firestore"
+import { Timestamp, doc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { storage } from "@/lib/firebase"
+import { storage, db } from "@/lib/firebase"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -28,6 +28,258 @@ async function uploadFileToStorage(fileBuffer: Buffer, fileName: string, fileTyp
     console.error("Error uploading file to storage:", error)
     throw new Error(`Failed to upload file: ${fileName}`)
   }
+}
+
+async function fetchCompanyData(companyId: string) {
+  try {
+    const companyDoc = await getDoc(doc(db, "companies", companyId))
+
+    if (companyDoc.exists()) {
+      const data = companyDoc.data()
+
+      // Always use ohplus.ph domain for sending emails (verified domain)
+      const verifiedEmail = "noreply@ohplus.ph"
+
+      // Log if company has a different email domain
+      if (data.email) {
+        const companyEmailDomain = data.email.split('@')[1]
+        if (companyEmailDomain !== 'ohplus.ph') {
+          console.log(`Using ohplus.ph domain for sending. Company email: ${data.email}`)
+        }
+      }
+
+      return {
+        company_name: data.company_name || data.name || "OH Plus",
+        company_location: data.company_location || data.address || "No. 727 General Solano St., San Miguel, Manila 1005",
+        phone: data.phone || data.telephone || data.contact_number || "+639XXXXXXXXX",
+        email: verifiedEmail,
+        website: data.website || "www.ohplus.ph",
+      }
+    }
+
+    return {
+      company_name: "OH Plus",
+      company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
+      phone: "+639XXXXXXXXX",
+      email: "noreply@ohplus.ph",
+      website: "www.ohplus.ph",
+    }
+  } catch (error) {
+    console.error("Error fetching company data:", error)
+    return {
+      company_name: "OH Plus",
+      company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
+      phone: "+639XXXXXXXXX",
+      email: "noreply@ohplus.ph",
+      website: "www.ohplus.ph",
+    }
+  }
+}
+
+function createEmailTemplate(
+  body: string,
+  userPhoneNumber?: string,
+  companyData?: {
+    company_name?: string
+    company_location?: string
+    phone?: string
+    email?: string
+    website?: string
+  }
+): string {
+  const phoneNumber = userPhoneNumber || companyData?.phone || "+639XXXXXXXXX"
+  const companyName = companyData?.company_name || ""
+  const companyLocation = companyData?.company_location || ""
+  const companyEmail = companyData?.email || "noreply@ohplus.ph"
+  const companyWebsite = companyData?.website || "www.ohplus.ph"
+
+  const processedBody = body
+    .split("\n")
+    .map((line: string) => line.trim())
+    .filter((line: string) => line.length > 0)
+    .map((line: string) => `<p>${line}</p>`)
+    .join("")
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${companyName} - Quotation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f8f9fa;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px 40px;
+            text-align: center;
+        }
+        .logo {
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: bold;
+            margin: 0;
+            letter-spacing: 1px;
+        }
+        .tagline {
+            color: #e8eaff;
+            font-size: 14px;
+            margin: 5px 0 0 0;
+            font-weight: 300;
+        }
+        .content {
+            padding: 40px;
+        }
+        .content p {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        .highlight-box {
+            background-color: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        .cta-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 14px 30px;
+            border-radius: 25px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s ease;
+        }
+        .cta-button:link,
+        .cta-button:visited,
+        .cta-button:hover,
+        .cta-button:active {
+            color: #ffffff !important;
+            text-decoration: none !important;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 30px 40px;
+            border-top: 1px solid #e9ecef;
+        }
+        .signature {
+            margin-bottom: 20px;
+        }
+        .signature-name {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        .signature-title {
+            color: #6c757d;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        .contact-info {
+            font-size: 14px;
+            color: #6c757d;
+            line-height: 1.4;
+        }
+        .contact-info strong {
+            color: #495057;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e9ecef;
+            margin: 20px 0;
+        }
+        .disclaimer {
+            font-size: 12px;
+            color: #adb5bd;
+            text-align: center;
+            margin-top: 20px;
+            line-height: 1.4;
+        }
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                width: 100% !important;
+            }
+            .header, .content, .footer {
+                padding: 20px !important;
+            }
+            .logo {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1 class="logo">${companyName}</h1>
+            <p class="tagline">Premium Outdoor Advertising Solutions</p>
+        </div>
+
+        <div class="content">
+            ${processedBody}
+
+            <div class="highlight-box">
+                <p style="margin: 0; font-weight: 500; color: #495057;">
+                    📋 <strong>What's Included:</strong><br>
+                    • Detailed quotation with specifications<br>
+                    • Competitive pricing for your advertising needs<br>
+                    • High-quality billboard placement options<br>
+                    • Professional campaign management
+                </p>
+            </div>
+
+            <div class="cta-section">
+                <p style="margin-bottom: 20px; color: #6c757d;">Ready to move forward with your campaign?</p>
+                <a href="mailto:${companyEmail}" class="cta-button">Get In Touch</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="signature">
+                <div class="signature-name">Sales Executive</div>
+                <div class="signature-title">${companyName} - Outdoor Advertising</div>
+            </div>
+
+            <div class="contact-info">
+                <strong>${companyName}</strong><br>
+                📍 ${companyLocation}<br>
+                📞 ${phoneNumber}<br>
+                📧 ${companyEmail}<br>
+                🌐 ${companyWebsite}
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="disclaimer">
+                This email contains confidential information intended only for the recipient.
+                If you have received this email in error, please notify the sender and delete this message.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+  `
 }
 
 export async function POST(request: NextRequest) {
@@ -111,225 +363,12 @@ export async function POST(request: NextRequest) {
     const finalSubject =
       subject || `Quotation: ${quotation.items?.[0]?.name || "Custom Advertising Solution"} - ${companyName || "Company"}`
 
-    // Format custom body as HTML if provided
-    const formattedCustomBody = customBody
-      ? customBody
-          .split("\n")
-          .map((line) => line.trim())
-          .filter((line) => line)
-          .map((line) => `<p>${line}</p>`)
-          .join("")
-      : `<p>We are excited to present you with a detailed quotation tailored to your specific advertising needs. Our team has carefully prepared this quotation to help you plan your marketing investment.</p>`
+    // Fetch company data for email template
+    const companyId = userData?.company_id || quotation?.company_id || "unknown"
+    const companyData = await fetchCompanyData(companyId)
 
-    const finalBody = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Quotation from ${companyName || "Company"}</title>
-        <style>
-          body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f8f9fa;
-          }
-          .container {
-            background: white;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-          }
-          .header {
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-            color: white;
-            padding: 30px 20px;
-            text-align: center;
-          }
-          .header h1 {
-            margin: 0;
-            font-size: 28px;
-            font-weight: 600;
-          }
-          .header p {
-            margin: 10px 0 0 0;
-            opacity: 0.9;
-            font-size: 16px;
-          }
-          .content {
-            padding: 30px;
-          }
-          .greeting {
-            font-size: 18px;
-            margin-bottom: 20px;
-            color: #1f2937;
-          }
-          .quotation-summary {
-            background: #f3f4f6;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 25px 0;
-            border-left: 4px solid #2563eb;
-          }
-          .summary-item {
-            display: flex;
-            justify-content: space-between;
-            margin: 8px 0;
-            padding: 5px 0;
-          }
-          .summary-label {
-            font-weight: 600;
-            color: #6b7280;
-          }
-          .summary-value {
-            color: #1f2937;
-            font-weight: 500;
-          }
-          .total-amount {
-            background: linear-gradient(135deg, #059669, #047857);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            border-radius: 8px;
-            font-size: 20px;
-            font-weight: 700;
-            margin: 25px 0;
-          }
-          .action-button {
-            text-align: center;
-            margin: 30px 0;
-          }
-          .btn {
-            display: inline-block;
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
-            color: white !important;
-            padding: 15px 30px;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 16px;
-            transition: transform 0.2s;
-          }
-          .btn:hover {
-            transform: translateY(-1px);
-          }
-          .message {
-            background: #eff6ff;
-            border: 1px solid #dbeafe;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
-            color: #1e40af;
-          }
-          .footer {
-            text-align: center;
-            color: #6b7280;
-            font-size: 14px;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-          }
-          .contact-info {
-            background: #f9fafb;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: center;
-          }
-          .attachment-note {
-            background: #fef3c7;
-            border: 1px solid #f59e0b;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            color: #92400e;
-            text-align: center;
-          }
-          .custom-message {
-            margin: 20px 0;
-            line-height: 1.6;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>${companyName || "Company"}</h1>
-            <p>Professional Advertising Solutions</p>
-          </div>
-
-          <div class="content">
-            <div class="greeting">
-              Dear ${quotation.client_name || "Valued Client"},
-            </div>
-
-            <div class="custom-message">
-              ${formattedCustomBody}
-            </div>
-
-            <div class="quotation-summary">
-              <h3 style="margin-top: 0; color: #1f2937;">Quotation Summary</h3>
-              <div class="summary-item">
-                <span class="summary-label">Site Location:</span>
-                <span class="summary-value">${quotation.items?.[0]?.location || "Custom Location"}</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Billboard Type:</span>
-                <span class="summary-value">${quotation.items?.[0]?.type || "Billboard"}</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Contract Duration:</span>
-                <span class="summary-value">${quotation.duration_days || 0} days</span>
-              </div>
-              <div class="summary-item">
-                <span class="summary-label">Valid Until:</span>
-                <span class="summary-value">${quotation.valid_until ? new Date(quotation.valid_until).toLocaleDateString() : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString()}</span>
-              </div>
-            </div>
-
-            <div class="total-amount">
-              Total Amount: ₱${(quotation.total_amount || 0).toLocaleString()}
-            </div>
-
-            ${
-              preGeneratedPDFs && preGeneratedPDFs.length > 0
-                ? `
-            <div class="attachment-note">
-              📎 <strong>PDF${preGeneratedPDFs.length > 1 ? "s" : ""} Attached:</strong> You'll find the complete quotation document${preGeneratedPDFs.length > 1 ? "s" : ""} attached to this email for your convenience.
-            </div>
-            `
-                : ""
-            }
-
-            <div class="action-button">
-              <a href="${quotationUrl}" class="btn">View Full Quotation Online</a>
-            </div>
-
-            <div class="contact-info">
-              <strong>Ready to get started?</strong><br>
-              📧 Email: ${currentUserEmail || "contact@company.com"}<br>
-              📞 Phone: ${currentUserEmail ? "Contact us for details" : "+63 123 456 7890"}
-            </div>
-
-            <p>Thank you for considering ${companyName || "our company"} as your advertising partner. We look forward to creating something amazing together!</p>
-
-            <p style="margin-bottom: 0;">
-              Best regards,<br>
-              <strong>The ${companyName || "Company"} Team</strong>
-            </p>
-          </div>
-
-          <div class="footer">
-            <p>This quotation is confidential and intended solely for ${quotation.client_company_name || "your company"}.</p>
-            <p>© ${new Date().getFullYear()} ${companyName || "Company"}. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `
+    // Create email template
+    const finalBody = createEmailTemplate(customBody || "We are excited to present you with a detailed quotation tailored to your specific advertising needs. Our team has carefully prepared this quotation to help you plan your marketing investment.", userData?.phone_number, companyData)
 
     console.log("Attempting to send email to:", clientEmail)
 
@@ -365,21 +404,28 @@ export async function POST(request: NextRequest) {
     console.log(`Total attachments prepared: ${attachments.length}`)
 
     // Prepare email data with all attachments
-    const emailData: {
-      from: string;
-      to: string[];
-      subject: string;
-      html: string;
-      reply_to?: string[];
-      cc?: string[];
-      attachments?: Array<{ filename: string; content: Buffer; type?: string }>;
-    } = {
-      from: `${companyName || "Company"} <noreply@${process.env.RESEND_VERIFIED_DOMAIN || 'company.com'}>`,
-      to: [clientEmail],
-      subject: finalSubject,
+    const from = `${companyData.company_name} <${companyData.email}>`
+    const to = [clientEmail]
+    const cc = ccEmailsArray.length > 0 ? ccEmailsArray : []
+
+    const emailData: any = {
+      from,
+      to,
+      subject: finalSubject.trim(),
       html: finalBody,
-      reply_to: replyToEmail ? [replyToEmail] : (currentUserEmail ? [currentUserEmail] : undefined),
-      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined,
+      attachments,
+    }
+
+    // Add CC if provided
+    if (cc.length > 0) {
+      emailData.cc = cc
+    }
+
+    // Add reply-to if replyToEmail is provided, otherwise use current user email
+    if (replyToEmail && replyToEmail.trim().length > 0) {
+      emailData.reply_to = replyToEmail.trim()
+    } else if (currentUserEmail && currentUserEmail.trim().length > 0) {
+      emailData.reply_to = currentUserEmail.trim()
     }
 
     if (attachments.length > 0) {
@@ -454,12 +500,12 @@ export async function POST(request: NextRequest) {
       }
 
       const emailDocument = {
-        from: emailData.from,
-        to: emailData.to,
-        cc: emailData.cc || undefined,
+        from: from,
+        to: to,
+        cc: cc.length > 0 ? cc : null,
         replyTo: emailData.reply_to,
-        subject: finalSubject,
-        body: customBody || "",
+        subject: finalSubject.trim(),
+        body: customBody.trim(),
         attachments: attachmentDetails.length > 0 ? attachmentDetails : undefined,
         email_type: "quotation",
         quotationId: quotation.id,

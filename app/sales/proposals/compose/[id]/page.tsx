@@ -1011,9 +1011,6 @@ ${contactDetails}`,
                              >
                                <Eye className="h-4 w-4" />
                              </Button>
-                             <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
-                               <X className="h-4 w-4" />
-                             </Button>
                            </div>
                          </div>
                        ))}

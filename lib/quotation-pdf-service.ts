@@ -137,7 +137,6 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
       `• Proposal to: ${quotation.client_company_name || "CLIENT COMPANY NAME"}`,
       `• Illumination: 10 units of 1000 watts metal Halide`,
       `• Lease Rate/Month: PHP ${(item.price || 0).toLocaleString()} (Exclusive of VAT)`,
-      `• Total Lease: PHP ${(item.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)`,
     ]
 
     details.forEach((detail) => {
@@ -423,7 +422,6 @@ export const generateQuotationEmailPDF = async (
       `• Proposal to: ${quotation.client_company_name || "CLIENT COMPANY NAME"}`,
       `• Illumination: 10 units of 1000 watts metal Halide`,
       `• Lease Rate/Month: PHP ${(item.price || 0).toLocaleString()} (Exclusive of VAT)`,
-      `• Total Lease: PHP ${(item.item_total_amount || 0).toLocaleString()} (Exclusive of VAT)`,
     ]
 
     details.forEach((detail) => {

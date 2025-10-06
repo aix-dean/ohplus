@@ -193,6 +193,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [generatingPDFsForSend, setGeneratingPDFsForSend] = useState(false)
 
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
     console.log("[v0] All line items:", lineItems)
@@ -305,46 +306,48 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   }
 
   const handleSaveAllChanges = async () => {
-    console.log("[v0] handleSaveAllChanges called")
-    console.log("[v0] Current state:", {
-      isEditing,
-      editableCostEstimate: !!costEstimate,
-      tempValuesCount: Object.keys(tempValues).length,
-      tempValues,
-      currentProductIndex,
-    })
-
-    if (!costEstimate) {
-      toast({
-        title: "Error",
-        description: "No cost estimate data available",
-        variant: "destructive",
+    setIsSaving(true)
+    try {
+      console.log("[v0] handleSaveAllChanges called")
+      console.log("[v0] Current state:", {
+        isEditing,
+        editableCostEstimate: !!costEstimate,
+        tempValuesCount: Object.keys(tempValues).length,
+        tempValues,
+        currentProductIndex,
       })
-      return
-    }
 
-    if (!isEditing) {
-      console.log("[v0] Not in edit mode, cannot save changes")
-      toast({
-        title: "Error",
-        description: "Please enter edit mode to save changes",
-        variant: "destructive",
-      })
-      return
-    }
+      if (!costEstimate) {
+        toast({
+          title: "Error",
+          description: "No cost estimate data available",
+          variant: "destructive",
+        })
+        return
+      }
 
-    if (Object.keys(tempValues).length === 0) {
-      console.log("[v0] No temp values to save, returning")
-      toast({
-        title: "No Changes",
-        description: "No changes to save",
-        variant: "destructive",
-      })
-      return
-    }
+      if (!isEditing) {
+        console.log("[v0] Not in edit mode, cannot save changes")
+        toast({
+          title: "Error",
+          description: "Please enter edit mode to save changes",
+          variant: "destructive",
+        })
+        return
+      }
 
-    // Create a deep copy of the cost estimate to ensure React detects changes
-    const updatedCostEstimate = JSON.parse(JSON.stringify(costEstimate))
+      if (Object.keys(tempValues).length === 0) {
+        console.log("[v0] No temp values to save, returning")
+        toast({
+          title: "No Changes",
+          description: "No changes to save",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Create a deep copy of the cost estimate to ensure React detects changes
+      const updatedCostEstimate = JSON.parse(JSON.stringify(costEstimate))
 
     const siteGroups = groupLineItemsBySite(updatedCostEstimate.lineItems || [])
     const siteNames = Object.keys(siteGroups)
@@ -492,15 +495,53 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       }
     })
 
-    try {
       // Remove the id field from update data as it's not needed for Firestore update
       const { id, ...updateDataWithoutId } = updatedCostEstimate
 
       await updateCostEstimate(updatedCostEstimate.id, updateDataWithoutId)
 
-      // Update state with the new data
-      setEditableCostEstimate(updatedCostEstimate)
-      setCostEstimate(updatedCostEstimate)
+      // Generate new PDF after saving the cost estimate data
+      console.log("[v0] Generating new PDF after saving changes")
+
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl: string | null = null
+      if (companyData?.photo_url) {
+        try {
+          const logoResponse = await fetch(companyData.photo_url)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(logoBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, userData ? {
+        first_name: userData.first_name || undefined,
+        last_name: userData.last_name || undefined,
+        email: userData.email || undefined,
+        company_id: userData.company_id || undefined,
+      } : undefined, companyData ? {
+        name: companyData.name || "Company Name",
+        address: companyData.address,
+        phone: companyData.phone,
+        email: companyData.email,
+        website: companyData.website || companyData.company_website,
+      } : undefined)
+
+      // Update cost estimate with new PDF URL and password
+      await updateCostEstimate(updatedCostEstimate.id, { pdf: pdfUrl, password: password })
+
+      // Update state with the new data including PDF
+      const finalCostEstimate = { ...updatedCostEstimate, pdf: pdfUrl, password: password }
+      setEditableCostEstimate(finalCostEstimate)
+      setCostEstimate(finalCostEstimate)
 
       // Force a re-render by updating the key or triggering a state change
       setEditingField(null)
@@ -513,7 +554,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         description: `Changes saved successfully for ${currentSiteName}`,
       })
       console.log("[v0] Save completed successfully for site:", currentSiteName)
-      console.log("[v0] Updated cost estimate:", updatedCostEstimate)
+      console.log("[v0] Updated cost estimate:", finalCostEstimate)
     } catch (error) {
       console.error("[v0] Save failed:", error)
       toast({
@@ -521,6 +562,8 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         description: "Failed to save changes",
         variant: "destructive",
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -693,37 +736,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }, [fetchClientHistory])
 
-  // Generate PDF when both costEstimate and companyData are available
-  useEffect(() => {
-    const generatePDFIfNeeded = async () => {
-      if (!costEstimate || !companyData || !companyData.name || (costEstimate.pdf && costEstimate.pdf.trim() !== "")) {
-        return
-      }
-
-      try {
-        const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, userData ? {
-          first_name: userData.first_name || undefined,
-          last_name: userData.last_name || undefined,
-          email: userData.email || undefined,
-          company_id: userData.company_id || undefined,
-        } : undefined, {
-          name: companyData.name,
-          address: companyData.address,
-          phone: companyData.phone,
-          email: companyData.email,
-          website: companyData.website || companyData.company_website,
-        })
-        await updateCostEstimate(costEstimate.id, { pdf: pdfUrl, password: password })
-        setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
-        console.log("Cost estimate PDF generated and uploaded successfully:", pdfUrl)
-      } catch (error) {
-        console.error("Error generating cost estimate PDF:", error)
-        toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" })
-      }
-    }
-
-    generatePDFIfNeeded()
-  }, [costEstimate, companyData, userData, toast])
 
   // Handle automatic share when page loads with action parameter
   useEffect(() => {
@@ -765,8 +777,88 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }, [isSendEmailDialogOpen, costEstimate])
 
-  const handleSendEmail = () => {
-    router.push(`/sales/cost-estimates/${costEstimateId}/compose-email`)
+  const handleSendEmail = async () => {
+    if (!costEstimate) return
+
+    // Ensure PDF is generated and saved before sending
+    try {
+      await generatePDFIfNeeded(costEstimate)
+      router.push(`/sales/cost-estimates/${costEstimateId}/compose-email`)
+    } catch (error) {
+      // Error is already handled in generatePDFIfNeeded
+    }
+  }
+
+  const handleSendWithPDFGeneration = async () => {
+    if (!costEstimate) return
+
+    console.log("=== DEBUG SEND BUTTON ===")
+    console.log("Current costEstimate.pdf:", costEstimate?.pdf, "Type:", typeof costEstimate?.pdf)
+
+    // Check if current cost estimate has PDF - if so, assume all related ones do too
+    if (costEstimate.pdf) {
+      console.log("✅ Skipping PDF generation - current estimate has PDF")
+      // Current estimate has PDF, assume all related estimates have PDFs too
+      setIsSendOptionsDialogOpen(true)
+      return
+    }
+
+    console.log("⚠️ Generating PDFs...")
+
+    setGeneratingPDFsForSend(true)
+    try {
+      let generatedCount = 0
+            // Generate PDFs for all related cost estimates
+      if (relatedCostEstimates.length > 1) {
+        // Generate and update PDFs for all related cost estimates
+        const updatedRelatedEstimates = [...relatedCostEstimates]
+        for (let i = 0; i < relatedCostEstimates.length; i++) {
+          const estimate = relatedCostEstimates[i]
+
+          // Check if PDF already exists
+          if (!estimate.pdf) {
+            // Generate PDF and get URL/password
+            const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(estimate, userData ? {
+              first_name: userData.first_name || undefined,
+              last_name: userData.last_name || undefined,
+              email: userData.email || undefined,
+              company_id: userData.company_id || undefined,
+            } : undefined, companyData ? {
+              name: companyData.name || "Company Name",
+              address: companyData.address,
+              phone: companyData.phone,
+              email: companyData.email,
+              website: companyData.website || companyData.company_website,
+            } : undefined)
+
+            // Update the cost estimate with PDF URL and password
+            await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password })
+            // Update the local state
+            updatedRelatedEstimates[i] = { ...estimate, pdf: pdfUrl, password: password }
+            generatedCount++
+          }
+        }
+        setRelatedCostEstimates(updatedRelatedEstimates)
+      } else {
+        // Single cost estimate - check if PDF exists before generating
+        if (!costEstimate.pdf) {
+          await generatePDFIfNeeded(costEstimate)
+          generatedCount++
+        }
+      }
+
+      // After PDFs are generated, open the send options dialog
+      setIsSendOptionsDialogOpen(true)
+    } catch (error) {
+      console.error("Error generating PDFs for send:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDFs. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFsForSend(false)
+    }
   }
 
   const handleSendEmailConfirm = async () => {
@@ -891,21 +983,80 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }
 
+  const generatePDFIfNeeded = async (costEstimate: CostEstimate) => {
+    if (costEstimate.pdf) {
+      return { pdfUrl: costEstimate.pdf, password: costEstimate.password }
+    }
+
+    try {
+      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, userData ? {
+        first_name: userData.first_name || undefined,
+        last_name: userData.last_name || undefined,
+        email: userData.email || undefined,
+        company_id: userData.company_id || undefined,
+      } : undefined, companyData ? {
+        name: companyData.name || "Company Name",
+        address: companyData.address,
+        phone: companyData.phone,
+        email: companyData.email,
+        website: companyData.website || companyData.company_website,
+      } : undefined)
+      await updateCostEstimate(costEstimate.id, { pdf: pdfUrl, password: password })
+      setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+      // Also update the relatedCostEstimates if this estimate is in there
+      setRelatedCostEstimates(prev => prev.map(est =>
+        est.id === costEstimate.id ? { ...est, pdf: pdfUrl, password: password } : est
+      ))
+      console.log("Cost estimate PDF generated and uploaded successfully:", pdfUrl)
+      return { pdfUrl, password }
+    } catch (error) {
+      console.error("Error generating cost estimate PDF:", error)
+      toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" })
+      throw error
+    }
+  }
+
   const handleDownloadPDF = async (userData: any) => {
     if (!costEstimate) return
     console.log(`users all data: ${userData}`)
+
     // Check if there are multiple related cost estimates (same page_id)
     if (relatedCostEstimates.length > 1) {
       setDownloadingPDF(true)
       try {
-        // Download all related cost estimates as separate PDFs
+        let generatedCount = 0
+        // Generate and update PDFs for all related cost estimates (only if not already generated)
+        const updatedRelatedEstimates = [...relatedCostEstimates]
         for (let i = 0; i < relatedCostEstimates.length; i++) {
           const estimate = relatedCostEstimates[i]
-          await generateCostEstimatePDF(estimate, undefined, false, undefined, userData )
+
+          // Check if PDF already exists
+          if (!estimate.pdf) {
+            // Generate PDF and get URL/password
+            const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(estimate, userData)
+
+            // Update the cost estimate with PDF URL and password
+            await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password })
+            // Update the local state
+            updatedRelatedEstimates[i] = { ...estimate, pdf: pdfUrl, password: password }
+            generatedCount++
+          }
+
+          // Download the PDF from the stored URL
+          if (updatedRelatedEstimates[i].pdf) {
+            const link = document.createElement('a')
+            link.href = updatedRelatedEstimates[i].pdf!
+            link.download = `${estimate.costEstimateNumber || estimate.id}.pdf`
+            link.target = '_blank'
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+          }
         }
+        setRelatedCostEstimates(updatedRelatedEstimates)
         toast({
           title: "PDFs Generated",
-          description: `${relatedCostEstimates.length} PDF files have been downloaded for all pages.`,
+          description: `${generatedCount > 0 ? `${generatedCount} PDF(s) generated and ` : ""}${relatedCostEstimates.length} PDF files have been downloaded for all pages.`,
         })
       } catch (error) {
         console.error("Error downloading multiple PDFs:", error)
@@ -917,6 +1068,14 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       } finally {
         setDownloadingPDF(false)
       }
+      return
+    }
+
+    // Ensure PDF is generated and saved before downloading for single cost estimate
+    try {
+      await generatePDFIfNeeded(costEstimate)
+    } catch (error) {
+      // Error is already handled in generatePDFIfNeeded
       return
     }
 
@@ -1537,15 +1696,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             )}
           </div>
 
-          <div className="flex">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Total Lease:</span>
-            <span className="text-gray-700">
-              PHP{" "}
-              {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}{" "}
-              (Exclusive of VAT)
-            </span>
-          </div>
         </div>
 
         {/* Site Notes */}
@@ -1817,97 +1967,109 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       {/* New Wrapper for Sidebar + Document */}
       <div className="flex justify-center items-start gap-6 mt-6">
         {/* Left Panel (now part of flow) */}
-        <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
-          <Button
-            variant="ghost"
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Templates</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={handleEditClick}
-            disabled={isEditing}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <Pencil className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Edit</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => handleDownloadPDF(userData)}
-            disabled={downloadingPDF}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            {downloadingPDF ? (
-              <>
-                <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
-                <span className="text-[10px] text-gray-700">Generating...</span>
-              </>
-            ) : (
-              <>
-                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
-                <span className="text-[10px] text-gray-700">Download</span>
-              </>
-            )}
-          </Button>
-        </div>
+        {costEstimate.status !== "sent" && (
+          <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
+            <Button
+              variant="ghost"
+              className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            >
+              <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
+              <span className="text-[10px] text-gray-700">Templates</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleEditClick}
+              disabled={isEditing}
+              className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            >
+              <Pencil className="h-8 w-8 text-gray-500 mb-1" />
+              <span className="text-[10px] text-gray-700">Edit</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => handleDownloadPDF(userData)}
+              disabled={downloadingPDF}
+              className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            >
+              {downloadingPDF ? (
+                <>
+                  <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
+                  <span className="text-[10px] text-gray-700">Generating...</span>
+                </>
+              ) : (
+                <>
+                  <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
+                  <span className="text-[10px] text-gray-700">Download</span>
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
         <div className="flex gap-6 items-start">
-          <div id="cost-estimate-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
-            <div className="text-center mb-8">
-              <div className="flex items-center justify-center mb-4 pt-6">
-                {companyData?.photo_url ? (
-                  <img
-                    src={companyData.photo_url || "/placeholder.svg"}
-                    alt="Company Logo"
-                    className="h-16 w-auto object-contain"
-                  />
-                ) : (
-                  <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Building className="h-8 w-8 text-gray-400" />
-                  </div>
-                )}
-              </div>
+          {costEstimate.status === "sent" && costEstimate.pdf ? (
+            <div className="w-[210mm] min-h-[297mm] bg-white shadow-md rounded-sm overflow-hidden">
+              <iframe
+                src={`${costEstimate.pdf}#view=FitH`}
+                className="w-full h-full min-h-[297mm]"
+                title="Cost Estimate PDF"
+              />
             </div>
-
-            {hasMultipleSites ? (
-              <>
-                {renderCostEstimationBlock(
-                  siteNames[currentProductIndex],
-                  siteGroups[siteNames[currentProductIndex]],
-                  currentProductIndex + 1,
-                )}
-              </>
-            ) : (
-              // Render single page for single site (original behavior)
-              renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
-            )}
-
-            {proposal && (
-              <div className="p-6 sm:p-8 border-t border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  Linked Proposal
-                </h2>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-lg font-semibold">{proposal.title}</p>
-                    <p className="text-gray-600">
-                      Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
-                    </p>
-                    <Button
-                      variant="link"
-                      className="p-0 mt-2"
-                      onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
-                    >
-                      View Proposal
-                    </Button>
-                  </CardContent>
-                </Card>
+          ) : (
+            <div id="cost-estimate-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
+              <div className="text-left mb-8 ml-8">
+                <div className="flex items-center justify-start mb-6 pt-6">
+                  {companyData?.photo_url ? (
+                    <img
+                      src={companyData.photo_url || "/placeholder.svg"}
+                      alt="Company Logo"
+                      className="h-24 w-auto object-contain"
+                    />
+                  ) : (
+                    <div className="h-24 w-24 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <Building className="h-12 w-12 text-gray-400" />
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+
+              {hasMultipleSites ? (
+                <>
+                  {renderCostEstimationBlock(
+                    siteNames[currentProductIndex],
+                    siteGroups[siteNames[currentProductIndex]],
+                    currentProductIndex + 1,
+                  )}
+                </>
+              ) : (
+                // Render single page for single site (original behavior)
+                renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
+              )}
+
+              {proposal && (
+                <div className="p-6 sm:p-8 border-t border-gray-200">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
+                    Linked Proposal
+                  </h2>
+                  <Card>
+                    <CardContent className="p-4">
+                      <p className="text-lg font-semibold">{proposal.title}</p>
+                      <p className="text-gray-600">
+                        Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
+                      </p>
+                      <Button
+                        variant="link"
+                        className="p-0 mt-2"
+                        onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
+                      >
+                        View Proposal
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+          )}
 
           <Button
             onClick={() => setShowHistory(!showHistory)}
@@ -2038,11 +2200,18 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
             {currentPageIndex === relatedCostEstimates.length - 1 ? (
               <Button
-                onClick={() => setIsSendOptionsDialogOpen(true)}
-                disabled={costEstimate?.status !== "draft"}
+                onClick={handleSendWithPDFGeneration}
+                disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
               >
-                Send
+                {generatingPDFsForSend ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Preparing...
+                  </>
+                ) : (
+                  "Send"
+                )}
               </Button>
             ) : (
               <Button
@@ -2061,11 +2230,18 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
-              onClick={() => setIsSendOptionsDialogOpen(true)}
-              disabled={costEstimate?.status !== "draft"}
+              onClick={handleSendWithPDFGeneration}
+              disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
               className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
             >
-              Send
+              {generatingPDFsForSend ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Preparing...
+                </>
+              ) : (
+                "Send"
+              )}
             </Button>
           </div>
         </div>

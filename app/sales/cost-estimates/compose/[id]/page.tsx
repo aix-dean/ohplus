@@ -10,7 +10,7 @@ import { Loader2, Send, ArrowLeft, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
-import { getCostEstimate } from "@/lib/cost-estimate-service"
+import { getCostEstimate, updateCostEstimateStatus } from "@/lib/cost-estimate-service"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
@@ -186,6 +186,9 @@ export default function ComposeEmailPage() {
         title: "Email Sent Successfully",
         description: "The cost estimate has been sent to the client.",
       })
+
+      // Update status to sent
+      await updateCostEstimateStatus(costEstimate.id, "sent")
 
       // Navigate back to the cost estimate page
       router.push(`/sales/cost-estimates/${params.id}`)
