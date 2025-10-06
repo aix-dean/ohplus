@@ -82,11 +82,6 @@ interface CompanyData {
 const formatCompanyAddress = (companyData: CompanyData | null): string => {
   if (!companyData) return ""
 
-  // Model 1: company_location as string (e.g., "727 Gen Solano St Manila")
-  if (companyData.company_location && typeof companyData.company_location === "string") {
-    return companyData.company_location
-  }
-
   // Model 2: address as object with city, province, street
   if (companyData.address && typeof companyData.address === "object") {
     const { street, city, province } = companyData.address
