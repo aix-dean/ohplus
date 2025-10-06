@@ -180,19 +180,14 @@ export default function SelectDatesPage() {
 
     const removeSite = (id: string) => {
         setSelectedSites((prev) => {
-            const updated = prev.filter((site) => site.id !== id)
-            if (updated.length === 0) {
-                router.push('/sales/dashboard')
-            }
-            return updated
-        })
+            const updated = prev.filter((site) => site.id !== id);
+            if (updated.length === 0) router.push("/sales/dashboard"); // safe now
+            return updated;
+        });
+
     }
-    useEffect(() => {
-        if (selectedSites.length === 0) {
-            router.push("/sales/dashboard");
-        }
-    }, [selectedSites, router]);
-    
+
+
     const renderCalendar = (monthIndex: number, year: number, bookedRanges: { start: Date; end: Date }[]) => {
         const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
         const startDay = new Date(year, monthIndex, 1).getDay()
