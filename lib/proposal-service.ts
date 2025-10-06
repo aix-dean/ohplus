@@ -81,7 +81,7 @@ export async function createProposal(
         if (companyDoc.exists()) {
           const companyData = companyDoc.data()
           companyName = companyData.name || ""
-          companyLogo = companyData.photo_url || ""
+          companyLogo = companyData.logo || ""
         }
       } catch (error) {
         console.error("Error fetching company data:", error)
@@ -108,6 +108,7 @@ export async function createProposal(
     // Clean the products data to ensure no undefined values
     const cleanProducts: ProposalProduct[] = products.map((product) => ({
       id: product.id,
+      ID: product.id, // Document ID of the selected site
       name: product.name || "",
       type: product.type || "",
       price: typeof product.price === "string" ? Number.parseFloat(product.price) || 0 : product.price || 0,
@@ -150,6 +151,7 @@ export async function createProposal(
     const proposalData = {
       title: title || "",
       proposalNumber: proposalNumber, // Add the new proposal number
+      proposalTitle: "Site Proposals", // Add default proposal title
       client: cleanClient,
       products: cleanProducts,
       totalAmount: totalAmount || 0,
@@ -479,11 +481,20 @@ export async function updateProposal(
     }
 
     if (data.title !== undefined) updateData.title = data.title
+    if (data.proposalTitle !== undefined) updateData.proposalTitle = data.proposalTitle
     if (data.validUntil !== undefined) updateData.validUntil = data.validUntil
     if (data.notes !== undefined) updateData.notes = data.notes
     if (data.customMessage !== undefined) updateData.customMessage = data.customMessage
     if (data.proposalNumber !== undefined) updateData.proposalNumber = data.proposalNumber // Add update for proposalNumber
     if (data.totalAmount !== undefined) updateData.totalAmount = data.totalAmount
+    if (data.preparedByName !== undefined) updateData.preparedByName = data.preparedByName
+    if (data.preparedByCompany !== undefined) updateData.preparedByCompany = data.preparedByCompany
+    if (data.companyName !== undefined) updateData.companyName = data.companyName
+    if (data.companyLogo !== undefined) updateData.companyLogo = data.companyLogo
+    if (data.logoWidth !== undefined) updateData.logoWidth = data.logoWidth
+    if (data.logoHeight !== undefined) updateData.logoHeight = data.logoHeight
+    if (data.logoLeft !== undefined) updateData.logoLeft = data.logoLeft
+    if (data.logoTop !== undefined) updateData.logoTop = data.logoTop
 
     if (data.templateSize !== undefined) updateData.templateSize = data.templateSize
     if (data.templateOrientation !== undefined) updateData.templateOrientation = data.templateOrientation
