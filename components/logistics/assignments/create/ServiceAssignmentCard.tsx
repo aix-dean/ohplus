@@ -333,13 +333,18 @@ export function ServiceAssignmentCard({
     <Card className="w-[90%]">
       <CardHeader>
         <CardTitle>
-          <div className="flex justify-between items-center bg-gray-100 p-2 rounded-md">
-            <div className="flex flex-col">
-              <span className="text-xl font-bold">
-                {products.find(p => p.id === productId)?.site_code || "Site Code"}
-              </span>
+           <div className="flex justify-between items-center bg-gray-100 p-2 rounded-md">
+             <div className="flex flex-col">
+               <span className="text-xl font-bold">
+                 {products.find(p => p.id === productId)?.site_code || products.find(p => p.id === productId)?.id?.substring(0, 8) || "-"}
+               </span>
               <span className="text-base text-gray-500">
-                {products.find(p => p.id === productId)?.name || "Select Project Site"}
+                {products.find(p => p.id === productId)?.name || (
+                  <>
+                    Select Project Site
+                    <span className="text-red-500">*</span>
+                  </>
+                )}
               </span>
             </div>
             <Button
@@ -359,7 +364,7 @@ export function ServiceAssignmentCard({
             <div className="flex flex-col text-sm">
               <p>SA#: {saNumber}</p>
               <p className="text-xs text-gray-500">
-                {products.find(p => p.id === productId)?.site_code || "Site Code"}
+                {products.find(p => p.id === productId)?.site_code || products.find(p => p.id === productId)?.id?.substring(0, 8) || "-"}
               </p>
             </div>
             <p className="text-sm">{currentTime}</p>
