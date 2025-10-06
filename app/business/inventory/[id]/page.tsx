@@ -47,7 +47,7 @@ export default function BusinessProductDetailPage() {
   const [dailyTraffic, setDailyTraffic] = useState("")
   const [trafficUnit, setTrafficUnit] = useState<"daily" | "weekly" | "monthly">("monthly")
   const [price, setPrice] = useState("")
-  const [priceUnit, setPriceUnit] = useState<"per spot" | "per day" | "per month">("per spot")
+  const [priceUnit, setPriceUnit] = useState<"per spot" | "per day" | "per month">("per month")
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imagesToRemove, setImagesToRemove] = useState<string[]>([])
@@ -76,6 +76,11 @@ export default function BusinessProductDetailPage() {
 
     fetchProduct()
   }, [params.id])
+
+  // Update price unit based on site type
+  useEffect(() => {
+    setPriceUnit(siteType === "static" ? "per month" : "per spot")
+  }, [siteType])
 
   const handleBack = () => {
     router.back()
@@ -274,7 +279,8 @@ export default function BusinessProductDetailPage() {
   const handleEdit = () => {
     if (product) {
       // Populate form with existing product data
-      setSiteType(product.content_type === "static" ? "static" : "digital")
+      const currentSiteType = product.content_type === "static" ? "static" : "digital"
+      setSiteType(currentSiteType)
       setCategory(product.categories?.[0] || "")
       setSiteName(product.name || "")
       setLocation(product.specs_rental?.location || "")
@@ -289,6 +295,7 @@ export default function BusinessProductDetailPage() {
       setDailyTraffic(product.specs_rental?.traffic_count?.toString() || "")
       setTrafficUnit("monthly") // Default
       setPrice(product.price?.toString() || "")
+      setPriceUnit(currentSiteType === "static" ? "per month" : "per spot")
       setUploadedFiles([])
       setCurrentImageIndex(0)
       setImagesToRemove([])
@@ -909,7 +916,7 @@ export default function BusinessProductDetailPage() {
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                   />
-                  <Select value="per spot" disabled>
+                  <Select value={priceUnit} disabled>
                     <SelectTrigger className="w-28 border-[#c4c4c4] bg-gray-50">
                       <SelectValue />
                     </SelectTrigger>
