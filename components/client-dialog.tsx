@@ -34,6 +34,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
   const [loadingCompanies, setLoadingCompanies] = useState(false)
   const [showNewCompanyInput, setShowNewCompanyInput] = useState(false)
   const [newCompanyName, setNewCompanyName] = useState("")
+  const [showAdditionalPhone, setShowAdditionalPhone] = useState(false)
+  const [showAdditionalEmail, setShowAdditionalEmail] = useState(false)
 
   // Compliance file states
   const [complianceFiles, setComplianceFiles] = useState({
@@ -66,7 +68,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     lastName: "", // Contact Person Last Name
     designation: client?.designation || "", // New field
     contactPhone: client?.phone || "+63", // Separate field for contact phone with +63 prefix
+    additionalPhone: client?.additionalPhone || "+63", // Additional contact number
     email: client?.email || "", // Contact Details Email
+    additionalEmail: client?.additionalEmail || "", // Additional email field
     user_company_id: client?.user_company_id || userData?.company_id || "", // New field
   })
 
@@ -80,6 +84,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     contactPhone: false,
     email: false,
     phoneFormat: false,
+    additionalPhoneFormat: false,
     websiteFormat: false,
     prefix: false,
   })
@@ -135,7 +140,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         lastName: "",
         designation: client?.designation || "",
         contactPhone: client?.phone || "+63",
+        additionalPhone: client?.additionalPhone || "+63",
         email: client?.email || "",
+        additionalEmail: client?.additionalEmail || "",
         user_company_id: client?.user_company_id || userData?.company_id || "", // New field
       })
       setLogoFile(null) // Clear selected file
@@ -152,6 +159,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         contactPhone: false,
         email: false,
         phoneFormat: false,
+        additionalPhoneFormat: false,
         websiteFormat: false,
         prefix: false,
       })
@@ -266,6 +274,36 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     }
   }
 
+  const handleAdditionalPhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\s/g, '') // Remove spaces
+
+    // Always ensure +63 prefix is present
+    if (!value.startsWith('+63')) {
+      if (value && /^\d/.test(value)) {
+        // If user types digits, add +63 prefix
+        value = '+63' + value.replace(/\D/g, '').substring(0, 9)
+      } else {
+        // If empty or doesn't start with digits, set to +63
+        value = '+63'
+      }
+    } else {
+      // If it starts with +63, ensure only digits after and limit to 10
+      const digitsAfterPrefix = value.substring(3).replace(/\D/g, '') // Remove non-digits
+      value = '+63' + digitsAfterPrefix.substring(0, 10) // Limit to 10 digits
+    }
+
+    // Update form data
+    setFormData((prev) => ({ ...prev, additionalPhone: value }))
+
+    // Clear validation errors when user types
+    if (validationErrors.additionalPhoneFormat) {
+      setValidationErrors((prev) => ({
+        ...prev,
+        additionalPhoneFormat: false
+      }))
+    }
+  }
+
 
   const scrollToFirstError = () => {
     // Define the order of fields to check for errors
@@ -333,6 +371,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         website: "",
         companyPhone: "",
         companyLogoUrl: "",
+        additionalPhone: "",
       }))
       setLogoPreviewUrl(null)
     } else {
@@ -353,6 +392,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
           lastName: "",
           designation: "",
           email: "",
+          additionalPhone: "",
+          additionalEmail: "",
         }))
         setLogoPreviewUrl(selectedCompany.companyLogoUrl || null)
         setShowNewCompanyInput(false)
@@ -550,6 +591,23 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       newValidationErrors.phoneFormat = false
     }
 
+    // Validate additional phone format (only if provided and has content beyond +63)
+    if (formData.additionalPhone.trim()) {
+      if (formData.additionalPhone === '+63') {
+        // If only +63 is entered, it's incomplete
+        newValidationErrors.additionalPhoneFormat = true
+        hasErrors = true
+      } else if (!validatePhoneFormat(formData.additionalPhone)) {
+        // If format is invalid
+        newValidationErrors.additionalPhoneFormat = true
+        hasErrors = true
+      } else {
+        newValidationErrors.additionalPhoneFormat = false
+      }
+    } else {
+      newValidationErrors.additionalPhoneFormat = false
+    }
+
     // Validate website URL format (only if provided)
     if (formData.website.trim()) {
       const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/
@@ -609,6 +667,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         name: `${formData.firstName} ${formData.lastName}`.trim() || "",
         email: formData.email || "",
         phone: formData.contactPhone || "",
+        additionalPhone: formData.additionalPhone || "",
+        additionalEmail: formData.additionalEmail || "",
         industry: formData.industry || "",
         address: formData.address || "",
         designation: formData.designation || "",
@@ -912,7 +972,52 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                   {validationErrors.phoneFormat && !validationErrors.contactPhone && (
                     <p className="text-sm text-[#f95151]">Please enter exactly 10 digits</p>
                   )}
+                  {!showAdditionalPhone && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAdditionalPhone(true)}
+                      className="mt-1 h-6 px-2 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add another contact number
+                    </Button>
+                  )}
                 </div>
+                {showAdditionalPhone && (
+                  <div>
+                    <Label htmlFor="additionalPhone" className="text-[#a1a1a1] text-sm">
+                      Additional Contact No.
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="additionalPhone"
+                        name="additionalPhone"
+                        value={formData.additionalPhone}
+                        onChange={handleAdditionalPhoneInput}
+                        placeholder="Enter 10 digits"
+                        className={`h-10 border-[#c4c4c4] flex-1 ${validationErrors.additionalPhoneFormat ? 'border-[#f95151]' : ''}`}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowAdditionalPhone(false)
+                          setFormData((prev) => ({ ...prev, additionalPhone: "" }))
+                          setValidationErrors((prev) => ({ ...prev, additionalPhoneFormat: false }))
+                        }}
+                        className="h-10 px-2 text-gray-500 hover:text-gray-700"
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                    {validationErrors.additionalPhoneFormat && (
+                      <p className="text-sm text-[#f95151]">Please enter exactly 10 digits</p>
+                    )}
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="email" className="text-[#a1a1a1] text-sm">
                     Email Address <span className="text-[#f95151]">*</span>
@@ -929,7 +1034,49 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                   {validationErrors.email && (
                     <p className="text-sm text-[#f95151]">Email address is required</p>
                   )}
+                  {!showAdditionalEmail && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAdditionalEmail(true)}
+                      className="mt-1 h-6 px-2 text-xs text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add another email
+                    </Button>
+                  )}
                 </div>
+                {showAdditionalEmail && (
+                  <div>
+                    <Label htmlFor="additionalEmail" className="text-[#a1a1a1] text-sm">
+                      Additional Email
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="additionalEmail"
+                        name="additionalEmail"
+                        type="email"
+                        value={formData.additionalEmail}
+                        onChange={handleChange}
+                        placeholder="Additional email address"
+                        className="h-10 border-[#c4c4c4] flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setShowAdditionalEmail(false)
+                          setFormData((prev) => ({ ...prev, additionalEmail: "" }))
+                        }}
+                        className="h-10 px-2 text-gray-500 hover:text-gray-700"
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

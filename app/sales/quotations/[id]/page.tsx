@@ -971,6 +971,9 @@ The OH Plus Team`,
   }
 
   const handleRemoveTerm = (index: number) => {
+    // Prevent removal of the first 3 terms (indices 0, 1, 2)
+    if (index < 3) return
+
     const currentTerms = tempValues.terms_and_conditions || editableQuotation?.template?.terms_and_conditions || []
     const newTerms = currentTerms.filter((_: string, i: number) => i !== index)
     setTempValues({
@@ -986,6 +989,7 @@ The OH Plus Team`,
     })
     setHasUnsavedChanges(true)
   }
+
 
   const renderQuotationBlock = (siteName: string, items: QuotationProduct, pageNumber: number) => {
     const currentQuotation = editableQuotation || quotation
@@ -1326,16 +1330,16 @@ The OH Plus Team`,
           <div className="space-y-2 text-sm">
             {(isEditing
               ? tempValues.terms_and_conditions || currentQuotation?.template?.terms_and_conditions || [
-                  "Quotation validity: 5 working days.",
                   "Site availability: First-come-first-served basis. Official documents required.",
                   "Payment terms: One month advance and two months security deposit.",
                   "Payment deadline: 7 days before rental start.",
+                  "Quotation validity: 5 working days.",
                 ]
-              : currentQuotation?.template?.terms_and_conditions || [
-                  "Quotation validity: 5 working days.",
+              : currentQuotation?.template?.terms_and_conditions || [     
                   "Site availability: First-come-first-served basis. Official documents required.",
                   "Payment terms: One month advance and two months security deposit.",
                   "Payment deadline: 7 days before rental start.",
+                  "Quotation validity: 5 working days.",
                 ]
             ).map((term: string, index: number) => (
               <div key={index} className="flex items-start gap-2">
@@ -1345,18 +1349,20 @@ The OH Plus Team`,
                     <textarea
                       value={term}
                       onChange={(e) => handleUpdateTerm(index, e.target.value)}
-                      className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px]"
+                      className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px] resize-none"
                       placeholder="Enter term and condition"
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveTerm(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    {index >= 3 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveTerm(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <span className="flex-1">{term}</span>

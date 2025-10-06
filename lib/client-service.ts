@@ -22,7 +22,9 @@ export interface Client {
   id: string
   name: string
   email: string
+  additionalEmail?: string // Additional email field
   phone: string
+  additionalPhone?: string // Additional contact number field
   company: string
   company_id?: string // Make sure this field is included
   designation?: string
@@ -98,7 +100,9 @@ export async function createClient(clientData: Omit<Client, "id" | "created" | "
     const newClient = {
       name: clientData.name,
       email: clientData.email,
+      additionalEmail: clientData.additionalEmail || "",
       phone: clientData.phone,
+      additionalPhone: clientData.additionalPhone || "",
       company: clientData.company,
       company_id: clientData.company_id || "",
       designation: clientData.designation || "",

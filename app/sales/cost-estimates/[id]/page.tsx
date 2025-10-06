@@ -1214,6 +1214,9 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   }
 
   const handleRemoveTerm = (index: number) => {
+    // Prevent removal of the first 3 terms (indices 0, 1, 2)
+    if (index < 3) return
+
     const currentTerms = tempValues.terms_and_conditions || editableCostEstimate?.template?.terms_and_conditions || []
     const newTerms = currentTerms.filter((_: string, i: number) => i !== index)
     setTempValues({
@@ -1635,15 +1638,17 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                       className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px]"
                       placeholder="Enter term and condition"
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveTerm(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    {index >= 3 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveTerm(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <span className="flex-1">{term}</span>
