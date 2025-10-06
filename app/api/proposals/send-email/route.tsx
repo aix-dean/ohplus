@@ -33,6 +33,9 @@ export async function POST(request: NextRequest) {
       ccEmail: body.ccEmail, // Now a string that might contain multiple emails
     })
 
+    console.log("Proposal company logo:", body.proposal?.companyLogo)
+    console.log("Proposal company name:", body.proposal?.companyName)
+
     const { proposal, clientEmail, subject, body: customBody, currentUserEmail, currentUserPhoneNumber, ccEmail } = body
 
     if (!proposal || !clientEmail) {
@@ -85,7 +88,7 @@ export async function POST(request: NextRequest) {
     console.log("Generated proposal URL:", proposalUrl)
 
     // Use custom subject and body if provided, otherwise fall back to default
-    const finalSubject = subject || `Proposal: ${proposal.title || "Custom Advertising Solution"} - OH Plus`
+    const finalSubject = subject || `Proposal: ${proposal.title || "Custom Advertising Solution"} - ${proposal.companyName || "OH Plus"}`
     const finalBody =
       customBody ||
       `
@@ -93,7 +96,7 @@ export async function POST(request: NextRequest) {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Proposal from OH Plus</title>
+        <title>Proposal from ${proposal.companyName || "OH Plus"}</title>
         <style>
           body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -125,6 +128,10 @@ export async function POST(request: NextRequest) {
             margin: 10px 0 0 0;
             opacity: 0.9;
             font-size: 16px;
+          }
+          .logo {
+            max-height: 60px;
+            margin-bottom: 10px;
           }
           .content {
             padding: 30px;
@@ -220,7 +227,7 @@ export async function POST(request: NextRequest) {
       <body>
         <div class="container">
           <div class="header">
-            <h1>OH Plus</h1>
+            ${proposal.companyLogo ? `<img src="${proposal.companyLogo}" alt="${proposal.companyName || 'Company Logo'}" style="max-height: 60px; margin-bottom: 10px;" />` : `<h1>${proposal.companyName || 'OH Plus'}</h1>`}
             <p>Professional Outdoor Advertising Solutions</p>
           </div>
 
@@ -273,7 +280,7 @@ export async function POST(request: NextRequest) {
             }
 
             <div class="action-button">
-              <a href="${proposalUrl}" class="btn">View Full Proposal Online</a>
+              <a href="https://mrk.ohplus.ph/pr/${proposal.id}" class="btn">View Full Proposal Online</a>
             </div>
 
             <p>We believe this proposal offers excellent value and aligns perfectly with your advertising goals. Our team is ready to discuss any questions you may have and work with you to bring this campaign to life.</p>

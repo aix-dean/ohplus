@@ -5,13 +5,40 @@ import { db } from "@/lib/firebase"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+// Function to convert image URL to base64 data URI
+async function imageUrlToDataUri(imageUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch(imageUrl)
+    if (!response.ok) {
+      console.error('Failed to fetch image:', response.status, response.statusText)
+      return null
+    }
+
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.startsWith('image/')) {
+      console.error('Invalid content type for image:', contentType)
+      return null
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    return `data:${contentType};base64,${base64}`
+  } catch (error) {
+    console.error('Error converting image to data URI:', error)
+    return null
+  }
+}
+
 function createEmailTemplate(
   body: string,
   userPhoneNumber?: string,
   companyName?: string,
   companyWebsite?: string,
+  companyAddress?: string,
   userDisplayName?: string,
-  replyTo?: string
+  replyTo?: string,
+  companyLogo?: string,
+  proposalId?: string
 ): string {
   const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
 
@@ -27,6 +54,7 @@ function createEmailTemplate(
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${companyName || "Company"} - Proposal</title>
     <style>
@@ -47,9 +75,32 @@ function createEmailTemplate(
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             padding: 30px 40px;
+        }
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .header-table td {
+            vertical-align: top;
+            padding: 0 10px;
+        }
+        .logo-cell {
+            width: 120px;
+            text-align: left;
+        }
+        .company-cell {
             text-align: center;
         }
+        .empty-cell {
+            width: 120px;
+        }
         .logo {
+            height: 60px;
+            width: auto;
+            max-width: 300px;
+            margin-bottom: 10px;
+        }
+        .company-name {
             color: #ffffff;
             font-size: 28px;
             font-weight: bold;
@@ -145,34 +196,56 @@ function createEmailTemplate(
             .header, .content, .footer {
                 padding: 20px !important;
             }
+            .header-table {
+                display: block !important;
+            }
+            .header-table tr {
+                display: block !important;
+                text-align: center !important;
+            }
+            .header-table td {
+                display: block !important;
+                width: 100% !important;
+                padding: 10px 0 !important;
+            }
             .logo {
-                font-size: 24px;
+                height: 50px !important;
+                max-width: 150px !important;
+            }
+            .company-name {
+                font-size: 24px !important;
             }
         }
     </style>
 </head>
 <body>
     <div class="email-container">
-        <div class="header">
-            <h1 class="logo">${companyName || "Company"}</h1>
-        </div>
+ 
+    <div class="header">
+        <table class="header-table">
+            <tr>
+                <td class="logo-cell">
+                    ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="logo" style="display: block; height: 60px; width: auto; max-width: 100px;" height="60" width="auto">` : ''}
+                </td>
+                <td class="company-cell">
+                    <h1 class="company-name">${companyName || "Company"}</h1>
+                    ${companyAddress ? `<p class="company-address" style="margin: 5px 0 0 0; color: #e8eaff; font-size: 14px;">${companyAddress}</p>` : ''}
+                </td>
+                <td class="empty-cell">
+                    <!-- Empty column -->
+                </td>
+            </tr>
+        </table>
+    </div>
         
         <div class="content">
             ${processedBody}
             
-            <div class="highlight-box">
-                <p style="margin: 0; font-weight: 500; color: #495057;">
-                    📋 <strong>What's Included:</strong><br>
-                    • Detailed site information and specifications<br>
-                    • Competitive pricing based on our discussion<br>
-                    • High-quality billboard placement options<br>
-                    • Professional campaign management
-                </p>
-            </div>
+
             
             <div class="cta-section">
                 <p style="margin-bottom: 20px; color: #6c757d;">Ready to move forward with your campaign?</p>
-                <a href="mailto:${replyTo || (userDisplayName ? userDisplayName.replace(/\s+/g, '').toLowerCase() : 'noreply') + '@ohplus.ph'}" class="cta-button">Get In Touch</a>
+                <a href="https://mrk.ohplus.ph/pr/${proposalId || ''}" class="cta-button">View</a>
             </div>
         </div>
         
@@ -217,10 +290,14 @@ export async function POST(request: NextRequest) {
     const companyName = formData.get("companyName") as string
     const companyWebsite = formData.get("companyWebsite") as string
     const userDisplayName = formData.get("userDisplayName") as string
+    const companyLogo = formData.get("companyLogo") as string
+    const proposalId = formData.get("proposalId") as string
 
     // Get actual company name from database if companyId is provided
     let actualCompanyName = companyName || "Company"
     let actualCompanyWebsite = companyWebsite
+    let actualCompanyAddress = ""
+    let actualCompanyLogo = companyLogo || ""
 
     if (companyId) {
       try {
@@ -229,16 +306,49 @@ export async function POST(request: NextRequest) {
 
         if (companyDocSnap.exists()) {
           const companyData = companyDocSnap.data()
+          console.log("[v0] Company data retrieved from database:", companyData)
           if (companyData.name) {
             actualCompanyName = companyData.name
+            console.log("[v0] Company name set to:", actualCompanyName)
           }
           if (companyData.website) {
             actualCompanyWebsite = companyData.website
+          }
+          if (companyData.address && typeof companyData.address === 'object') {
+            // Format address object to string
+            const addr = companyData.address
+            const addressParts = []
+            if (addr.street) addressParts.push(addr.street)
+            if (addr.city) addressParts.push(addr.city)
+            if (addr.state) addressParts.push(addr.state)
+            if (addr.zip) addressParts.push(addr.zip)
+            if (addr.country) addressParts.push(addr.country)
+            actualCompanyAddress = addressParts.join(', ')
+            console.log("[v0] Company address object:", companyData.address)
+            console.log("[v0] Company address formatted to:", actualCompanyAddress)
+          } else if (companyData.address && typeof companyData.address === 'string') {
+            actualCompanyAddress = companyData.address
+            console.log("[v0] Company address string set to:", actualCompanyAddress)
+          }
+          if (companyData.photo_url) {
+            actualCompanyLogo = companyData.photo_url
           }
         }
       } catch (error) {
         console.error("Error fetching company data:", error)
         // Continue with fallback values
+      }
+    }
+
+    // Convert logo URL to data URI for email compatibility
+    let logoDataUri = null
+    if (actualCompanyLogo) {
+      console.log("[v0] Converting logo URL to data URI:", actualCompanyLogo)
+      logoDataUri = await imageUrlToDataUri(actualCompanyLogo)
+      if (logoDataUri) {
+        console.log("[v0] Successfully converted logo to data URI")
+      } else {
+        console.log("[v0] Failed to convert logo to data URI, using original URL")
       }
     }
 
@@ -249,7 +359,9 @@ export async function POST(request: NextRequest) {
 
     if (verifiedDomain) {
       // Use verified domain if available
-      from = `${actualCompanyName} <noreply@${verifiedDomain}>`
+      // Sanitize company name to remove special characters that break email format
+      const sanitizedCompanyName = actualCompanyName.replace(/[<>\[\]{}|\\^`]/g, '').trim()
+      from = `${sanitizedCompanyName} <noreply@${verifiedDomain}>`
     } else {
       // Fallback to default - this may not work if no domains are verified
       from = `noreply@resend.dev`
@@ -258,6 +370,8 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Email sending - Subject:", subject)
     console.log("[v0] Email sending - Body length:", body?.length)
     console.log("[v0] Email sending - Body preview:", body?.substring(0, 100))
+    console.log("[v0] Email sending - Company Logo URL:", actualCompanyLogo)
+    console.log("[v0] Email sending - Logo Data URI available:", !!logoDataUri)
 
     if (!body || body.trim().length === 0) {
       console.error("[v0] Email sending failed - Empty body")
@@ -328,7 +442,7 @@ export async function POST(request: NextRequest) {
       from,
       to,
       subject: subject.trim(),
-      html: createEmailTemplate(body.trim(), currentUserPhoneNumber, actualCompanyName, actualCompanyWebsite, userDisplayName, replyTo),
+      html: createEmailTemplate(body.trim(), currentUserPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, userDisplayName, replyTo, logoDataUri || actualCompanyLogo, proposalId),
     }
 
     if (cc && cc.length > 0) {
