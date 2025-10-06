@@ -546,6 +546,17 @@ export async function POST(request: NextRequest) {
               <a href="https://mrk.ohplus.ph/pr/${proposal.id}" class="btn">View Full Proposal Online</a>
             </div>
 
+            ${
+              proposal.password
+                ? `
+            <div class="attachment-note">
+              🔐 <strong>Access Code:</strong> ${proposal.password}<br>
+              <small style="color: #6b7280;">Please use this code to access the proposal online.</small>
+            </div>
+            `
+                : ""
+            }
+
             <p>We believe this proposal offers excellent value and aligns perfectly with your advertising goals. Our team is ready to discuss any questions you may have and work with you to bring this campaign to life.</p>
 
             <div class="contact-info">

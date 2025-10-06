@@ -41,7 +41,15 @@ async function populateCompanyLogo(proposalData: any): Promise<any> {
   return { ...proposalData, companyLogo }
 }
 
-// Removed generateProposalPassword function
+// Generate a secure password for proposal access
+function generateProposalPassword(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+  let password = ""
+  for (let i = 0; i < 8; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return password
+}
 
 // Create a new proposal
 export async function createProposal(
@@ -57,6 +65,8 @@ export async function createProposal(
     campaignId?: string // Add optional campaign ID parameter
     companyId?: string // Add optional company ID parameter
     client_company_id?: string // Add client_company_id parameter
+    password?: string // Add optional password for public access
+    generatePassword?: boolean // Add option to auto-generate password
   } = {},
 ): Promise<string> {
   try {
@@ -132,6 +142,12 @@ export async function createProposal(
     // Generate proposal number
     const proposalNumber = `PP${Date.now()}`
 
+    // Handle password generation
+    let password = options.password || null
+    if (options.generatePassword && !password) {
+      password = generateProposalPassword()
+    }
+
     const proposalData = {
       title: title || "",
       proposalNumber: proposalNumber, // Add the new proposal number
@@ -149,6 +165,7 @@ export async function createProposal(
       updatedAt: serverTimestamp(),
       status: "draft" as const, // Always set to draft now
       campaignId: options.campaignId || null, // Store campaign ID if provided
+      password: password, // Store password for public access
     }
 
     const docRef = await addDoc(collection(db, "proposals"), proposalData)
@@ -329,7 +346,26 @@ export async function getProposalById(proposalId: string): Promise<Proposal | nu
   }
 }
 
-// Removed verifyProposalPassword function
+// Verify proposal password for public access
+export async function verifyProposalPassword(proposalId: string, password: string): Promise<boolean> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const proposalDoc = await getDoc(doc(db, "proposals", proposalId))
+
+    if (proposalDoc.exists()) {
+      const data = proposalDoc.data()
+      return data.password === password
+    }
+
+    return false
+  } catch (error) {
+    console.error("Error verifying proposal password:", error)
+    return false
+  }
+}
 
 // Update proposal status with optional custom user info for public viewers
 export async function updateProposalStatus(
@@ -454,6 +490,7 @@ export async function updateProposal(
     if (data.templateOrientation !== undefined) updateData.templateOrientation = data.templateOrientation
     if (data.templateLayout !== undefined) updateData.templateLayout = data.templateLayout
     if (data.templateBackground !== undefined) updateData.templateBackground = data.templateBackground
+    if (data.password !== undefined) updateData.password = data.password
 
     if (data.products !== undefined) {
       updateData.products = data.products

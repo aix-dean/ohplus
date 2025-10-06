@@ -138,7 +138,8 @@ function createEmailTemplate(
   replyTo?: string,
   companyLogo?: string,
   proposalId?: string,
-  dominantColor?: string
+  dominantColor?: string,
+  proposalPassword?: string
 ): string {
   const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
 
@@ -287,7 +288,7 @@ function createEmailTemplate(
         }
 .footer {
     background-color: #ffffff;
-    padding: 20px 0px 0px 30px; /* top:20px, right:0, bottom:0px, left:30px */
+    padding: 0px 0px 0px 30px; /* top:20px, right:0, bottom:0px, left:30px */
 }
 
         .footer-table {
@@ -317,7 +318,7 @@ function createEmailTemplate(
             width: 40px;
             height: 40px;
             object-fit: contain;
-            margin-bottom: 8px;
+            margin-top: 12px;
         }
         .footer-company-name {
             margin: 0;
@@ -447,7 +448,6 @@ function createEmailTemplate(
             .footer-right-column {
                 display: block !important;
                 width: 100% !important;
-                padding: 10px 0 !important;
             }
             .footer-left-column {
                 text-align: center !important;
@@ -489,13 +489,19 @@ function createEmailTemplate(
         
         <div class="content">
             ${processedBody}
-            
 
-            
             <div class="cta-section">
                 <p style="margin-bottom: 20px; color: #6c757d;">Ready to move forward with your campaign?</p>
                 <a href="https://mrk.ohplus.ph/pr/${proposalId || ''}" class="cta-button">View</a>
             </div>
+
+            ${proposalPassword ? `
+            <div class="highlight-box" style="border-left-color: ${dominantColor || '#667eea'} !important;">
+                <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🔐 Access Code</h4>
+                <p style="margin: 0; font-family: monospace; font-size: 18px; font-weight: bold; color: ${dominantColor || '#667eea'}; background: #f8f9fa; padding: 10px; border-radius: 4px; text-align: center;">${proposalPassword}</p>
+                <p style="margin: 10px 0 0 0; font-size: 14px; color: #6c757d;">Please use this code to access the proposal online.</p>
+            </div>
+            ` : ''}
         </div>
         
         <div class="footer">
@@ -545,6 +551,7 @@ export async function POST(request: NextRequest) {
     const userDisplayName = formData.get("userDisplayName") as string
     const companyLogo = formData.get("companyLogo") as string
     const proposalId = formData.get("proposalId") as string
+    const proposalPassword = formData.get("proposalPassword") as string
 
     // Validate and sanitize userDisplayName for security and data integrity
     let validatedUserDisplayName = userDisplayName
@@ -807,7 +814,7 @@ export async function POST(request: NextRequest) {
       from,
       to,
       subject: subject.trim(),
-      html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined),
+      html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
     }
 
     if (cc && cc.length > 0) {

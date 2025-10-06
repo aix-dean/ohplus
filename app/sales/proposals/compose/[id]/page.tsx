@@ -539,6 +539,11 @@ ${contactDetails}`,
       // Pass the proposal ID for the email template
       formData.append('proposalId', resolvedParams.id)
 
+      // Pass the proposal password if it exists
+      if (proposal?.password) {
+        formData.append('proposalPassword', proposal.password)
+      }
+
       console.log('Sending email with company data:', {
         companyId: userData?.company_id,
         companyName: projectData?.company_name,
