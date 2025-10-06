@@ -1030,7 +1030,8 @@ export async function getCostEstimatesByProductIdAndCompanyId(productId: string,
 // Generate PDF and upload to Firebase storage with password protection
 export async function generateAndUploadCostEstimatePDF(
   costEstimate: CostEstimate,
-  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string }
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
+  companyData: {name: string, address?: any, phone?: string, email?: string, website?: string},
 ): Promise<{ pdfUrl: string; password: string }> {
   try {
     // Generate the PDF blob using the API
@@ -1041,7 +1042,7 @@ export async function generateAndUploadCostEstimatePDF(
       },
       body: JSON.stringify({
         costEstimate,
-        companyData: null,
+        companyData,
         logoDataUrl: null,
         format: 'pdf',
         userData

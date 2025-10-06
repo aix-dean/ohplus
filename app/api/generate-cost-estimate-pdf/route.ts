@@ -63,13 +63,20 @@ const formatDuration = (days: number, startDate?: any, endDate?: any): string =>
 }
 
 const formatCompanyAddress = (companyData: any): string => {
-  if (!companyData) return ""
-  const parts = []
-  if (companyData.company_location?.street) parts.push(companyData.company_location.street)
-  if (companyData.company_location?.city) parts.push(companyData.company_location.city)
-  if (companyData.company_location?.province) parts.push(companyData.company_location.province)
-  if (companyData.zip) parts.push(companyData.zip)
-  return parts.join(", ")
+const parts: string[] = [];
+
+const location = companyData.company_location && (
+  companyData.company_location.street ||
+  companyData.company_location.city ||
+  companyData.company_location.province
+) ? companyData.company_location : companyData.address;
+
+if (location?.street) parts.push(location.street);
+if (location?.city) parts.push(location.city);
+if (location?.province) parts.push(location.province);
+
+const fullAddress = parts.join(", ");
+  return fullAddress
 }
 
 const calculateProratedPrice = (price: number, startDate: Date | undefined, endDate: Date | undefined): number => {
@@ -431,7 +438,7 @@ function generateCostEstimateHTML(
       </div>
     </div>
 
-    <div class="title">${isMultipleSites ? `Cost Estimate for ${primarySite}` : costEstimate.title || "Cost Estimate"}</div>
+    <div class="title">${isMultipleSites ? `${primarySite}` : `${costEstimate.lineItems[0].description} Cost Estimate` || "Cost Estimate"}</div>
 
     <div class="salutation">
       Dear ${costEstimate.client?.name?.split(" ").pop() || "Client"},
@@ -552,7 +559,7 @@ function generateCostEstimateHTML(
       </div>
     </div>
         <div class="page-footer" style="font-size:8px; width:100%; text-align:center; padding:2px 0; color: #444;">
-          <div>${companyData?.name || 'Company Name'}</div>
+          <div>${companyData?.company_name || companyData?.name}</div>
           <div>${formatCompanyAddress(companyData)}</div>
           <div>Tel: ${companyData?.phone || 'N/A'} | Email: ${companyData?.email || 'N/A'}</div>
         </div>

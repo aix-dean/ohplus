@@ -376,6 +376,12 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             salutation: newValue,
           }
           break
+        case "greeting":
+          updatedCostEstimate.template = {
+            ...updatedCostEstimate.template,
+            greeting: newValue,
+          }
+          break
         case "signature_position":
           updatedCostEstimate.signature_position = newValue
           break
@@ -657,25 +663,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           const ceActivities = await getProposalActivities(costEstimateId)
           setActivities(ceActivities)
 
-          // Check if PDF needs to be generated
-          if (!ce.pdf || ce.pdf.trim() === "") {
-            setTimeout(async () => {
-              try {
-                const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(ce, userData ? {
-                  first_name: userData.first_name || undefined,
-                  last_name: userData.last_name || undefined,
-                  email: userData.email || undefined,
-                  company_id: userData.company_id || undefined,
-                } : undefined)
-                await updateCostEstimate(ce.id, { pdf: pdfUrl, password: password })
-                setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
-                console.log("Cost estimate PDF generated and uploaded successfully:", pdfUrl)
-              } catch (error) {
-                console.error("Error generating cost estimate PDF:", error)
-                toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" })
-              }
-            }, 2000)
-          }
         } else {
           toast({
             title: "Cost Estimate Not Found",
@@ -711,6 +698,38 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }, [fetchClientHistory])
 
+  // Generate PDF when both costEstimate and companyData are available
+  useEffect(() => {
+    const generatePDFIfNeeded = async () => {
+      if (!costEstimate || !companyData || !companyData.name || (costEstimate.pdf && costEstimate.pdf.trim() !== "")) {
+        return
+      }
+
+      try {
+        const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, userData ? {
+          first_name: userData.first_name || undefined,
+          last_name: userData.last_name || undefined,
+          email: userData.email || undefined,
+          company_id: userData.company_id || undefined,
+        } : undefined, {
+          name: companyData.name,
+          address: companyData.address,
+          phone: companyData.phone,
+          email: companyData.email,
+          website: companyData.website || companyData.company_website,
+        })
+        await updateCostEstimate(costEstimate.id, { pdf: pdfUrl, password: password })
+        setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+        console.log("Cost estimate PDF generated and uploaded successfully:", pdfUrl)
+      } catch (error) {
+        console.error("Error generating cost estimate PDF:", error)
+        toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" })
+      }
+    }
+
+    generatePDFIfNeeded()
+  }, [costEstimate, companyData, userData, toast])
+
   // Handle automatic share when page loads with action parameter
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -742,7 +761,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     if (isSendEmailDialogOpen && costEstimate) {
-      setEmailSubject(`Cost Estimate: ${costEstimate.title || "Custom Cost Estimate"} - OH Plus`)
+      setEmailSubject(`Cost Estimate: ${costEstimate.lineItems[0].description || "Custom Cost Estimate"}`)
       setEmailBody(
         `Dear ${costEstimate.client?.contactPerson || costEstimate.client?.company || "Valued Client"},\n\nWe are pleased to provide you with a detailed cost estimate for your advertising campaign. Please find the full cost estimate attached and accessible via the link below.\n\nThank you for considering OH Plus for your advertising needs. We look forward to working with you to bring your campaign to life!\n\nBest regards,\nThe OH Plus Team`,
       )
@@ -1015,8 +1034,9 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           "Site availability: First-come-first-served basis. Official documents required.",
           "Payment terms: One month advance and two months security deposit.",
           "Payment deadline: 7 days before rental start.",
-        ]
-      }) // Set default terms
+        ],
+        greeting: costEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`
+      }) // Set default terms and greeting
       setIsEditing(true)
     }
   }
@@ -1296,7 +1316,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }, 0)
 
     const siteTotal = Object.keys(tempValues).length > 0 ? previewSiteTotal : siteLineItems.reduce((sum, item) => sum + item.total, 0)
-    const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.title
+    const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.lineItems[0]?.description
 
     const baseCENumber = costEstimate?.costEstimateNumber || costEstimate?.id
     const uniqueCENumber = hasMultipleSites
@@ -1365,9 +1385,26 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
         {/* Greeting */}
         <div className="text-left mb-8">
-          <p className="text-base">
-            Good Day! Thank you for considering {companyData?.name || "our company"} for your business needs.
-          </p>
+          {isEditing && editingField === "greeting" ? (
+            <textarea
+              value={tempValues.greeting || currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
+              onChange={(e) => updateTempValues("greeting", e.target.value)}
+              className="w-full text-left text-base border border-gray-300 rounded p-2"
+              rows={2}
+              placeholder="Enter greeting text"
+            />
+          ) : (
+            <div
+              className={isEditing ? "cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
+              onClick={() => isEditing && handleFieldEdit("greeting", currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`)}
+              title={isEditing ? "Click to edit greeting" : ""}
+            >
+              <p className="text-base">
+                {currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
+              </p>
+              {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+            </div>
+          )}
         </div>
 
         {/* Details Header */}
@@ -1838,7 +1875,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                   </div>
                 )}
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
             </div>
 
             {hasMultipleSites ? (
@@ -1989,7 +2025,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       ) : null}
 
       {!isEditing && relatedCostEstimates.length > 1 ? (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
               variant="outline"
@@ -2027,7 +2063,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       ) : !isEditing ? (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
               onClick={() => setIsSendOptionsDialogOpen(true)}
