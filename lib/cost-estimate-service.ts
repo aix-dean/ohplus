@@ -1034,7 +1034,7 @@ export async function generateAndUploadCostEstimatePDF(
 ): Promise<{ pdfUrl: string; password: string }> {
   try {
     // Generate the PDF blob using the API
-    const response = await fetch(`/api/generate-cost-estimate-pdf`, {
+    const response = await fetch('/api/generate-cost-estimate-pdf', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

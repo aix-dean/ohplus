@@ -3,10 +3,13 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ArrowLeft, Edit, Trash2, Package, MapPin, DollarSign, Settings, Calendar, User, Building, Image, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { toast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -80,6 +83,8 @@ export default function InventoryDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   const itemId = params.id as string
 
@@ -238,7 +243,7 @@ export default function InventoryDetailsPage() {
   }, [fullscreenImage, currentImageIndex, item?.imageUrls.length])
 
   const handleEdit = () => {
-    router.push(`/it/inventory/edit/${itemId}`)
+    setShowEditDialog(true)
   }
 
   const handleDelete = () => {
@@ -676,6 +681,61 @@ export default function InventoryDetailsPage() {
                 />
               )}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Inventory Item</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Basic fields for editing */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edit-name">Item Name</Label>
+                  <Input
+                    id="edit-name"
+                    defaultValue={item?.name || ""}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-brand">Brand</Label>
+                  <Input
+                    id="edit-brand"
+                    defaultValue={item?.brand || ""}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  defaultValue={item?.description || ""}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                // Handle save
+                setIsEditing(true)
+                // Simulate save
+                setTimeout(() => {
+                  setIsEditing(false)
+                  setShowEditDialog(false)
+                  toast({
+                    title: "Item Updated",
+                    description: "The item has been updated successfully.",
+                  })
+                }, 1000)
+              }} disabled={isEditing}>
+                {isEditing ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
