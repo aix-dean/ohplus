@@ -2419,6 +2419,99 @@ export default function ProposalDetailsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Templates Panel Dialog - Work in Progress */}
+      <Dialog open={showTemplatesPanel} onOpenChange={setShowTemplatesPanel}>
+        <DialogContent className="max-w-md mx-auto border-0 shadow-lg">
+          <DialogTitle className="text-xl font-semibold mb-4 text-center">Template Settings</DialogTitle>
+
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Grid3X3 className="h-8 w-8 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Work in Progress</h3>
+            <p className="text-gray-600 mb-6">
+              Template customization features are currently under development. This functionality will be available in a future update.
+            </p>
+            <Button
+              onClick={() => setShowTemplatesPanel(false)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Template Form Dialog */}
+      <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+        <DialogContent className="max-w-md mx-auto border-0 shadow-lg">
+          <DialogTitle className="text-xl font-semibold mb-4">Create New Template</DialogTitle>
+
+          <form onSubmit={handleFormSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="template-name">Template Name</Label>
+              <Input
+                id="template-name"
+                value={formData.name}
+                onChange={(e) => handleInputChange("name", e.target.value)}
+                placeholder="Enter template name"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="background-url">Background URL (optional)</Label>
+              <Input
+                id="background-url"
+                value={formData.background_url}
+                onChange={(e) => handleInputChange("background_url", e.target.value)}
+                placeholder="https://example.com/image.jpg"
+              />
+            </div>
+
+            {/* File Upload */}
+            <div className="space-y-2">
+              <Label>Or Upload Background Image</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="cursor-pointer"
+              />
+              {filePreview && (
+                <div className="mt-2">
+                  <img src={filePreview} alt="Preview" className="max-w-full h-32 object-cover rounded border" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBackToList}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={formLoading || uploading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {formLoading || uploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Template"
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
         isOpen={isDeleteConfirmationOpen}
