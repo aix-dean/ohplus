@@ -33,12 +33,6 @@ const categoryLabels = {
 
 async function fetchCompanyData(companyId: string) {
   // Provide immediate fallback data to prevent hanging
-  const fallbackData = {
-    company_name: "Golden Touch Imaging Specialist",
-    company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
-    phone: "Telephone: (02) 5310 1750 to 53",
-    photo_url: null,
-  }
 
   try {
     // Attempt to fetch company data with a very short timeout
@@ -48,18 +42,18 @@ async function fetchCompanyData(companyId: string) {
       const data = companyDoc.data()
       // Return fetched data merged with fallback for missing fields
       return {
-        company_name: data.company_name || data.name || fallbackData.company_name,
-        company_location: data.company_location || data.address || fallbackData.company_location,
-        phone: data.phone || data.telephone || data.contact_number || fallbackData.phone,
+        company_name: data.name ||  "",
+        company_location: data.address || [],
+        phone: data.phone || data.telephone || data.contact_number || "",
         photo_url: data.photo_url || data.logo_url || null,
       }
     }
 
-    return fallbackData
+    return null
   } catch (error) {
     console.error("Error fetching company data:", error)
     // Always return fallback data instead of throwing
-    return fallbackData
+    return null
   }
 }
 

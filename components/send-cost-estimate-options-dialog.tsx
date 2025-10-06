@@ -73,6 +73,7 @@ export function SendCostEstimateOptionsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogTitle></DialogTitle>
       <DialogContent className="sm:max-w-[400px] p-0">
         {/* Header */}
         <div className="flex items-center justify-between p-6 pb-4">
