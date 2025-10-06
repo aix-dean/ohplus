@@ -39,6 +39,7 @@ export type ProductMedia = {
 
 export type ProposalProduct = {
   id: string
+  ID: string // Document ID of the selected or created site
   name: string
   type: string
   price: number
@@ -77,6 +78,7 @@ export type Proposal = {
    title: string
    description?: string
    proposalNumber?: string // Add proposal number field
+   proposalTitle?: string // Add proposal title field for the main heading
    client: ProposalClient
    products: ProposalProduct[]
    totalAmount: number
@@ -87,6 +89,12 @@ export type Proposal = {
    companyId?: string | null // Add company_id field
    companyName?: string // Add company name field
    companyLogo?: string // Add company logo field
+   logoWidth?: number // Add logo width field
+   logoHeight?: number // Add logo height field
+   logoLeft?: number // Add logo left position field
+   logoTop?: number // Add logo top position field
+   preparedByName?: string // Add prepared by name field
+   preparedByCompany?: string // Add prepared by company field
    campaignId?: string | null
    templateSize?: string
    templateOrientation?: string

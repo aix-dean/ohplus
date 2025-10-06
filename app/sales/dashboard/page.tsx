@@ -838,21 +838,31 @@ function SalesDashboardContent() {
       // Generate a simple title for the proposal
       const proposalTitle = `Proposal for ${selectedClientForProposal.company} - ${new Date().toLocaleDateString()}`
 
-      const proposalProducts = selectedProducts.map(product => ({
-        id: product.id || "",
-        name: product.name,
-        type: product.type || "rental",
-        price: product.price || 0,
-        location: product.specs_rental?.location || (product as any).light?.location || "N/A", // Ensure location is present
-        site_code: product.site_code || product.specs_rental?.site_code || (product as any).light?.siteCode || undefined, // Ensure site_code is present
-        media: product.media || [],
-        specs_rental: product.specs_rental || null,
-        light: (product as any).light || null,
-        description: product.description || "",
-        health_percentage: 0, // Default value
-        categories: product.categories || [], // Include categories from product
-        category_names: product.category_names || [], // Include category names from product
-      }));
+      const proposalProducts = selectedProducts.map(product => {
+        const proposalProduct: any = {
+          id: product.id || "",
+          ID: product.id || "", // Document ID of the selected site
+          name: product.name,
+          type: product.type || "rental",
+          price: product.price || 0,
+          location: product.specs_rental?.location || (product as any).light?.location || "N/A", // Ensure location is present
+          media: product.media || [],
+          specs_rental: product.specs_rental || null,
+          light: (product as any).light || null,
+          description: product.description || "",
+          health_percentage: 0, // Default value
+          categories: product.categories || [], // Include categories from product
+          category_names: product.category_names || [], // Include category names from product
+        }
+
+        // Only add site_code if it has a value
+        const siteCode = product.site_code || product.specs_rental?.site_code || (product as any).light?.siteCode
+        if (siteCode) {
+          proposalProduct.site_code = siteCode
+        }
+
+        return proposalProduct as ProposalProduct
+      });
 
       const proposalId = await createProposal(proposalTitle, selectedClientForProposal, proposalProducts as ProposalProduct[], user.uid, {
         // You can add notes or custom messages here if needed
