@@ -56,6 +56,7 @@ interface CompanyData {
   name?: string
   company_location?: any
   address?: any
+  logo?: string
   company_website?: string
   website?: string
   photo_url?: string
@@ -604,9 +605,9 @@ The OH Plus Team`,
     try {
       // Prepare logo data URL if company logo exists
       let logoDataUrl: string | null = null
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const logoResponse = await fetch(companyData.photo_url)
+          const logoResponse = await fetch(companyData.logo)
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             logoDataUrl = await new Promise<string>((resolve) => {
@@ -749,14 +750,14 @@ The OH Plus Team`,
 
   const handleDownloadImage = async (userData: any) => {
     if (!quotation) return
-
+    console.log("[v0] handleDownloadImage: userData:", userData)
     setDownloadingImage(true)
     try {
       // Load company logo if available
       let logoDataUrl: string | null = null
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const response = await fetch(companyData.photo_url)
+          const response = await fetch(companyData.logo)
           const blob = await response.blob()
           logoDataUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader()
@@ -785,7 +786,7 @@ The OH Plus Team`,
             ...relatedQuotation,
             quotation_number: uniqueQuotationNumber,
           }
-
+          console.log(`UserDAta requesting pdf for quotation : ${userData}`)
           const response = await fetch('/api/generate-quotation-pdf', {
             method: 'POST',
             headers: {
@@ -836,6 +837,7 @@ The OH Plus Team`,
             quotation,
             companyData,
             logoDataUrl,
+            userData
           }),
         })
 
@@ -971,8 +973,8 @@ The OH Plus Team`,
   }
 
   const handleRemoveTerm = (index: number) => {
-    // Prevent removal of the first 3 terms (indices 0, 1, 2)
-    if (index < 3) return
+    // Prevent removal of the first 4 terms (indices 0, 1, 2, 3)
+    if (index < 4) return
 
     const currentTerms = tempValues.terms_and_conditions || editableQuotation?.template?.terms_and_conditions || []
     const newTerms = currentTerms.filter((_: string, i: number) => i !== index)
@@ -1352,7 +1354,7 @@ The OH Plus Team`,
                       className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px] resize-none"
                       placeholder="Enter term and condition"
                     />
-                    {index >= 3 && (
+                    {index >= 4 && (
                       <Button
                         type="button"
                         variant="outline"
@@ -1552,7 +1554,7 @@ The OH Plus Team`,
       {/* New Wrapper for Sidebar + Document */}
       <div className="flex justify-center items-start gap-6 mt-6">
         {/* Left Panel */}
-        <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
+        <div className="flex flex-col space-y-4 hidden lg:flex">
           <Button
             variant="ghost"
             className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
@@ -1592,12 +1594,12 @@ The OH Plus Team`,
         <div className="flex gap-6 items-start">
           <div id="quotation-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
            <div className="text-center mb-8">
-             <div className="flex items-center justify-center mb-4 mt-6">
-                {companyData?.photo_url ? (
+             <div className="flex items-center justify-start mb-4 mt-6 ml-10">
+                {companyData?.logo ? (
                   <img
-                    src={companyData.photo_url || "/placeholder.svg"}
+                    src={companyData.logo || "/placeholder.svg"}
                     alt="Company Logo"
-                    className="h-16 w-auto object-contain"
+                    className="h-[100px] w-auto object-contain"
                   />
                 ) : (
                   <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
@@ -1738,7 +1740,7 @@ The OH Plus Team`,
 
       {/* Pagination Controls - Updated for quotations */}
       {relatedQuotations.length > 1 ? (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
               variant="outline"
@@ -1775,7 +1777,7 @@ The OH Plus Team`,
           </div>
         </div>
       ) : (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
           <Button
             onClick={handleSendClick}
             className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium" 

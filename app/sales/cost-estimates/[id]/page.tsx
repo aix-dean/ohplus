@@ -69,6 +69,7 @@ interface CompanyData {
   address?: any
   company_website?: string
   website?: string
+  logo?: string
   photo_url?: string
   contact_person?: string
   email?: string
@@ -587,6 +588,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           address: companyDataResult.address,
           company_website: companyDataResult.company_website || companyDataResult.website,
           photo_url: companyDataResult.photo_url,
+          logo: companyDataResult.logo || companyDataResult.photo_url,
           contact_person: companyDataResult.contact_person,
           email: companyDataResult.email,
           phone: companyDataResult.phone,
@@ -1214,8 +1216,8 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   }
 
   const handleRemoveTerm = (index: number) => {
-    // Prevent removal of the first 3 terms (indices 0, 1, 2)
-    if (index < 3) return
+    // Prevent removal of the first 4 terms (indices 0, 1, 2, 3)
+    if (index < 4) return
 
     const currentTerms = tempValues.terms_and_conditions || editableCostEstimate?.template?.terms_and_conditions || []
     const newTerms = currentTerms.filter((_: string, i: number) => i !== index)
@@ -1638,7 +1640,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                       className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px]"
                       placeholder="Enter term and condition"
                     />
-                    {index >= 3 && (
+                    {index >= 4 && (
                       <Button
                         type="button"
                         variant="outline"
@@ -1829,21 +1831,20 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
         <div className="flex gap-6 items-start">
           <div id="cost-estimate-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
-            <div className="text-center mb-8">
-              <div className="flex items-center justify-center mb-4 pt-6">
-                {companyData?.photo_url ? (
+            <div>
+              <div className="flex items-start justify-start mb-4 pt-6 ml-10">
+                {companyData?.logo ? (
                   <img
-                    src={companyData.photo_url || "/placeholder.svg"}
+                    src={companyData.logo || "/placeholder.svg"}
                     alt="Company Logo"
-                    className="h-16 w-auto object-contain"
+                    className="h-[100px] w-auto object-contain"
                   />
                 ) : (
                   <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Building className="h-8 w-8 text-gray-400" />
+                    <Building className="h-20 w-20 text-gray-400" />
                   </div>
                 )}
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
             </div>
 
             {hasMultipleSites ? (

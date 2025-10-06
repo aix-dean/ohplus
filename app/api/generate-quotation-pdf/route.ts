@@ -124,7 +124,7 @@ const getDateObject = (date: any): Date | undefined => {
 }
 
 export async function POST(request: NextRequest) {
-  const { quotation, companyData, logoDataUrl, userData, format = 'pdf' }: { quotation: Quotation; companyData: any; logoDataUrl: string | null; userData?: any; format?: 'pdf' | 'image' } = await request.json()
+  const { quotation, companyData, logoDataUrl, userData, format = 'pdf' }: { quotation: Quotation; companyData: any; logoDataUrl: string | null; userData: any; format?: 'pdf' | 'image' } = await request.json()
   console.log('Received quotation:', quotation)
   console.log('Received companyData:', companyData)
   console.log('Received logoDataUrl:', !!logoDataUrl)
@@ -150,13 +150,13 @@ export async function POST(request: NextRequest) {
       printBackground: true,
       displayHeaderFooter: true,
       headerTemplate: `
-        <div style="text-align: center; width: 100%; padding: 5px;">
-          ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 50px; margin-right: 10px;">` : ''}
+        <div style="text-align: left; width: 100%; padding: 5px; margin-left: 70px">
+          ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 100px; margin-right: 10px;">` : ''}
         </div>
       `,
        footerTemplate: `<div></div>`,
       margin: {
-        top: '25mm',
+        top: '40mm',
         right: '10mm',
         bottom: '30mm',
         left: '10mm'
@@ -198,7 +198,7 @@ function generateQuotationHTML(
     <title>${quotation.quotation_number}</title>
     <style>
     @page {
-  margin: 25mm 15mm 30mm 15mm; /* extra bottom space */
+  margin: 40mm 15mm 30mm 15mm; /* extra bottom space */
 }
     *{
       border-size: border-box;
@@ -511,7 +511,7 @@ function generateQuotationHTML(
       <div class="signature-section">
         <div>Very truly yours,</div>
         <div class="signature-line"></div>
-        <div>${userData?.first_name || quotation.signature_name || "AIX Xymbiosis"}</div>
+        <div>${userData?.first_name && userData.last_name ? `${userData?.first_name} ${userData.last_name}` : quotation.signature_name}</div>
         <div>${quotation.signature_position || "Sales Manager"}</div>
       </div>
       <div class="signature-section">

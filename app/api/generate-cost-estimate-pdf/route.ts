@@ -131,7 +131,7 @@ const getDateObject = (date: any): Date | undefined => {
 }
 
 export async function POST(request: NextRequest) {
-  const { costEstimate, companyData, logoDataUrl, format = 'pdf', userData }: { costEstimate: CostEstimate; companyData: any; logoDataUrl: string | null; format?: 'pdf' | 'image'; userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string } } = await request.json()
+  const { costEstimate, companyData, logoDataUrl, format = 'pdf', userData }: { costEstimate: CostEstimate; companyData: any; logoDataUrl: string | null; format?: 'pdf' | 'image'; userData?: any } = await request.json()
   console.log('Received cost estimate:', costEstimate)
   console.log('Received companyData:', companyData)
   console.log('Received logoDataUrl:', !!logoDataUrl)
