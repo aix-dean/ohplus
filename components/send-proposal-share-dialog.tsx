@@ -100,6 +100,31 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal, templateSet
     setIsGeneratingPDF(true)
 
     try {
+      // First ensure PDF is generated and saved to the document if not already done
+      if (!proposal.pdf || proposal.pdf.trim() === "") {
+        // Import the service functions here to avoid circular dependencies
+        const { generateAndUploadProposalPDF } = await import('@/lib/proposal-service')
+        const { updateProposal } = await import('@/lib/proposal-service')
+
+        const { pdfUrl, password } = await generateAndUploadProposalPDF(
+          proposal,
+          templateSettings?.size || 'A4',
+          templateSettings?.orientation || 'Portrait'
+        )
+
+        // Update proposal with PDF URL and password
+        console.log("Updating proposal with PDF URL:", pdfUrl, "and password:", password)
+        await updateProposal(
+          proposal.id,
+          { pdf: pdfUrl, password: password },
+          "system",
+          "System"
+        )
+
+        console.log("PDF generated and uploaded successfully:", pdfUrl)
+        console.log("Proposal document updated with PDF URL and password")
+      }
+
       // Generate PDF blob with current template settings (same as download)
       const { blob, filename } = await generateProposalPDFBlob(
         proposal,

@@ -41,10 +41,13 @@ async function fetchCompanyData(companyId: string) {
     if (companyDoc.exists()) {
       const data = companyDoc.data()
       // Return fetched data merged with fallback for missing fields
+      // Use field names that match the API expectations
       return {
-        company_name: data.name ||  "",
-        company_location: data.address || [],
+        name: data.name || "",
+        address: data.address || [],
         phone: data.phone || data.telephone || data.contact_number || "",
+        email: data.email || "",
+        website: data.website || data.company_website || "",
         photo_url: data.photo_url || data.logo_url || null,
       }
     }
@@ -414,7 +417,7 @@ export async function generateDetailedCostEstimatePDF(
     pdf.setFontSize(16)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
-    const companyName = companyData?.company_name || "Golden Touch Imaging Specialist"
+    const companyName = companyData?.name || "Golden Touch Imaging Specialist"
     const companyNameWidth = pdf.getTextWidth(companyName)
     const companyNameX = pageWidth / 2 - companyNameWidth / 2
     pdf.text(companyName, companyNameX, yPosition)
@@ -678,7 +681,7 @@ export async function generateCostEstimatePDFBlob(
   pdf.setFontSize(16)
   pdf.setFont("helvetica", "bold")
   pdf.setTextColor(0, 0, 0)
-  const companyName = companyData?.company_name || "Golden Touch Imaging Specialist"
+  const companyName = companyData?.name || "Golden Touch Imaging Specialist"
   const companyNameWidth = pdf.getTextWidth(companyName)
   const companyNameX = pageWidth / 2 - companyNameWidth / 2
   pdf.text(companyName, companyNameX, yPosition)

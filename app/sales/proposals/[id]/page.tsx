@@ -564,41 +564,6 @@ export default function ProposalDetailsPage() {
           })
           setEditableProducts(products)
 
-          // Check if PDF needs to be generated
-          if (!proposalData.pdf || proposalData.pdf.trim() === "") {
-            // Generate PDF and upload to Firebase storage
-            setTimeout(async () => {
-              try {
-                const { pdfUrl, password } = await generateAndUploadProposalPDF(
-                  proposalData,
-                  proposalData.templateSize || "A4",
-                  proposalData.templateOrientation || "Portrait"
-                )
-
-                // Update proposal with PDF URL and password
-                console.log("Updating proposal with PDF URL:", pdfUrl, "and password:", password)
-                await updateProposal(
-                  proposalData.id,
-                  { pdf: pdfUrl, password: password },
-                  userData?.uid || "system",
-                  userData?.displayName || "System"
-                )
-
-                // Update local state
-                setProposal(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
-
-                console.log("PDF generated and uploaded successfully:", pdfUrl)
-                console.log("Proposal document updated with PDF URL and password")
-              } catch (error) {
-                console.error("Error generating PDF:", error)
-                toast({
-                  title: "Error",
-                  description: "Failed to generate PDF",
-                  variant: "destructive",
-                })
-              }
-            }, 2000) // Small delay to ensure the page is fully rendered
-          }
         }
       } catch (error) {
         console.error("Error fetching proposal:", error)
@@ -1170,6 +1135,44 @@ export default function ProposalDetailsPage() {
     setIsEditMode(false)
   }
 
+  const generatePDFIfNeeded = async (proposal: Proposal) => {
+    if (proposal.pdf && proposal.pdf.trim() !== "") {
+      return { pdfUrl: proposal.pdf, password: proposal.password }
+    }
+
+    try {
+      const { pdfUrl, password } = await generateAndUploadProposalPDF(
+        proposal,
+        proposal.templateSize || "A4",
+        proposal.templateOrientation || "Portrait"
+      )
+
+      // Update proposal with PDF URL and password
+      console.log("Updating proposal with PDF URL:", pdfUrl, "and password:", password)
+      await updateProposal(
+        proposal.id,
+        { pdf: pdfUrl, password: password },
+        userData?.uid || "system",
+        userData?.displayName || "System"
+      )
+
+      // Update local state
+      setProposal(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+
+      console.log("PDF generated and uploaded successfully:", pdfUrl)
+      console.log("Proposal document updated with PDF URL and password")
+      return { pdfUrl, password }
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      })
+      throw error
+    }
+  }
+
   const handleDownload = async () => {
     if (!proposal) {
       toast({
@@ -1180,7 +1183,13 @@ export default function ProposalDetailsPage() {
       return
     }
 
-    await downloadProposalPDF(proposal, selectedSize, selectedOrientation, toast)
+    // Ensure PDF is generated and saved before downloading
+    try {
+      await generatePDFIfNeeded(proposal)
+      await downloadProposalPDF(proposal, selectedSize, selectedOrientation, toast)
+    } catch (error) {
+      // Error is already handled in generatePDFIfNeeded
+    }
   }
 
   const handleTemplateSelect = (template: any) => {
@@ -2242,7 +2251,15 @@ export default function ProposalDetailsPage() {
                 Save as Draft
               </Button>
               <Button
-                onClick={() => setIsSendOptionsDialogOpen(true)}
+                onClick={async () => {
+                  if (!proposal) return
+                  try {
+                    await generatePDFIfNeeded(proposal)
+                    setIsSendOptionsDialogOpen(true)
+                  } catch (error) {
+                    // Error is already handled in generatePDFIfNeeded
+                  }
+                }}
                 className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
               >
                 <Send className="h-5 w-5 mr-2" />

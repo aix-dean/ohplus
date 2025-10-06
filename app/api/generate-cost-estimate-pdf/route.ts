@@ -164,8 +164,8 @@ export async function POST(request: NextRequest) {
       printBackground: true,
       displayHeaderFooter: true,
       headerTemplate: `
-        <div class="header" style="text-align: center; width: 100%; padding: 5px;">
-          ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 50px; margin-right: 10px;">` : ''}
+        <div class="header" style="text-align: left; width: 100%; padding: 5px; margin-left: 15mm;">
+          ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 75px;">` : ''}
         </div>
       `,
       footerTemplate: `<div> </div>
@@ -485,12 +485,6 @@ function generateCostEstimateHTML(
           <div class="details-row">
             <div class="details-label">Lease rate per month:</div>
             <div class="details-value">PHP ${monthlyRate.toLocaleString()} (Exclusive of VAT)</div>
-          </div>
-        </li>
-        <li>
-          <div class="details-row">
-            <div class="details-label">Total Lease:</div>
-            <div class="details-value">PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)).toLocaleString()} (Exclusive of VAT)</div>
           </div>
         </li>
       </ul>

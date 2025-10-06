@@ -420,6 +420,11 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((docSnap) => {
       const data = docSnap.data()
+      console.log(`[DEBUG] getCostEstimatesByPageId data for ${docSnap.id}:`, {
+        pdf: data.pdf,
+        password: data.password,
+        allFields: Object.keys(data)
+      })
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
@@ -444,6 +449,8 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
         signature_position: data.signature_position || undefined,
         items: data.items || undefined,
         template: data.template || undefined,
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -487,6 +494,8 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       signature_position: data.signature_position || undefined,
       items: data.items || undefined,
       template: data.template || undefined,
+      pdf: data.pdf || undefined,
+      password: data.password || undefined,
     } as CostEstimate
   } catch (error) {
     console.error("Error fetching cost estimate:", error)
@@ -578,6 +587,11 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((docSnap) => {
       const data = docSnap.data()
+      console.log(`[DEBUG] getCostEstimate data for ${docSnap.id}:`, {
+        pdf: data.pdf,
+        password: data.password,
+        allFields: Object.keys(data)
+      })
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
@@ -602,6 +616,8 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         signature_position: data.signature_position || undefined,
         items: data.items || undefined,
         template: data.template || undefined,
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -667,6 +683,8 @@ export async function getPaginatedCostEstimates(
         signature_position: data.signature_position || undefined,
         items: data.items || undefined,
         template: data.template || undefined,
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
 
@@ -728,6 +746,8 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         signature_position: data.signature_position || undefined,
         items: data.items || undefined,
         template: data.template || undefined,
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -781,6 +801,8 @@ export async function getPaginatedCostEstimatesByCreatedBy(
         endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
         validUntil: safeToDate(data.validUntil),
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
 
@@ -1009,6 +1031,8 @@ export async function getCostEstimatesByProductIdAndCompanyId(productId: string,
         endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
         validUntil: safeToDate(data.validUntil),
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
 
       // Check if the cost estimate matches the product ID and company ID
@@ -1031,10 +1055,60 @@ export async function getCostEstimatesByProductIdAndCompanyId(productId: string,
 export async function generateAndUploadCostEstimatePDF(
   costEstimate: CostEstimate,
   userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
-  companyData: {name: string, address?: any, phone?: string, email?: string, website?: string},
+  companyData?: {name: string, address?: any, phone?: string, email?: string, website?: string},
 ): Promise<{ pdfUrl: string; password: string }> {
   try {
-    // Generate the PDF blob using the API
+    // Always fetch fresh company data and logo to ensure consistency
+    let logoDataUrl = null
+    let finalCompanyData = companyData
+
+    // Always try to fetch company data and logo from database
+    const companyId = userData?.company_id || costEstimate.company_id
+    if (companyId) {
+      try {
+        const companyDoc = await getDoc(doc(db, "companies", companyId))
+        if (companyDoc.exists()) {
+          const companyInfo = companyDoc.data()
+
+          // Merge provided companyData with fresh database data
+          finalCompanyData = {
+            name: finalCompanyData?.name || companyInfo.name || "Company Name",
+            address: finalCompanyData?.address || companyInfo.address,
+            phone: finalCompanyData?.phone || companyInfo.phone || companyInfo.telephone || companyInfo.contact_number,
+            email: finalCompanyData?.email || companyInfo.email,
+            website: finalCompanyData?.website || companyInfo.website || companyInfo.company_website,
+          }
+
+          // Always fetch logo from database
+          if (companyInfo?.photo_url) {
+            const logoResponse = await fetch(companyInfo.photo_url)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              const logoArrayBuffer = await logoBlob.arrayBuffer()
+              const logoBase64 = Buffer.from(logoArrayBuffer).toString('base64')
+              const mimeType = logoBlob.type || 'image/png'
+              logoDataUrl = `data:${mimeType};base64,${logoBase64}`
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching company data and logo:', error)
+        // Continue with provided data if fetch fails
+      }
+    }
+
+    // Ensure we have company data
+    if (!finalCompanyData) {
+      finalCompanyData = {
+        name: "Company Name",
+        address: undefined,
+        phone: undefined,
+        email: undefined,
+        website: undefined,
+      }
+    }
+
+    // Generate the PDF blob using the API (same approach as generateCostEstimatePDF)
     const response = await fetch('/api/generate-cost-estimate-pdf', {
       method: 'POST',
       headers: {
@@ -1042,8 +1116,8 @@ export async function generateAndUploadCostEstimatePDF(
       },
       body: JSON.stringify({
         costEstimate,
-        companyData,
-        logoDataUrl: null,
+        companyData: finalCompanyData,
+        logoDataUrl,
         format: 'pdf',
         userData
       }),
@@ -1053,8 +1127,7 @@ export async function generateAndUploadCostEstimatePDF(
       throw new Error(`Failed to generate PDF: ${response.statusText}`)
     }
 
-    const buffer = await response.arrayBuffer()
-    const blob = new Blob([buffer], { type: 'application/pdf' })
+    const blob = await response.blob()
 
     // Generate password
     const password = generateCostEstimatePassword()

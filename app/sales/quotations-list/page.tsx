@@ -1389,15 +1389,12 @@ export default function QuotationsListPage() {
                         <div className="text-sm text-gray-600">{quotation.items?.name || quotation.product_name || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
-                        {quotation.status?.toLowerCase() === "reserved" ? (
-                          <span className="text-[#30C71D] font-bold font-medium leading-[50%]">
-                            Reserved
-                          </span>
-                        ) : (
-                          <span className="text-[#C4C4C4] font-bold leading-[50%]">
-                            Pending
-                          </span>
-                        )}
+                        <Badge
+                          variant="secondary"
+                          className={`${getStatusColor(quotation.status)} border`}
+                        >
+                          {quotation.status ? quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1).toLowerCase() : "Draft"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="py-3">
                         <span

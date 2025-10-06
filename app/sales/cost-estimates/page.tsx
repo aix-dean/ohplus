@@ -608,6 +608,7 @@ function CostEstimatesPageContent() {
                   <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Contact Person</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Status</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -628,6 +629,9 @@ function CostEstimatesPageContent() {
                     </TableCell>
                     <TableCell className="py-3">
                       <Skeleton className="h-5 w-24" />
+                    </TableCell>
+                    <TableCell className="py-3">
+                      <Skeleton className="h-6 w-16" />
                     </TableCell>
                     <TableCell className="text-right py-3">
                       <Skeleton className="h-8 w-8 ml-auto" />
@@ -672,6 +676,7 @@ function CostEstimatesPageContent() {
                   <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Contact Person</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
+                  <TableHead className="font-semibold text-gray-900 border-0">Status</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -710,6 +715,12 @@ function CostEstimatesPageContent() {
                       </TableCell>
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600">{costEstimate.lineItems?.[0]?.description || "—"}</div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Badge className={`${statusConfig.color} border`}>
+                          <StatusIcon className="h-3 w-3 mr-1" />
+                          {statusConfig.label}
+                        </Badge>
                       </TableCell>
                       <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
