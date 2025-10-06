@@ -26,7 +26,6 @@ import {
   getDoc,
   updateDoc,
 } from "firebase/firestore"
-import { generatePersonalizedJONumber } from "@/lib/job-order-service"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -493,55 +492,6 @@ export default function CreateServiceAssignmentPage() {
         // Don't throw here - we don't want notification failure to break assignment creation
       }
 
-      // Create or update job order with campaign name
-      try {
-        if (formData.campaignName) {
-          if (jobOrderData?.id) {
-            // Update existing job order with campaign name
-            const jobOrderRef = doc(db, "job_orders", jobOrderData.id)
-            await updateDoc(jobOrderRef, {
-              campaignName: formData.campaignName,
-              updatedAt: serverTimestamp(),
-            })
-            console.log("Updated job order with campaign name:", jobOrderData.id)
-          } else {
-            // Create new job order with campaign name
-            const newJobOrderData = {
-              joNumber: await generatePersonalizedJONumber(userData),
-              siteName: selectedProduct?.name || "",
-              siteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
-              joType: formData.serviceType,
-              requestedBy: userData?.first_name || "Auto-Generated",
-              assignTo: formData.assignedTo || formData.crew,
-              dateRequested: formData.startDate?.toISOString() || new Date().toISOString(),
-              deadline: formData.endDate?.toISOString() || new Date().toISOString(),
-              jobDescription: formData.remarks,
-              campaignName: formData.campaignName,
-              message: formData.campaignName, // Keep for backward compatibility
-              company_id: userData?.company_id || "",
-              created_by: user.uid,
-              status: "pending" as const,
-              quotation_id: "",
-            }
-
-            const newJobOrderRef = await addDoc(collection(db, "job_orders"), {
-              ...newJobOrderData,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            })
-
-            // Update the service assignment with the new job order ID
-            await updateDoc(assignmentDocRef, {
-              jobOrderId: newJobOrderRef.id,
-            })
-
-            console.log("Created new job order with campaign name:", newJobOrderRef.id)
-          }
-        }
-      } catch (jobOrderError) {
-        console.error("Error creating/updating job order:", jobOrderError)
-        // Don't throw here - we don't want job order operations to break assignment creation
-      }
 
       // Set session storage and navigate to assignments
       sessionStorage.setItem('lastCreatedServiceAssignmentId', assignmentDocRef.id)
