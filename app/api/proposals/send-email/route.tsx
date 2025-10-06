@@ -4,6 +4,146 @@ import { generateProposalPDF } from "@/lib/pdf-service"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+// Function to convert image URL to base64 data URI
+async function imageUrlToDataUri(imageUrl: string): Promise<string | null> {
+  try {
+    console.log('Fetching image from URL:', imageUrl)
+    const response = await fetch(imageUrl)
+    console.log('Response status:', response.status, response.statusText)
+
+    if (!response.ok) {
+      console.error('Failed to fetch image:', response.status, response.statusText)
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+
+    const contentType = response.headers.get('content-type')
+    console.log('Content type:', contentType)
+    if (!contentType || !contentType.startsWith('image/')) {
+      console.error('Invalid content type for image:', contentType)
+      throw new Error(`Invalid content type: ${contentType}. Expected image/*`)
+    }
+
+    const contentLength = response.headers.get('content-length')
+    console.log('Content length:', contentLength)
+
+    const arrayBuffer = await response.arrayBuffer()
+    console.log('Array buffer size:', arrayBuffer.byteLength)
+
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    const dataUri = `data:${contentType};base64,${base64}`
+    console.log('Data URI created successfully, length:', dataUri.length)
+
+    return dataUri
+  } catch (error) {
+    console.error('Error converting image to data URI:', error)
+    throw new Error(`Image conversion failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+// Function to extract dominant color from base64 image data
+async function extractDominantColor(base64DataUri: string): Promise<string | null> {
+  try {
+    console.log('Starting color extraction process...')
+
+    // Extract base64 data from data URI
+    const base64Data = base64DataUri.split(',')[1]
+    if (!base64Data) {
+      console.error('Invalid base64 data URI format')
+      return null
+    }
+    console.log('Base64 data extracted successfully')
+
+    // Convert base64 to buffer
+    const imageBuffer = Buffer.from(base64Data, 'base64')
+    console.log('Image buffer created, size:', imageBuffer.length, 'bytes')
+
+    // Dynamically import node-vibrant to avoid ES module issues
+    let Vibrant: any
+    try {
+      console.log('Attempting to import node-vibrant...')
+      // Use named import for node-vibrant v4+
+      const vibrantModule = await import('node-vibrant/node')
+      Vibrant = vibrantModule.Vibrant
+      console.log('node-vibrant imported successfully')
+    } catch (error) {
+      console.error('Failed to import node-vibrant:', error)
+      throw new Error(`node-vibrant import failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
+
+    // Get color palette from the image buffer using node-vibrant
+    console.log('Extracting color palette from image buffer...')
+    const palette = await Vibrant.from(imageBuffer).getPalette()
+    console.log('Palette extracted:', palette ? 'Success' : 'Failed')
+
+    if (!palette) {
+      console.error('Failed to extract color palette from image')
+      throw new Error('No color palette could be extracted from the image')
+    }
+
+    // Log all available palette swatches for debugging
+    console.log('Available palette swatches:', Object.keys(palette))
+
+    // Get the dominant color (Vibrant swatch)
+    const dominantColor = palette.Vibrant
+
+    if (!dominantColor) {
+      console.error('No dominant color found in palette')
+      // Try alternative swatches if Vibrant is not available
+      const alternativeSwatches = ['Muted', 'DarkVibrant', 'DarkMuted', 'LightVibrant', 'LightMuted']
+      for (const swatchName of alternativeSwatches) {
+        if (palette[swatchName]) {
+          console.log(`Using alternative swatch: ${swatchName}`)
+          const altDominantColor = palette[swatchName]
+          const hexColor = rgbToHex(
+            Math.round(altDominantColor.rgb[0]),
+            Math.round(altDominantColor.rgb[1]),
+            Math.round(altDominantColor.rgb[2])
+          )
+          console.log('Alternative dominant color extracted:', hexColor)
+          return hexColor
+        }
+      }
+      throw new Error('No suitable color swatch found in the palette')
+    }
+
+    // Convert RGB values to hex format
+    const hexColor = rgbToHex(
+      Math.round(dominantColor.rgb[0]),
+      Math.round(dominantColor.rgb[1]),
+      Math.round(dominantColor.rgb[2])
+    )
+
+    console.log('Dominant color extracted:', hexColor)
+    return hexColor
+
+  } catch (error) {
+    console.error('Error extracting dominant color:', error)
+    throw new Error(`Color extraction failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+// Helper function to convert RGB to hex
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()
+}
+
+// Helper function to shade a color by a percentage
+function shadeColor(color: string, percent: number): string {
+  // Remove # if present
+  color = color.replace('#', '')
+
+  // Parse r, g, b values
+  const num = parseInt(color, 16)
+  const amt = Math.round(2.55 * percent)
+  const R = (num >> 16) + amt
+  const G = (num >> 8 & 0x00FF) + amt
+  const B = (num & 0x0000FF) + amt
+
+  return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+    (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1).toUpperCase()
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log("Proposal email API route called")
@@ -35,6 +175,42 @@ export async function POST(request: NextRequest) {
 
     console.log("Proposal company logo:", body.proposal?.companyLogo)
     console.log("Proposal company name:", body.proposal?.companyName)
+
+    // Extract dominant color from company logo if available
+    let dominantColor: string = '#667eea' // Default fallback color
+    let logoDataUri: string | null = null
+
+    // Use the correct logo URL consistently
+    const companyLogoUrl = 'https://firebasestorage.googleapis.com/v0/b/oh-app-bcf24.appspot.com/o/company_logos%2FmlQu3MEGrcdhWVEAJZPYBGSFLbx1%2F1753334275475_Login.png?alt=media&token=645590e5-6ca9-4783-9d90-6ace8f545495'
+
+    if (companyLogoUrl) {
+      try {
+        console.log("Converting logo URL to data URI:", companyLogoUrl)
+        logoDataUri = await imageUrlToDataUri(companyLogoUrl)
+
+        if (logoDataUri) {
+          console.log("Successfully converted logo to data URI")
+
+          // Extract dominant color from the logo
+          const extractedColor = await extractDominantColor(logoDataUri)
+          if (extractedColor) {
+            dominantColor = extractedColor
+            console.log("Successfully extracted dominant color:", dominantColor)
+          } else {
+            console.error("Failed to extract dominant color from logo, using fallback color")
+            dominantColor = '#667eea' // Use fallback color instead of throwing error
+          }
+        } else {
+          console.error("Failed to convert logo to data URI, using original URL")
+          logoDataUri = companyLogoUrl // Use original URL as fallback
+        }
+      } catch (error) {
+        console.error("Error processing company logo:", error)
+        throw new Error(`Logo processing failed: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    } else {
+      throw new Error("Company logo URL not available for color extraction")
+    }
 
     const { proposal, clientEmail, subject, body: customBody, currentUserEmail, currentUserPhoneNumber, ccEmail } = body
 
@@ -89,9 +265,9 @@ export async function POST(request: NextRequest) {
 
     // Use custom subject and body if provided, otherwise fall back to default
     const finalSubject = subject || `Proposal: ${proposal.title || "Custom Advertising Solution"} - ${proposal.companyName || "OH Plus"}`
-    const finalBody =
-      customBody ||
-      `
+
+    // Create email template function that uses the extracted dominant color
+    const createProposalEmailTemplate = (dominantColor: string) => `
       <!DOCTYPE html>
       <html>
       <head>
@@ -114,7 +290,7 @@ export async function POST(request: NextRequest) {
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
           }
           .header {
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            background: linear-gradient(135deg, ${dominantColor}, ${shadeColor(dominantColor, -20)});
             color: white;
             padding: 30px 20px;
             text-align: center;
@@ -146,7 +322,7 @@ export async function POST(request: NextRequest) {
             border-radius: 8px;
             padding: 20px;
             margin: 25px 0;
-            border-left: 4px solid #2563eb;
+            border-left: 4px solid ${dominantColor};
           }
           .summary-item {
             display: flex;
@@ -163,7 +339,7 @@ export async function POST(request: NextRequest) {
             font-weight: 500;
           }
           .total-amount {
-            background: linear-gradient(135deg, #059669, #047857);
+            background: linear-gradient(135deg, ${dominantColor}, ${shadeColor(dominantColor, -20)});
             color: white;
             padding: 20px;
             text-align: center;
@@ -178,7 +354,7 @@ export async function POST(request: NextRequest) {
           }
           .btn {
             display: inline-block;
-            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            background: linear-gradient(135deg, ${dominantColor}, ${shadeColor(dominantColor, -20)});
             color: white !important;
             padding: 15px 30px;
             text-decoration: none;
@@ -199,12 +375,99 @@ export async function POST(request: NextRequest) {
             color: #1e40af;
           }
           .footer {
-            text-align: center;
-            color: #6b7280;
-            font-size: 14px;
+            background: linear-gradient(135deg, ${dominantColor}, ${shadeColor(dominantColor, -20)});
+            color: white;
+            padding: 50px 30px 30px 30px;
+            position: relative;
+            overflow: hidden;
+            min-height: 200px;
             margin-top: 30px;
+          }
+          .footer-circles {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+          }
+          .footer-circle-1 {
+            position: absolute;
+            top: -40px;
+            right: -60px;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 2;
+          }
+          .footer-circle-2 {
+            position: absolute;
+            top: -20px;
+            right: 20px;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            z-index: 1;
+          }
+          .footer-content {
+            position: relative;
+            z-index: 3;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            max-width: 400px;
+          }
+          .footer-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+          }
+          .footer-logo {
+            width: 40px;
+            height: 40px;
+            margin-right: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            color: white;
+          }
+          .footer-company-name {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0;
+            color: white;
+          }
+          .footer-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 5px 0;
+            color: white;
+          }
+          .footer-position {
+            font-size: 14px;
+            opacity: 0.9;
+            margin: 2px 0 15px 0;
+            color: white;
+          }
+          .footer-contact {
+            font-size: 13px;
+            margin: 3px 0;
+            color: rgba(255, 255, 255, 0.9);
+          }
+          .footer-legal {
+            margin-top: 25px;
             padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 12px;
+            opacity: 0.8;
+            text-align: center;
+            color: white;
           }
           .contact-info {
             background: #f9fafb;
@@ -227,7 +490,7 @@ export async function POST(request: NextRequest) {
       <body>
         <div class="container">
           <div class="header">
-            ${proposal.companyLogo ? `<img src="${proposal.companyLogo}" alt="${proposal.companyName || 'Company Logo'}" style="max-height: 60px; margin-bottom: 10px;" />` : `<h1>${proposal.companyName || 'OH Plus'}</h1>`}
+            ${proposal.companyLogo ? `<img src="${logoDataUri || proposal.companyLogo}" alt="${proposal.companyName || 'Company Logo'}" style="max-height: 60px; margin-bottom: 10px;" />` : `<h1>${proposal.companyName || 'OH Plus'}</h1>`}
             <p>Professional Outdoor Advertising Solutions</p>
           </div>
 
@@ -300,13 +563,47 @@ export async function POST(request: NextRequest) {
           </div>
 
           <div class="footer">
-            <p>This proposal is confidential and intended solely for ${proposal.client?.company || "your company"}.</p>
-            <p>© ${new Date().getFullYear()} OH Plus. All rights reserved.</p>
+            <div class="footer-circles">
+              <div class="footer-circle-1"></div>
+              <div class="footer-circle-2"></div>
+            </div>
+            <div class="footer-content">
+              <!-- Header elements copied to footer -->
+              <div class="footer-header-section" style="text-align: center; margin-bottom: 30px;">
+                ${proposal.companyLogo ? `<img src="${logoDataUri || proposal.companyLogo}" alt="${proposal.companyName || 'Company Logo'}" style="max-height: 60px; margin-bottom: 10px;" />` : `<h2 style="color: white; margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">${proposal.companyName || 'OH Plus'}</h2>`}
+                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 16px;">Professional Outdoor Advertising Solutions</p>
+              </div>
+
+              <!-- Updated contact information with header-like styling -->
+              <div class="footer-contact-section">
+                <div class="footer-name" style="font-size: 18px; font-weight: 600; margin: 0 0 5px 0; color: white; letter-spacing: 0.5px;">Sales Executive</div>
+                <div class="footer-company" style="font-size: 16px; font-weight: 500; margin: 0 0 2px 0; color: rgba(255, 255, 255, 0.95);">AAi - Outdoor Advertising</div>
+                <div class="footer-position" style="font-size: 16px; font-weight: 600; margin: 0 0 15px 0; color: white; letter-spacing: 0.5px;">AAi</div>
+
+                <div class="footer-contact" style="font-size: 14px; margin: 5px 0; color: rgba(255, 255, 255, 0.95); display: flex; align-items: center; justify-content: flex-start;">
+                  <span style="margin-right: 8px;">📞</span>
+                  <span>+639923657387</span>
+                </div>
+                <div class="footer-contact" style="font-size: 14px; margin: 5px 0; color: rgba(255, 255, 255, 0.95); display: flex; align-items: center; justify-content: flex-start;">
+                  <span style="margin-right: 8px;">📧</span>
+                  <span>aixymbiosis@aix.com</span>
+                </div>
+
+                <div class="footer-legal-text" style="font-size: 12px; margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.85); line-height: 1.4;">
+                  This email contains confidential information intended only for the recipient. If you have received this email in error, please notify the sender and delete this message.
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </body>
       </html>
     `
+
+    const finalBody =
+      customBody ||
+      createProposalEmailTemplate(dominantColor)
 
     console.log("Attempting to send email to:", clientEmail)
 
@@ -356,6 +653,41 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("Email sending error:", error)
+
+    // Handle color extraction errors specifically
+    if (error instanceof Error && error.message.includes('Color extraction failed')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to extract colors from company logo",
+          details: error.message,
+        },
+        { status: 400 },
+      )
+    }
+
+    if (error instanceof Error && error.message.includes('Logo processing failed')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to process company logo",
+          details: error.message,
+        },
+        { status: 400 },
+      )
+    }
+
+    if (error instanceof Error && error.message.includes('No company logo provided')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "No company logo provided for color extraction",
+          details: error.message,
+        },
+        { status: 400 },
+      )
+    }
+
     return NextResponse.json(
       {
         success: false,

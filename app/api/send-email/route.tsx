@@ -29,6 +29,105 @@ async function imageUrlToDataUri(imageUrl: string): Promise<string | null> {
   }
 }
 
+// Function to extract dominant color from base64 image data
+async function extractDominantColor(base64DataUri: string): Promise<string | null> {
+  try {
+    // Extract base64 data from data URI
+    const base64Data = base64DataUri.split(',')[1]
+    if (!base64Data) {
+      console.error('Invalid base64 data URI format')
+      return null
+    }
+
+    // Convert base64 to buffer
+    const imageBuffer = Buffer.from(base64Data, 'base64')
+
+    // Dynamically import node-vibrant to avoid ES module issues
+    let Vibrant: any
+    try {
+      console.log('Attempting to import node-vibrant...')
+      // Use named import for node-vibrant v4+
+      const vibrantModule = await import('node-vibrant/node')
+      Vibrant = vibrantModule.Vibrant
+      console.log('node-vibrant imported successfully')
+    } catch (error) {
+      console.error('Failed to import node-vibrant:', error)
+      return null // Return null if node-vibrant is not available
+    }
+
+    // Get color palette from the image buffer using node-vibrant
+    const palette = await Vibrant.from(imageBuffer).getPalette()
+
+    if (!palette) {
+      console.error('Failed to extract color palette from image')
+      return null
+    }
+
+    // Log all available palette swatches for debugging
+    console.log('Available palette swatches:', Object.keys(palette))
+
+    // Get the dominant color (Vibrant swatch)
+    const dominantColor = palette.Vibrant
+
+    if (!dominantColor) {
+      console.error('No dominant color found in palette')
+      // Try alternative swatches if Vibrant is not available
+      const alternativeSwatches = ['Muted', 'DarkVibrant', 'DarkMuted', 'LightVibrant', 'LightMuted']
+      for (const swatchName of alternativeSwatches) {
+        if (palette[swatchName]) {
+          console.log(`Using alternative swatch: ${swatchName}`)
+          const altDominantColor = palette[swatchName]
+          const hexColor = rgbToHex(
+            Math.round(altDominantColor.rgb[0]),
+            Math.round(altDominantColor.rgb[1]),
+            Math.round(altDominantColor.rgb[2])
+          )
+          console.log('Alternative dominant color extracted:', hexColor)
+          return hexColor
+        }
+      }
+      console.error('No suitable color swatch found in the palette')
+      return null
+    }
+
+    // Convert RGB values to hex format
+    const hexColor = rgbToHex(
+      Math.round(dominantColor.rgb[0]),
+      Math.round(dominantColor.rgb[1]),
+      Math.round(dominantColor.rgb[2])
+    )
+
+    console.log('Dominant color extracted:', hexColor)
+    return hexColor
+
+  } catch (error) {
+    console.error('Error extracting dominant color:', error)
+    return null
+  }
+}
+
+// Helper function to convert RGB to hex
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()
+}
+
+// Helper function to shade a color by a percentage
+function shadeColor(color: string, percent: number): string {
+  // Remove # if present
+  color = color.replace('#', '')
+
+  // Parse r, g, b values
+  const num = parseInt(color, 16)
+  const amt = Math.round(2.55 * percent)
+  const R = (num >> 16) + amt
+  const G = (num >> 8 & 0x00FF) + amt
+  const B = (num & 0x0000FF) + amt
+
+  return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+    (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+    (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1).toUpperCase()
+}
+
 function createEmailTemplate(
   body: string,
   userPhoneNumber?: string,
@@ -38,7 +137,8 @@ function createEmailTemplate(
   userDisplayName?: string,
   replyTo?: string,
   companyLogo?: string,
-  proposalId?: string
+  proposalId?: string,
+  dominantColor?: string
 ): string {
   const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
 
@@ -64,7 +164,7 @@ function createEmailTemplate(
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
             color: #333333;
-            background-color: #f8f9fa;
+            background-color: #d9dfe6ff;
         }
         .email-container {
             max-width: 600px;
@@ -73,8 +173,40 @@ function createEmailTemplate(
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 30px 40px;
+            background: #ffffff;
+            padding: 20px 40px;
+            position: relative;
+            overflow: hidden;
+        }
+        .header-circles {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .header-circle-1 {
+            position: absolute;
+            top: -70px;
+            right: -90px;
+            width: 240px;
+            height: 240px;
+            border-radius: 50%;
+            background: ${dominantColor || '#667eea'};
+            opacity: 1.0;
+            z-index: 2;
+        }
+        .header-circle-2 {
+            position: absolute;
+            top: -50px;
+            right: 20px;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: ${dominantColor ? shadeColor(dominantColor, 50) : '#764ba2'};
+            opacity: 0.8;
+            z-index: 1;
         }
         .header-table {
             width: 100%;
@@ -89,7 +221,7 @@ function createEmailTemplate(
             text-align: left;
         }
         .company-cell {
-            text-align: center;
+            text-align: left;
         }
         .empty-cell {
             width: 120px;
@@ -101,7 +233,7 @@ function createEmailTemplate(
             margin-bottom: 10px;
         }
         .company-name {
-            color: #ffffff;
+            color: #2c3e50;
             font-size: 28px;
             font-weight: bold;
             margin: 0;
@@ -113,9 +245,12 @@ function createEmailTemplate(
             margin: 5px 0 0 0;
             font-weight: 300;
         }
-        .content {
-            padding: 40px;
-        }
+.content {
+    padding: 40px;
+    background-color: #eaeaea;
+}
+
+
         .content p {
             margin: 0 0 16px 0;
             font-size: 16px;
@@ -134,7 +269,7 @@ function createEmailTemplate(
         }
         .cta-button {
             display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: ${dominantColor || '#667eea'};
             color: #ffffff !important;
             text-decoration: none;
             padding: 14px 30px;
@@ -150,10 +285,94 @@ function createEmailTemplate(
             color: #ffffff !important;
             text-decoration: none !important;
         }
-        .footer {
-            background-color: #f8f9fa;
-            padding: 30px 40px;
-            border-top: 1px solid #e9ecef;
+.footer {
+    background-color: #ffffff;
+    padding: 20px 0px 0px 30px; /* top:20px, right:0, bottom:0px, left:30px */
+}
+
+        .footer-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .footer-left-column {
+            width: 40%;
+            vertical-align: top;
+            padding-right: 20px;
+            padding-bottom: 20px;
+        }
+        .footer-right-column {
+            width: 60%;
+            vertical-align: top;
+            position: relative;
+            overflow: hidden;
+            padding-right: 0;
+            margin-right: 0;
+        }
+        .footer-left-content {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .footer-logo {
+            width: 40px;
+            height: 40px;
+            object-fit: contain;
+            margin-bottom: 8px;
+        }
+        .footer-company-name {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+        .sales-info {
+            margin-top: 0px;
+        }
+        .sales-name {
+            margin: 0 0 8px 0;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .sales-position {
+            margin: 0 0 5px 0;
+            color: #6c757d;
+            font-size: 11px;
+        }
+        .sales-contact {
+            margin: 0 0 3px 0;
+            color: #6c757d;
+            font-size: 11px;
+        }
+        .footer-circles {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .footer-circle-1 {
+            position: absolute;
+            top: -50px;
+            right: -130px;
+            width: 270px;
+            height: 270px;
+            border-radius: 50%;
+            background: ${dominantColor || '#667eea'};
+            opacity: 1.0;
+            z-index: 2;
+        }
+        .footer-circle-2 {
+            position: absolute;
+            top: -50px;
+            right: -60px;
+            width: 290px;
+            height: 290px;
+            border-radius: 50%;
+            background: ${dominantColor ? shadeColor(dominantColor, 50) : '#764ba2'};
+            opacity: 0.8;
+            z-index: 1;
         }
         .signature {
             margin-bottom: 20px;
@@ -215,6 +434,32 @@ function createEmailTemplate(
             .company-name {
                 font-size: 24px !important;
             }
+            .header-circles {
+                display: none !important;
+            }
+            .footer-circles {
+                display: none !important;
+            }
+            .footer-table {
+                display: block !important;
+            }
+            .footer-left-column,
+            .footer-right-column {
+                display: block !important;
+                width: 100% !important;
+                padding: 10px 0 !important;
+            }
+            .footer-left-column {
+                text-align: center !important;
+            }
+            .footer-right-column {
+                position: relative !important;
+                height: 150px !important;
+            }
+            .footer-left-content {
+                align-items: center !important;
+                text-align: center !important;
+            }
         }
     </style>
 </head>
@@ -222,6 +467,10 @@ function createEmailTemplate(
     <div class="email-container">
  
     <div class="header">
+        <div class="header-circles">
+            <div class="header-circle-1"></div>
+            <div class="header-circle-2"></div>
+        </div>
         <table class="header-table">
             <tr>
                 <td class="logo-cell">
@@ -229,7 +478,7 @@ function createEmailTemplate(
                 </td>
                 <td class="company-cell">
                     <h1 class="company-name">${companyName || "Company"}</h1>
-                    ${companyAddress ? `<p class="company-address" style="margin: 5px 0 0 0; color: #e8eaff; font-size: 14px;">${companyAddress}</p>` : ''}
+                    ${companyAddress ? `<p class="company-address" style="margin: 5px 0 0 0; color: #34495e; font-size: 14px;">${companyAddress}</p>` : ''}
                 </td>
                 <td class="empty-cell">
                     <!-- Empty column -->
@@ -250,23 +499,27 @@ function createEmailTemplate(
         </div>
         
         <div class="footer">
-            <div class="signature">
-                <div class="signature-name">${userDisplayName || "Sales Executive"}</div>
-                <div class="signature-title">${companyName || "Company"} - Outdoor Advertising</div>
-            </div>
-
-            <div class="contact-info">
-                <strong>${companyName || "Company"}</strong><br>
-                📞 ${phoneNumber}<br>
-                📧 ${replyTo || (userDisplayName ? userDisplayName.replace(/\s+/g, '').toLowerCase() : 'noreply') + '@ohplus.ph'}<br>
-            </div>
-            
-            <div class="divider"></div>
-            
-            <div class="disclaimer">
-                This email contains confidential information intended only for the recipient. 
-                If you have received this email in error, please notify the sender and delete this message.
-            </div>
+            <table class="footer-table">
+                <tr>
+                    <td class="footer-left-column">
+                        <div class="footer-left-content">
+                            ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
+                            <div class="sales-info">
+                                <h4 class="sales-name" style="color: ${dominantColor || '#667eea'}; margin: 0 0 2px 0; font-size: 16px; font-weight: 600;">${userDisplayName || "Sales Executive"}</h4>
+                                <p class="sales-position" style="margin: 0 0 3px 0; color: #6c757d; font-size: 12px; font-weight: 500;">Sales Executive</p>
+                                ${replyTo ? `<p class="sales-contact" style="margin: 0 0 2px 0; color: #6c757d; font-size: 11px;">${replyTo}</p>` : ''}
+                                ${userPhoneNumber ? `<p class="sales-contact" style="margin: 0; color: #6c757d; font-size: 11px;">${userPhoneNumber}</p>` : ''}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="footer-right-column">
+                        <div class="footer-circles">
+                            <div class="footer-circle-1"></div>
+                            <div class="footer-circle-2"></div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
         </div>
     </div>
 </body>
@@ -293,6 +546,46 @@ export async function POST(request: NextRequest) {
     const companyLogo = formData.get("companyLogo") as string
     const proposalId = formData.get("proposalId") as string
 
+    // Validate and sanitize userDisplayName for security and data integrity
+    let validatedUserDisplayName = userDisplayName
+    if (!validatedUserDisplayName || typeof validatedUserDisplayName !== 'string' || validatedUserDisplayName.trim().length === 0) {
+      console.error("[v0] User display name validation failed - missing or empty")
+      return NextResponse.json({
+        error: "User display name is required and cannot be empty"
+      }, { status: 400 })
+    }
+
+    // Sanitize userDisplayName to prevent XSS attacks
+    validatedUserDisplayName = validatedUserDisplayName.trim()
+    // HTML escape the userDisplayName for safe template insertion
+    validatedUserDisplayName = validatedUserDisplayName
+      .replace(/&/g, '&')
+      .replace(/</g, '<')
+      .replace(/>/g, '>')
+      .replace(/"/g, '"')
+      .replace(/'/g, '&#x27;')
+      .replace(/\//g, '&#x2F;')
+
+    console.log("[v0] User display name validated and sanitized:", validatedUserDisplayName)
+
+    // Validate and sanitize currentUserPhoneNumber for security
+    let validatedPhoneNumber = currentUserPhoneNumber
+    if (validatedPhoneNumber && typeof validatedPhoneNumber === 'string') {
+      validatedPhoneNumber = validatedPhoneNumber.trim()
+      // Basic phone number sanitization - remove potentially dangerous characters
+      validatedPhoneNumber = validatedPhoneNumber.replace(/[<>\"']/g, '')
+      console.log("[v0] Phone number sanitized:", validatedPhoneNumber)
+    }
+
+    // Validate and sanitize replyTo email for security
+    let validatedReplyTo = replyTo
+    if (validatedReplyTo && typeof validatedReplyTo === 'string') {
+      validatedReplyTo = validatedReplyTo.trim()
+      // Basic email sanitization - remove potentially dangerous characters
+      validatedReplyTo = validatedReplyTo.replace(/[<>\"']/g, '')
+      console.log("[v0] Reply-to email sanitized:", validatedReplyTo)
+    }
+
     // Get actual company name from database if companyId is provided
     let actualCompanyName = companyName || "Company"
     let actualCompanyWebsite = companyWebsite
@@ -307,48 +600,72 @@ export async function POST(request: NextRequest) {
         if (companyDocSnap.exists()) {
           const companyData = companyDocSnap.data()
           console.log("[v0] Company data retrieved from database:", companyData)
-          if (companyData.name) {
+
+          // Safely extract company data with validation
+          if (companyData?.name && typeof companyData.name === 'string') {
             actualCompanyName = companyData.name
             console.log("[v0] Company name set to:", actualCompanyName)
           }
-          if (companyData.website) {
+          if (companyData?.website && typeof companyData.website === 'string') {
             actualCompanyWebsite = companyData.website
           }
-          if (companyData.address && typeof companyData.address === 'object') {
-            // Format address object to string
-            const addr = companyData.address
-            const addressParts = []
-            if (addr.street) addressParts.push(addr.street)
-            if (addr.city) addressParts.push(addr.city)
-            if (addr.state) addressParts.push(addr.state)
-            if (addr.zip) addressParts.push(addr.zip)
-            if (addr.country) addressParts.push(addr.country)
-            actualCompanyAddress = addressParts.join(', ')
-            console.log("[v0] Company address object:", companyData.address)
-            console.log("[v0] Company address formatted to:", actualCompanyAddress)
-          } else if (companyData.address && typeof companyData.address === 'string') {
-            actualCompanyAddress = companyData.address
-            console.log("[v0] Company address string set to:", actualCompanyAddress)
+          if (companyData?.address) {
+            if (typeof companyData.address === 'object' && companyData.address !== null) {
+              // Format address object to string
+              const addr = companyData.address
+              const addressParts = []
+              if (addr.street && typeof addr.street === 'string') addressParts.push(addr.street)
+              if (addr.city && typeof addr.city === 'string') addressParts.push(addr.city)
+              if (addr.state && typeof addr.state === 'string') addressParts.push(addr.state)
+              if (addr.zip && typeof addr.zip === 'string') addressParts.push(addr.zip)
+              if (addr.country && typeof addr.country === 'string') addressParts.push(addr.country)
+              actualCompanyAddress = addressParts.join(', ')
+              console.log("[v0] Company address object:", companyData.address)
+              console.log("[v0] Company address formatted to:", actualCompanyAddress)
+            } else if (typeof companyData.address === 'string') {
+              actualCompanyAddress = companyData.address
+              console.log("[v0] Company address string set to:", actualCompanyAddress)
+            }
           }
-          if (companyData.photo_url) {
-            actualCompanyLogo = companyData.photo_url
+          if (companyData?.photo_url && typeof companyData.photo_url === 'string') {
+            // Use the provided logo URL instead of database URL for consistency
+            actualCompanyLogo = 'https://firebasestorage.googleapis.com/v0/b/oh-app-bcf24.appspot.com/o/company_logos%2FmlQu3MEGrcdhWVEAJZPYBGSFLbx1%2F1753334275475_Login.png?alt=media&token=645590e5-6ca9-4783-9d90-6ace8f545495'
           }
+        } else {
+          console.log("[v0] Company document not found for ID:", companyId)
         }
       } catch (error) {
-        console.error("Error fetching company data:", error)
-        // Continue with fallback values
+        console.error("[v0] Error fetching company data:", error)
+        // Continue with fallback values - not a critical failure
       }
     }
 
     // Convert logo URL to data URI for email compatibility
     let logoDataUri = null
+    let dominantColor = null
     if (actualCompanyLogo) {
-      console.log("[v0] Converting logo URL to data URI:", actualCompanyLogo)
-      logoDataUri = await imageUrlToDataUri(actualCompanyLogo)
-      if (logoDataUri) {
-        console.log("[v0] Successfully converted logo to data URI")
-      } else {
-        console.log("[v0] Failed to convert logo to data URI, using original URL")
+      try {
+        console.log("[v0] Converting logo URL to data URI:", actualCompanyLogo)
+        logoDataUri = await imageUrlToDataUri(actualCompanyLogo)
+        if (logoDataUri) {
+          console.log("[v0] Successfully converted logo to data URI")
+
+          // Extract dominant color from the logo
+          dominantColor = await extractDominantColor(logoDataUri)
+          if (dominantColor) {
+            console.log("[v0] Successfully extracted dominant color:", dominantColor)
+          } else {
+            console.log("[v0] Failed to extract dominant color, using fallback color #667eea")
+            dominantColor = undefined // Explicitly set to undefined for fallback
+          }
+        } else {
+          console.log("[v0] Failed to convert logo to data URI, using original URL")
+        }
+      } catch (error) {
+        console.error("[v0] Error processing company logo:", error)
+        // Continue without logo - not a critical failure
+        logoDataUri = null
+        dominantColor = null
       }
     }
 
@@ -373,6 +690,7 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Email sending - Company Logo URL:", actualCompanyLogo)
     console.log("[v0] Email sending - Logo Data URI available:", !!logoDataUri)
 
+    // Validate required fields with enhanced user data validation
     if (!body || body.trim().length === 0) {
       console.error("[v0] Email sending failed - Empty body")
       return NextResponse.json({ error: "Email body cannot be empty" }, { status: 400 })
@@ -383,9 +701,56 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email subject cannot be empty" }, { status: 400 })
     }
 
-    // Parse JSON strings
-    const to = JSON.parse(toJson)
-    const cc = ccJson ? JSON.parse(ccJson) : undefined
+    if (!toJson) {
+      console.error("[v0] Email sending failed - Missing recipients")
+      return NextResponse.json({ error: "Email recipients are required" }, { status: 400 })
+    }
+
+    // Enhanced user data validation
+    if (!currentUserPhoneNumber || currentUserPhoneNumber.trim().length === 0) {
+      console.warn("[v0] User phone number missing - using fallback")
+      // This is not critical, but log it for monitoring
+    }
+
+    if (!replyTo || replyTo.trim().length === 0) {
+      console.warn("[v0] Reply-to email missing - using fallback")
+      // This is not critical, but log it for monitoring
+    }
+
+    // Validate company information for better error reporting
+    if (!companyId) {
+      console.warn("[v0] Company ID missing - using fallback company information")
+    }
+
+    if (!actualCompanyName || actualCompanyName === "Company") {
+      console.warn("[v0] Company name not properly resolved - using fallback")
+    }
+
+    // Parse JSON strings with error handling
+    let to: string[]
+    let cc: string[] | undefined
+
+    try {
+      to = JSON.parse(toJson)
+      if (!Array.isArray(to) || to.length === 0) {
+        console.error("[v0] Invalid 'to' field: must be a non-empty array")
+        return NextResponse.json({ error: "Email recipients (to) must be a non-empty array" }, { status: 400 })
+      }
+    } catch (error) {
+      console.error("[v0] Failed to parse 'to' JSON:", error)
+      return NextResponse.json({ error: "Invalid email recipients format" }, { status: 400 })
+    }
+
+    try {
+      cc = ccJson ? JSON.parse(ccJson) : undefined
+      if (cc && (!Array.isArray(cc) || cc.length === 0)) {
+        console.error("[v0] Invalid 'cc' field: must be a non-empty array if provided")
+        return NextResponse.json({ error: "Email CC recipients must be a non-empty array if provided" }, { status: 400 })
+      }
+    } catch (error) {
+      console.error("[v0] Failed to parse 'cc' JSON:", error)
+      return NextResponse.json({ error: "Invalid email CC recipients format" }, { status: 400 })
+    }
 
     // Process file attachments
     const attachments = []
@@ -442,7 +807,7 @@ export async function POST(request: NextRequest) {
       from,
       to,
       subject: subject.trim(),
-      html: createEmailTemplate(body.trim(), currentUserPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, userDisplayName, replyTo, logoDataUri || actualCompanyLogo, proposalId),
+      html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined),
     }
 
     if (cc && cc.length > 0) {

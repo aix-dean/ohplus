@@ -510,9 +510,9 @@ ${contactDetails}`,
       if (projectData?.company_website) {
         formData.append("companyWebsite", projectData.company_website)
       }
-      if (userData?.displayName) {
-        formData.append("userDisplayName", userData.displayName)
-      }
+      // Always send userDisplayName with fallback
+      const displayName = userData?.displayName || user?.displayName || user?.email?.split('@')[0] || "Sales Executive"
+      formData.append("userDisplayName", displayName)
 
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
