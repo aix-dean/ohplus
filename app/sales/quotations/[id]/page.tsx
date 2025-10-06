@@ -1447,7 +1447,7 @@ The OH Plus Team`,
             <p className="mb-16">Conforme:</p>
             <div className="border-b border-gray-400 w-48 mb-2"></div>
             <p className="font-medium">{currentQuotation?.client_name || "Client Name"}</p>
-            <p className="text-sm">{currentQuotation?.client_designation || "Client Designation"}</p>
+            <p className="text-sm">{currentQuotation?.client_designation || "Position"}</p>
             <p className="text-xs mt-4 text-gray-600 italic">
               This signed quotation serves as an
               <br />

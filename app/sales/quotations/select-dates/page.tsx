@@ -28,7 +28,7 @@ export default function SelectDatesPage() {
 
   const [selectedSites, setSelectedSites] = useState<Product[]>([])
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
-  const [bookings, setBookings] = useState<Booking[]>([])
+  const [siteBookings, setSiteBookings] = useState<Record<string, Booking[]>>({})
 
   useEffect(() => {
     const sitesParam = searchParams.get("sites")
@@ -45,19 +45,20 @@ export default function SelectDatesPage() {
     if (sitesParam) {
       try {
         const siteIds = JSON.parse(decodeURIComponent(sitesParam))
+        console.log(`Parsed site IDs:`, siteIds)
         const fetchProducts = async () => {
           const products: Product[] = []
-          const allBookings: Booking[] = []
+          const bookingsMap: Record<string, Booking[]> = {}
           for (const siteId of siteIds) {
             const product = await getProductById(siteId)
             if (product) products.push(product)
 
             // Fetch bookings for this product
             const productBookings = await getProductBookings(siteId)
-            allBookings.push(...productBookings)
+            bookingsMap[siteId] = productBookings
           }
           setSelectedSites(products)
-          setBookings(allBookings)
+          setSiteBookings(bookingsMap)
         }
         fetchProducts()
       } catch (error) {
@@ -167,20 +168,30 @@ export default function SelectDatesPage() {
     }
   }
 
-  // Real booked ranges from database
-  const bookedRanges = bookings.map(booking => ({
-    start: convertToDate(booking.start_date),
-    end: convertToDate(booking.end_date)
-  }))
+  // Helper function to get filtered booked ranges for a site
+  const getBookedRanges = (siteId: string) => {
+    const bookings = siteBookings[siteId] || []
 
-  const checkOverlap = (s: Date, e: Date) =>
-    bookedRanges.some((r) => s <= r.end && e >= r.start)
-
-  const removeSite = (id: string) => {
-    setSelectedSites((prev) => prev.filter((site) => site.id !== id))
+    return bookings.map(booking => ({
+      start: convertToDate(booking.start_date),
+      end: convertToDate(booking.end_date),
+    }))
   }
 
-  const renderCalendar = (monthIndex: number, year: number) => {
+  const checkOverlap = (siteId: string, s: Date, e: Date) =>
+    getBookedRanges(siteId).some((r) => s <= r.end && e >= r.start)
+
+  const removeSite = (id: string) => {
+    setSelectedSites((prev) => {
+      const updated = prev.filter((site) => site.id !== id)
+      if (updated.length === 0) {
+        router.push('/sales/dashboard')
+      }
+      return updated
+    })
+  }
+
+  const renderCalendar = (monthIndex: number, year: number, bookedRanges: { start: Date; end: Date }[]) => {
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate()
     const startDay = new Date(year, monthIndex, 1).getDay()
 
@@ -203,14 +214,8 @@ export default function SelectDatesPage() {
             const selectedStart = startDate ? new Date(startDate) : null
             const selectedEnd = endDate ? new Date(endDate) : null
 
-            // Only show booked dates that overlap with the selected range
-            const isBooked = selectedStart && selectedEnd &&
-              bookedRanges.some((r) =>
-                // Check if the booked range overlaps with selected range
-                (r.start <= selectedEnd && r.end >= selectedStart) &&
-                // And this specific date is within the booked range
-                (date >= r.start && date <= r.end)
-              )
+            // Highlight dates that are booked
+            const isBooked = bookedRanges.some((r) => date >= r.start && date <= r.end)
 
             const isStartDate = startDate && date.toDateString() === new Date(startDate).toDateString()
             const isEndDate = endDate && date.toDateString() === new Date(endDate).toDateString()
@@ -221,17 +226,16 @@ export default function SelectDatesPage() {
             return (
               <div
                 key={day}
-                className={`p-1 rounded text-center relative ${
-                  isBooked
-                    ? "bg-red-700 text-white"
-                    : isSelected
-                    ? "bg-blue-600 text-white font-bold ring-2 ring-blue-300"
+                className={`p-1 rounded text-center relative ${isBooked
+                  ? "bg-red-500 text-white" // booked overrides everything
+                  : isSelected
+                    ? "bg-blue-500 text-white font-bold ring-2 ring-blue-300"
                     : isBetween
-                    ? "bg-blue-100 text-blue-800"
-                    : isInRange
-                    ? "bg-blue-100 text-blue-800 font-semibold"
-                    : "text-gray-700"
-                }`}
+                      ? "bg-blue-100 text-blue-800"
+                      : isInRange
+                        ? "bg-blue-100 text-blue-800 font-semibold"
+                        : "text-gray-700"
+                  }`}
               >
                 {day}
                 {isSelected && (
@@ -256,6 +260,18 @@ export default function SelectDatesPage() {
     { month: (baseMonth + 2) % 12, year: baseMonth + 2 > 11 ? baseYear + 1 : baseYear },
   ]
 
+  // Check if any site has overlapping dates
+  const hasOverlaps = selectedSites.some(site =>
+    startDate && endDate && checkOverlap(site.id!, new Date(startDate), new Date(endDate))
+  )
+  const today = new Date().toISOString().split("T")[0]
+
+  const getNextDay = (dateStr: string) => {
+    if (!dateStr) return today
+    const d = new Date(dateStr)
+    d.setDate(d.getDate() + 1)
+    return d.toISOString().split("T")[0]
+  }
   return (
     <div className="min-h-screen bg-white p-6">
       <div className="max-w-7xl mx-auto">
@@ -265,33 +281,73 @@ export default function SelectDatesPage() {
             ← Back
           </Button>
           <h1 className="text-3xl font-bold text-gray-900">Select Dates</h1>
-          <div className="h-11 flex items-center px-4 bg-gray-50 rounded-md border">
-            <span className="text-gray-900 font-medium">{totalDays} days</span>
-          </div>
+
         </div>
 
         {/* Start/End Date Inputs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div>
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+          <div className="px-2">
             <label className="block text-sm font-semibold mb-2">Start Date</label>
-            <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <Input type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value)
+                // reset end date if it's invalid
+                if (endDate && e.target.value && endDate <= e.target.value) {
+                  setEndDate("")
+                }
+              }}
+              min={today}
+            />
           </div>
-          <div>
+          <div className="px-2">
             <label className="block text-sm font-semibold mb-2">End Date</label>
-            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              min={getNextDay(startDate)}
+              disabled={!startDate} // disable until start date is picked
+            />
+          </div>
+          <div className="px-2">
+            <span className="font-semibold mb-4 text-sm block ">Total</span>
+            <span className="text-sm">{totalDays} days</span>
+          </div>
+          <div className="justify-end md:ml-auto flex items-end">
+            <Button
+              onClick={handleCreateQuotation}
+              disabled={!startDate || !endDate || isCreating || hasOverlaps}
+              className="px-8 py-3 text-lg font-semibold"
+            >
+              {isCreating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</> : "Next →"}
+            </Button>
           </div>
         </div>
-
         {/* Sites with calendars */}
         <div className="space-y-6">
           {selectedSites.map((site) => {
-            const overlap = startDate && endDate && checkOverlap(new Date(startDate), new Date(endDate))
+            const bookedRanges = getBookedRanges(site.id!)
+            const overlap = startDate && endDate && checkOverlap(site.id!, new Date(startDate), new Date(endDate))
             return (
               <div key={site.id} className="border rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   {/* Left: Site card */}
                   <div className="bg-gray-100 rounded-lg overflow-hidden">
-                    <div className="h-40 bg-gray-300 flex items-center justify-center">Site Photo</div>
+                    <div className="h-40 relative">
+                      {site.media && site.media.length > 0 ? (
+                        <Image
+                          src={site.media[0].url}
+                          alt={site.name}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="h-full bg-gray-300 flex items-center justify-center text-gray-500">
+                          No Image
+                        </div>
+                      )}
+                    </div>
                     <div className="p-3 text-sm space-y-1">
                       <p className="text-gray-500">{site.site_code || "Site Code"}</p>
                       <p className="font-medium">{site.name}</p>
@@ -306,7 +362,7 @@ export default function SelectDatesPage() {
                   <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
                     {monthsToShow.map(({ month, year }) => (
                       <div key={`${year}-${month}`}>
-                        {renderCalendar(month, year)}
+                        {renderCalendar(month, year, bookedRanges)}
                       </div>
                     ))}
                   </div>
@@ -328,16 +384,6 @@ export default function SelectDatesPage() {
           })}
         </div>
 
-        {/* Next Button */}
-        <div className="flex justify-end mt-6">
-          <Button
-            onClick={handleCreateQuotation}
-            disabled={!startDate || !endDate || isCreating}
-            className="px-8 py-3 text-lg font-semibold"
-          >
-            {isCreating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</> : "Next →"}
-          </Button>
-        </div>
       </div>
     </div>
   )
