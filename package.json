@@ -58,6 +58,7 @@
     "embla-carousel-react": "latest",
     "firebase": "latest",
     "framer-motion": "^12.23.22",
+    "node-vibrant": "^4.0.3",
     "gsap": "^3.13.0",
     "html2canvas": "^1.4.1",
     "https": "latest",
@@ -90,6 +91,7 @@
     "zod": "latest"
   },
   "devDependencies": {
+    "@types/get-image-colors": "^4.0.5",
     "@types/google.maps": "^3.58.1",
     "@types/html2canvas": "^1.0.0",
     "@types/node": "^22",

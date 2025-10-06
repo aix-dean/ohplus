@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { initializeApp, getApps } from "firebase/app"
 import { logProposalViewed } from "@/lib/proposal-activity-service"
-import { getProposalById } from "@/lib/proposal-service"
+import { getProposalById, verifyProposalPassword } from "@/lib/proposal-service"
 
 // Initialize Firebase for server-side use
 function getFirebaseApp() {
@@ -35,7 +35,28 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return NextResponse.json({ error: "Proposal not found" }, { status: 404 })
     }
 
-    // Log proposal view (no password needed)
+    // Check if proposal has a password
+    if (proposal.password) {
+      const url = new URL(request.url)
+      const password = url.searchParams.get('password')
+
+      if (!password) {
+        return NextResponse.json({
+          error: "Password required",
+          requiresPassword: true
+        }, { status: 401 })
+      }
+
+      const isValidPassword = await verifyProposalPassword(id, password)
+      if (!isValidPassword) {
+        return NextResponse.json({
+          error: "Invalid password",
+          requiresPassword: true
+        }, { status: 401 })
+      }
+    }
+
+    // Log proposal view
     try {
       await logProposalViewed(id, "public_viewer", `${proposal.client.contactPerson} (${proposal.client.company})`)
     } catch (logError) {

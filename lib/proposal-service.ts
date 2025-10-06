@@ -25,9 +25,27 @@ import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import type { Proposal, ProposalProduct, ProposalClient } from "@/lib/types/proposal"
 import { logProposalCreated, logProposalStatusChanged, logProposalEmailSent } from "@/lib/proposal-activity-service"
 
+
+async function populateCompanyLogo(proposalData: any): Promise<any> {
+  let companyLogo = proposalData.companyLogo || ""
+  if (!companyLogo && proposalData.companyId) {
+    try {
+      const companyDoc = await getDoc(doc(db, "companies", proposalData.companyId))
+      if (companyDoc.exists()) {
+        const companyData = companyDoc.data()
+        companyLogo = companyData.photo_url || ""
+      }
+    } catch (error) {
+      console.error("Error fetching company data for logo:", error)
+    }
+  }
+  return { ...proposalData, companyLogo }
+}
+
 // Generate an 8-digit password for proposal PDF access
 export function generateProposalPassword(): string {
   return Math.floor(10000000 + Math.random() * 90000000).toString()
+
 }
 
 // Create a new proposal
@@ -44,6 +62,8 @@ export async function createProposal(
     campaignId?: string // Add optional campaign ID parameter
     companyId?: string // Add optional company ID parameter
     client_company_id?: string // Add client_company_id parameter
+    password?: string // Add optional password for public access
+    generatePassword?: boolean // Add option to auto-generate password
   } = {},
 ): Promise<string> {
   try {
@@ -121,6 +141,12 @@ export async function createProposal(
     // Generate proposal number
     const proposalNumber = `PP${Date.now()}`
 
+    // Handle password generation
+    let password = options.password || null
+    if (options.generatePassword && !password) {
+      password = generateProposalPassword()
+    }
+
     const proposalData = {
       title: title || "",
       proposalNumber: proposalNumber, // Add the new proposal number
@@ -138,6 +164,7 @@ export async function createProposal(
       updatedAt: serverTimestamp(),
       status: "draft" as const, // Always set to draft now
       campaignId: options.campaignId || null, // Store campaign ID if provided
+      password: password, // Store password for public access
     }
 
     const docRef = await addDoc(collection(db, "proposals"), proposalData)
@@ -261,19 +288,19 @@ export async function getProposalsByUserId(userId: string): Promise<Proposal[]> 
     const q = query(proposalsRef, where("createdBy", "==", userId), orderBy("createdAt", "desc"))
 
     const querySnapshot = await getDocs(q)
-    const proposals: Proposal[] = []
-
-    querySnapshot.forEach((doc) => {
+    const proposalPromises = querySnapshot.docs.map(async (doc) => {
       const data = doc.data()
-      proposals.push({
+      const populatedData = await populateCompanyLogo(data)
+      return {
         id: doc.id,
-        ...data,
+        ...populatedData,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
         validUntil: data.validUntil instanceof Timestamp ? data.validUntil.toDate() : new Date(data.validUntil),
-      } as Proposal)
+      } as Proposal
     })
 
+    const proposals = await Promise.all(proposalPromises)
     return proposals
   } catch (error) {
     console.error("Error fetching proposals:", error)
@@ -295,10 +322,13 @@ export async function getProposalById(proposalId: string): Promise<Proposal | nu
       const data = proposalDoc.data()
       console.log("Proposal data found:", data.title)
 
+      // Populate companyLogo from company data if missing
+      const populatedData = await populateCompanyLogo(data)
+
       // Convert Firestore timestamps to dates
       const proposal: Proposal = {
         id: proposalDoc.id,
-        ...data,
+        ...populatedData,
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
         validUntil: data.validUntil?.toDate() || new Date(),
@@ -315,7 +345,26 @@ export async function getProposalById(proposalId: string): Promise<Proposal | nu
   }
 }
 
-// Removed verifyProposalPassword function
+// Verify proposal password for public access
+export async function verifyProposalPassword(proposalId: string, password: string): Promise<boolean> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const proposalDoc = await getDoc(doc(db, "proposals", proposalId))
+
+    if (proposalDoc.exists()) {
+      const data = proposalDoc.data()
+      return data.password === password
+    }
+
+    return false
+  } catch (error) {
+    console.error("Error verifying proposal password:", error)
+    return false
+  }
+}
 
 // Update proposal status with optional custom user info for public viewers
 export async function updateProposalStatus(
@@ -440,6 +489,7 @@ export async function updateProposal(
     if (data.templateOrientation !== undefined) updateData.templateOrientation = data.templateOrientation
     if (data.templateLayout !== undefined) updateData.templateLayout = data.templateLayout
     if (data.templateBackground !== undefined) updateData.templateBackground = data.templateBackground
+    if (data.password !== undefined) updateData.password = data.password
 
     if (data.pdf !== undefined) updateData.pdf = data.pdf
     if (data.password !== undefined) updateData.password = data.password
@@ -566,17 +616,18 @@ export async function getPaginatedProposals(
     q = query(q, limit(itemsPerPage + 1)) // Fetch one more to check if there are more items
 
     const querySnapshot = await getDocs(q)
-    const proposals: Proposal[] = []
-    querySnapshot.forEach((doc) => {
+    const proposalPromises = querySnapshot.docs.map(async (doc) => {
       const data = doc.data()
-      proposals.push({
+      const populatedData = await populateCompanyLogo(data)
+      return {
         id: doc.id,
-        ...data,
+        ...populatedData,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
         validUntil: data.validUntil instanceof Timestamp ? data.validUntil.toDate() : new Date(data.validUntil),
-      } as Proposal)
+      } as Proposal
     })
+    const proposals = await Promise.all(proposalPromises)
 
     let filteredItems = proposals
     if (searchTerm) {
@@ -626,17 +677,18 @@ export async function getPaginatedProposalsByUserId(
     q = query(q, limit(itemsPerPage + 1)) // Fetch one more to check if there are more items
 
     const querySnapshot = await getDocs(q)
-    const proposals: Proposal[] = []
-    querySnapshot.forEach((doc) => {
+    const proposalPromises = querySnapshot.docs.map(async (doc) => {
       const data = doc.data()
-      proposals.push({
+      const populatedData = await populateCompanyLogo(data)
+      return {
         id: doc.id,
-        ...data,
+        ...populatedData,
         createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
         updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
         validUntil: data.validUntil instanceof Timestamp ? data.validUntil.toDate() : new Date(data.validUntil),
-      } as Proposal)
+      } as Proposal
     })
+    const proposals = await Promise.all(proposalPromises)
 
     let filteredItems = proposals
     if (searchTerm) {
@@ -760,6 +812,36 @@ export async function getProposalsCount(searchTerm = "", statusFilter: string | 
   }
 }
 
+// Helper function to wait for all images to load in a document
+function waitForImagesToLoad(doc: Document): Promise<void> {
+  return new Promise((resolve) => {
+    const images = doc.querySelectorAll('img')
+    let loadedCount = 0
+    const totalImages = images.length
+
+    if (totalImages === 0) {
+      resolve()
+      return
+    }
+
+    const checkComplete = () => {
+      loadedCount++
+      if (loadedCount === totalImages) {
+        resolve()
+      }
+    }
+
+    images.forEach((img) => {
+      if (img.complete) {
+        checkComplete()
+      } else {
+        img.addEventListener('load', checkComplete)
+        img.addEventListener('error', checkComplete) // Consider failed images as loaded to avoid hanging
+      }
+    })
+  })
+}
+
 // Client-side PDF generation using html2canvas
 export async function downloadProposalPDF(
   proposal: Proposal,
@@ -801,8 +883,12 @@ export async function downloadProposalPDF(
         backgroundColor: '#ffffff',
         width: container.offsetWidth,
         height: container.offsetHeight,
-        imageTimeout: 0,
+        imageTimeout: 15000, // Increased timeout for images
         logging: false,
+        onclone: async (clonedDoc) => {
+          // Wait for all images to load in the cloned document
+          await waitForImagesToLoad(clonedDoc)
+        },
       })
 
       const imgData = canvas.toDataURL('image/jpeg', 0.7)
@@ -873,8 +959,12 @@ export async function generateProposalPDFBlob(
       backgroundColor: '#ffffff',
       width: container.offsetWidth,
       height: container.offsetHeight,
-      imageTimeout: 0,
+      imageTimeout: 15000, // Increased timeout for images
       logging: false,
+      onclone: async (clonedDoc) => {
+        // Wait for all images to load in the cloned document
+        await waitForImagesToLoad(clonedDoc)
+      },
     })
 
       const imgData = canvas.toDataURL('image/jpeg', 0.7)

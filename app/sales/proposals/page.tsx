@@ -195,7 +195,7 @@ function ProposalsPageContent() {
                           <ul className="list-disc list-inside">
                             {proposal.products?.map((product, index) => (
                               <li key={index}>{product.name || product.name}</li>
-                            )) || <li>No sites</li>}
+                            )) || <li key={`no-sites-${proposal.id}`}>No sites</li>}
                           </ul>
                         </div>
                       )}

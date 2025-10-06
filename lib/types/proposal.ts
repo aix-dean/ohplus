@@ -103,6 +103,7 @@ export type Proposal = {
      | "cost_estimate_pending"
      | "cost_estimate_approved"
      | "cost_estimate_rejected"
+   password?: string // Optional password for public access
    createdAt: Date
    updatedAt: Date
  }
