@@ -109,6 +109,7 @@ export default function BusinessInventoryPage() {
   const [siteName, setSiteName] = useState("")
   const [location, setLocation] = useState("")
   const [locationLabel, setLocationLabel] = useState("")
+  const [geopoint, setGeopoint] = useState<[number, number] | null>(null)
   const [height, setHeight] = useState("")
   const [width, setWidth] = useState("")
   const [dimensionUnit, setDimensionUnit] = useState<"ft" | "m">("ft")
@@ -119,7 +120,7 @@ export default function BusinessInventoryPage() {
   const [dailyTraffic, setDailyTraffic] = useState("")
   const [trafficUnit, setTrafficUnit] = useState<"daily" | "weekly" | "monthly">("monthly")
   const [price, setPrice] = useState("0")
-  const [priceUnit, setPriceUnit] = useState<"per spot" | "per day" | "per month">("per spot")
+  const [priceUnit, setPriceUnit] = useState<"per spot" | "per day" | "per month">("per month")
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
@@ -541,6 +542,7 @@ export default function BusinessInventoryPage() {
     setSiteName("")
     setLocation("")
     setLocationLabel("")
+    setGeopoint(null)
     setHeight("")
     setWidth("")
     setDimensionUnit("ft")
@@ -551,7 +553,7 @@ export default function BusinessInventoryPage() {
     setDailyTraffic("")
     setTrafficUnit("monthly")
     setPrice("0")
-    setPriceUnit("per spot")
+    setPriceUnit("per month")
     setUploadedFiles([])
     setCurrentImageIndex(0)
 
@@ -790,6 +792,7 @@ export default function BusinessInventoryPage() {
         specs_rental: {
           audience_types: selectedAudience,
           location,
+          ...(geopoint && { geopoint }),
           traffic_count: parseInt(dailyTraffic) || null,
           height: parseFloat(height) || null,
           width: parseFloat(width) || null,
@@ -813,7 +816,7 @@ export default function BusinessInventoryPage() {
           },
         },
         media: mediaUrls,
-        type: siteType,
+        type: "RENTAL",
         active: true,
       }
 
@@ -825,6 +828,7 @@ export default function BusinessInventoryPage() {
       setSiteName("")
       setLocation("")
       setLocationLabel("")
+      setGeopoint(null)
       setHeight("")
       setWidth("")
       setDimensionUnit("ft")
@@ -835,7 +839,7 @@ export default function BusinessInventoryPage() {
       setDailyTraffic("")
       setTrafficUnit("monthly")
       setPrice("0")
-      setPriceUnit("per spot")
+      setPriceUnit("per month")
       setUploadedFiles([])
       setCurrentImageIndex(0)
 
@@ -1272,6 +1276,7 @@ export default function BusinessInventoryPage() {
                 <GooglePlacesAutocomplete
                   value={location}
                   onChange={setLocation}
+                  onGeopointChange={setGeopoint}
                   placeholder="Enter street address or search location..."
                   enableMap={true}
                   mapHeight="250px"

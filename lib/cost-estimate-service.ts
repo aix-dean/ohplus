@@ -831,6 +831,7 @@ export async function createMultipleCostEstimates(
     const companyId = options?.company_id || ""
 
     // Create a separate cost estimate for each site
+    const baseTimestamp = Date.now()
     for (let i = 0; i < sitesData.length; i++) {
       const site = sitesData[i]
       const durationDays = calculateDurationDays(options?.startDate || null, options?.endDate || null)
@@ -863,7 +864,7 @@ export async function createMultipleCostEstimates(
       // Calculate total amount for this site
       totalAmount = lineItems.reduce((sum, item) => sum + item.total, 0)
 
-      const costEstimateNumber = `CE${Date.now()}-${site.id.slice(-4)}` // Generate unique CE number for each site
+      const costEstimateNumber = `CE${baseTimestamp + i}` // Generate unique CE number for each site
 
       const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
         proposalId: null, // No associated proposal
@@ -1080,8 +1081,8 @@ export async function generateAndUploadCostEstimatePDF(
           }
 
           // Always fetch logo from database
-          if (companyInfo?.photo_url) {
-            const logoResponse = await fetch(companyInfo.photo_url)
+          if (companyInfo?.logo) {
+            const logoResponse = await fetch(companyInfo.logo)
             if (logoResponse.ok) {
               const logoBlob = await logoResponse.blob()
               const logoArrayBuffer = await logoBlob.arrayBuffer()

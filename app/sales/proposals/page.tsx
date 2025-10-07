@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { getPaginatedProposalsByUserId, getProposalsCountByUserId, downloadProposalPDF } from "@/lib/proposal-service"
+import { createMultipleCostEstimates } from "@/lib/cost-estimate-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useToast } from "@/hooks/use-toast"
@@ -228,6 +229,11 @@ function ProposalsPageContent() {
                           Share
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleCreateCostEstimate(proposal)}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Create CE
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleCreateQuotation(proposal)}>
                           <Plus className="mr-2 h-4 w-4" />
                           Create Quotation
@@ -386,6 +392,54 @@ function ProposalsPageContent() {
     // Navigate to detail page and trigger share there
     // This ensures the proposal is rendered and can be shared properly
     router.push(`/sales/proposals/${proposal.id}?action=share`)
+  }
+
+  const handleCreateCostEstimate = async (proposal: Proposal) => {
+    if (!user?.uid) return
+
+    try {
+      // Map proposal client to CostEstimateClientData
+      const clientData = {
+        id: proposal.client.id,
+        name: proposal.client.name,
+        email: proposal.client.email,
+        company: proposal.client.company,
+        phone: proposal.client.phone || "",
+        address: proposal.client.address || "",
+        designation: proposal.client.designation || "",
+        industry: proposal.client.industry || "",
+      }
+
+      // Map proposal products to CostEstimateSiteData[]
+      const sitesData = proposal.products.map((product) => ({
+        id: product.id,
+        name: product.name,
+        location: product.location,
+        price: product.price,
+        type: product.type,
+        image: product.media?.[0]?.url || undefined,
+        specs_rental: product.specs_rental,
+      }))
+
+      const costEstimateIds = await createMultipleCostEstimates(clientData, sitesData, user.uid, {
+        company_id: userData?.company_id || "",
+      })
+
+      toast({
+        title: "Cost Estimates Created",
+        description: `${costEstimateIds.length} individual cost estimates have been created successfully from the proposal.`,
+      })
+
+      // Navigate to the cost estimates page or the first created CE
+      router.push(`/sales/cost-estimates`)
+    } catch (error) {
+      console.error("Error creating cost estimates from proposal:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create cost estimates from proposal. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleCreateQuotation = (proposal: Proposal) => {

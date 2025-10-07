@@ -58,7 +58,7 @@ interface CompanyData {
   address?: any
   company_website?: string
   website?: string
-  photo_url?: string
+  logo?: string
   contact_person?: string
   email?: string
   phone?: string
@@ -537,16 +537,16 @@ The OH Plus Team`,
 
       // Prepare logo data URL if company logo exists
       let logoDataUrl: string | null = null
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const logoResponse = await fetch(companyData.photo_url)
+          const logoResponse = await fetch(companyData.logo)
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             logoDataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result as string)
-              reader.readAsDataURL(logoBlob)
-            })
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
           }
         } catch (error) {
           console.error('Error fetching company logo:', error)
@@ -586,6 +586,14 @@ The OH Plus Team`,
         description: "Quotation updated successfully.",
       })
 
+      // Refresh data from server
+      const refreshedQuotation = await getQuotationById(quotationId)
+      if (refreshedQuotation) {
+        setQuotation(refreshedQuotation)
+        setEditableQuotation({ ...refreshedQuotation })
+        await fetchRelatedQuotations(refreshedQuotation)
+      }
+
       console.log("[v0] PDF generated and quotation saved successfully:", pdfUrl)
     } catch (error) {
       console.error("Error saving quotation or generating PDF:", error)
@@ -623,16 +631,16 @@ The OH Plus Team`,
       await generatePDFIfNeeded(quotation)
       // Prepare logo data URL if company logo exists
       let logoDataUrl: string | null = null
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const logoResponse = await fetch(companyData.photo_url)
+          const logoResponse = await fetch(companyData.logo)
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             logoDataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(reader.result as string)
-            reader.readAsDataURL(logoBlob)
-          })
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(logoBlob)
+            })
           }
         } catch (error) {
           console.error('Error fetching company logo:', error)
@@ -916,9 +924,9 @@ The OH Plus Team`,
         // If no PDF exists, generate one
         // Prepare logo data URL if company logo exists
         let logoDataUrl: string | null = null
-        if (companyData?.photo_url) {
+        if (companyData?.logo) {
           try {
-            const logoResponse = await fetch(companyData.photo_url)
+            const logoResponse = await fetch(companyData.logo)
             if (logoResponse.ok) {
               const logoBlob = await logoResponse.blob()
               logoDataUrl = await new Promise<string>((resolve) => {
@@ -1578,9 +1586,9 @@ The OH Plus Team`,
     try {
       // Prepare logo data URL if company logo exists
       let logoDataUrl: string | null = null
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const logoResponse = await fetch(companyData.photo_url)
+          const logoResponse = await fetch(companyData.logo)
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             logoDataUrl = await new Promise<string>((resolve) => {
@@ -1761,9 +1769,9 @@ The OH Plus Team`,
             <div id="quotation-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
              <div className="text-left mb-8 ml-8">
                <div className="flex items-center justify-start mb-6 mt-6">
-                 {companyData?.photo_url ? (
+                 {companyData?.logo ? (
                    <img
-                     src={companyData.photo_url || "/placeholder.svg"}
+                     src={companyData.logo || "/placeholder.svg"}
                      alt="Company Logo"
                      className="h-24 w-auto object-contain"
                    />

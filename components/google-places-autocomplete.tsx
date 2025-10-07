@@ -10,6 +10,7 @@ import { loadGoogleMaps } from "@/lib/google-maps-loader"
 interface GooglePlacesAutocompleteProps {
   value: string
   onChange: (value: string) => void
+  onGeopointChange?: (geopoint: [number, number] | null) => void
   placeholder?: string
   className?: string
   enableMap?: boolean
@@ -26,6 +27,7 @@ declare global {
 export function GooglePlacesAutocomplete({
   value,
   onChange,
+  onGeopointChange,
   placeholder = "Enter location...",
   className,
   enableMap = false,
@@ -119,6 +121,13 @@ export function GooglePlacesAutocomplete({
             if (inputRef.current) {
               inputRef.current.value = newAddress
             }
+
+            // Call geopoint callback if provided
+            if (onGeopointChange && position) {
+              const lat = position.lat()
+              const lng = position.lng()
+              onGeopointChange([lat, lng])
+            }
           }
         })
       })
@@ -135,6 +144,13 @@ export function GooglePlacesAutocomplete({
             onChange(newAddress)
             if (inputRef.current) {
               inputRef.current.value = newAddress
+            }
+
+            // Call geopoint callback if provided
+            if (onGeopointChange && position) {
+              const lat = position.lat()
+              const lng = position.lng()
+              onGeopointChange([lat, lng])
             }
           }
         })
@@ -158,6 +174,13 @@ export function GooglePlacesAutocomplete({
 
       const address = place.formatted_address || place.name || ""
       onChange(address)
+
+      // Call geopoint callback if provided
+      if (onGeopointChange && place.geometry && place.geometry.location) {
+        const lat = place.geometry.location.lat()
+        const lng = place.geometry.location.lng()
+        onGeopointChange([lat, lng])
+      }
 
       // Update map if enabled
       if (enableMap && map && marker) {

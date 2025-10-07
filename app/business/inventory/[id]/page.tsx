@@ -245,7 +245,7 @@ export default function BusinessProductDetailPage() {
           },
         },
         media: allMedia,
-        type: siteType,
+        type: "RENTAL",
         updated: serverTimestamp(),
       }
 
