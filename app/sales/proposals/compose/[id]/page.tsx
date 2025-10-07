@@ -278,7 +278,7 @@ ${contactDetails}`,
 
         setProposal(proposalData)
 
-        console.log('Company Logo:', proposalData.companyLogo)
+        console.log('Company Logo from query:', proposalData.companyLogo)
 
         // Read URL parameters
         const urlParams = new URLSearchParams(window.location.search)
@@ -398,7 +398,8 @@ ${contactDetails}`,
           finalCompanyName,
           `📞 ${userData?.phone_number || '+639XXXXXXXXX'}`,
           `📧 ${replyToEmail}`,
-          ...(projectData?.company_website && projectData.company_website !== 'www.ohplus.ph' ? [`🌐 ${projectData.company_website}`] : [])
+          ...(projectData?.company_website && projectData.company_website !== 'www.ohplus.ph' ? [`🌐 ${projectData.company_website}`] : []),
+          ...(proposalData?.companyLogo ? [`Logo: ${proposalData.companyLogo}`] : [])
         ].join('\n')
 
         console.log('Contact details construction:', {

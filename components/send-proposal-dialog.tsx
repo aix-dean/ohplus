@@ -54,19 +54,17 @@ export function SendProposalDialog({ isOpen, onClose, proposal, onProposalSent }
   const handleSendProposal = async () => {
     setIsSending(true)
     try {
+      const formData = new FormData()
+      formData.append("proposal", JSON.stringify(proposal))
+      formData.append("clientEmail", proposal.client.email)
+      formData.append("subject", subject)
+      formData.append("body", body)
+      formData.append("currentUserEmail", currentUserEmail)
+      formData.append("ccEmail", ccEmail)
+
       const response = await fetch("/api/proposals/send-email", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          proposal,
-          clientEmail: proposal.client.email,
-          subject,
-          body,
-          currentUserEmail,
-          ccEmail,
-        }),
+        body: formData,
       })
 
       const result = await response.json()
