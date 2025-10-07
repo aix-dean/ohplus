@@ -507,7 +507,6 @@ export default function QuotationsListPage() {
               status: "uploaded",
               fileUrl: downloadURL,
               fileName: file.name,
-              uploadedAt: serverTimestamp(),
               uploadedBy: user?.uid,
             }
           }
@@ -1116,7 +1115,6 @@ export default function QuotationsListPage() {
           status: "completed",
           fileUrl: downloadURL,
           fileName: selectedQuotationForProject.tempFile?.name || "",
-          uploadedAt: serverTimestamp(),
           uploadedBy: user?.uid,
         },
         status: "reserved", // Update the main status of the quotation

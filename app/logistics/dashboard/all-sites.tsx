@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import type { Product } from "@/lib/firebase-service"
@@ -22,11 +22,11 @@ const gradientBorderStyles = `
 `
 
 // Direct Firebase imports for job order fetching
-import { collection, query, where, getDocs, onSnapshot } from "firebase/firestore"
+import { collection, query, where, getDocs, onSnapshot, orderBy, limit, startAfter } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 // Number of items to display per page
-const ITEMS_PER_PAGE = 8
+const ITEMS_PER_PAGE = 12
 
 interface AllSitesTabProps {
   searchQuery?: string
@@ -50,11 +50,8 @@ export default function AllSitesTab({
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalItems, setTotalItems] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [pageCache, setPageCache] = useState<
-    Map<number, { items: Product[]; lastDoc: QueryDocumentSnapshot<DocumentData> | null }>
-  >(new Map())
+  const [hasNextPage, setHasNextPage] = useState(false)
+  const lastDocsRef = useRef<Map<number, QueryDocumentSnapshot<DocumentData> | null>>(new Map())
 
   // Report dialog state
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
@@ -76,7 +73,8 @@ export default function AllSitesTab({
   // Reset pagination when search or filter changes
     useEffect(() => {
       setCurrentPage(1)
-      setPageCache(new Map())
+      lastDocsRef.current = new Map()
+      setHasNextPage(false)
     }, [searchQuery, contentTypeFilter])
   
   // Debug effect to log JO counts when they change
@@ -109,128 +107,97 @@ export default function AllSitesTab({
         return unsubscribe
       }, [userData?.company_id, products])
     
-      // Real-time products listener
-      useEffect(() => {
+      // Fetch paginated products
+      const fetchProducts = useCallback(async (page: number = 1) => {
         if (!userData?.company_id) return
     
         setLoading(true)
-        const q = query(collection(db, "products"), where("company_id", "==", userData.company_id), where("active", "==", true))
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const allProducts: Product[] = []
-          querySnapshot.forEach((doc) => {
-            const product = doc.data() as Product
-            product.id = doc.id
-            allProducts.push(product)
-          })
+        try {
+          // Build base query
+          let constraints: any[] = [
+            where("company_id", "==", userData.company_id),
+            where("active", "==", true),
+            orderBy("created", "desc"),
+            limit(ITEMS_PER_PAGE + 1) // +1 to check if there's a next page
+          ]
     
-          // Filter by searchTerm
-          let filtered = allProducts
-          if (searchQuery) {
-            filtered = allProducts.filter(p => p.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+          // Add startAfter cursor for pagination
+          const lastDoc = lastDocsRef.current.get(page - 1)
+          if (lastDoc && page > 1) {
+            constraints.splice(-1, 0, startAfter(lastDoc)) // Insert before limit
           }
     
-          // Filter by contentTypeFilter
+          const q = query(collection(db, "products"), ...constraints)
+          const querySnapshot = await getDocs(q)
+    
+          const productsData: Product[] = []
+          querySnapshot.forEach((doc) => {
+            const product = { id: doc.id, ...doc.data() } as Product
+            productsData.push(product)
+          })
+    
+          // Check if there's a next page
+          const hasNext = productsData.length > ITEMS_PER_PAGE
+          const currentPageProducts = hasNext ? productsData.slice(0, ITEMS_PER_PAGE) : productsData
+    
+          // Store the last document for next page
+          const lastDocOfPage = querySnapshot.docs[querySnapshot.docs.length - (hasNext ? 2 : 1)]
+          lastDocsRef.current.set(page, lastDocOfPage || null)
+          setHasNextPage(hasNext)
+    
+          // Apply client-side filters
+          let filtered = currentPageProducts
+          if (searchQuery) {
+            filtered = currentPageProducts.filter(p =>
+              p.name?.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+          }
+    
           if (contentTypeFilter !== "All") {
             filtered = filtered.filter((product) => {
-              if (contentTypeFilter === "Static") return product.content_type === "Static" || product.content_type === "static"
-              else if (contentTypeFilter === "Dynamic") return product.content_type === "Dynamic" || product.content_type === "dynamic"
-              return true
+              const productType = (product.content_type || "").toLowerCase()
+              const filterType = contentTypeFilter.toLowerCase()
+              return productType === filterType
             })
           }
     
-          setTotalItems(filtered.length)
-          setTotalPages(Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE)))
-    
-          // Slice for current page
-          const start = (currentPage - 1) * ITEMS_PER_PAGE
-          const end = start + ITEMS_PER_PAGE
-          const sliced = filtered.slice(start, end)
-          setProducts(sliced)
-    
-          setPageCache(new Map()) // clear cache
+          setProducts(filtered)
           setLoading(false)
           setError(null)
-        }, (error) => {
-          console.error("Error listening to products:", error)
+        } catch (error) {
+          console.error("Error fetching products:", error)
           setError("Failed to load sites. Please try again.")
           setLoading(false)
-        })
+        }
+      }, [userData?.company_id, searchQuery, contentTypeFilter])
     
-        return unsubscribe
-      }, [userData?.company_id, searchQuery, contentTypeFilter, currentPage])
+      // Fetch products when dependencies change
+      useEffect(() => {
+        fetchProducts(currentPage)
+      }, [currentPage, searchQuery, contentTypeFilter, userData?.company_id])
 
   // Pagination handlers
   const goToPage = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
+    if (page >= 1) {
       setCurrentPage(page)
       // Scroll to top when changing pages
       window.scrollTo({ top: 0, behavior: "smooth" })
     }
   }
 
-  const goToPreviousPage = () => goToPage(currentPage - 1)
-  const goToNextPage = () => goToPage(currentPage + 1)
-
-  // Generate page numbers for pagination
-  const getPageNumbers = () => {
-    const pageNumbers = []
-    const maxPagesToShow = 5
-
-    if (totalPages <= maxPagesToShow) {
-      // If we have 5 or fewer pages, show all of them
-      for (let i = 1; i <= totalPages; i++) {
-        pageNumbers.push(i)
-      }
-    } else {
-      // Always include first page
-      pageNumbers.push(1)
-
-      // Calculate start and end of page range around current page
-      let startPage = Math.max(2, currentPage - 1)
-      let endPage = Math.min(totalPages - 1, currentPage + 1)
-
-      // Adjust if we're near the beginning
-      if (currentPage <= 3) {
-        endPage = Math.min(totalPages - 1, 4)
-      }
-
-      // Adjust if we're near the end
-      if (currentPage >= totalPages - 2) {
-        startPage = Math.max(2, totalPages - 3)
-      }
-
-      // Add ellipsis if needed before the range
-      if (startPage > 2) {
-        pageNumbers.push("...")
-      }
-
-      // Add the range of pages
-      for (let i = startPage; i <= endPage; i++) {
-        pageNumbers.push(i)
-      }
-
-      // Add ellipsis if needed after the range
-      if (endPage < totalPages - 1) {
-        pageNumbers.push("...")
-      }
-
-      // Always include last page
-      pageNumbers.push(totalPages)
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      goToPage(currentPage - 1)
     }
-
-    return pageNumbers
   }
 
-  // Filter products based on contentTypeFilter prop
-  const filteredProducts = products.filter((product) => {
-    // Content type filter
-    if (contentTypeFilter !== "All") {
-      if (contentTypeFilter === "Static") return product.content_type === "Static" || product.content_type === "static"
-      else if (contentTypeFilter === "Dynamic")
-        return product.content_type === "Dynamic" || product.content_type === "dynamic"
+  const goToNextPage = () => {
+    if (hasNextPage) {
+      goToPage(currentPage + 1)
     }
-    return true
-  })
+  }
+
+
 
   // Convert product to site format for display
   const productToSite = (product: Product) => {
@@ -336,7 +303,7 @@ export default function AllSitesTab({
       )}
 
       {/* Empty State */}
-      {!loading && !error && filteredProducts.length === 0 && (
+      {!loading && !error && products.length === 0 && (
         <div className="bg-gray-50 border border-gray-200 border-dashed rounded-md p-8 text-center">
           <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <AlertCircle size={24} className="text-gray-400" />
@@ -355,11 +322,11 @@ export default function AllSitesTab({
         </div>
       )}
       {/* Site Display - Grid or List View */}
-      {!loading && !error && filteredProducts.length > 0 && (
+      {!loading && !error && products.length > 0 && (
         <>
           {viewMode === "grid" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <UnifiedSiteCard
                   key={product.id}
                   site={productToSite(product)}
@@ -375,7 +342,7 @@ export default function AllSitesTab({
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredProducts.map((product) => (
+              {products.map((product) => (
                 <UnifiedSiteListItem
                   key={product.id}
                   site={productToSite(product)}
@@ -393,11 +360,11 @@ export default function AllSitesTab({
 
 
       {/* Pagination Controls */}
-      {!loading && !error && filteredProducts.length > 0 && (
+      {!loading && !error && products.length > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
           <div className="text-sm text-gray-500 flex items-center">
             <span>
-              Page {currentPage} of {totalPages} ({totalItems} items)
+              Page {currentPage} ({products.length} items)
             </span>
           </div>
 
@@ -412,32 +379,23 @@ export default function AllSitesTab({
               <ChevronLeft size={16} />
             </Button>
 
-            {/* Page numbers */}
+            {/* Current page indicator */}
             <div className="flex items-center gap-1">
-              {getPageNumbers().map((page, index) =>
-                page === "..." ? (
-                  <span key={`ellipsis-${index}`} className="px-2">
-                    ...
-                  </span>
-                ) : (
-                  <Button
-                    key={`page-${page}`}
-                    variant={currentPage === page ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => goToPage(page as number)}
-                    className="h-8 w-8 p-0"
-                  >
-                    {page}
-                  </Button>
-                ),
-              )}
+              <Button
+                variant="default"
+                size="sm"
+                className="h-8 px-3"
+                disabled
+              >
+                {currentPage}
+              </Button>
             </div>
 
             <Button
               variant="outline"
               size="sm"
               onClick={goToNextPage}
-              disabled={currentPage >= totalPages}
+              disabled={!hasNextPage}
               className="h-8 w-8 p-0"
             >
               <ChevronRight size={16} />

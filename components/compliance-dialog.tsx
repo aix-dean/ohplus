@@ -111,12 +111,12 @@ export function ComplianceDialog({
     {
       key: "signedQuotation",
       name: "Signed Quotation",
-      status: acceptedItems.has("signedQuotation") ? "accepted" : declinedItems.has("signedQuotation") ? "declined" : (quotation?.signedQuotation?.status === "accepted" || quotation?.signedQuotation?.status === "completed") ? "accepted" : quotation?.signedQuotation?.status === "declined" ? "declined" : quotation?.signedQuotation?.fileUrl ? "uploaded" : "uploaded",
-      file: quotation?.signedQuotation?.fileName,
-      fileUrl: quotation?.signedQuotation?.fileUrl,
-      uploadedBy: quotation?.signedQuotation?.uploadedBy,
-      uploadedAt: quotation?.signedQuotation?.uploadedAt,
-      completed: quotation?.signedQuotation?.completed,
+      status: acceptedItems.has("signedQuotation") ? "accepted" : declinedItems.has("signedQuotation") ? "declined" : (compliance.signedQuotation?.status === "accepted" || compliance.signedQuotation?.status === "completed") ? "accepted" : compliance.signedQuotation?.status === "declined" ? "declined" : compliance.signedQuotation?.fileUrl ? "uploaded" : "uploaded",
+      file: compliance.signedQuotation?.fileName,
+      fileUrl: compliance.signedQuotation?.fileUrl,
+      uploadedBy: compliance.signedQuotation?.uploadedBy,
+      uploadedAt: compliance.signedQuotation?.uploadedAt,
+      completed: compliance.signedQuotation?.completed,
     },
   ]
 
@@ -285,17 +285,44 @@ export function ComplianceDialog({
                 const compliance = quotation?.projectCompliance?.[selectedItemKey]
                 const uploadedAt = compliance?.uploadedAt
                 if (uploadedAt) {
-                  const date = uploadedAt && typeof uploadedAt.toDate === 'function' ? uploadedAt.toDate() : new Date(uploadedAt)
-                  return (
-                    <>
-                      <p className="mb-0">
-                        <span className="font-bold">Date:</span> {format(date, "MMM d, yyyy")}
-                      </p>
-                      <p className="mb-0">
-                        <span className="font-bold">Time:</span> {date.toLocaleTimeString()} GMT
-                      </p>
-                    </>
-                  )
+                  let date: Date
+                  try {
+                    if (uploadedAt && typeof uploadedAt.toDate === 'function') {
+                      date = uploadedAt.toDate()
+                    } else if (uploadedAt instanceof Date) {
+                      date = uploadedAt
+                    } else if (typeof uploadedAt === 'string' || typeof uploadedAt === 'number') {
+                      date = new Date(uploadedAt)
+                    } else {
+                      throw new Error('Invalid date format')
+                    }
+                    // Validate the date
+                    if (isNaN(date.getTime())) {
+                      throw new Error('Invalid date')
+                    }
+                    return (
+                      <>
+                        <p className="mb-0">
+                          <span className="font-bold">Date:</span> {format(date, "MMM d, yyyy")}
+                        </p>
+                        <p className="mb-0">
+                          <span className="font-bold">Time:</span> {date.toLocaleTimeString()} GMT
+                        </p>
+                      </>
+                    )
+                  } catch (error) {
+                    console.error('Error formatting date:', error, uploadedAt)
+                    return (
+                      <>
+                        <p className="mb-0">
+                          <span className="font-bold">Date:</span> Invalid Date
+                        </p>
+                        <p className="mb-0">
+                          <span className="font-bold">Time:</span> Invalid Time
+                        </p>
+                      </>
+                    )
+                  }
                 }
                 return (
                   <>

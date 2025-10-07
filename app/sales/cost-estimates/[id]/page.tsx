@@ -41,8 +41,6 @@ import {
   Building,
   History,
 } from "lucide-react"
-import { getProposal } from "@/lib/proposal-service"
-import type { Proposal } from "@/lib/types/proposal"
 import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline"
 import { getProposalActivities } from "@/lib/proposal-activity-service"
 import type { ProposalActivity } from "@/lib/types/proposal-activity"
@@ -69,7 +67,7 @@ interface CompanyData {
   address?: any
   company_website?: string
   website?: string
-  photo_url?: string
+  logo?: string
   contact_person?: string
   email?: string
   phone?: string
@@ -170,7 +168,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [proposal, setProposal] = useState<Proposal | null>(null)
   const [activities, setActivities] = useState<ProposalActivity[]>([])
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false)
@@ -189,6 +186,10 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
   const [clientHistory, setClientHistory] = useState<CostEstimate[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [pdfPreviewDialogOpen, setPdfPreviewDialogOpen] = useState(false)
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<CostEstimate | null>(null)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  const [loadingPdfPreview, setLoadingPdfPreview] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -498,16 +499,33 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       // Remove the id field from update data as it's not needed for Firestore update
       const { id, ...updateDataWithoutId } = updatedCostEstimate
 
-      await updateCostEstimate(updatedCostEstimate.id, updateDataWithoutId)
+      // Clean the data to remove undefined values before sending to Firestore
+      const cleanData = (obj: any): any => {
+        if (obj === null || obj === undefined) return obj
+        if (typeof obj !== 'object') return obj
+        if (Array.isArray(obj)) return obj.map(cleanData)
+
+        const cleaned: any = {}
+        for (const [key, value] of Object.entries(obj)) {
+          if (value !== undefined) {
+            cleaned[key] = cleanData(value)
+          }
+        }
+        return cleaned
+      }
+
+      const cleanedUpdateData = cleanData(updateDataWithoutId)
+
+      await updateCostEstimate(updatedCostEstimate.id, cleanedUpdateData)
 
       // Generate new PDF after saving the cost estimate data
       console.log("[v0] Generating new PDF after saving changes")
 
       // Prepare logo data URL if company logo exists
       let logoDataUrl: string | null = null
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const logoResponse = await fetch(companyData.photo_url)
+          const logoResponse = await fetch(companyData.logo)
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             logoDataUrl = await new Promise<string>((resolve) => {
@@ -553,6 +571,21 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         title: "Success",
         description: `Changes saved successfully for ${currentSiteName}`,
       })
+
+      // Refresh data from server
+      const refreshedCostEstimate = await getCostEstimate(costEstimateId)
+      if (refreshedCostEstimate) {
+        setCostEstimate(refreshedCostEstimate)
+        setEditableCostEstimate(refreshedCostEstimate)
+        // Refresh related cost estimates if needed
+        if (refreshedCostEstimate.page_id) {
+          const relatedCEs = await getCostEstimatesByPageId(refreshedCostEstimate.page_id)
+          setRelatedCostEstimates(relatedCEs)
+          const currentIndex = relatedCEs.findIndex((rce) => rce.id === refreshedCostEstimate.id)
+          setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
+        }
+      }
+
       console.log("[v0] Save completed successfully for site:", currentSiteName)
       console.log("[v0] Updated cost estimate:", finalCostEstimate)
     } catch (error) {
@@ -630,7 +663,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           company_location: companyDataResult.company_location || companyDataResult.address,
           address: companyDataResult.address,
           company_website: companyDataResult.company_website || companyDataResult.website,
-          photo_url: companyDataResult.photo_url,
+          logo: companyDataResult.logo,
           contact_person: companyDataResult.contact_person,
           email: companyDataResult.email,
           phone: companyDataResult.phone,
@@ -694,10 +727,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             console.log("[v0] No page_id found for this cost estimate")
           }
 
-          if (ce.proposalId) {
-            const linkedProposal = await getProposal(ce.proposalId)
-            setProposal(linkedProposal)
-          }
           const ceActivities = await getProposalActivities(costEstimateId)
           setActivities(ceActivities)
 
@@ -1189,8 +1218,17 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           "Payment terms: One month advance and two months security deposit.",
           "Payment deadline: 7 days before rental start.",
         ],
-        greeting: costEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`
-      }) // Set default terms and greeting
+        greeting: costEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`,
+        unitPrice: costEstimate.lineItems.find(item => item.category.includes("Billboard Rental"))?.unitPrice,
+        durationDays: costEstimate.durationDays,
+        startDate: costEstimate.startDate,
+        endDate: costEstimate.endDate,
+        salutation: costEstimate.template?.salutation,
+        site_notes: costEstimate.items?.site_notes,
+        price_notes: costEstimate.items?.price_notes,
+        signature_position: costEstimate.signature_position,
+        closing_message: costEstimate.template?.closing_message,
+      }) // Set all current values to preserve edits
       setIsEditing(true)
     }
   }
@@ -1346,6 +1384,112 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const handlePageSelect = (pageIndex: number) => {
     const selectedCostEstimate = relatedCostEstimates[pageIndex]
     router.push(`/sales/cost-estimates/${selectedCostEstimate.id}`)
+  }
+
+  const handleHistoryItemClick = async (historyItem: CostEstimate) => {
+    setSelectedHistoryItem(historyItem)
+    setLoadingPdfPreview(true)
+    setPdfPreviewDialogOpen(true)
+
+    try {
+      // Check if cost estimate already has a PDF
+      if (historyItem.pdf && historyItem.pdf.trim() !== "") {
+        setPdfPreviewUrl(historyItem.pdf)
+      } else {
+        // If no PDF exists, generate one
+        // Prepare logo data URL if company logo exists
+        let logoDataUrl: string | null = null
+        if (companyData?.logo) {
+          try {
+            const logoResponse = await fetch(companyData.logo)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              logoDataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.readAsDataURL(logoBlob)
+              })
+            }
+          } catch (error) {
+            console.error('Error fetching company logo:', error)
+          }
+        }
+
+        // Prepare cost estimate data for API (convert dates to serializable format)
+        const serializableCostEstimate = {
+          ...historyItem,
+          createdAt: historyItem.createdAt?.toISOString ? historyItem.createdAt.toISOString() : historyItem.createdAt,
+          updatedAt: historyItem.updatedAt?.toISOString ? historyItem.updatedAt.toISOString() : historyItem.updatedAt,
+          startDate: historyItem.startDate?.toISOString ? historyItem.startDate.toISOString() : historyItem.startDate,
+          endDate: historyItem.endDate?.toISOString ? historyItem.endDate.toISOString() : historyItem.endDate,
+        }
+
+        // Call the generate-cost-estimate-pdf API
+        const response = await fetch('/api/generate-cost-estimate-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            costEstimate: serializableCostEstimate,
+            companyData,
+            logoDataUrl,
+            userData,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('API Error:', response.status, errorText)
+          throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+
+        // Save the generated PDF URL to the cost estimate
+        try {
+          const { pdfUrl } = await generateAndUploadCostEstimatePDF(historyItem, userData ? {
+            first_name: userData.first_name || undefined,
+            last_name: userData.last_name || undefined,
+            email: userData.email || undefined,
+            company_id: userData.company_id || undefined,
+          } : undefined, companyData ? {
+            name: companyData.name || "Company Name",
+            address: companyData.address,
+            phone: companyData.phone,
+            email: companyData.email,
+            website: companyData.website || companyData.company_website,
+          } : undefined)
+          await updateCostEstimate(historyItem.id, { pdf: pdfUrl })
+          console.log("PDF saved to cost estimate:", pdfUrl)
+        } catch (saveError) {
+          console.error("Error saving PDF to cost estimate:", saveError)
+          // Continue with preview even if save fails
+        }
+
+        setPdfPreviewUrl(url)
+      }
+    } catch (error) {
+      console.error("Error loading PDF preview:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load PDF preview",
+        variant: "destructive",
+      })
+      setPdfPreviewDialogOpen(false)
+    } finally {
+      setLoadingPdfPreview(false)
+    }
+  }
+
+  const handleClosePdfPreview = () => {
+    setPdfPreviewDialogOpen(false)
+    setSelectedHistoryItem(null)
+    if (pdfPreviewUrl) {
+      window.URL.revokeObjectURL(pdfPreviewUrl)
+      setPdfPreviewUrl(null)
+    }
   }
 
   const handleAddTerm = () => {
@@ -1506,7 +1650,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{adjustedTitle} - Cost Estimate</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{adjustedTitle} Cost Estimate</h1>
         </div>
 
         {/* Salutation */}
@@ -2019,9 +2163,9 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             <div id="cost-estimate-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
               <div className="text-left mb-8 ml-8">
                 <div className="flex items-center justify-start mb-6 pt-6">
-                  {companyData?.photo_url ? (
+                  {companyData?.logo ? (
                     <img
-                      src={companyData.photo_url || "/placeholder.svg"}
+                      src={companyData.logo || "/placeholder.svg"}
                       alt="Company Logo"
                       className="h-24 w-auto object-contain"
                     />
@@ -2044,29 +2188,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               ) : (
                 // Render single page for single site (original behavior)
                 renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
-              )}
-
-              {proposal && (
-                <div className="p-6 sm:p-8 border-t border-gray-200">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                    Linked Proposal
-                  </h2>
-                  <Card>
-                    <CardContent className="p-4">
-                      <p className="text-lg font-semibold">{proposal.title}</p>
-                      <p className="text-gray-600">
-                        Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
-                      </p>
-                      <Button
-                        variant="link"
-                        className="p-0 mt-2"
-                        onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
-                      >
-                        View Proposal
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
               )}
             </div>
           )}
@@ -2116,7 +2237,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                 {clientHistory.map((historyItem) => (
                   <div
                     key={historyItem.id}
-                    onClick={() => router.push(`/sales/cost-estimates/${historyItem.id}`)}
+                    onClick={() => handleHistoryItemClick(historyItem)}
                     className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <div className="text-sm font-medium text-gray-900 mb-1">
@@ -2227,12 +2348,12 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       ) : !isEditing ? (
-        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
               onClick={handleSendWithPDFGeneration}
               disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
-              className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
+              className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
             >
               {generatingPDFsForSend ? (
                 <>
@@ -2249,31 +2370,47 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
       {!isEditing && hasMultipleSites && relatedCostEstimates.length <= 1 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="flex items-center gap-4 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg opacity-90">
+          <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
               variant="outline"
               size="sm"
               onClick={handlePreviousProduct}
-              disabled={Object.keys(siteGroups).length <= 1}
-              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
+              disabled={currentProductIndex === 0}
+              className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
             >
               Previous
             </Button>
-            <div className="relative">
-              <span className="text-sm font-medium text-gray-700 px-4">
-                {currentProductIndex + 1} of {Object.keys(siteGroups).length}
-              </span>
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"></div>
+
+            <div className="px-4 py-2 bg-gray-100 text-gray-800 rounded-full font-medium text-sm">
+              {currentProductIndex + 1}/{Object.keys(siteGroups).length}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextProduct}
-              disabled={Object.keys(siteGroups).length <= 1}
-              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
-            >
-              Next
-            </Button>
+
+            {currentProductIndex === Object.keys(siteGroups).length - 1 ? (
+              <Button
+                onClick={handleSendWithPDFGeneration}
+                disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
+                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
+              >
+                {generatingPDFsForSend ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Preparing...
+                  </>
+                ) : (
+                  "Send"
+                )}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextProduct}
+                disabled={currentProductIndex === Object.keys(siteGroups).length - 1}
+                className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
+              >
+                Next
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -2521,6 +2658,45 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF Preview Dialog */}
+      <Dialog open={pdfPreviewDialogOpen} onOpenChange={handleClosePdfPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedHistoryItem ? `Cost Estimate ${selectedHistoryItem.costEstimateNumber || selectedHistoryItem.id?.slice(-8) || "N/A"}` : "PDF Preview"}
+            </DialogTitle>
+            <DialogDescription>
+              Preview of the cost estimate PDF
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-[600px]">
+            {loadingPdfPreview ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-600">Generating PDF preview...</p>
+                </div>
+              </div>
+            ) : pdfPreviewUrl ? (
+              <iframe
+                src={`${pdfPreviewUrl}#view=FitH&toolbar=0&navpanes=0`}
+                className="w-full h-full min-h-[600px] border-0"
+                title="PDF Preview"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-600">Failed to load PDF preview</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClosePdfPreview}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
