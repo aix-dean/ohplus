@@ -143,6 +143,8 @@ function createEmailTemplate(
 ): string {
   const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
 
+  
+
   const processedBody = body
     .split("\n")
     .map((line) => line.trim())
@@ -205,7 +207,9 @@ function createEmailTemplate(
             width: 220px;
             height: 220px;
             border-radius: 50%;
-            background: ${dominantColor ? shadeColor(dominantColor, 50) : '#764ba2'};
+background: ${dominantColor 
+  ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` 
+  : ''};
             opacity: 0.8;
             z-index: 1;
         }
@@ -218,7 +222,7 @@ function createEmailTemplate(
             padding: 0 10px;
         }
         .logo-cell {
-            width: 120px;
+            width: 100px;
             text-align: left;
         }
         .company-cell {
@@ -228,14 +232,14 @@ function createEmailTemplate(
             width: 120px;
         }
         .logo {
-            height: 60px;
+            height: 40px;
             width: auto;
             max-width: 300px;
             margin-bottom: 10px;
         }
         .company-name {
             color: #2c3e50;
-            font-size: 28px;
+            font-size: 20px;
             font-weight: bold;
             margin: 0;
             letter-spacing: 1px;
@@ -314,34 +318,46 @@ function createEmailTemplate(
             flex-direction: column;
             gap: 15px;
         }
+        .footer-logo-company-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 8px;
+        }
         .footer-logo {
             width: 40px;
             height: 40px;
             object-fit: contain;
-            margin-top: 12px;
+            flex-shrink: 0;
         }
         .footer-company-name {
             margin: 0;
             color: #2c3e50;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
             line-height: 1.2;
         }
         .sales-info {
-            margin-top: 0px;
+            margin: 0;
+            padding: 0;
         }
         .sales-name {
-            margin: 0 0 8px 0;
+            margin: 0;
+            padding: 0;
             font-size: 12px;
             font-weight: 600;
         }
         .sales-position {
-            margin: 0 0 5px 0;
+            margin: 0;
+            padding: 0;
             color: #6c757d;
             font-size: 11px;
+            font-weight: normal;
+            font-style: normal;
         }
         .sales-contact {
-            margin: 0 0 3px 0;
+            margin: 0;
+            padding: 0;
             color: #6c757d;
             font-size: 11px;
         }
@@ -371,8 +387,9 @@ function createEmailTemplate(
             width: 290px;
             height: 290px;
             border-radius: 50%;
-            background: ${dominantColor ? shadeColor(dominantColor, 50) : '#764ba2'};
-            opacity: 0.8;
+background: ${dominantColor 
+  ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` 
+  : ''};            opacity: 0.8;
             z-index: 1;
         }
         .signature {
@@ -460,6 +477,16 @@ function createEmailTemplate(
                 align-items: center !important;
                 text-align: center !important;
             }
+            .footer-logo-company-row {
+                flex-direction: column !important;
+                align-items: center !important;
+                text-align: center !important;
+                gap: 8px !important;
+            }
+            .footer-company-name {
+                font-size: 14px !important;
+                text-align: center !important;
+            }
         }
     </style>
 </head>
@@ -478,7 +505,7 @@ function createEmailTemplate(
                 </td>
                 <td class="company-cell">
                     <h1 class="company-name">${companyName || "Company"}</h1>
-                    ${companyAddress ? `<p class="company-address" style="margin: 5px 0 0 0; color: #34495e; font-size: 14px;">${companyAddress}</p>` : ''}
+                    ${companyAddress ? `<p class="company-address" style="margin: 5px 0 0 0; color: #34495e; font-size: 12px;">${companyAddress}</p>` : ''}
                 </td>
                 <td class="empty-cell">
                     <!-- Empty column -->
@@ -491,10 +518,9 @@ function createEmailTemplate(
             ${processedBody}
 
             <div class="cta-section">
-                <p style="margin-bottom: 20px; color: #6c757d;">Ready to move forward with your campaign?</p>
                 <a href="https://mrk.ohplus.ph/pr/${proposalId || ''}" class="cta-button">View</a>
             </div>
-
+<!--
             ${proposalPassword ? `
             <div class="highlight-box" style="border-left-color: ${dominantColor || '#667eea'} !important;">
                 <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🔐 Access Code</h4>
@@ -502,6 +528,7 @@ function createEmailTemplate(
                 <p style="margin: 10px 0 0 0; font-size: 14px; color: #6c757d;">Please use this code to access the proposal online.</p>
             </div>
             ` : ''}
+            -->
         </div>
         
         <div class="footer">
@@ -509,12 +536,15 @@ function createEmailTemplate(
                 <tr>
                     <td class="footer-left-column">
                         <div class="footer-left-content">
-                            ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
+                            <div class="footer-logo-company-row">
+                                ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
+                                <h3 class="footer-company-name">${companyName || "Company"}</h3>
+                            </div>
                             <div class="sales-info">
-                                <h4 class="sales-name" style="color: ${dominantColor || '#667eea'}; margin: 0 0 2px 0; font-size: 16px; font-weight: 600;">${userDisplayName || "Sales Executive"}</h4>
-                                <p class="sales-position" style="margin: 0 0 3px 0; color: #6c757d; font-size: 12px; font-weight: 500;">Sales Executive</p>
-                                ${replyTo ? `<p class="sales-contact" style="margin: 0 0 2px 0; color: #6c757d; font-size: 11px;">${replyTo}</p>` : ''}
-                                ${userPhoneNumber ? `<p class="sales-contact" style="margin: 0; color: #6c757d; font-size: 11px;">${userPhoneNumber}</p>` : ''}
+                                <h4 class="sales-name" style="color: #000000; margin: 0 0 0; font-size: 14px; font-weight: 600;">${userDisplayName || "Sales Executive"}</h4>
+                                <p class="sales-position" style="margin: 0; color: #030404ff; font-size: 11px;">Sales Executive</p>
+                                ${replyTo ? `<p class="sales-contact" style="margin: 0; color: #030404ff; font-size: 11px;">${replyTo}</p>` : ''}
+                                ${userPhoneNumber ? `<p class="sales-contact" style="margin: 0; color: #030404ff; font-size: 11px;">${userPhoneNumber}</p>` : ''}
                             </div>
                         </div>
                     </td>
@@ -635,8 +665,11 @@ export async function POST(request: NextRequest) {
             }
           }
           if (companyData?.photo_url && typeof companyData.photo_url === 'string') {
-            // Use the provided logo URL instead of database URL for consistency
-            actualCompanyLogo = 'https://firebasestorage.googleapis.com/v0/b/oh-app-bcf24.appspot.com/o/company_logos%2FmlQu3MEGrcdhWVEAJZPYBGSFLbx1%2F1753334275475_Login.png?alt=media&token=645590e5-6ca9-4783-9d90-6ace8f545495'
+            // Use Firebase photo_url as fallback only if no FormData logo provided
+            if (!actualCompanyLogo) {
+              actualCompanyLogo = companyData.photo_url
+              console.log("[v0] Using Firebase photo_url as company logo:", actualCompanyLogo)
+            }
           }
         } else {
           console.log("[v0] Company document not found for ID:", companyId)

@@ -249,7 +249,6 @@ function createEmailTemplate(
             </div>
 
             <div class="cta-section">
-                <p style="margin-bottom: 20px; color: #6c757d;">Ready to move forward with your campaign?</p>
                 <a href="mailto:${companyEmail}" class="cta-button">Get In Touch</a>
             </div>
         </div>
