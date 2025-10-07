@@ -1650,7 +1650,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{adjustedTitle} - Cost Estimate</h1>
+          <h1 className="text-xl font-bold text-gray-900 mb-4">{adjustedTitle} Cost Estimate</h1>
         </div>
 
         {/* Salutation */}
