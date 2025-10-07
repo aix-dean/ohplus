@@ -131,8 +131,8 @@ export async function POST(request: Request) {
       attributesToRetrieve = "saNumber,projectSiteId,projectSiteName,projectSiteLocation,serviceType,assignedTo,jobDescription,message,joNumber,requestedBy,status,coveredDateStart,coveredDateEnd,created,updated,company_id"
       attributesToHighlight = "saNumber,projectSiteName,serviceType"
     } else if (indexName === 'cost_estimates') {
-      attributesToRetrieve = "id,title,client,client_company,client_contact,client_email,client_phone,status,totalAmount,createdAt,company_id,lineItems,lineItemsCount"
-      attributesToHighlight = "title,client_company,client_contact"
+      attributesToRetrieve = "id,costEstimateNumber,title,client,client_company,client_contact,client_email,client_phone,status,totalAmount,createdAt,company_id,lineItems,lineItemsCount"
+      attributesToHighlight = "costEstimateNumber,title,client_company,client_contact"
     } else if (indexName === 'collectibles') {
       attributesToRetrieve = "id,invoice_number,invoice_id,contract_pdf_url,client,period,amount,due_date,booking,status,created,company_id"
       attributesToHighlight = "invoice_number,client.name,booking.reservation_id,booking.project_name"

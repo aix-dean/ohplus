@@ -65,9 +65,9 @@ export const generateQuotationPDF = async (quotation: Quotation, companyData?: a
 
   // Load company logo if available
   let logoDataUrl: string | null = null
-  if (companyData?.photo_url) {
+  if (companyData?.logo) {
     try {
-      const response = await fetch(companyData.photo_url)
+      const response = await fetch(companyData.logo)
       const blob = await response.blob()
       logoDataUrl = await new Promise<string>((resolve) => {
         const reader = new FileReader()
