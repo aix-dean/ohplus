@@ -877,23 +877,45 @@ export async function downloadProposalPDF(
       throw new Error("No proposal pages found")
     }
 
+    // Hardcoded to landscape orientation for all paper sizes
+    let pdfWidth = 297 // A4 landscape width in mm
+    let pdfHeight = 210 // A4 landscape height in mm
+
+    switch (selectedSize) {
+      case "A4":
+        pdfWidth = 297
+        pdfHeight = 210
+        break
+      case "Letter size":
+        pdfWidth = 279.4
+        pdfHeight = 215.9
+        break
+      case "Legal size":
+        pdfWidth = 355.6
+        pdfHeight = 215.9
+        break
+      default:
+        pdfWidth = 297
+        pdfHeight = 210
+    }
+
+    console.log(`Creating PDF with dimensions: ${pdfWidth}mm x ${pdfHeight}mm (Landscape)`)
     const pdf = new jsPDF({
-      orientation: selectedOrientation === "Landscape" ? "landscape" : "portrait",
+      orientation: 'landscape',
       unit: "mm",
-      format: selectedSize === "A4" ? "a4" : selectedSize === "Letter size" ? "letter" : "legal"
+      format: [pdfWidth, pdfHeight]
     })
+    console.log(`PDF page size: ${pdf.internal.pageSize.getWidth()}mm x ${pdf.internal.pageSize.getHeight()}mm`)
 
     for (let i = 0; i < pageContainers.length; i++) {
       const container = pageContainers[i] as HTMLElement
 
-      // Capture the page with html2canvas
+      // Capture the page with html2canvas at natural size
       const canvas = await html2canvas(container, {
         scale: 3, // Higher quality
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
-        width: container.offsetWidth,
-        height: container.offsetHeight,
         imageTimeout: 15000, // Increased timeout for images
         logging: false,
         onclone: async (clonedDoc) => {
@@ -904,20 +926,13 @@ export async function downloadProposalPDF(
 
       const imgData = canvas.toDataURL('image/jpeg', 0.7)
 
-      // Calculate dimensions to fit the page
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = canvas.width
-      const imgHeight = canvas.height
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
-      const imgX = (pdfWidth - imgWidth * ratio) / 2
-      const imgY = (pdfHeight - imgHeight * ratio) / 2
-
+      // Add the captured image to fill the entire PDF page
+      // The canvas is already scaled to match PDF dimensions
       if (i > 0) {
         pdf.addPage()
       }
 
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+      pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight())
     }
 
     // Save the PDF
@@ -953,23 +968,45 @@ export async function generateProposalPDFBlob(
     throw new Error("No proposal pages found")
   }
 
+  // Hardcoded to landscape orientation for all paper sizes
+  let pdfWidth = 297 // A4 landscape width in mm
+  let pdfHeight = 210 // A4 landscape height in mm
+
+  switch (selectedSize) {
+    case "A4":
+      pdfWidth = 297
+      pdfHeight = 210
+      break
+    case "Letter size":
+      pdfWidth = 279.4
+      pdfHeight = 215.9
+      break
+    case "Legal size":
+      pdfWidth = 355.6
+      pdfHeight = 215.9
+      break
+    default:
+      pdfWidth = 297
+      pdfHeight = 210
+  }
+
+  console.log(`Creating PDF blob with dimensions: ${pdfWidth}mm x ${pdfHeight}mm (Landscape)`)
   const pdf = new jsPDF({
-    orientation: selectedOrientation === "Landscape" ? "landscape" : "portrait",
+    orientation: 'landscape',
     unit: "mm",
-    format: selectedSize === "A4" ? "a4" : selectedSize === "Letter size" ? "letter" : "legal"
+    format: [pdfWidth, pdfHeight]
   })
+  console.log(`PDF blob page size: ${pdf.internal.pageSize.getWidth()}mm x ${pdf.internal.pageSize.getHeight()}mm`)
 
   for (let i = 0; i < pageContainers.length; i++) {
     const container = pageContainers[i] as HTMLElement
 
-    // Capture the page with html2canvas
+    // Capture the page with html2canvas at natural size
     const canvas = await html2canvas(container, {
       scale: 3, // Higher quality
       useCORS: true,
       allowTaint: false,
       backgroundColor: '#ffffff',
-      width: container.offsetWidth,
-      height: container.offsetHeight,
       imageTimeout: 15000, // Increased timeout for images
       logging: false,
       onclone: async (clonedDoc) => {
@@ -980,20 +1017,13 @@ export async function generateProposalPDFBlob(
 
       const imgData = canvas.toDataURL('image/jpeg', 0.7)
 
-    // Calculate dimensions to fit the page
-    const pdfWidth = pdf.internal.pageSize.getWidth()
-    const pdfHeight = pdf.internal.pageSize.getHeight()
-    const imgWidth = canvas.width
-    const imgHeight = canvas.height
-    const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
-    const imgX = (pdfWidth - imgWidth * ratio) / 2
-    const imgY = (pdfHeight - imgHeight * ratio) / 2
+      // Add the captured image to fill the entire PDF page
+      // The canvas is already scaled to match PDF dimensions
+      if (i > 0) {
+        pdf.addPage()
+      }
 
-    if (i > 0) {
-      pdf.addPage()
-    }
-
-    pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+      pdf.addImage(imgData, 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight())
   }
 
   // Generate blob instead of saving
@@ -1007,7 +1037,7 @@ export async function generateProposalPDFBlob(
 export async function generateAndUploadProposalPDF(
   proposal: Proposal,
   selectedSize: string = "A4",
-  selectedOrientation: string = "Portrait"
+  selectedOrientation: string = "Landscape"
 ): Promise<{ pdfUrl: string; password: string }> {
   try {
     // Generate the PDF blob
@@ -1079,3 +1109,4 @@ export async function getSentEmailsForProposal(proposalId: string, emailType: "p
     return []
   }
 }
+

@@ -2046,11 +2046,30 @@ function SalesDashboardContent() {
 
 {/* Right Column: Proposal History - Always show when in proposal mode or when copying sites */}
 {proposalCreationMode && (
-  <div className="flex flex-col gap-4 mt-24 h-[calc(100vh-120px)]">
-    <ProposalHistory
-      selectedClient={selectedClientForProposal}
-      onCopySites={handleCopySitesFromProposal}
-    />
+  <div className="w-full md:w-80 h-[60vh] bg-white rounded-[20px] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] print:hidden flex flex-col mt-[100px]">
+    <div className="p-6 pb-0">
+      <h3 className="text-lg font-semibold">
+        Proposal History
+        {selectedClientForProposal && (
+          <span className="text-sm font-normal text-gray-500 block">for {selectedClientForProposal.company}</span>
+        )}
+      </h3>
+    </div>
+    <div className="flex-1 overflow-y-auto">
+      <ProposalHistory
+        selectedClient={
+          selectedClientForProposal
+            ? {
+                id: selectedClientForProposal.id || "",
+                company: selectedClientForProposal.company,
+                contactPerson: selectedClientForProposal.contactPerson,
+              }
+            : null
+        }
+        onCopySites={handleCopySitesFromProposal}
+        showHeader={false}
+      />
+    </div>
   </div>
 )}
 
