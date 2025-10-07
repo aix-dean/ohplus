@@ -696,7 +696,16 @@ function CostEstimatesPageContent() {
                       <TableCell className="py-3">
                         <div className="text-sm text-gray-600">
                           {(() => {
-                            const date = costEstimate.createdAt instanceof Date ? costEstimate.createdAt : (costEstimate.createdAt && typeof costEstimate.createdAt.toDate === 'function' ? costEstimate.createdAt.toDate() : null);
+                            let date = null;
+                            if (costEstimate.createdAt instanceof Date) {
+                              date = costEstimate.createdAt;
+                            } else if (costEstimate.createdAt && typeof costEstimate.createdAt.toDate === 'function') {
+                              date = costEstimate.createdAt.toDate();
+                            } else if (typeof costEstimate.createdAt === 'string') {
+                              date = new Date(costEstimate.createdAt);
+                            } else if (typeof costEstimate.createdAt === 'number') {
+                              date = new Date(costEstimate.createdAt);
+                            }
                             if (!date || isNaN(date.getTime())) {
                               return "N/A";
                             }
