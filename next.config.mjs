@@ -11,7 +11,9 @@ const nextConfig = {
   },
   experimental: {
     optimizeCss: false,
+    esmExternals: true,
   },
+  transpilePackages: ['html2canvas', 'jspdf'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
