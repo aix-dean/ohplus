@@ -862,8 +862,8 @@ export async function downloadProposalPDF(
 ): Promise<void> {
   try {
     // Dynamic imports for client-side libraries
-    const html2canvas = (await import('html2canvas')).default
-    const jsPDF = (await import('jspdf')).default
+    const { default: html2canvas } = await import('html2canvas')
+    const { default: jsPDF } = await import('jspdf')
 
     toast({
       title: "Download",
@@ -943,8 +943,8 @@ export async function generateProposalPDFBlob(
   selectedOrientation: string
 ): Promise<{ blob: Blob; filename: string }> {
   // Dynamic imports for client-side libraries
-  const html2canvas = (await import('html2canvas')).default
-  const jsPDF = (await import('jspdf')).default
+  const { default: html2canvas } = await import('html2canvas')
+  const { default: jsPDF } = await import('jspdf')
 
   // Find all page containers
   const pageContainers = document.querySelectorAll('[class*="mx-auto bg-white shadow-lg"]')
