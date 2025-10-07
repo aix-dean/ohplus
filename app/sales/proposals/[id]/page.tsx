@@ -155,7 +155,7 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
   )
 }
 
-const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; onColorExtracted?: (color: string) => void; hasShadow?: boolean }> = ({ className, proposal, onColorExtracted, hasShadow = true }) => {
+const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; onColorExtracted?: (color: string) => void; hasShadow?: boolean; onLogoChange?: (logoUrl: string) => void }> = ({ className, proposal, onColorExtracted, hasShadow = true, onLogoChange }) => {
   const { userData } = useAuth()
   const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("")
@@ -259,17 +259,15 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; on
       const uploadPath = `companies/logos/${Date.now()}_${file.name}`
       const logoUrl = await uploadFileToFirebaseStorage(file, uploadPath)
 
-      const companyDocRef = doc(db, "companies", userData.company_id)
-      await updateDoc(companyDocRef, {
-        logo: logoUrl,
-      })
-
-      setCompanyLogo(logoUrl)
+      // Just update local state, don't save to database yet
+      if (onLogoChange) {
+        onLogoChange(logoUrl)
+      }
       setSelectedFile(null)
 
       toast({
-        title: "Success",
-        description: "Company logo uploaded successfully",
+        title: "Image Updated",
+        description: "Click 'Save' to confirm changes",
       })
     } catch (error) {
       console.error("Error uploading company logo:", error)
@@ -367,10 +365,11 @@ export default function ProposalDetailsPage() {
   const [showBackgroundTemplates, setShowBackgroundTemplates] = useState(false)
   const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
-  const [zoomLevel, setZoomLevel] = useState<number>(1)
+  const [zoomLevel, setZoomLevel] = useState<number>(0.85)
   const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
   const [printLoading, setPrintLoading] = useState(false)
   const [dominantColor, setDominantColor] = useState<string | null>(null)
+  const [originalDominantColor, setOriginalDominantColor] = useState<string | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>("")
   const [isAddSiteDialogOpen, setIsAddSiteDialogOpen] = useState(false)
@@ -390,6 +389,7 @@ export default function ProposalDetailsPage() {
   const [editableProducts, setEditableProducts] = useState<{ [key: string]: any }>({})
   const [savingEdit, setSavingEdit] = useState(false)
   const [editableLogo, setEditableLogo] = useState<string>("")
+  const [pendingSiteImages, setPendingSiteImages] = useState<{[productId: string]: string}>({})
   const [logoDimensions, setLogoDimensions] = useState({ width: 183, height: 110 })
   const [logoPosition, setLogoPosition] = useState({ left: 114, top: 175 })
   const [originalLogoDimensions, setOriginalLogoDimensions] = useState({ width: 183, height: 110 })
@@ -399,6 +399,7 @@ export default function ProposalDetailsPage() {
   const [logoStartPos, setLogoStartPos] = useState({ x: 0, y: 0 })
   const [logoStartDimensions, setLogoStartDimensions] = useState({ width: 183, height: 110 })
   const [logoStartPosition, setLogoStartPosition] = useState({ left: 114, top: 175 })
+  const [logoResizeDirection, setLogoResizeDirection] = useState<string>('')
 
   const fetchClients = async () => {
     if (!userData?.company_id) return
@@ -655,6 +656,22 @@ export default function ProposalDetailsPage() {
       }, 1000)
     }
   }, [proposal, loading])
+
+  // Extract color from editable logo when it changes
+  useEffect(() => {
+    if (editableLogo) {
+      Vibrant.from(editableLogo).getPalette().then(palette => {
+        const vibrant = palette.Vibrant
+        if (vibrant) {
+          const hex = vibrant.hex
+          setDominantColor(hex)
+        }
+      }).catch(error => {
+        console.error('Error extracting color from editable logo:', error)
+        setDominantColor('#f8c102')
+      })
+    }
+  }, [editableLogo])
 
   const fetchTemplates = async () => {
     if (!userData?.company_id) {
@@ -1084,8 +1101,32 @@ export default function ProposalDetailsPage() {
         preparedByName: editablePreparedByName,
         preparedByCompany: editablePreparedByCompany
       }
+
+      // Save company logo if changed
       if (editableLogo) {
         updateData.companyLogo = editableLogo
+        // Also update the company document
+        if (userData?.company_id) {
+          const companyDocRef = doc(db, "companies", userData.company_id)
+          await updateDoc(companyDocRef, {
+            logo: editableLogo,
+          })
+        }
+      }
+
+      // Save site images if changed
+      if (Object.keys(pendingSiteImages).length > 0) {
+        const finalProducts = updatedProducts.map(product => {
+          const pendingImageUrl = pendingSiteImages[product.id]
+          if (pendingImageUrl) {
+            return {
+              ...product,
+              media: [{ url: pendingImageUrl, isVideo: false }]
+            }
+          }
+          return product
+        })
+        updateData.products = finalProducts
       }
       await updateProposal(
         proposal.id,
@@ -1096,7 +1137,15 @@ export default function ProposalDetailsPage() {
 
       console.log("Update successful")
 
-      setProposal(prev => prev ? { ...prev, title: editableTitle, proposalTitle: editableProposalTitle, companyName: editableCompanyName, logoWidth: logoDimensions.width, logoHeight: logoDimensions.height, logoLeft: logoPosition.left, logoTop: logoPosition.top, client: updatedClient, products: updatedProducts, companyLogo: editableLogo || prev.companyLogo, preparedByName: editablePreparedByName, preparedByCompany: editablePreparedByCompany } : null)
+      setProposal(prev => prev ? { ...prev, title: editableTitle, proposalTitle: editableProposalTitle, companyName: editableCompanyName, logoWidth: logoDimensions.width, logoHeight: logoDimensions.height, logoLeft: logoPosition.left, logoTop: logoPosition.top, client: updatedClient, products: updateData.products || updatedProducts, companyLogo: editableLogo || prev.companyLogo, preparedByName: editablePreparedByName, preparedByCompany: editablePreparedByCompany } : null)
+
+      // Clear pending changes after successful save
+      setEditableLogo("")
+      setPendingSiteImages({})
+
+      // Reset cursor when exiting edit mode
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
       setIsEditMode(false)
       toast({
         title: "Success",
@@ -1124,6 +1173,11 @@ export default function ProposalDetailsPage() {
       // Entering edit mode - store original values
       setOriginalLogoDimensions({ ...logoDimensions })
       setOriginalLogoPosition({ ...logoPosition })
+      setOriginalDominantColor(dominantColor)
+    } else {
+      // Exiting edit mode - reset cursor
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
     }
     setIsEditMode(!isEditMode)
   }
@@ -1132,6 +1186,13 @@ export default function ProposalDetailsPage() {
     // Restore original logo dimensions and position
     setLogoDimensions({ ...originalLogoDimensions })
     setLogoPosition({ ...originalLogoPosition })
+    setDominantColor(originalDominantColor)
+    // Clear pending changes
+    setEditableLogo("")
+    setPendingSiteImages({})
+    // Reset cursor when exiting edit mode
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
     setIsEditMode(false)
   }
 
@@ -1533,19 +1594,35 @@ export default function ProposalDetailsPage() {
     }
   }
 
-  const handleLogoMouseDown = (e: React.MouseEvent) => {
+  const handleLogoMouseDown = (e: React.MouseEvent, resizeDirection?: string) => {
     if (!isEditMode) return
 
-    // Check if clicking on resize handle (bottom-right corner)
+    // Check if clicking on resize handle
     const rect = e.currentTarget.getBoundingClientRect()
-    const isOnResizeHandle = e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20
+    const isOnResizeHandle = resizeDirection || (
+      e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20
+    )
 
     if (isOnResizeHandle) {
       // Resize mode
       setIsResizingLogo(true)
+      setLogoResizeDirection(resizeDirection || 'se')
       setLogoStartPos({ x: e.clientX, y: e.clientY })
       setLogoStartDimensions({ ...logoDimensions })
-      document.body.style.cursor = 'nw-resize'
+      setLogoStartPosition({ ...logoPosition })
+
+      // Set cursor based on resize direction
+      const cursorMap: { [key: string]: string } = {
+        'nw': 'nw-resize',
+        'ne': 'ne-resize',
+        'sw': 'sw-resize',
+        'se': 'se-resize',
+        'n': 'n-resize',
+        's': 's-resize',
+        'w': 'w-resize',
+        'e': 'e-resize'
+      }
+      document.body.style.cursor = cursorMap[resizeDirection || 'se'] || 'nw-resize'
     } else {
       // Drag mode
       setIsDraggingLogo(true)
@@ -1562,10 +1639,50 @@ export default function ProposalDetailsPage() {
       const deltaX = e.clientX - logoStartPos.x
       const deltaY = e.clientY - logoStartPos.y
 
-      const newWidth = Math.max(50, logoStartDimensions.width + deltaX)
-      const newHeight = Math.max(30, logoStartDimensions.height + deltaY)
+      let newWidth = logoStartDimensions.width
+      let newHeight = logoStartDimensions.height
+      let newLeft = logoStartPosition.left
+      let newTop = logoStartPosition.top
+
+      switch (logoResizeDirection) {
+        case 'nw': // Top-left
+          newWidth = Math.max(50, logoStartDimensions.width - deltaX)
+          newHeight = Math.max(30, logoStartDimensions.height - deltaY)
+          newLeft = logoStartPosition.left + (logoStartDimensions.width - newWidth)
+          newTop = logoStartPosition.top + (logoStartDimensions.height - newHeight)
+          break
+        case 'ne': // Top-right
+          newWidth = Math.max(50, logoStartDimensions.width + deltaX)
+          newHeight = Math.max(30, logoStartDimensions.height - deltaY)
+          newTop = logoStartPosition.top + (logoStartDimensions.height - newHeight)
+          break
+        case 'sw': // Bottom-left
+          newWidth = Math.max(50, logoStartDimensions.width - deltaX)
+          newHeight = Math.max(30, logoStartDimensions.height + deltaY)
+          newLeft = logoStartPosition.left + (logoStartDimensions.width - newWidth)
+          break
+        case 'se': // Bottom-right
+          newWidth = Math.max(50, logoStartDimensions.width + deltaX)
+          newHeight = Math.max(30, logoStartDimensions.height + deltaY)
+          break
+        case 'n': // Top edge
+          newHeight = Math.max(30, logoStartDimensions.height - deltaY)
+          newTop = logoStartPosition.top + (logoStartDimensions.height - newHeight)
+          break
+        case 's': // Bottom edge
+          newHeight = Math.max(30, logoStartDimensions.height + deltaY)
+          break
+        case 'w': // Left edge
+          newWidth = Math.max(50, logoStartDimensions.width - deltaX)
+          newLeft = logoStartPosition.left + (logoStartDimensions.width - newWidth)
+          break
+        case 'e': // Right edge
+          newWidth = Math.max(50, logoStartDimensions.width + deltaX)
+          break
+      }
 
       setLogoDimensions({ width: newWidth, height: newHeight })
+      setLogoPosition({ left: newLeft, top: newTop })
     } else if (isDraggingLogo) {
       const deltaX = e.clientX - logoStartPos.x
       const deltaY = e.clientY - logoStartPos.y
@@ -1573,23 +1690,21 @@ export default function ProposalDetailsPage() {
       const newLeft = logoStartPosition.left + deltaX
       const newTop = logoStartPosition.top + deltaY
 
-      // Keep logo within reasonable bounds (page area)
-      const constrainedLeft = Math.max(0, Math.min(newLeft, 600)) // Adjust max based on page width
-      const constrainedTop = Math.max(0, Math.min(newTop, 400)) // Adjust max based on page height
-
-      setLogoPosition({ left: constrainedLeft, top: constrainedTop })
+      // Allow free movement anywhere on the page
+      setLogoPosition({ left: newLeft, top: newTop })
     }
   }
 
   const handleLogoMouseUp = () => {
     setIsResizingLogo(false)
     setIsDraggingLogo(false)
+    setLogoResizeDirection('')
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
   }
 
   useEffect(() => {
-    if (isResizingLogo) {
+    if (isResizingLogo || isDraggingLogo) {
       document.addEventListener('mousemove', handleLogoMouseMove)
       document.addEventListener('mouseup', handleLogoMouseUp)
       return () => {
@@ -1597,7 +1712,7 @@ export default function ProposalDetailsPage() {
         document.removeEventListener('mouseup', handleLogoMouseUp)
       }
     }
-  }, [isResizingLogo, logoStartPos, logoStartDimensions])
+  }, [isResizingLogo, isDraggingLogo, logoStartPos, logoStartDimensions, logoStartPosition])
 
   if (loading) {
     return (
@@ -1631,32 +1746,32 @@ export default function ProposalDetailsPage() {
   const getPageContainerClass = (size: string, orientation: string) => {
     const baseStyles = "mx-auto bg-white shadow-lg print:shadow-none print:mx-0 print:my-0 relative overflow-hidden"
 
-    // Size-based dimensions with orientation support and responsiveness
+    // Size-based dimensions with orientation support and responsiveness - adjusted sizes
     let sizeStyles = ""
     switch (size) {
       case "A4":
         if (orientation === "Landscape") {
-          sizeStyles = "w-full md:w-[297mm] min-h-[400px] md:min-h-[210mm]" // A4 Landscape
+          sizeStyles = "w-full md:w-[280mm] min-h-[350px] md:min-h-[180mm]" // A4 Landscape - adjusted
         } else {
-          sizeStyles = "w-full md:w-[210mm] min-h-[600px] md:min-h-[297mm]" // A4 Portrait
+          sizeStyles = "w-full md:w-[200mm] min-h-[500px] md:min-h-[240mm]" // A4 Portrait - adjusted
         }
         break
       case "Letter size":
         if (orientation === "Landscape") {
-          sizeStyles = "w-full md:w-[11in] min-h-[400px] md:min-h-[8.5in]" // Letter Landscape
+          sizeStyles = "w-full md:w-[10in] min-h-[350px] md:min-h-[7in]" // Letter Landscape - adjusted
         } else {
-          sizeStyles = "w-full md:w-[8.5in] min-h-[600px] md:min-h-[11in]" // Letter Portrait
+          sizeStyles = "w-full md:w-[8in] min-h-[500px] md:min-h-[9in]" // Letter Portrait - adjusted
         }
         break
       case "Legal size":
         if (orientation === "Landscape") {
-          sizeStyles = "w-full md:w-[14in] min-h-[400px] md:min-h-[8.5in]" // Legal Landscape
+          sizeStyles = "w-full md:w-[12in] min-h-[350px] md:min-h-[7in]" // Legal Landscape - adjusted
         } else {
-          sizeStyles = "w-full md:w-[8.5in] min-h-[600px] md:min-h-[14in]" // Legal Portrait
+          sizeStyles = "w-full md:w-[8in] min-h-[500px] md:min-h-[10in]" // Legal Portrait - adjusted
         }
         break
       default:
-        sizeStyles = "w-full max-w-4xl min-h-[600px]"
+        sizeStyles = "w-full max-w-4xl min-h-[500px]" // Adjusted max-width and height
     }
 
 
@@ -1674,44 +1789,44 @@ export default function ProposalDetailsPage() {
     return (
       <div className="relative w-full h-full bg-white">
         {/* Header */}
-        <div className="absolute top-0 left-0 w-[800px] h-[80px] rounded-tr-[50px] rounded-br-[50px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
         {/* Header Right */}
-        <div className="absolute top-0 left-0 w-[1500px] h-[80px] rounded-tl-[50px] rounded-tr-[50px] rounded-br-[50px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
-        {/* Background borders and accents */}
+        <div className="absolute top-0 left-0 w-[1310px] h-[70px] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+        {/* Background borders and accents - scaled */}
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-0 w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="bg-white h-[1001px] w-[774px]" />
+            <div className="bg-white h-[857px] w-[675px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[540px] top-[2px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-[473px] top-[2px] w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="h-[461px] w-[79px]" />
+            <div className="h-[393px] w-[69px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[695px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[594px] w-[0px]">
           <div className="flex-none rotate-[90deg]">
-            <div className="h-[461px] w-[79px]" />
+            <div className="h-[393px] w-[69px]" />
           </div>
         </div>
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-[2px] w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="h-[763px] rounded-bl-[50px] rounded-br-[50px] w-[79px]" />
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[238px] top-[695px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-[208px] top-[594px] w-[0px]">
           <div className="flex-none rotate-[90deg]">
-            <div className="h-[763px] rounded-bl-[50px] rounded-br-[50px] w-[79px]" />
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
           </div>
         </div>
 
         {/* Company Logo */}
         <div
-          className="absolute border-2 border-transparent hover:border-blue-400 transition-colors"
+          className={`absolute border-2 transition-colors ${isEditMode ? 'border-[#c4c4c4] border-dashed' : 'border-transparent'}`}
           style={{
-            left: logoPosition.left,
-            top: logoPosition.top,
-            width: logoDimensions.width,
-            height: logoDimensions.height
+            left: logoPosition.left * 0.875,
+            top: logoPosition.top * 0.857,
+            width: logoDimensions.width * 0.875,
+            height: logoDimensions.height * 0.857
           }}
           onMouseDown={handleLogoMouseDown}
         >
@@ -1719,7 +1834,7 @@ export default function ProposalDetailsPage() {
             {editableLogo ? (
               <img src={editableLogo} alt="Proposal logo" className="h-full w-full object-contain" />
             ) : (
-              <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} hasShadow={false} />
+              <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} hasShadow={false} onLogoChange={setEditableLogo} />
             )}
             {isEditMode && (
               <>
@@ -1749,22 +1864,59 @@ export default function ProposalDetailsPage() {
                   className="hidden"
                   id="proposal-logo"
                 />
-                <label htmlFor="proposal-logo" className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-30 transition-all rounded-lg">
-                  <div className="opacity-0 hover:opacity-100 text-white text-center">
-                    <Upload className="h-8 w-8 mx-auto mb-2" />
-                    <p className="text-sm">Change Logo</p>
-                  </div>
+                <label htmlFor="proposal-logo" className="absolute top-1 right-1 w-6 h-6 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center cursor-pointer transition-colors shadow-lg">
+                  <Upload className="h-3 w-3 text-white" />
                 </label>
-                {/* Resize Handle */}
+                {/* Resize Handles - Small dots */}
+                {/* Top-left corner */}
                 <div
-                  className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 cursor-nw-resize rounded-tl-md opacity-70 hover:opacity-100 transition-opacity"
-                  onMouseDown={handleLogoMouseDown}
+                  className="absolute top-0 left-0 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-nw-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'nw')}
                   title="Drag to resize logo"
-                >
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-2 h-2 border-r-2 border-b-2 border-white transform rotate-45"></div>
-                  </div>
-                </div>
+                />
+                {/* Top-right corner */}
+                <div
+                  className="absolute top-0 right-0 w-3 h-3 translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-ne-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'ne')}
+                  title="Drag to resize logo"
+                />
+                {/* Bottom-left corner */}
+                <div
+                  className="absolute bottom-0 left-0 w-3 h-3 -translate-x-1/2 translate-y-1/2 bg-blue-500 cursor-sw-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'sw')}
+                  title="Drag to resize logo"
+                />
+                {/* Bottom-right corner */}
+                <div
+                  className="absolute bottom-0 right-0 w-3 h-3 translate-x-1/2 translate-y-1/2 bg-blue-500 cursor-se-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'se')}
+                  title="Drag to resize logo"
+                />
+                {/* Middle edges */}
+                {/* Top edge */}
+                <div
+                  className="absolute top-0 left-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-n-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'n')}
+                  title="Drag to resize logo"
+                />
+                {/* Bottom edge */}
+                <div
+                  className="absolute bottom-0 left-1/2 w-3 h-3 -translate-x-1/2 translate-y-1/2 bg-blue-500 cursor-s-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 's')}
+                  title="Drag to resize logo"
+                />
+                {/* Left edge */}
+                <div
+                  className="absolute left-0 top-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-w-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'w')}
+                  title="Drag to resize logo"
+                />
+                {/* Right edge */}
+                <div
+                  className="absolute right-0 top-1/2 w-3 h-3 translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-e-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'e')}
+                  title="Drag to resize logo"
+                />
               </>
             )}
           </div>
@@ -1775,11 +1927,11 @@ export default function ProposalDetailsPage() {
           <input
             value={editableProposalTitle}
             onChange={(e) => setEditableProposalTitle(e.target.value)}
-            className="absolute font-bold text-[#333333] text-[80px] leading-none left-[114px] top-[331px] min-w-[300px] max-w-[800px] w-auto bg-yellow-50 border-2 border-yellow-400 rounded px-2 outline-none whitespace-nowrap"
-            style={{ width: `${Math.max(300, (editableProposalTitle.length * 45) + 40)}px` }}
+            className="absolute font-bold text-[#333333] text-[70px] leading-none left-[100px] top-[284px] min-w-[262px] max-w-[700px] w-auto border-2 border-[#c4c4c4] border-dashed rounded px-2 outline-none whitespace-nowrap"
+            style={{ width: `${Math.max(262, (editableProposalTitle.length * 39) + 35)}px` }}
           />
         ) : (
-          <p className="absolute font-bold text-[#333333] text-[80px] leading-none left-[114px] top-[331px] whitespace-nowrap">
+          <p className="absolute font-bold text-[#333333] text-[70px] leading-none left-[100px] top-[284px] whitespace-nowrap">
             {proposal?.proposalTitle || 'Site Proposals'}
           </p>
         )}
@@ -1789,40 +1941,40 @@ export default function ProposalDetailsPage() {
           <input
             value={editableCompanyName}
             onChange={(e) => setEditableCompanyName(e.target.value)}
-            className="absolute font-semibold text-[#333333] text-[20px] leading-none left-[114px] top-[285px] w-[333px] bg-yellow-50 border-2 border-yellow-400 rounded px-2 outline-none"
+            className="absolute font-semibold text-[#333333] text-[18px] leading-none left-[100px] top-[243px] w-[291px] border-2 border-[#c4c4c4] border-dashed rounded px-2 outline-none"
           />
         ) : (
-          <p className="absolute font-semibold text-[#333333] text-[20px] leading-none left-[114px] top-[285px] w-[333px]">
+          <p className="absolute font-semibold text-[#333333] text-[18px] leading-none left-[100px] top-[243px] w-[291px]">
             {proposal?.companyName || 'Company Name'}
           </p>
         )}
 
         {/* Date */}
-        <p className="absolute font-normal text-[#333333] text-[20px] text-right top-[104px] right-[32px] w-[219px]">
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[89px] right-[28px] w-[191px]">
           {formattedDate}
         </p>
 
         {/* Page Number */}
-        <p className="absolute font-normal text-[#333333] text-[20px] text-right top-[650px] right-[32px] w-[59px]">
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[558px] right-[28px] w-[51px]">
           {pageNumber}/{totalPages}
         </p>
 
         {/* Prepared For */}
         {isEditMode ? (
-          <div className="absolute text-[#333333] text-[20px] left-[114px] top-[451px] w-[737px] leading-[1.2]">
+          <div className="absolute text-[#333333] text-[18px] left-[100px] top-[386px] w-[645px] leading-[1.2]">
             <p className="font-bold mb-0">Prepared for:</p>
             <input
               value={editableClientContact}
               onChange={(e) => setEditableClientContact(e.target.value)}
-              className="bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none"
+              className="border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none"
             /> - <input
               value={editableClientCompany}
               onChange={(e) => setEditableClientCompany(e.target.value)}
-              className="bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none"
+              className="border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none"
             />
           </div>
         ) : (
-          <div className="absolute text-[#333333] text-[20px] left-[114px] top-[451px] w-[737px] leading-[1.2]">
+          <div className="absolute text-[#333333] text-[18px] left-[100px] top-[386px] w-[645px] leading-[1.2]">
             <p className="font-bold mb-0">Prepared for:</p>
             <p>{proposal?.client.contactPerson} - {proposal?.client.company}</p>
           </div>
@@ -1830,33 +1982,37 @@ export default function ProposalDetailsPage() {
 
         {/* Prepared By */}
         {isEditMode ? (
-          <div className="absolute font-bold text-[#333333] text-[20px] left-[114px] top-[508px] w-[785px] leading-[1.2]">
+          <div className="absolute font-bold text-[#333333] text-[18px] left-[100px] top-[434px] w-[688px] leading-[1.2]">
             <p className="mb-0">Prepared By:</p>
             <input
               value={editablePreparedByName}
               onChange={(e) => setEditablePreparedByName(e.target.value)}
-              className="font-normal bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none"
+              className="font-normal border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none"
             /> - <input
               value={editablePreparedByCompany}
               onChange={(e) => setEditablePreparedByCompany(e.target.value)}
-              className="font-normal bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none"
+              className="font-normal border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none"
             />
           </div>
         ) : (
-          <div className="absolute font-bold text-[#333333] text-[20px] left-[114px] top-[508px] w-[785px] leading-[1.2]">
+          <div className="absolute font-bold text-[#333333] text-[18px] left-[100px] top-[434px] w-[688px] leading-[1.2]">
             <p className="mb-0">Prepared By:</p>
             <p className="font-normal">{proposal?.preparedByName || `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim()} - {proposal?.preparedByCompany || proposal?.companyName}</p>
           </div>
         )}
 
         {/* Bottom Logo */}
-        <div className="absolute h-[46px] left-[32px] top-[730px] w-[77px] z-20">
-          <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
+        <div className="absolute h-[40px] left-[28px] top-[626px] w-[67px] z-20">
+          {editableLogo ? (
+            <img src={editableLogo} alt="Proposal logo" className="h-full w-full object-contain" />
+          ) : (
+            <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
+          )}
         </div>
         {/* Footer */}
-        <div className="absolute top-[714px] right-0 w-[800px] h-[80px] rounded-tl-[50px] rounded-bl-[50px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-[610px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
         {/* Footer Right */}
-        <div className="absolute top-[714px] right-0 w-[1500px] h-[80px] rounded-tl-[50px] rounded-tl-[50px] rounded-br-[50px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+        <div className="absolute top-[610px] right-0 w-[1310px] h-[70px] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
       </div>
     )
   }
@@ -1878,39 +2034,39 @@ export default function ProposalDetailsPage() {
 
     return (
       <div className="relative w-full h-full bg-white">
-        {/* Header - same as intro page */}
-        <div className="absolute top-0 left-0 w-[800px] h-[80px] rounded-tr-[50px] rounded-br-[50px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-0 left-0 w-[1500px] h-[80px] bg-[rgba(248,193,2,0.5)] rounded-tl-[50px] rounded-tr-[50px] rounded-br-[50px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+        {/* Header - scaled */}
+        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-0 left-0 w-[1310px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
 
-        {/* Background borders and accents - same as intro page */}
+        {/* Background borders and accents - scaled */}
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-0 w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="bg-white h-[1001px] w-[774px]" />
+            <div className="bg-white h-[857px] w-[675px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[540px] top-[2px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-[473px] top-[2px] w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="h-[461px] w-[79px]" />
+            <div className="h-[393px] w-[69px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[695px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[594px] w-[0px]">
           <div className="flex-none rotate-[90deg]">
-            <div className="h-[461px] w-[79px]" />
+            <div className="h-[393px] w-[69px]" />
           </div>
         </div>
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-[2px] w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="h-[763px] rounded-bl-[50px] rounded-br-[50px] w-[79px]" />
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[238px] top-[695px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-[208px] top-[594px] w-[0px]">
           <div className="flex-none rotate-[90deg]">
-            <div className="h-[763px] rounded-bl-[50px] rounded-br-[50px] w-[79px]" />
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
           </div>
         </div>
 
-        {/* Date - same as intro page */}
-        <p className="absolute font-normal text-[#333333] text-[20px] text-right top-[104px] right-[32px] w-[219px]">
+        {/* Date - scaled */}
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[89px] right-[28px] w-[191px]">
           {proposal?.createdAt ? new Date(proposal.createdAt).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
@@ -1919,35 +2075,91 @@ export default function ProposalDetailsPage() {
         </p>
 
         {/* Page Number */}
-        <p className="absolute font-normal text-[#333333] text-[20px] text-right top-[650px] right-[32px] w-[59px]">
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[558px] right-[28px] w-[51px]">
           {pageNumber}/{totalPages}
         </p>
 
-        {/* Main Image - Top Left */}
-        <div className="absolute left-0 top-[81px] w-[372px] h-[372px] overflow-hidden">
-          {product.media && product.media.length > 0 ? (
-            product.media[0].isVideo ? (
-              <video
-                src={product.media[0].url}
-                className="w-full h-full object-cover"
-                controls
+        {/* Main Image - Top Left - scaled */}
+        <div className="absolute left-0 top-[70px] w-[324px] h-[324px] overflow-hidden">
+          {(() => {
+            const pendingImageUrl = pendingSiteImages[product.id]
+            const currentImageUrl = pendingImageUrl || (product.media && product.media.length > 0 ? product.media[0].url : null)
+
+            if (currentImageUrl) {
+              return product.media && product.media.length > 0 && product.media[0].isVideo && !pendingImageUrl ? (
+                <video
+                  src={currentImageUrl}
+                  className="w-full h-full object-cover"
+                  controls
+                />
+              ) : (
+                <img
+                  src={currentImageUrl}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+              )
+            } else {
+              return (
+                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                  <span className="text-gray-500">No image available</span>
+                </div>
+              )
+            }
+          })()}
+          {isEditMode && (
+            <>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    const uploadSiteImage = async () => {
+                      try {
+                        const uploadPath = `proposals/sites/${Date.now()}_${file.name}`
+                        const imageUrl = await uploadFileToFirebaseStorage(file, uploadPath)
+
+                        // Just update local state, don't save to database yet
+                        setPendingSiteImages(prev => ({
+                          ...prev,
+                          [product.id]: imageUrl
+                        }))
+
+                        toast({
+                          title: "Image Updated",
+                          description: "Click 'Save' to confirm changes",
+                        })
+                      } catch (error) {
+                        console.error("Error uploading site image:", error)
+                        toast({
+                          title: "Error",
+                          description: "Failed to upload site image",
+                          variant: "destructive",
+                        })
+                      }
+                    }
+                    uploadSiteImage()
+                  }
+                }}
+                className="hidden"
+                id={`site-image-${product.id}`}
               />
-            ) : (
-              <img
-                src={product.media[0].url}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
-            )
-          ) : (
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-              <span className="text-gray-500">No image available</span>
-            </div>
+              <label
+                htmlFor={`site-image-${product.id}`}
+                className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-30 transition-all rounded-lg group"
+              >
+                <div className="opacity-0 group-hover:opacity-100 text-white text-center transition-opacity">
+                  <Upload className="h-8 w-8 mx-auto mb-2" />
+                  <p className="text-sm">Change Image</p>
+                </div>
+              </label>
+            </>
           )}
         </div>
 
-        {/* Google Map - Bottom Left */}
-        <div className="absolute left-0 top-[453px] w-[372px] h-[260px] overflow-hidden">
+        {/* Google Map - Bottom Left - scaled */}
+        <div className="absolute left-0 top-[386px] w-[324px] h-[226px] overflow-hidden">
           {product.location ? (
             <GoogleMap location={product.location} className="w-full h-full" />
           ) : (
@@ -1957,15 +2169,15 @@ export default function ProposalDetailsPage() {
           )}
         </div>
 
-        {/* Site Details - Right Side */}
-        <div className="absolute font-bold text-[#333333] text-[20px] left-[409px] top-[200px] w-[495.663px] leading-[1.2]">
+        {/* Site Details - Right Side - scaled */}
+        <div className="absolute font-bold text-[#333333] text-[18px] left-[358px] top-[171px] w-[434px] leading-[1.2]">
           {/* Site Name */}
-          <div className="mb-2 text-[40px]">
+          <div className="mb-2 text-[35px]">
             {isEditMode ? (
               <input
                 value={editableProducts[product.id]?.name || product.name}
                 onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], name: e.target.value } }))}
-                className="mb-0 bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none w-full"
+                className="mb-0 border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
               />
             ) : (
               <p className="mb-0">{product.name}</p>
@@ -1980,10 +2192,10 @@ export default function ProposalDetailsPage() {
                 <input
                   value={editableProducts[product.id]?.location || product.location || 'N/A'}
                   onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: e.target.value } }))}
-                  className="font-normal text-[20px] bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none w-full"
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                 />
               ) : (
-                <p className="font-normal text-[20px]">{product.location || 'N/A'}</p>
+                <p className="font-normal text-[18px]">{product.location || 'N/A'}</p>
               )}
             </div>
 
@@ -1994,10 +2206,10 @@ export default function ProposalDetailsPage() {
                 <input
                   value={editableProducts[product.id]?.dimension || ''}
                   onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], dimension: e.target.value } }))}
-                  className="font-normal text-[20px] mb-0 bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none w-full"
+                  className="font-normal text-[18px] mb-0 border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                 />
               ) : (
-                <p className="font-normal text-[20px] mb-0">
+                <p className="font-normal text-[18px] mb-0">
                   {product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}
                   {product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}
                   {product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}
@@ -2013,10 +2225,10 @@ export default function ProposalDetailsPage() {
                 <input
                   value={editableProducts[product.id]?.type || ''}
                   onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], type: e.target.value } }))}
-                  className="font-normal text-[20px] bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none w-full"
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                 />
               ) : (
-                <p className="font-normal text-[20px]">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
+                <p className="font-normal text-[18px]">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
               )}
             </div>
 
@@ -2027,10 +2239,10 @@ export default function ProposalDetailsPage() {
                 <input
                   value={editableProducts[product.id]?.traffic || ''}
                   onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], traffic: e.target.value } }))}
-                  className="font-normal text-[20px] bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none w-full"
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                 />
               ) : (
-                <p className="font-normal text-[20px]">
+                <p className="font-normal text-[18px]">
                   {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
                 </p>
               )}
@@ -2043,10 +2255,10 @@ export default function ProposalDetailsPage() {
                 <input
                   value={editableProducts[product.id]?.srp || ''}
                   onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
-                  className="font-normal text-[20px] bg-yellow-50 border-2 border-yellow-400 rounded px-1 outline-none w-full"
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                 />
               ) : (
-                <p className="font-normal text-[20px]">
+                <p className="font-normal text-[18px]">
                   {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
                 </p>
               )}
@@ -2055,13 +2267,17 @@ export default function ProposalDetailsPage() {
         </div>
 
         {/* Bottom Logo */}
-        <div className="absolute h-[46px] left-[32px] top-[730px] w-[77px] z-20">
-          <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
+        <div className="absolute h-[40px] left-[28px] top-[626px] w-[67px] z-20">
+          {editableLogo ? (
+            <img src={editableLogo} alt="Proposal logo" className="h-full w-full object-contain" />
+          ) : (
+            <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
+          )}
         </div>
 
-        {/* Footer - same as intro page */}
-        <div className="absolute top-[714px] right-0 w-[800px] h-[80px] rounded-tl-[50px] rounded-bl-[50px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-[714px] right-0 w-[1500px] h-[80px] bg-[rgba(248,193,2,0.5)] rounded-tl-[50px] rounded-tl-[50px] rounded-br-[50px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+        {/* Footer - scaled */}
+        <div className="absolute top-[610px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-[610px] right-0 w-[1310px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
       </div>
     )
   }
@@ -2080,12 +2296,12 @@ export default function ProposalDetailsPage() {
       </div>
 
       {/* Client Selector */}
-      <div className="px-6 py-4 print:hidden">
+      <div className="px-4 py-2 print:hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
-            <span className="font-medium text-[20px] text-[#333333] w-[70px]">Client:</span>
+            <span className="font-medium text-[16px] text-[#333333] w-[60px]">Client:</span>
             <Select value={selectedClientId} onValueChange={handleClientChange}>
-              <SelectTrigger className="bg-white border-2 border-[#c4c4c4] rounded-[10px] h-[39px] w-[311px]">
+              <SelectTrigger className="bg-white border-2 border-[#c4c4c4] rounded-[8px] h-[32px] w-[250px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -2097,43 +2313,43 @@ export default function ProposalDetailsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             <Button
               variant="outline"
               onClick={handleTemplates}
-              className="w-[65px] h-[65px] bg-white border-[#c4c4c4] border-2 rounded-[15px] p-0 flex items-center justify-center hover:bg-gray-50"
+              className="w-[50px] h-[50px] bg-white border-[#c4c4c4] border-2 rounded-[12px] p-0 flex items-center justify-center hover:bg-gray-50"
             >
-              <Grid3X3 className="h-6 w-6 text-black opacity-50" />
+              <Grid3X3 className="h-5 w-5 text-black opacity-50" />
             </Button>
             <Button
               variant="outline"
               onClick={handleToggleEditMode}
-              className="w-[65px] h-[65px] bg-white border-[#c4c4c4] border-2 rounded-[15px] p-0 flex items-center justify-center hover:bg-gray-50"
+              className="w-[50px] h-[50px] bg-white border-[#c4c4c4] border-2 rounded-[12px] p-0 flex items-center justify-center hover:bg-gray-50"
             >
-              <Edit className="h-6 w-6 text-black opacity-50" />
+              <Edit className="h-5 w-5 text-black opacity-50" />
             </Button>
             <Button
               variant="outline"
               onClick={handleDownload}
-              className="w-[65px] h-[65px] bg-white border-[#c4c4c4] border-2 rounded-[15px] p-0 flex items-center justify-center hover:bg-gray-50"
+              className="w-[50px] h-[50px] bg-white border-[#c4c4c4] border-2 rounded-[12px] p-0 flex items-center justify-center hover:bg-gray-50"
             >
-              <Download className="h-6 w-6 text-black opacity-50" />
+              <Download className="h-5 w-5 text-black opacity-50" />
             </Button>
           </div>
         </div>
       </div>
 
       {/* Sites Selector */}
-      <div className="px-6 py-4 print:hidden">
-        <div className="flex items-center mb-4">
-          <span className="font-medium text-[20px] text-[#333333] w-[70px]">Site:</span>
-          <div className="flex gap-4">
+      <div className="px-4 py-2 print:hidden">
+        <div className="flex items-center mb-3">
+          <span className="font-medium text-[16px] text-[#333333] w-[60px]">Site:</span>
+          <div className="flex gap-3">
             {proposal?.products?.map((product, index) => (
               <div
                 key={product.id}
-                className="bg-[#c4c4c4] bg-opacity-25 shadow h-[39px] rounded-[10px] flex items-center justify-between px-3 min-w-[120px]"
+                className="bg-[#c4c4c4] bg-opacity-25 shadow h-[32px] rounded-[8px] flex items-center justify-between px-2 min-w-[100px]"
               >
-                <span className="font-medium text-[14px] text-[#333] leading-none truncate">
+                <span className="font-medium text-[12px] text-[#333] leading-none truncate">
                   {product.site_code || product.name}
                 </span>
                 <button
@@ -2143,15 +2359,15 @@ export default function ProposalDetailsPage() {
                   }}
                   className="ml-2 text-[#333] hover:text-gray-600 transition-colors"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3 w-3" />
                 </button>
               </div>
             ))}
             <div
-              className="bg-white shadow h-[39px] rounded-[10px] flex items-center px-3 min-w-[120px] cursor-pointer hover:bg-gray-50"
+              className="bg-white shadow h-[32px] rounded-[8px] flex items-center px-2 min-w-[100px] cursor-pointer hover:bg-gray-50"
               onClick={handleAddSiteClick}
             >
-              <span className="font-medium text-[20px] text-[#333333]">+Add Site</span>
+              <span className="font-medium text-[16px] text-[#333333]">+Add Site</span>
             </div>
           </div>
         </div>
@@ -2160,31 +2376,42 @@ export default function ProposalDetailsPage() {
       {/* Main content area */}
       <div className="flex-1 flex flex-col md:flex-row">
         {/* Proposal Page Content */}
-        <div className="flex-1 p-2 md:p-4 space-y-4">
+        <div className="flex-1 p-2 md:p-4">
           {Array.from({ length: getTotalPages(selectedLayout) }, (_, index) => {
             const pageNumber = index + 1
             return (
-              <div key={pageNumber} className={getPageContainerClass(selectedSize, "Landscape")} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
+              <div key={pageNumber} className={`${getPageContainerClass(selectedSize, "Landscape")} ${index > 0 ? 'mt-[-65px]' : ''}`} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
                 {pageNumber === 1 ? renderIntroPage(pageNumber) : renderSitePage(pageNumber)}
               </div>
             )
           })}
         </div>
 
-        <div className="w-full md:w-80 border-l md:border-l border-gray-200 p-4 overflow-y-auto print:hidden">
-          <ProposalHistory
-            selectedClient={
-              proposal
-                ? {
-                    id: proposal.client.id || "",
-                    company: proposal.client.company,
-                    contactPerson: proposal.client.contactPerson,
-                  }
-                : null
-            }
-            useProposalViewer={true}
-            excludeProposalId={params.id as string}
-          />
+        <div className="w-full md:w-80 h-[60vh] bg-white rounded-[20px] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] print:hidden flex flex-col">
+          <div className="p-6 pb-0">
+            <h3 className="text-lg font-semibold">
+              Proposal History
+              {proposal && (
+                <span className="text-sm font-normal text-gray-500 block">for {proposal.client.company}</span>
+              )}
+            </h3>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <ProposalHistory
+              selectedClient={
+                proposal
+                  ? {
+                      id: proposal.client.id || "",
+                      company: proposal.client.company,
+                      contactPerson: proposal.client.contactPerson,
+                    }
+                  : null
+              }
+              useProposalViewer={true}
+              excludeProposalId={params.id as string}
+              showHeader={false}
+            />
+          </div>
         </div>
       </div>
 

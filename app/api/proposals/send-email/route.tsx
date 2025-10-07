@@ -154,34 +154,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email service not configured" }, { status: 500 })
     }
 
-    let body
+    let formData
     try {
-      body = await request.json()
+      formData = await request.formData()
     } catch (parseError) {
-      console.error("Failed to parse request body:", parseError)
-      return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
+      console.error("Failed to parse form data:", parseError)
+      return NextResponse.json({ error: "Invalid form data" }, { status: 400 })
     }
 
-    console.log("Request body received:", {
-      hasProposal: !!body.proposal,
-      hasClientEmail: !!body.clientEmail,
-      proposalId: body.proposal?.id,
-      customSubject: body.subject,
-      customBody: body.body,
-      currentUserEmail: body.currentUserEmail,
-      currentUserPhoneNumber: body.currentUserPhoneNumber,
-      ccEmail: body.ccEmail, // Now a string that might contain multiple emails
+    const proposalData = formData.get("proposal") as string
+    const proposal = proposalData ? JSON.parse(proposalData) : null
+
+    console.log("Request form data received:", {
+      hasProposal: !!proposal,
+      hasClientEmail: !!formData.get("clientEmail"),
+      proposalId: proposal?.id,
+      customSubject: formData.get("subject"),
+      customBody: formData.get("body"),
+      currentUserEmail: formData.get("currentUserEmail"),
+      currentUserPhoneNumber: formData.get("currentUserPhoneNumber"),
+      ccEmail: formData.get("ccEmail"), // Now a string that might contain multiple emails
     })
 
-    console.log("Proposal company logo:", body.proposal?.companyLogo)
-    console.log("Proposal company name:", body.proposal?.companyName)
+    console.log("Proposal company logo:", proposal?.companyLogo)
+    console.log("Proposal company name:", proposal?.companyName)
 
     // Extract dominant color from company logo if available
     let dominantColor: string = '#667eea' // Default fallback color
     let logoDataUri: string | null = null
 
     // Use the correct logo URL consistently
-    const companyLogoUrl = 'https://firebasestorage.googleapis.com/v0/b/oh-app-bcf24.appspot.com/o/company_logos%2FmlQu3MEGrcdhWVEAJZPYBGSFLbx1%2F1753334275475_Login.png?alt=media&token=645590e5-6ca9-4783-9d90-6ace8f545495'
+    const companyLogoUrl = proposal?.companyLogo
 
     if (companyLogoUrl) {
       try {
@@ -206,13 +209,22 @@ export async function POST(request: NextRequest) {
         }
       } catch (error) {
         console.error("Error processing company logo:", error)
-        throw new Error(`Logo processing failed: ${error instanceof Error ? error.message : String(error)}`)
+        // Continue without logo - not a critical failure
+        logoDataUri = null
+        dominantColor = '#667eea' // Use default color
       }
     } else {
-      throw new Error("Company logo URL not available for color extraction")
+      console.log("No company logo provided, using default styling")
+      logoDataUri = null
+      dominantColor = '#667eea' // Use default color
     }
 
-    const { proposal, clientEmail, subject, body: customBody, currentUserEmail, currentUserPhoneNumber, ccEmail } = body
+    const clientEmail = formData.get("clientEmail") as string
+    const subject = formData.get("subject") as string
+    const customBody = formData.get("body") as string
+    const currentUserEmail = formData.get("currentUserEmail") as string
+    const currentUserPhoneNumber = formData.get("currentUserPhoneNumber") as string
+    const ccEmail = formData.get("ccEmail") as string
 
     if (!proposal || !clientEmail) {
       console.error("Missing required fields:", { proposal: !!proposal, clientEmail: !!clientEmail })
@@ -580,9 +592,23 @@ export async function POST(request: NextRequest) {
             </div>
             <div class="footer-content">
               <!-- Header elements copied to footer -->
-              <div class="footer-header-section" style="text-align: center; margin-bottom: 30px;">
-                ${proposal.companyLogo ? `<img src="${logoDataUri || proposal.companyLogo}" alt="${proposal.companyName || 'Company Logo'}" style="max-height: 60px; margin-bottom: 10px;" />` : `<h2 style="color: white; margin: 0 0 10px 0; font-size: 24px; font-weight: 600;">${proposal.companyName || 'OH Plus'}</h2>`}
-                <p style="color: rgba(255, 255, 255, 0.9); margin: 0; font-size: 16px;">Professional Outdoor Advertising Solutions</p>
+              <div class="footer-header-section" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px;">
+                <div class="footer-left-content" style="display: flex; align-items: center; gap: 15px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    ${proposal.companyLogo ? `<img src="${logoDataUri || proposal.companyLogo}" alt="${proposal.companyName || 'Company Logo'}" class="footer-logo" style="max-height: 60px;" />` : `<div style="width: 60px; height: 60px; background: rgba(255, 255, 255, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; color: white;">${(proposal.companyName || 'OH Plus').charAt(0)}</div>`}
+                    <span style="color: white; font-size: 18px; font-weight: 600;">${proposal.companyName || 'OH Plus'}</span>
+                  </div>
+                  <div class="sales-info">
+                    <h4 class="sales-name" style="color: ${dominantColor}; margin: 0 0 2px 0; font-size: 16px; font-weight: 600;">Sales Executive</h4>
+                    <p class="sales-position" style="margin: 0 0 3px 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">AAi - Outdoor Advertising</p>
+                    <p class="sales-contact" style="margin: 0 0 2px 0; color: rgba(255, 255, 255, 0.9); font-size: 13px;">📞 +639923657387</p>
+                    <p class="sales-contact" style="margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 13px;">📧 aixymbiosis@aix.com</p>
+                  </div>
+                </div>
+                <div class="footer-company-section" style="text-align: right;">
+                  <h2 style="color: white; margin: 0; font-size: 24px; font-weight: 600;">${proposal.companyName || 'OH Plus'}</h2>
+                  <p style="color: rgba(255, 255, 255, 0.9); margin: 5px 0 0 0; font-size: 16px;">Professional Outdoor Advertising Solutions</p>
+                </div>
               </div>
 
               <!-- Updated contact information with header-like styling -->
@@ -665,38 +691,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Email sending error:", error)
 
-    // Handle color extraction errors specifically
+    // Handle color extraction errors specifically (now non-critical)
     if (error instanceof Error && error.message.includes('Color extraction failed')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to extract colors from company logo",
-          details: error.message,
-        },
-        { status: 400 },
-      )
+      console.warn("Color extraction failed, but continuing with default color:", error.message)
     }
 
     if (error instanceof Error && error.message.includes('Logo processing failed')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Failed to process company logo",
-          details: error.message,
-        },
-        { status: 400 },
-      )
-    }
-
-    if (error instanceof Error && error.message.includes('No company logo provided')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "No company logo provided for color extraction",
-          details: error.message,
-        },
-        { status: 400 },
-      )
+      console.warn("Logo processing failed, but continuing without logo:", error.message)
     }
 
     return NextResponse.json(
