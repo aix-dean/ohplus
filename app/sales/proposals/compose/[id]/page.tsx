@@ -3,6 +3,7 @@
 import React from "react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, doc, updateDoc } from "firebase/firestore"
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
@@ -475,6 +476,20 @@ ${contactDetails}`,
     setSending(true)
 
     try {
+      // Upload attachments to Firebase storage if they don't have URLs
+      for (const attachment of attachments) {
+        if (attachment.file && !attachment.url) {
+          try {
+            const uploadPath = `proposals/attachments/${resolvedParams.id}/`
+            const downloadURL = await uploadFileToFirebaseStorage(attachment.file, uploadPath)
+            attachment.url = downloadURL
+          } catch (uploadError) {
+            console.error(`Error uploading attachment ${attachment.name}:`, uploadError)
+            // Continue without URL, but log error
+          }
+        }
+      }
+
       const formData = new FormData()
 
       const toEmails = emailData.to

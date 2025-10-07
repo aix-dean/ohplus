@@ -28,6 +28,8 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, emailType = 
   const [loading, setLoading] = useState(false)
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null)
   const [currentView, setCurrentView] = useState<'list' | 'detail'>('list')
+  const [fileViewerOpen, setFileViewerOpen] = useState(false)
+  const [selectedAttachment, setSelectedAttachment] = useState<any>(null)
 
   useEffect(() => {
     if (open && proposalId) {
@@ -45,6 +47,16 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, emailType = 
   const handleBackToList = () => {
     setCurrentView('list')
     setSelectedEmail(null)
+  }
+
+  const handleAttachmentClick = (attachment: any) => {
+    setSelectedAttachment(attachment)
+    setFileViewerOpen(true)
+  }
+
+  const handleCloseFileViewer = () => {
+    setFileViewerOpen(false)
+    setSelectedAttachment(null)
   }
 
   const fetchEmails = async () => {
@@ -198,14 +210,12 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, emailType = 
                       <div className="flex-1 space-y-2">
                         {selectedEmail.attachments.map((attachment, index) => (
                           <div key={index} className="break-words">
-                            <a
-                              href={attachment.fileUrl || "#"}
-                              className="text-base text-blue-600 underline hover:text-blue-800 break-all"
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              onClick={() => handleAttachmentClick(attachment)}
+                              className="text-base text-blue-600 underline hover:text-blue-800 break-all cursor-pointer bg-transparent border-none p-0"
                             >
                               {attachment.fileName}
-                            </a>
+                            </button>
                           </div>
                         ))}
                       </div>
@@ -218,6 +228,34 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, emailType = 
         </div>
         </div>
       </DialogContent>
+
+      {/* File Viewer Dialog */}
+      <Dialog open={fileViewerOpen} onOpenChange={setFileViewerOpen}>
+        <DialogContent className="w-[90vw] h-[90vh] max-w-none max-h-none bg-white rounded-[20px] p-0 border-0 shadow-lg">
+          <DialogTitle className="sr-only">File Viewer</DialogTitle>
+          <div className="relative h-full">
+            <button
+              onClick={handleCloseFileViewer}
+              className="absolute top-4 right-4 z-10 p-2 hover:bg-gray-100 rounded-full transition-colors"
+              aria-label="Close file viewer"
+            >
+              <X className="h-5 w-5 text-gray-500" />
+            </button>
+            <div className="p-6 h-full">
+              <h2 className="text-xl font-bold text-gray-800 mb-4">
+                {selectedAttachment?.fileName || 'File Viewer'}
+              </h2>
+              <div className="h-[calc(100%-4rem)]">
+                <iframe
+                  src={selectedAttachment?.fileUrl}
+                  className="w-full h-full border rounded-lg"
+                  title={selectedAttachment?.fileName || 'File Viewer'}
+                />
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

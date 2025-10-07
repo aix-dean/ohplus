@@ -291,10 +291,15 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; on
 
   if (companyLogo) {
     return (
-      <img
-        src={companyLogo || "/placeholder.svg"}
-        alt="Company logo"
-        className={`object-contain rounded-lg ${hasShadow ? 'shadow-sm bg-white' : ''} ${className}`}
+      <div
+        style={{
+          backgroundImage: `url(${companyLogo || "/placeholder.svg"})`,
+          backgroundSize: 'contain',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundColor: hasShadow ? 'white' : 'transparent',
+        }}
+        className={`rounded-lg ${hasShadow ? 'shadow-sm' : ''} ${className}`}
         onError={(e) => {
           // If image fails to load, clear it so upload button shows
           setCompanyLogo("")
@@ -356,7 +361,7 @@ export default function ProposalDetailsPage() {
   const [uploading, setUploading] = useState(false)
   const [selectedTemplateBackground, setSelectedTemplateBackground] = useState<string>("")
   const [selectedSize, setSelectedSize] = useState<string>("A4")
-  const [selectedOrientation, setSelectedOrientation] = useState<string>("Portrait")
+  const [selectedOrientation, setSelectedOrientation] = useState<string>("Landscape")
   const [selectedLayout, setSelectedLayout] = useState<string>("1")
   const [previewSize, setPreviewSize] = useState<string>("A4")
   const [previewOrientation, setPreviewOrientation] = useState<string>("Portrait")
@@ -400,6 +405,8 @@ export default function ProposalDetailsPage() {
   const [logoStartDimensions, setLogoStartDimensions] = useState({ width: 183, height: 110 })
   const [logoStartPosition, setLogoStartPosition] = useState({ left: 114, top: 175 })
   const [logoResizeDirection, setLogoResizeDirection] = useState<string>('')
+  const [selectedProductForMedia, setSelectedProductForMedia] = useState<ProposalProduct | null>(null)
+  const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false)
 
   const fetchClients = async () => {
     if (!userData?.company_id) return
@@ -1105,13 +1112,6 @@ export default function ProposalDetailsPage() {
       // Save company logo if changed
       if (editableLogo) {
         updateData.companyLogo = editableLogo
-        // Also update the company document
-        if (userData?.company_id) {
-          const companyDocRef = doc(db, "companies", userData.company_id)
-          await updateDoc(companyDocRef, {
-            logo: editableLogo,
-          })
-        }
       }
 
       // Save site images if changed
@@ -1205,7 +1205,7 @@ export default function ProposalDetailsPage() {
       const { pdfUrl, password } = await generateAndUploadProposalPDF(
         proposal,
         proposal.templateSize || "A4",
-        proposal.templateOrientation || "Portrait"
+        proposal.templateOrientation || "Landscape"
       )
 
       // Update proposal with PDF URL and password
@@ -2004,15 +2004,24 @@ export default function ProposalDetailsPage() {
         {/* Bottom Logo */}
         <div className="absolute h-[40px] left-[28px] top-[626px] w-[67px] z-20">
           {editableLogo ? (
-            <img src={editableLogo} alt="Proposal logo" className="h-full w-full object-contain" />
+            <div
+              style={{
+                backgroundImage: `url(${editableLogo})`,
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                width: '100%',
+                height: '100%',
+              }}
+            />
           ) : (
             <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
           )}
         </div>
         {/* Footer */}
-        <div className="absolute top-[610px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
         {/* Footer Right */}
-        <div className="absolute top-[610px] right-0 w-[1310px] h-[70px] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+        <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
       </div>
     )
   }
@@ -2089,14 +2098,14 @@ export default function ProposalDetailsPage() {
               return product.media && product.media.length > 0 && product.media[0].isVideo && !pendingImageUrl ? (
                 <video
                   src={currentImageUrl}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full"
                   controls
                 />
               ) : (
                 <img
                   src={currentImageUrl}
                   alt={product.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full"
                 />
               )
             } else {
@@ -2108,53 +2117,18 @@ export default function ProposalDetailsPage() {
             }
           })()}
           {isEditMode && (
-            <>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    const uploadSiteImage = async () => {
-                      try {
-                        const uploadPath = `proposals/sites/${Date.now()}_${file.name}`
-                        const imageUrl = await uploadFileToFirebaseStorage(file, uploadPath)
-
-                        // Just update local state, don't save to database yet
-                        setPendingSiteImages(prev => ({
-                          ...prev,
-                          [product.id]: imageUrl
-                        }))
-
-                        toast({
-                          title: "Image Updated",
-                          description: "Click 'Save' to confirm changes",
-                        })
-                      } catch (error) {
-                        console.error("Error uploading site image:", error)
-                        toast({
-                          title: "Error",
-                          description: "Failed to upload site image",
-                          variant: "destructive",
-                        })
-                      }
-                    }
-                    uploadSiteImage()
-                  }
-                }}
-                className="hidden"
-                id={`site-image-${product.id}`}
-              />
-              <label
-                htmlFor={`site-image-${product.id}`}
-                className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-30 transition-all rounded-lg group"
-              >
-                <div className="opacity-0 group-hover:opacity-100 text-white text-center transition-opacity">
-                  <Upload className="h-8 w-8 mx-auto mb-2" />
-                  <p className="text-sm">Change Image</p>
-                </div>
-              </label>
-            </>
+            <div
+              className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-30 transition-all rounded-lg group"
+              onClick={() => {
+                setSelectedProductForMedia(product)
+                setIsMediaDialogOpen(true)
+              }}
+            >
+              <div className="opacity-0 group-hover:opacity-100 text-white text-center transition-opacity">
+                <Upload className="h-8 w-8 mx-auto mb-2" />
+                <p className="text-sm">Change Image</p>
+              </div>
+            </div>
           )}
         </div>
 
@@ -2269,15 +2243,24 @@ export default function ProposalDetailsPage() {
         {/* Bottom Logo */}
         <div className="absolute h-[40px] left-[28px] top-[626px] w-[67px] z-20">
           {editableLogo ? (
-            <img src={editableLogo} alt="Proposal logo" className="h-full w-full object-contain" />
+            <div
+              style={{
+                backgroundImage: `url(${editableLogo})`,
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                width: '100%',
+                height: '100%',
+              }}
+            />
           ) : (
             <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
           )}
         </div>
 
         {/* Footer - scaled */}
-        <div className="absolute top-[610px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-[610px] right-0 w-[1310px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+        <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
       </div>
     )
   }
@@ -2498,6 +2481,75 @@ export default function ProposalDetailsPage() {
           </div>
         </div>
       )}
+
+      {/* Media Selection Dialog */}
+      <Dialog open={isMediaDialogOpen} onOpenChange={setIsMediaDialogOpen}>
+        <DialogContent className="max-w-4xl mx-auto border-0 shadow-lg">
+          <DialogTitle className="text-xl font-semibold mb-4">
+            Select Image for {selectedProductForMedia?.name}
+          </DialogTitle>
+
+          {selectedProductForMedia?.media && selectedProductForMedia.media.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+              {selectedProductForMedia.media.map((mediaItem, index) => (
+                <div
+                  key={index}
+                  className="relative cursor-pointer border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 transition-colors"
+                  onClick={() => {
+                    setPendingSiteImages(prev => ({
+                      ...prev,
+                      [selectedProductForMedia.id]: mediaItem.url
+                    }))
+                    setIsMediaDialogOpen(false)
+                    setSelectedProductForMedia(null)
+                    toast({
+                      title: "Image Selected",
+                      description: "Click 'Save' to confirm changes",
+                    })
+                  }}
+                >
+                  {mediaItem.isVideo ? (
+                    <video
+                      src={mediaItem.url}
+                      className="w-full h-32 object-cover"
+                      controls={false}
+                    />
+                  ) : (
+                    <img
+                      src={mediaItem.url}
+                      alt={`Media ${index + 1}`}
+                      className="w-full h-32 object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/placeholder.svg"
+                      }}
+                    />
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1">
+                    {mediaItem.type || 'Image'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No media available for this site.</p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsMediaDialogOpen(false)
+                setSelectedProductForMedia(null)
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Send Options Dialog */}
       <SendProposalShareDialog
