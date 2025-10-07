@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       displayHeaderFooter: true,
       headerTemplate: `
         <div class="header" style="text-align: left; width: 100%; padding: 5px; margin-left: 15mm;">
-          ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 75px;">` : ''}
+          ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 55px;">` : ''}
         </div>
       `,
       footerTemplate: `<div> </div>

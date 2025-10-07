@@ -1509,7 +1509,7 @@ try {
         pdf.setTextColor(0, 0, 0)
       }
 
-      yPosition += 35
+      yPosition += 40
 
       // Product grid
       const gridClass = getSitesPerPage(selectedLayout) === 1
