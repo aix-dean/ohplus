@@ -499,7 +499,24 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       // Remove the id field from update data as it's not needed for Firestore update
       const { id, ...updateDataWithoutId } = updatedCostEstimate
 
-      await updateCostEstimate(updatedCostEstimate.id, updateDataWithoutId)
+      // Clean the data to remove undefined values before sending to Firestore
+      const cleanData = (obj: any): any => {
+        if (obj === null || obj === undefined) return obj
+        if (typeof obj !== 'object') return obj
+        if (Array.isArray(obj)) return obj.map(cleanData)
+
+        const cleaned: any = {}
+        for (const [key, value] of Object.entries(obj)) {
+          if (value !== undefined) {
+            cleaned[key] = cleanData(value)
+          }
+        }
+        return cleaned
+      }
+
+      const cleanedUpdateData = cleanData(updateDataWithoutId)
+
+      await updateCostEstimate(updatedCostEstimate.id, cleanedUpdateData)
 
       // Generate new PDF after saving the cost estimate data
       console.log("[v0] Generating new PDF after saving changes")

@@ -464,7 +464,7 @@ export async function generateQuotationPDF(quotation: Quotation, returnBlob: boo
 
   // Add header elements to the first page
   await addHeaderElementsToPage()
-  yPosition = Math.max(yPosition, margin + 35) // Ensure content starts below header elements
+  yPosition = Math.max(yPosition, margin + 40) // Ensure content starts below header elements with added spacing
 
   // Header (Quotation Title)
   pdf.setFontSize(24) // Increased font size
