@@ -1712,7 +1712,7 @@ The OH Plus Team`,
       {/* New Wrapper for Sidebar + Document */}
       <div className="flex justify-center items-start gap-6 mt-6">
         {/* Left Panel */}
-        {quotation.status !== "sent" && (
+        {quotation.status === "draft" && (
           <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
             <Button
               variant="ghost"
