@@ -5,6 +5,171 @@ import { db } from "@/lib/firebase"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+// Gmail compatibility utilities
+interface EmailDomainInfo {
+  domain: string
+  isGmail: boolean
+  isCorporate: boolean
+  requiresFallback: boolean
+}
+
+function analyzeEmailDomain(email: string): EmailDomainInfo {
+  const domain = email.toLowerCase().split('@')[1]
+  if (!domain) {
+    return { domain: '', isGmail: false, isCorporate: false, requiresFallback: false }
+  }
+
+  const isGmail = domain === 'gmail.com'
+  const corporateDomains = ['ohplus.ph', 'aix.ph', 'gmail.com']
+  const isCorporate = corporateDomains.includes(domain)
+
+  // Gmail recipients need fallback handling due to strict filtering
+  const requiresFallback = isGmail
+
+  return { domain, isGmail, isCorporate, requiresFallback }
+}
+
+function separateGmailRecipients(recipients: string[]): { gmail: string[], other: string[] } {
+  const gmail: string[] = []
+  const other: string[] = []
+
+  recipients.forEach(email => {
+    const domainInfo = analyzeEmailDomain(email)
+    if (domainInfo.isGmail) {
+      gmail.push(email)
+    } else {
+      other.push(email)
+    }
+  })
+
+  return { gmail, other }
+}
+
+// Rate limiting for Gmail to avoid spam filters
+const gmailRateLimit = new Map<string, { count: number, resetTime: number }>()
+const RATE_LIMIT_WINDOW = 60 * 1000 // 1 minute
+const RATE_LIMIT_MAX = 5 // Max 5 emails per minute per sender
+
+function checkGmailRateLimit(senderEmail: string): boolean {
+  const now = Date.now()
+  const senderLimit = gmailRateLimit.get(senderEmail)
+
+  if (!senderLimit || now > senderLimit.resetTime) {
+    gmailRateLimit.set(senderEmail, { count: 1, resetTime: now + RATE_LIMIT_WINDOW })
+    return true
+  }
+
+  if (senderLimit.count >= RATE_LIMIT_MAX) {
+    return false
+  }
+
+  senderLimit.count++
+  return true
+}
+
+// SPF/DKIM/DMARC compliance utilities
+interface EmailComplianceInfo {
+  domain: string
+  spfValid: boolean
+  dkimValid: boolean
+  dmarcValid: boolean
+  complianceScore: number
+  recommendations: string[]
+}
+
+async function checkEmailCompliance(domain: string): Promise<EmailComplianceInfo> {
+  const recommendations: string[] = []
+  let spfValid = false
+  let dkimValid = false
+  let dmarcValid = false
+
+  try {
+    // Check SPF record
+    try {
+      const spfResponse = await fetch(`https://dns.google/resolve?name=${domain}&type=TXT`)
+      const spfData = await spfResponse.json()
+
+      if (spfData.Answer) {
+        spfValid = spfData.Answer.some((record: any) =>
+          record.data.includes('v=spf1') || record.data.includes('spf2.0')
+        )
+      }
+
+      if (!spfValid) {
+        recommendations.push(`Add SPF record for ${domain} to improve deliverability`)
+      }
+    } catch (error) {
+      console.warn(`[v0] Could not check SPF for ${domain}:`, error)
+      recommendations.push(`Verify SPF record exists for ${domain}`)
+    }
+
+    // Check DMARC record
+    try {
+      const dmarcResponse = await fetch(`https://dns.google/resolve?name=_dmarc.${domain}&type=TXT`)
+      const dmarcData = await dmarcResponse.json()
+
+      if (dmarcData.Answer) {
+        dmarcValid = dmarcData.Answer.some((record: any) =>
+          record.data.includes('v=DMARC1')
+        )
+      }
+
+      if (!dmarcValid) {
+        recommendations.push(`Add DMARC policy for ${domain} (start with p=none for monitoring)`)
+      }
+    } catch (error) {
+      console.warn(`[v0] Could not check DMARC for ${domain}:`, error)
+      recommendations.push(`Consider adding DMARC policy for ${domain}`)
+    }
+
+    // DKIM is harder to check programmatically, so we'll assume it's configured
+    // if SPF and DMARC are present, or provide general recommendation
+    if (spfValid && dmarcValid) {
+      dkimValid = true // Assume DKIM is configured with proper SPF/DMARC
+    } else {
+      recommendations.push(`Configure DKIM for ${domain} to maximize deliverability`)
+    }
+
+  } catch (error) {
+    console.error(`[v0] Error checking email compliance for ${domain}:`, error)
+    recommendations.push(`Verify DNS records (SPF, DKIM, DMARC) for ${domain}`)
+  }
+
+  const complianceScore = (spfValid ? 33 : 0) + (dkimValid ? 33 : 0) + (dmarcValid ? 34 : 0)
+
+  return {
+    domain,
+    spfValid,
+    dkimValid,
+    dmarcValid,
+    complianceScore,
+    recommendations
+  }
+}
+
+function validateFromAddress(from: string): { isValid: boolean, domain: string, recommendations: string[] } {
+  const recommendations: string[] = []
+
+  // Extract domain from email address
+  const domainMatch = from.match(/@([^>]+)$/)
+  if (!domainMatch) {
+    return { isValid: false, domain: '', recommendations: ['Invalid email format in from address'] }
+  }
+
+  const domain = domainMatch[1]
+
+  // Check for suspicious patterns
+  if (domain.includes('resend.dev') || domain.includes('gmail.com')) {
+    recommendations.push('Consider using a verified custom domain for better deliverability')
+  }
+
+  if (domain.length > 60) {
+    recommendations.push('Domain name is unusually long, may trigger spam filters')
+  }
+
+  return { isValid: true, domain, recommendations }
+}
+
 // Function to convert image URL to base64 data URI
 async function imageUrlToDataUri(imageUrl: string): Promise<string | null> {
   try {
@@ -126,6 +291,184 @@ function shadeColor(color: string, percent: number): string {
   return '#' + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
     (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
     (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1).toUpperCase()
+}
+
+function createUltraSimpleGmailTemplate(
+  body: string,
+  companyName?: string,
+  userDisplayName?: string,
+  replyTo?: string,
+  proposalId?: string
+): string {
+  const processedBody = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .join("\n\n")
+
+  return `Subject: ${companyName || "Company"} - Important Proposal
+
+Dear Valued Customer,
+
+${processedBody}
+
+To view the complete proposal, please visit:
+https://mrk.ohplus.ph/pr/${proposalId || ''}
+
+---
+This email was sent from ${companyName || "Company"}
+Contact: ${userDisplayName || "Sales Executive"}
+${replyTo ? `Email: ${replyTo}` : ''}
+
+Note: If you're having trouble viewing this email, please add our email address to your contacts or safe senders list.
+  `
+}
+
+function createGmailCompatibleTemplate(
+  body: string,
+  userPhoneNumber?: string,
+  companyName?: string,
+  companyWebsite?: string,
+  companyAddress?: string,
+  userDisplayName?: string,
+  replyTo?: string,
+  companyLogo?: string,
+  proposalId?: string,
+  dominantColor?: string,
+  proposalPassword?: string
+): string {
+  const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
+  const primaryColor = dominantColor || '#667eea'
+  const secondaryColor = dominantColor ? shadeColor(dominantColor, 40) : '#5a6fd8'
+
+  const processedBody = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => `<p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.6; color: #333333;">${line}</p>`)
+    .join("")
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${companyName || "Company"} - Proposal</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; background-color: #f5f5f5; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.header {
+    background: #ffffff;
+    padding: 30px 0 30px 20px; /* top right bottom left */
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+}
+        .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        .header-square-1 { width: 120px; height: 10px; background: ${primaryColor}; opacity: 1.0; z-index: 2; margin-right: 10px; }
+        .header-square-2 { width: 100px; height: 10px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; }
+        .header-content { width: 70%; height: 100px; text-align: left; position: relative; z-index: 3; }
+        .company-name { color: #000000; font-size: 24px; font-weight: bold; margin: 0 0 10px 0; letter-spacing: 1px; }
+        .company-address { color: #000000; font-size: 14px; margin: 0; }
+        .content { padding: 40px 30px; background-color: #f9f9f9; }
+        .content p { margin: 0 0 16px 0; }
+        .highlight-box { background-color: #f8f9ff; border-left: 4px solid ${primaryColor}; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
+        .cta-section { text-align: center; margin: 30px 0; }
+        .cta-button { display: inline-block; background: ${primaryColor}; color: #ffffff !important; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: 600; font-size: 16px; transition: transform 0.2s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
+        .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
+        .footer { background: #ffffff; padding: 30px 0 30px 30px; color: #000000; position: relative; overflow: hidden; width: 100%; }
+        .footer-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        .footer-square-1 { width: 120px; height: 139px; background: ${primaryColor}; opacity: 1.0; z-index: 2; margin-right: 10px; }
+        .footer-square-2 { width: 100px; height: 139px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; }
+        .footer-content { width: 70%; position: relative; z-index: 3; }
+        .footer-header { margin-bottom: 20px; }
+        .footer-company-name { font-size: 18px; font-weight: 600; margin: 0 0 5px 0; color: #000000; }
+        .footer-website { color: #000000; font-size: 14px; margin: 0; }
+        .signature { margin-top: 25px; }
+        .signature-name { font-weight: 600; color: #000000; font-size: 16px; margin: 0; }
+        .signature-title { color: #000000; font-size: 14px; margin: 0; }
+        .contact-info { font-size: 14px; color: #000000; }
+        .contact-info strong { color: #000000; }
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; box-shadow: none; }
+            .header, .content, .footer { padding: 20px !important; }
+            .header-circles, .footer-circles { display: none !important; }
+            .company-name { font-size: 20px !important; }
+            .cta-button { padding: 12px 24px !important; font-size: 14px !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+
+                <div class="header-circles">
+                                <div class="header-content">
+                    <h1 class="company-name">${companyName || "Company"}</h1>
+                    ${companyAddress ? `<p class="company-address">${companyAddress}</p>` : ''}
+                </div>
+                                    <div class="header-square-2"></div>
+
+                    <div class="header-square-1"></div>
+                </div>
+        </div>
+
+        <div class="content">
+            ${processedBody}
+
+            <div class="cta-section">
+                <a href="https://mrk.ohplus.ph/pr/${proposalId || ''}" class="cta-button">View Proposal</a>
+            </div>
+<!--
+            ${proposalPassword ? `
+            <div class="highlight-box">
+                <h4 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px; font-weight: 600;">🔐 Access Code</h4>
+                <p style="margin: 0; font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: ${primaryColor}; background: #f8f9fa; padding: 12px; border-radius: 6px; text-align: center; border: 2px dashed rgba(102, 126, 234, 0.3);">${proposalPassword}</p>
+                <p style="margin: 10px 0 0 0; font-size: 14px; color: #6c757d;">Please use this code to access the proposal online.</p>
+            </div>
+            ` : ''}
+            -->
+        </div>
+
+        <div class="footer">
+
+                <div class="footer-circles">
+                                <div class="footer-content">
+                    <div class="footer-header">
+                        <h3 class="footer-company-name">${companyName || "Company"}</h3>
+                        ${companyWebsite ? `<p class="footer-website">${companyWebsite}</p>` : ''}
+                    </div>
+
+                    <div class="signature">
+                        <h4 class="signature-name">${userDisplayName || "Sales Executive"}</h4>
+                        <p class="signature-title">Sales Executive</p>
+                        <div class="contact-info">
+                            ${replyTo ? `<p style="margin: 0;">${replyTo}</p>` : ''}
+                            ${userPhoneNumber ? `<p style="margin: 0;"> ${userPhoneNumber}</p>` : ''}
+                        </div>
+                    </div>
+                </div>
+                                    <div class="footer-square-2"></div>
+
+                    <div class="footer-square-1"></div>
+                </div>
+            </div>
+    </div>
+</body>
+</html>
+  `
 }
 
 function createEmailTemplate(
@@ -495,8 +838,8 @@ background: ${dominantColor
  
     <div class="header">
         <div class="header-circles">
-            <div class="header-circle-1"></div>
-            <div class="header-circle-2"></div>
+            <div class="header-square-1"></div>
+            <div class="header-square-2"></div>
         </div>
         <table class="header-table">
             <tr>
@@ -550,8 +893,8 @@ background: ${dominantColor
                     </td>
                     <td class="footer-right-column">
                         <div class="footer-circles">
-                            <div class="footer-circle-1"></div>
-                            <div class="footer-circle-2"></div>
+                            <div class="footer-square-1"></div>
+                            <div class="footer-square-2"></div>
                         </div>
                     </td>
                 </tr>
@@ -719,9 +1062,32 @@ export async function POST(request: NextRequest) {
       // Sanitize company name to remove special characters that break email format
       const sanitizedCompanyName = actualCompanyName.replace(/[<>\[\]{}|\\^`]/g, '').trim()
       from = `${sanitizedCompanyName} <noreply@${verifiedDomain}>`
+
+      // Validate the from address for compliance
+      const fromValidation = validateFromAddress(from)
+      if (!fromValidation.isValid) {
+        console.warn("[v0] Invalid from address format:", fromValidation.recommendations)
+      }
+
+      // Check email compliance for the domain
+      const complianceInfo = await checkEmailCompliance(verifiedDomain)
+      console.log("[v0] Email compliance check for", verifiedDomain, ":", {
+        score: complianceInfo.complianceScore,
+        spf: complianceInfo.spfValid,
+        dkim: complianceInfo.dkimValid,
+        dmarc: complianceInfo.dmarcValid,
+        recommendations: complianceInfo.recommendations
+      })
+
+      // Warn if compliance score is low
+      if (complianceInfo.complianceScore < 66) {
+        console.warn("[v0] Low email compliance score for", verifiedDomain, "- may affect deliverability")
+      }
+
     } else {
       // Fallback to default - this may not work if no domains are verified
       from = `noreply@resend.dev`
+      console.warn("[v0] No verified domain configured - using fallback. This may impact deliverability.")
     }
 
     console.log("[v0] Email sending - Subject:", subject)
@@ -842,69 +1208,175 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Email sending - Attachments count:", attachments.length)
 
-    // Send email using Resend
-    const emailData: any = {
-      from,
-      to,
-      subject: subject.trim(),
-      html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
-    }
+    // Separate Gmail and non-Gmail recipients for different handling
+    const { gmail: gmailRecipients, other: otherRecipients } = separateGmailRecipients(to)
+    const allCc = cc || []
+    const { gmail: gmailCc, other: otherCc } = separateGmailRecipients(allCc)
 
-    if (cc && cc.length > 0) {
-      emailData.cc = cc
-    }
-
-    if (replyTo && replyTo.trim()) {
-      emailData.reply_to = replyTo.trim()
-    }
-
-    if (attachments.length > 0) {
-      emailData.attachments = attachments
-    }
-
-    console.log("[v0] Email sending - Sending to Resend API")
-    console.log("[v0] Email data:", {
-      from,
-      to: to.length,
-      cc: cc?.length || 0,
-      subject: subject.substring(0, 50) + "...",
-      hasAttachments: attachments.length > 0,
-      attachmentCount: attachments.length,
-      totalAttachmentSize: attachments.reduce((sum, att) => sum + att.content.length, 0)
+    console.log("[v0] Email domain analysis:", {
+      totalRecipients: to.length,
+      gmailRecipients: gmailRecipients.length,
+      otherRecipients: otherRecipients.length,
+      gmailCc: gmailCc.length,
+      otherCc: otherCc.length
     })
 
-    const { data, error } = await resend.emails.send(emailData)
-
-    if (error) {
-      console.error("[v0] Resend error:", error)
-      console.error("[v0] Error details:", {
-        name: error.name,
-        message: error.message
-      })
-
-      // Provide more specific error messages
-      let errorMessage = error.message || "Failed to send email"
-      if (errorMessage.includes("domain")) {
-        errorMessage = "Email domain not verified. Please go to your Resend dashboard (resend.com), add and verify your domain (ohplus.ph), then set RESEND_VERIFIED_DOMAIN environment variable to your verified domain."
-      } else if (errorMessage.includes("attachment")) {
-        errorMessage = "Attachment issue. Please check file sizes and try again."
+    // Check rate limiting for Gmail recipients
+    if (gmailRecipients.length > 0) {
+      const rateLimitPassed = checkGmailRateLimit(validatedReplyTo || from)
+      if (!rateLimitPassed) {
+        console.warn("[v0] Gmail rate limit exceeded for sender:", validatedReplyTo || from)
+        return NextResponse.json({
+          error: "Rate limit exceeded for Gmail recipients. Please wait before sending more emails to Gmail addresses.",
+          code: "RATE_LIMIT_EXCEEDED"
+        }, { status: 429 })
       }
+    }
 
+    // Send emails separately for Gmail and non-Gmail recipients
+    const results = []
+
+    // Send to non-Gmail recipients with regular template
+    if (otherRecipients.length > 0) {
+      try {
+        const regularEmailData: any = {
+          from,
+          to: otherRecipients,
+          subject: subject.trim(),
+          html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
+        }
+
+        if (otherCc.length > 0) {
+          regularEmailData.cc = otherCc
+        }
+
+        if (replyTo && replyTo.trim()) {
+          regularEmailData.reply_to = replyTo.trim()
+        }
+
+        if (attachments.length > 0) {
+          regularEmailData.attachments = attachments
+        }
+
+        console.log("[v0] Sending regular email to non-Gmail recipients:", otherRecipients.length)
+        const { data, error } = await resend.emails.send(regularEmailData)
+
+        if (error) {
+          console.error("[v0] Error sending regular email:", error)
+          results.push({ type: 'regular', success: false, error: error.message, recipients: otherRecipients.length })
+        } else {
+          console.log("[v0] Regular email sent successfully:", data?.id)
+          results.push({ type: 'regular', success: true, data, recipients: otherRecipients.length })
+        }
+      } catch (error) {
+        console.error("[v0] Exception sending regular email:", error)
+        results.push({ type: 'regular', success: false, error: error instanceof Error ? error.message : 'Unknown error', recipients: otherRecipients.length })
+      }
+    }
+
+    // Send to Gmail recipients with Gmail-optimized template
+    if (gmailRecipients.length > 0) {
+      try {
+        const gmailEmailData: any = {
+          from,
+          to: gmailRecipients,
+          subject: subject.trim(),
+          html: createGmailCompatibleTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
+        }
+
+        if (gmailCc.length > 0) {
+          gmailEmailData.cc = gmailCc
+        }
+
+        if (replyTo && replyTo.trim()) {
+          gmailEmailData.reply_to = replyTo.trim()
+        }
+
+        if (attachments.length > 0) {
+          gmailEmailData.attachments = attachments
+        }
+
+        console.log("[v0] Sending Gmail-optimized email to recipients:", gmailRecipients.length)
+        const { data, error } = await resend.emails.send(gmailEmailData)
+
+        if (error) {
+          console.error("[v0] Error sending Gmail-optimized email:", error)
+          results.push({ type: 'gmail', success: false, error: error.message, recipients: gmailRecipients.length })
+
+          // If Gmail fails, try alternative approach with simplified template
+          if (error.message.includes("domain") || error.message.includes("spam") || error.message.includes("blocked")) {
+            console.log("[v0] Attempting fallback for Gmail recipients with ultra-simple template")
+
+            const fallbackEmailData: any = {
+              from,
+              to: gmailRecipients,
+              subject: `[IMPORTANT] ${subject.trim()}`,
+              html: createUltraSimpleGmailTemplate(body.trim(), actualCompanyName, validatedUserDisplayName, validatedReplyTo, proposalId),
+            }
+
+            if (replyTo && replyTo.trim()) {
+              fallbackEmailData.reply_to = replyTo.trim()
+            }
+
+            const { data: fallbackData, error: fallbackError } = await resend.emails.send(fallbackEmailData)
+
+            if (fallbackError) {
+              console.error("[v0] Fallback also failed for Gmail:", fallbackError)
+              results.push({ type: 'gmail-fallback', success: false, error: fallbackError.message, recipients: gmailRecipients.length })
+            } else {
+              console.log("[v0] Gmail fallback email sent successfully:", fallbackData?.id)
+              results.push({ type: 'gmail-fallback', success: true, data: fallbackData, recipients: gmailRecipients.length })
+            }
+          }
+        } else {
+          console.log("[v0] Gmail-optimized email sent successfully:", data?.id)
+          results.push({ type: 'gmail', success: true, data, recipients: gmailRecipients.length })
+        }
+      } catch (error) {
+        console.error("[v0] Exception sending Gmail email:", error)
+        results.push({ type: 'gmail', success: false, error: error instanceof Error ? error.message : 'Unknown error', recipients: gmailRecipients.length })
+      }
+    }
+
+    // Analyze results and return appropriate response
+    const successfulSends = results.filter(r => r.success)
+    const failedSends = results.filter(r => !r.success)
+
+    if (successfulSends.length === 0) {
+      // All sends failed
+      const primaryError = failedSends[0]?.error || "Failed to send email"
       return NextResponse.json({
-        error: errorMessage,
-        details: error.message
+        error: primaryError,
+        details: "All email sends failed",
+        results: results.map(r => ({ type: r.type, success: r.success, error: r.error }))
       }, { status: 400 })
     }
 
-    console.log("[v0] Email sent successfully:", data?.id)
-    console.log("[v0] Email delivery details:", {
-      id: data?.id
+    if (failedSends.length > 0) {
+      // Partial success
+      console.warn("[v0] Partial email send success:", {
+        successful: successfulSends.length,
+        failed: failedSends.length
+      })
+    }
+
+    console.log("[v0] Email send completed with results:", {
+      totalAttempts: results.length,
+      successful: successfulSends.length,
+      failed: failedSends.length,
+      totalRecipients: to.length + (cc?.length || 0)
     })
 
     return NextResponse.json({
       success: true,
-      data,
-      message: "Email sent successfully! If you don't receive it within a few minutes, please check your spam/junk folder. Note: Emails may take 1-5 minutes to deliver."
+      message: `Email sent successfully to ${successfulSends.reduce((sum, r) => sum + r.recipients, 0)} recipients. ${failedSends.length > 0 ? `${failedSends.reduce((sum, r) => sum + r.recipients, 0)} recipients failed.` : ''}`,
+      results: results.map(r => ({
+        type: r.type,
+        success: r.success,
+        recipients: r.recipients,
+        error: r.error
+      })),
+      deliveryNote: "Gmail recipients may experience delays due to strict filtering. Please ask recipients to check spam/promotions folders."
     })
   } catch (error) {
     console.error("[v0] Send email error:", error)
@@ -914,3 +1386,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
