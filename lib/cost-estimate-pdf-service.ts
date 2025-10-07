@@ -48,7 +48,7 @@ async function fetchCompanyData(companyId: string) {
         phone: data.phone || data.telephone || data.contact_number || "",
         email: data.email || "",
         website: data.website || data.company_website || "",
-        photo_url: data.photo_url || data.logo_url || null,
+        logo: data.logo || data.logo_url || null,
       }
     }
 
@@ -305,9 +305,9 @@ export async function generateCostEstimatePDF(
         companyData = await fetchCompanyData(companyId)
 
         // Fetch company logo if available
-        if (companyData?.photo_url) {
+        if (companyData?.logo) {
           try {
-            const logoResponse = await fetch(companyData.photo_url)
+            const logoResponse = await fetch(companyData.logo)
             if (logoResponse.ok) {
               const logoBlob = await logoResponse.blob()
               const logoArrayBuffer = await logoBlob.arrayBuffer()
@@ -394,9 +394,9 @@ export async function generateDetailedCostEstimatePDF(
         companyData = await fetchCompanyData(companyId)
 
         // Fetch company logo if available
-        if (companyData?.photo_url) {
+        if (companyData?.logo) {
           try {
-            const logoResponse = await fetch(companyData.photo_url)
+            const logoResponse = await fetch(companyData.logo)
             if (logoResponse.ok) {
               const logoBlob = await logoResponse.blob()
               const logoArrayBuffer = await logoBlob.arrayBuffer()
@@ -658,9 +658,9 @@ export async function generateCostEstimatePDFBlob(
       companyData = await fetchCompanyData(companyId)
 
       // Fetch company logo if available
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const logoResponse = await fetch(companyData.photo_url)
+          const logoResponse = await fetch(companyData.logo)
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             const logoArrayBuffer = await logoBlob.arrayBuffer()
@@ -874,9 +874,9 @@ export async function printCostEstimatePDF(
         companyData = await fetchCompanyData(companyId)
 
         // Fetch company logo if available
-        if (companyData?.photo_url) {
+        if (companyData?.logo) {
           try {
-            const logoResponse = await fetch(companyData.photo_url)
+            const logoResponse = await fetch(companyData.logo)
             if (logoResponse.ok) {
               const logoBlob = await logoResponse.blob()
               const logoArrayBuffer = await logoBlob.arrayBuffer()
