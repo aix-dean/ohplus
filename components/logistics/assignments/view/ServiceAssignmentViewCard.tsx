@@ -67,6 +67,10 @@ export function ServiceAssignmentViewCard({
   const selectedProduct = products.find(p => p.id === assignmentData.projectSiteId);
   const selectedTeam = teams.find(t => t.id === assignmentData.crew);
 
+  // Get site information - prioritize assignment data, then fall back to product lookup
+  const siteCode = selectedProduct?.site_code || assignmentData.projectSiteId?.substring(0, 8) || "-";
+  const siteName = assignmentData.projectSiteName || selectedProduct?.name || "-";
+
   return (
     <Card className="w-[90%]">
       <CardHeader>
@@ -74,10 +78,10 @@ export function ServiceAssignmentViewCard({
           <div className="flex justify-between items-center bg-gray-100 p-2 rounded-md">
             <div className="flex flex-col">
               <span className="text-xl font-bold">
-                {selectedProduct?.site_code || "Site Code"}
+                {siteCode}
               </span>
               <span className="text-base text-gray-500">
-                {selectedProduct?.name || "Select Project Site"}
+                {siteName}
               </span>
             </div>
           </div>
@@ -89,7 +93,7 @@ export function ServiceAssignmentViewCard({
             <div className="flex flex-col text-sm">
               <p>SA#: {assignmentData.saNumber}</p>
               <p className="text-xs text-gray-500">
-                {selectedProduct?.site_code || "Site Code"}
+                {siteCode}
               </p>
             </div>
             <p className="text-sm">{currentTime}</p>
@@ -108,7 +112,7 @@ export function ServiceAssignmentViewCard({
               <div className="flex items-center space-x-4">
                 <Label className="w-32 flex-shrink-0">Campaign Name:</Label>
                 <div className="flex-1 p-2 bg-gray-50 rounded border">
-                  {assignmentData.message || "N/A"}
+                  {assignmentData.campaignName || "N/A"}
                 </div>
               </div>
             )}
@@ -206,14 +210,6 @@ export function ServiceAssignmentViewCard({
               </div>
             </div>
 
-            {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(assignmentData.serviceType) && (
-              <div className="flex items-center space-x-4">
-                <Label className="w-32 flex-shrink-0">Illumination/Nits:</Label>
-                <div className="flex-1 p-2 bg-gray-50 rounded border">
-                  {assignmentData.illuminationNits || "N/A"}
-                </div>
-              </div>
-            )}
 
             {!["Monitoring", "Maintenance", "Repair"].includes(assignmentData.serviceType) && (
               <div className="flex items-center space-x-4">

@@ -404,6 +404,41 @@ export default function CreateServiceAssignmentPage() {
       return;
     }
 
+    // Validate required fields based on service type
+    if (formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair") {
+      // Campaign Name is required for non-maintenance/repair services
+      if (!formData.campaignName || formData.campaignName.trim() === "") {
+        toast({
+          title: "Campaign Name Required",
+          description: "Please enter a campaign name.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType)) {
+      // Material Specs is required for services that are not monitoring, change material, maintenance, or repair
+      if (!formData.materialSpecs || formData.materialSpecs.trim() === "") {
+        toast({
+          title: "Material Specs Required",
+          description: "Please select material specifications.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // Crew is always required
+    if (!formData.crew || formData.crew.trim() === "") {
+      toast({
+        title: "Crew Selection Required",
+        description: "Please select a crew for the assignment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
@@ -523,6 +558,41 @@ export default function CreateServiceAssignmentPage() {
       toast({
         title: "Site Selection Required",
         description: "Please select a site before saving the draft.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate required fields based on service type for drafts too
+    if (formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair") {
+      // Campaign Name is required for non-maintenance/repair services
+      if (!formData.campaignName || formData.campaignName.trim() === "") {
+        toast({
+          title: "Campaign Name Required",
+          description: "Please enter a campaign name before saving the draft.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType)) {
+      // Material Specs is required for services that are not monitoring, change material, maintenance, or repair
+      if (!formData.materialSpecs || formData.materialSpecs.trim() === "") {
+        toast({
+          title: "Material Specs Required",
+          description: "Please select material specifications before saving the draft.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // Crew is always required
+    if (!formData.crew || formData.crew.trim() === "") {
+      toast({
+        title: "Crew Selection Required",
+        description: "Please select a crew before saving the draft.",
         variant: "destructive",
       });
       return;
