@@ -651,30 +651,27 @@ The OH Plus Team`,
       if (relatedQuotations.length > 1) {
         console.log("[v0] Downloading multiple quotation PDFs:", relatedQuotations.length)
 
-        // Generate PDFs for all related quotations if needed
+        // Generate PDFs for all related quotations if needed and collect pdfUrls
+        const quotationData = []
         for (const relatedQuotation of relatedQuotations) {
-          await generatePDFIfNeeded(relatedQuotation)
+          const { pdfUrl } = await generatePDFIfNeeded(relatedQuotation)
+          if (pdfUrl) {
+            quotationData.push({ quotation: relatedQuotation, pdfUrl })
+          }
         }
-        // Refresh related quotations data after updates
-        await fetchRelatedQuotations(quotation)
 
         // Download all related quotations as separate PDFs from saved URLs
-        for (let i = 0; i < relatedQuotations.length; i++) {
-          const relatedQuotation = relatedQuotations[i]
-
-          if (!relatedQuotation.pdf) {
-            console.error("PDF not generated for quotation:", relatedQuotation.id)
-            continue
-          }
+        for (let i = 0; i < quotationData.length; i++) {
+          const { quotation: relatedQuotation, pdfUrl } = quotationData[i]
 
           // Create unique quotation number with suffix
           const baseQuotationNumber = relatedQuotation.quotation_number || relatedQuotation.id?.slice(-8) || "QT-000"
           const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
 
           // Download from the saved PDF URL
-          const response = await fetch(relatedQuotation.pdf)
+          const response = await fetch(pdfUrl)
           if (!response.ok) {
-            console.error('Failed to download PDF from:', relatedQuotation.pdf)
+            console.error('Failed to download PDF from:', pdfUrl)
             continue
           }
 
@@ -689,14 +686,14 @@ The OH Plus Team`,
           window.URL.revokeObjectURL(url)
 
           // Add small delay between downloads to ensure proper file naming
-          if (i < relatedQuotations.length - 1) {
+          if (i < quotationData.length - 1) {
             await new Promise((resolve) => setTimeout(resolve, 100))
           }
         }
 
         toast({
           title: "PDFs Downloaded",
-          description: `${relatedQuotations.length} PDF files have been downloaded for all pages.`,
+          description: `${quotationData.length} PDF files have been downloaded for all pages.`,
         })
       } else {
         // Single quotation
@@ -759,30 +756,27 @@ The OH Plus Team`,
       if (relatedQuotations.length > 1) {
         console.log("[v0] Downloading multiple quotation PDFs:", relatedQuotations.length)
 
-        // Generate PDFs for all related quotations if needed
+        // Generate PDFs for all related quotations if needed and collect pdfUrls
+        const quotationData = []
         for (const relatedQuotation of relatedQuotations) {
-          await generatePDFIfNeeded(relatedQuotation)
+          const { pdfUrl } = await generatePDFIfNeeded(relatedQuotation)
+          if (pdfUrl) {
+            quotationData.push({ quotation: relatedQuotation, pdfUrl })
+          }
         }
-        // Refresh related quotations data after updates
-        await fetchRelatedQuotations(quotation)
 
         // Download all related quotations as separate PDFs from saved URLs
-        for (let i = 0; i < relatedQuotations.length; i++) {
-          const relatedQuotation = relatedQuotations[i]
-
-          if (!relatedQuotation.pdf) {
-            console.error("PDF not generated for quotation:", relatedQuotation.id)
-            continue
-          }
+        for (let i = 0; i < quotationData.length; i++) {
+          const { quotation: relatedQuotation, pdfUrl } = quotationData[i]
 
           // Create unique quotation number with suffix
           const baseQuotationNumber = relatedQuotation.quotation_number || relatedQuotation.id?.slice(-8) || "QT-000"
           const uniqueQuotationNumber = `${baseQuotationNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
 
           // Download from the saved PDF URL
-          const response = await fetch(relatedQuotation.pdf)
+          const response = await fetch(pdfUrl)
           if (!response.ok) {
-            console.error('Failed to download PDF from:', relatedQuotation.pdf)
+            console.error('Failed to download PDF from:', pdfUrl)
             continue
           }
 
@@ -797,28 +791,28 @@ The OH Plus Team`,
           window.URL.revokeObjectURL(url)
 
           // Add small delay between downloads to ensure proper file naming
-          if (i < relatedQuotations.length - 1) {
+          if (i < quotationData.length - 1) {
             await new Promise((resolve) => setTimeout(resolve, 100))
           }
         }
 
         toast({
           title: "PDFs Downloaded",
-          description: `${relatedQuotations.length} PDF files have been downloaded for all pages.`,
+          description: `${quotationData.length} PDF files have been downloaded for all pages.`,
         })
       } else {
         // Single quotation
         // Ensure PDF is generated and saved if not already done
-        await generatePDFIfNeeded(quotation)
+        const { pdfUrl } = await generatePDFIfNeeded(quotation)
 
-        if (!quotation.pdf) {
+        if (!pdfUrl) {
           throw new Error("Failed to generate PDF")
         }
 
         // Download from the saved PDF URL
-        const response = await fetch(quotation.pdf)
+        const response = await fetch(pdfUrl)
         if (!response.ok) {
-          console.error('Failed to download PDF from:', quotation.pdf)
+          console.error('Failed to download PDF from:', pdfUrl)
           throw new Error("Failed to download PDF")
         }
 
