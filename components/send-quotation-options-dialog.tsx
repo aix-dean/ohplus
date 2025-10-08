@@ -73,9 +73,9 @@ export function SendQuotationOptionsDialog({
         <div className="px-6 pb-4">
           <div className="flex items-center space-x-3">
             <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-              {companyData?.photo_url ? (
+              {companyData?.logo ? (
                 <Image
-                  src={companyData.photo_url || "/placeholder.svg"}
+                  src={companyData.logo || "/placeholder.svg"}
                   alt="Company Logo"
                   width={80}
                   height={80}
