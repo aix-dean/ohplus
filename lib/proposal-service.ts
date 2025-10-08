@@ -916,7 +916,7 @@ export async function downloadProposalPDF(
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
-        imageTimeout: 15000, // Increased timeout for images
+        imageTimeout: 15000 + (proposal.products.length * 2000), // Dynamic timeout based on product count for static map images
         logging: false,
         onclone: async (clonedDoc) => {
           // Wait for all images to load in the cloned document
@@ -1007,7 +1007,7 @@ export async function generateProposalPDFBlob(
       useCORS: true,
       allowTaint: false,
       backgroundColor: '#ffffff',
-      imageTimeout: 15000, // Increased timeout for images
+      imageTimeout: 15000 + (proposal.products.length * 2000), // Dynamic timeout based on product count for static map images
       logging: false,
       onclone: async (clonedDoc) => {
         // Wait for all images to load in the cloned document

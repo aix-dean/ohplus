@@ -42,6 +42,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
+import { generateStaticMapUrl } from "@/lib/static-maps"
 import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
 import { ProposalHistory } from "@/components/proposal-history"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -384,6 +385,7 @@ export default function ProposalDetailsPage() {
   const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false)
   const [siteToDelete, setSiteToDelete] = useState<{ id: string; name: string } | null>(null)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   const [editableTitle, setEditableTitle] = useState("Site Proposals")
   const [editableProposalTitle, setEditableProposalTitle] = useState("Site Proposals")
   const [editableCompanyName, setEditableCompanyName] = useState("")
@@ -1244,12 +1246,15 @@ export default function ProposalDetailsPage() {
       return
     }
 
-    // Ensure PDF is generated and saved before downloading
+    setDownloading(true)
     try {
+      // Ensure PDF is generated and saved before downloading
       await generatePDFIfNeeded(proposal)
       await downloadProposalPDF(proposal, selectedSize, selectedOrientation, toast)
     } catch (error) {
       // Error is already handled in generatePDFIfNeeded
+    } finally {
+      setDownloading(false)
     }
   }
 
@@ -2132,15 +2137,30 @@ export default function ProposalDetailsPage() {
           )}
         </div>
 
-        {/* Google Map - Bottom Left - scaled */}
+        {/* Static Map - Bottom Left - scaled */}
         <div className="absolute left-0 top-[386px] w-[324px] h-[226px] overflow-hidden">
-          {product.location ? (
-            <GoogleMap location={product.location} className="w-full h-full" />
-          ) : (
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-              <span className="text-gray-500">No location available</span>
-            </div>
-          )}
+          {(() => {
+            const mapUrl = generateStaticMapUrl(product.location)
+            return mapUrl ? (
+              <img
+                src={mapUrl}
+                alt={`Map of ${product.location}`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                  const parent = target.parentElement
+                  if (parent) {
+                    parent.innerHTML = '<div class="w-full h-full bg-gray-200 flex items-center justify-center"><span class="text-gray-500">Map unavailable</span></div>'
+                  }
+                }}
+              />
+            ) : (
+              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                <span className="text-gray-500">No location available</span>
+              </div>
+            )
+          })()}
         </div>
 
         {/* Site Details - Right Side - scaled */}
@@ -2314,9 +2334,14 @@ export default function ProposalDetailsPage() {
             <Button
               variant="outline"
               onClick={handleDownload}
-              className="w-[50px] h-[50px] bg-white border-[#c4c4c4] border-2 rounded-[12px] p-0 flex items-center justify-center hover:bg-gray-50"
+              disabled={downloading}
+              className="w-[50px] h-[50px] bg-white border-[#c4c4c4] border-2 rounded-[12px] p-0 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50"
             >
-              <Download className="h-5 w-5 text-black opacity-50" />
+              {downloading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-black opacity-50" />
+              ) : (
+                <Download className="h-5 w-5 text-black opacity-50" />
+              )}
             </Button>
           </div>
         </div>
