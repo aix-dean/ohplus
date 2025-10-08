@@ -137,8 +137,8 @@ export async function POST(request: Request) {
       attributesToRetrieve = "id,invoice_number,invoice_id,contract_pdf_url,client,period,amount,due_date,booking,status,created,company_id"
       attributesToHighlight = "invoice_number,client.name,booking.reservation_id,booking.project_name"
     } else if (indexName === 'quotaions') {
-      attributesToRetrieve = "quotation_number,client_name,items,seller_id,status,created"
-      attributesToHighlight = "quotation_number,client_name"
+      attributesToRetrieve = "quotation_number,client_name,items,seller_id,status,created,client_company_name,client_email,client_phone,client_address,client_designation,total_amount,company_id,projectCompliance,projectName"
+      attributesToHighlight = "quotation_number,client_name,created"
     } else if (indexName === 'booking') {
       attributesToRetrieve = "reservation_id,product_name,client,project_name,start_date,end_date,status,created,quotation_id,product_id,company_id,client_name,client_company_name"
       attributesToHighlight = "reservation_id,product_name,client_name,client_company_name"
