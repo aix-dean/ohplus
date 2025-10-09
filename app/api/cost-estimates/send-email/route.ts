@@ -53,6 +53,7 @@ async function fetchCompanyData(companyId: string) {
         phone: data.phone || data.telephone || data.contact_number || "+639XXXXXXXXX",
         email: verifiedEmail,
         website: data.website || "www.ohplus.ph",
+        company_logo: data.logo|| ""
       }
     }
 
@@ -76,21 +77,40 @@ async function fetchCompanyData(companyId: string) {
 }
 
 function createEmailTemplate(
-  body: string,
-  userPhoneNumber?: string,
-  companyData?: {
-    company_name?: string
-    company_location?: string
-    phone?: string
-    email?: string
-    website?: string
-  }
-): string {
+body: string, userPhoneNumber?: string, companyData?: {
+  company_name?: string
+  company_location?: string
+  phone?: string
+  email?: string
+  website?: string
+  logo?: String
+}, userData?: {
+  first_name?: string
+  middle_name?: string
+  last_name?: string
+  position?: string
+  department?: string
+  email?: string
+  phone_number?: string
+}, costEstimate?: any): string {
   const phoneNumber = userPhoneNumber || companyData?.phone || "+639XXXXXXXXX"
   const companyName = companyData?.company_name || ""
   const companyLocation = companyData?.company_location || ""
   const companyEmail = companyData?.email || "noreply@ohplus.ph"
   const companyWebsite = companyData?.website || "www.ohplus.ph"
+  const companyLogo = companyData?.logo || ""
+
+  // User data for signature
+  const firstName = userData?.first_name || ""
+  const middleName = userData?.middle_name || ""
+  const lastName = userData?.last_name || ""
+  const userPosition = (userData?.position && userData.position.trim() !== '') ? userData.position :
+                      (userData?.department && userData.department.trim() !== '') ? userData.department :
+                      "Sales Team"
+  const userEmail = userData?.email || ""
+
+  //Cost estimate date
+  const costEstimateId = costEstimate?.id || ""
 
   const processedBody = body
     .split("\n")
@@ -124,7 +144,15 @@ function createEmailTemplate(
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             padding: 30px 40px;
-            text-align: center;
+            display: flex;                /* Make elements in a row */
+            align-items: center;          /* Vertically center logo + text */
+            justify-content: flex-start;  /* Align everything to the left */
+            gap: 12px; 
+            text-align: left;
+            flex-direction: column;
+            overflow: visible;        /* Allow shape to extend outside */
+            border: 2px solid red;
+
         }
         .logo {
             color: #ffffff;
@@ -132,7 +160,29 @@ function createEmailTemplate(
             font-weight: bold;
             margin: 0;
             letter-spacing: 1px;
+            height: 60px; /* adjust as needed */
+            width: 60px;
         }
+        .logo-link {
+            text-decoration: none; /* remove underline */
+            color: inherit; /* keep the text color same */
+        }
+
+        .logo-link:hover {
+            opacity: 0.8; /* optional: add a hover effect */
+        }
+
+        .half-circle {
+            position: absolute;
+            right: 0px;
+            top: 0;
+            width: 50px;
+            height: 100px;
+            background: #ffffff;     /* color of the half circle */
+            border-radius: 50% 0 0 50%;
+            z-index: -1;
+        }
+
         .tagline {
             color: #e8eaff;
             font-size: 14px;
@@ -226,45 +276,95 @@ function createEmailTemplate(
                 font-size: 24px;
             }
         }
+            
     </style>
 </head>
 <body>
     <div class="email-container">
-        <div class="header">
-            <h1 class="logo">${companyName}</h1>
-            <p class="tagline">Premium Outdoor Advertising Solutions</p>
-        </div>
+    <div style="
+      position: relative;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 30px 40px;
+      border-radius: 8px;
+      overflow: visible;
+    ">
+      <!-- Circle shape -->
+      <div style="
+        position: absolute;
+        right: -60px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 160px;
+        height: 160px;
+        background: #f5b642;
+        border-radius: 50%;
+        z-index: 1;
+      "></div>
+
+      <!-- Table content -->
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse: collapse; position: relative; z-index: 2;">
+        <tr>
+          <td style="vertical-align: middle;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding-right: 12px;">
+                  <a href="/" style="text-decoration: none;">
+                    <img
+                      src="${companyLogo}"
+                      alt="${companyName} Logo"
+                      width="70"
+                      height="70"
+                      style="display: block;"
+                    />
+                  </a>
+                </td>
+                <td>
+                  <h1 style="
+                    margin: 0;
+                    font-size: 20px;
+                    color: #ffffff;
+                    font-family: Arial, sans-serif;
+                    font-weight: bold;
+                  ">
+                    ${companyName}
+                  </h1>
+                  <p style="
+                    margin: 4px 0 0;
+                    font-size: 14px;
+                    color: #e8eaff;
+                    font-family: Arial, sans-serif;
+                  ">
+                    ${companyLocation}
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+
 
         <div class="content">
             ${processedBody}
 
             <div class="highlight-box">
                 <p style="margin: 0; font-weight: 500; color: #495057;">
-                    📋 <strong>What's Included:</strong><br>
-                    • Detailed cost breakdown and specifications<br>
-                    • Competitive pricing for your advertising needs<br>
-                    • High-quality billboard placement options<br>
-                    • Professional campaign management
                 </p>
             </div>
 
             <div class="cta-section">
-                <a href="mailto:${companyEmail}" class="cta-button">Get In Touch</a>
+                <a href="https://mrk.ohplus.ph/ce/${costEstimateId}" class="cta-button">View</a>
             </div>
         </div>
 
         <div class="footer">
-            <div class="signature">
-                <div class="signature-name">Sales Executive</div>
-                <div class="signature-title">${companyName} - Outdoor Advertising</div>
-            </div>
-
             <div class="contact-info">
                 <strong>${companyName}</strong><br>
-                📍 ${companyLocation}<br>
-                📞 ${phoneNumber}<br>
-                📧 ${companyEmail}<br>
-                🌐 ${companyWebsite}
+                ${firstName} ${middleName} ${lastName}<br>
+                ${phoneNumber}<br>
+                ${userEmail}<br>
             </div>
 
             <div class="divider"></div>
@@ -344,7 +444,7 @@ export async function POST(request: NextRequest) {
             Buffer.from(pdf.content, 'base64'),
             pdf.filename,
             'application/pdf',
-            companyId
+            companyId,
           )
           attachmentDetails.push({
             fileName: pdf.filename,
@@ -430,7 +530,7 @@ export async function POST(request: NextRequest) {
       from,
       to,
       subject: subject.trim(),
-      html: createEmailTemplate(body.trim(), userData?.phone_number, companyData),
+      html: createEmailTemplate(body.trim(), userData?.phone_number, companyData, userData,costEstimate),
       attachments,
     }
 
