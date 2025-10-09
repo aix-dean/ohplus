@@ -25,6 +25,7 @@ export default function SelectDatesPage() {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [isCreating, setIsCreating] = useState(false)
+  const [monthOffset, setMonthOffset] = useState(0)
 
   const [selectedSites, setSelectedSites] = useState<Product[]>([])
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
@@ -65,7 +66,12 @@ export default function SelectDatesPage() {
         console.error("Error parsing site IDs:", error)
       }
     }
-  }, [searchParams])
+   }, [searchParams])
+
+   // Reset month offset when dates change
+   useEffect(() => {
+     setMonthOffset(0)
+   }, [startDate, endDate])
 
   const handleCreateQuotation = async () => {
     if (!startDate || !endDate || !selectedClient || selectedSites.length === 0) {
@@ -182,12 +188,26 @@ export default function SelectDatesPage() {
     getBookedRanges(siteId).some((r) => s <= r.end && e >= r.start)
 
   const removeSite = (id: string) => {
-    setSelectedSites((prev) => {
-      const updated = prev.filter((site) => site.id !== id);
-      if (updated.length === 0) router.push("/sales/dashboard"); // safe now
-      return updated;
-    });
+      setSelectedSites((prev) => {
+          const updated = prev.filter((site) => site.id !== id);
+          if (updated.length === 0) router.push("/sales/dashboard"); // safe now
+          return updated;
+      });
 
+  }
+
+  // Helper function to get all months between start and end dates
+  const getMonthsBetween = (start: string, end: string) => {
+      if (!start || !end) return []
+      const startDate = new Date(start)
+      const endDate = new Date(end)
+      const months = []
+      const current = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+      while (current <= endDate) {
+          months.push({ month: current.getMonth(), year: current.getFullYear() })
+          current.setMonth(current.getMonth() + 1)
+      }
+      return months
   }
 
   const renderCalendar = (monthIndex: number, year: number, bookedRanges: { start: Date; end: Date }[]) => {
@@ -249,15 +269,29 @@ export default function SelectDatesPage() {
   }
 
   // Get months to show based on selected start date or current date
-  const baseDate = startDate ? new Date(startDate) : new Date()
-  const baseMonth = baseDate.getMonth()
-  const baseYear = baseDate.getFullYear()
+  const allMonths = startDate && endDate ? getMonthsBetween(startDate, endDate) : []
+  const shouldShowAllMonths = allMonths.length > 3
 
-  const monthsToShow = [
-    { month: baseMonth, year: baseYear },
-    { month: (baseMonth + 1) % 12, year: baseMonth + 1 > 11 ? baseYear + 1 : baseYear },
-    { month: (baseMonth + 2) % 12, year: baseMonth + 2 > 11 ? baseYear + 1 : baseYear },
-  ]
+  let monthsToShow = []
+  if (shouldShowAllMonths) {
+      // Show 3 months starting from monthOffset
+      const startIndex = monthOffset
+      monthsToShow = allMonths.slice(startIndex, startIndex + 3)
+  } else {
+      // Original logic - show 3 months
+      const baseDate = startDate ? new Date(startDate) : new Date()
+      const baseMonth = baseDate.getMonth()
+      const baseYear = baseDate.getFullYear()
+      monthsToShow = [
+          { month: baseMonth, year: baseYear },
+          { month: (baseMonth + 1) % 12, year: baseMonth + 1 > 11 ? baseYear + 1 : baseYear },
+          { month: (baseMonth + 2) % 12, year: baseMonth + 2 > 11 ? baseYear + 1 : baseYear },
+      ]
+  }
+
+  // Navigation controls
+  const canGoLeft = shouldShowAllMonths && monthOffset > 0
+  const canGoRight = shouldShowAllMonths && monthOffset + 3 < allMonths.length
 
   // Check if any site has overlapping dates
   const hasOverlaps = selectedSites.some(site =>
@@ -358,12 +392,38 @@ export default function SelectDatesPage() {
                   </div>
 
                   {/* Right: Calendars */}
-                  <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {monthsToShow.map(({ month, year }) => (
-                      <div key={`${year}-${month}`}>
-                        {renderCalendar(month, year, bookedRanges)}
+                  <div className="md:col-span-3">
+                    {/* Navigation controls */}
+                    {shouldShowAllMonths && (
+                      <div className="flex justify-between items-center mb-4">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setMonthOffset(Math.max(0, monthOffset - 1))}
+                          disabled={!canGoLeft}
+                        >
+                          ← Previous
+                        </Button>
+                        <span className="text-sm text-gray-600">
+                          Showing months {monthOffset + 1} - {Math.min(monthOffset + 3, allMonths.length)} of {allMonths.length}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setMonthOffset(Math.min(allMonths.length - 3, monthOffset + 1))}
+                          disabled={!canGoRight}
+                        >
+                          Next →
+                        </Button>
                       </div>
-                    ))}
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {monthsToShow.map(({ month, year }) => (
+                        <div key={`${year}-${month}`}>
+                          {renderCalendar(month, year, bookedRanges)}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
