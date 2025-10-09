@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { X, Upload, CheckCircle } from "lucide-react"
 import { format } from "date-fns"
+import { getProjectCompliance } from "@/lib/utils"
 
 interface ComplianceItem {
   key: string
@@ -29,6 +30,7 @@ interface ComplianceDialogProps {
   onDecline?: (quotationId: string, complianceType: string) => void
   onMarkAsReserved?: (quotation: any) => void
   userEmail?: string
+  viewOnly?: boolean
 }
 
 export function ComplianceDialog({
@@ -40,7 +42,8 @@ export function ComplianceDialog({
   onAccept = () => {},
   onDecline = () => {},
   onMarkAsReserved,
-  userEmail
+  userEmail,
+  viewOnly = false
 }: ComplianceDialogProps) {
   const [fileViewerOpen, setFileViewerOpen] = useState(false)
   const [selectedFileUrl, setSelectedFileUrl] = useState<string>("")
@@ -48,6 +51,8 @@ export function ComplianceDialog({
   const [acceptedItems, setAcceptedItems] = useState<Set<string>>(new Set())
   const [declinedItems, setDeclinedItems] = useState<Set<string>>(new Set())
 
+  console.log("[DEBUG] ComplianceDialog quotation:", quotation);
+  console.log("[DEBUG] ComplianceDialog quotation?.projectCompliance:", quotation?.projectCompliance);
   const compliance = quotation?.projectCompliance || {}
 
   const getDisplayFilename = (key: string) => {
@@ -120,9 +125,9 @@ export function ComplianceDialog({
     },
   ]
 
-  const allItems = toReserveItems
-  const completed = allItems.filter((item) => item.status === "accepted").length
-  const total = allItems.length
+  const complianceData = getProjectCompliance(quotation)
+  const completed = complianceData.completed
+  const total = complianceData.total
 
   const handleFileUpload = (complianceType: string) => {
     const input = document.createElement("input")
@@ -206,21 +211,35 @@ export function ComplianceDialog({
                     )}
                   </div>
                   <div className="flex justify-center">
-                    <Button
-                      onClick={() => handleFileUpload(item.key)}
-                      disabled={uploadingFiles.has(`${quotation?.id}-${item.key}`)}
-                      className="bg-white border-2 border-[#c4c4c4] text-[#333333] hover:bg-gray-50 rounded-[6px] h-[24px] px-2 text-[10px]"
-                      variant="outline"
-                    >
-                      {uploadingFiles.has(`${quotation?.id}-${item.key}`) ? (
-                        "Uploading..."
+                    {viewOnly ? (
+                      item.fileUrl ? (
+                        <Button
+                          onClick={() => handleViewFile(item.fileUrl!, item.key)}
+                          className="bg-white border-2 border-[#c4c4c4] text-[#333333] hover:bg-gray-50 rounded-[6px] h-[24px] px-2 text-[10px]"
+                          variant="outline"
+                        >
+                          View
+                        </Button>
                       ) : (
-                        <>
-                          <Upload className="w-3 h-3 mr-1" />
-                          Upload
-                        </>
-                      )}
-                    </Button>
+                        <span className="text-[12px] text-[#333333]">-</span>
+                      )
+                    ) : (
+                      <Button
+                        onClick={() => handleFileUpload(item.key)}
+                        disabled={uploadingFiles.has(`${quotation?.id}-${item.key}`)}
+                        className="bg-white border-2 border-[#c4c4c4] text-[#333333] hover:bg-gray-50 rounded-[6px] h-[24px] px-2 text-[10px]"
+                        variant="outline"
+                      >
+                        {uploadingFiles.has(`${quotation?.id}-${item.key}`) ? (
+                          "Uploading..."
+                        ) : (
+                          <>
+                            <Upload className="w-3 h-3 mr-1" />
+                            Upload
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 </div>
                 {item.note && (
@@ -234,19 +253,21 @@ export function ComplianceDialog({
         </div>
 
         {/* Mark as Reserved Button */}
-        <div className="flex justify-end pb-4 pr-4">
-          <Button
-            disabled={completed === 0}
-            onClick={() => {
-              if (onMarkAsReserved) {
-                onMarkAsReserved(quotation)
-              }
-            }}
-            className="bg-[#48b02c] hover:bg-[#3d8f24] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold text-[12px] rounded-[6px] h-[28px] px-4"
-          >
-            Mark as Reserved
-          </Button>
-        </div>
+        {!viewOnly && (
+          <div className="flex justify-end pb-4 pr-4">
+            <Button
+              disabled={completed === 0}
+              onClick={() => {
+                if (onMarkAsReserved) {
+                  onMarkAsReserved(quotation)
+                }
+              }}
+              className="bg-[#48b02c] hover:bg-[#3d8f24] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold text-[12px] rounded-[6px] h-[28px] px-4"
+            >
+              Mark as Reserved
+            </Button>
+          </div>
+        )}
       </DialogContent>
 
       {/* File Viewer Dialog */}
@@ -336,38 +357,40 @@ export function ComplianceDialog({
                 )
               })()}
             </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => {
-                  setDeclinedItems(prev => new Set(prev).add(selectedItemKey))
-                  setAcceptedItems(prev => {
-                    const newSet = new Set(prev)
-                    newSet.delete(selectedItemKey)
-                    return newSet
-                  })
-                  onDecline(quotation.id, selectedItemKey)
-                  setFileViewerOpen(false)
-                }}
-                className="bg-white border border-[#c4c4c4] text-black rounded-[10px] h-10 sm:h-[47px] font-medium text-sm sm:text-[20px] px-3 sm:px-6 hover:bg-gray-50"
-              >
-                Decline
-              </Button>
-              <Button
-                onClick={() => {
-                  setAcceptedItems(prev => new Set(prev).add(selectedItemKey))
-                  setDeclinedItems(prev => {
-                    const newSet = new Set(prev)
-                    newSet.delete(selectedItemKey)
-                    return newSet
-                  })
-                  onAccept(quotation.id, selectedItemKey)
-                  setFileViewerOpen(false)
-                }}
-                className="bg-[#1d0beb] hover:bg-[#1d0beb]/90 text-white rounded-[10px] h-10 sm:h-[47px] font-semibold text-sm sm:text-[20px] px-3 sm:px-6"
-              >
-                Accept
-              </Button>
-            </div>
+            {!viewOnly && (
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setDeclinedItems(prev => new Set(prev).add(selectedItemKey))
+                    setAcceptedItems(prev => {
+                      const newSet = new Set(prev)
+                      newSet.delete(selectedItemKey)
+                      return newSet
+                    })
+                    onDecline(quotation.id, selectedItemKey)
+                    setFileViewerOpen(false)
+                  }}
+                  className="bg-white border border-[#c4c4c4] text-black rounded-[10px] h-10 sm:h-[47px] font-medium text-sm sm:text-[20px] px-3 sm:px-6 hover:bg-gray-50"
+                >
+                  Decline
+                </Button>
+                <Button
+                  onClick={() => {
+                    setAcceptedItems(prev => new Set(prev).add(selectedItemKey))
+                    setDeclinedItems(prev => {
+                      const newSet = new Set(prev)
+                      newSet.delete(selectedItemKey)
+                      return newSet
+                    })
+                    onAccept(quotation.id, selectedItemKey)
+                    setFileViewerOpen(false)
+                  }}
+                  className="bg-[#1d0beb] hover:bg-[#1d0beb]/90 text-white rounded-[10px] h-10 sm:h-[47px] font-semibold text-sm sm:text-[20px] px-3 sm:px-6"
+                >
+                  Accept
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
