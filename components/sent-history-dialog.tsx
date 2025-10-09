@@ -3,14 +3,16 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { getSentEmailsForProposal } from "@/lib/proposal-service"
+import { getSentEmailsForReport } from "@/lib/report-service"
 import { format } from "date-fns"
 import { X } from "lucide-react"
 
 interface SentHistoryDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
-    proposalId: string
-    emailType?: "proposal" | "cost_estimate" | "quotation"
+    proposalId?: string
+    reportId?: string
+    emailType?: "proposal" | "cost_estimate" | "quotation" | "report"
   }
 
 interface EmailRecord {
@@ -23,7 +25,7 @@ interface EmailRecord {
   attachments: any[]
 }
 
-export function SentHistoryDialog({ open, onOpenChange, proposalId, emailType = "proposal" }: SentHistoryDialogProps) {
+export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, emailType = "proposal" }: SentHistoryDialogProps) {
   const [emails, setEmails] = useState<EmailRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null)
@@ -32,12 +34,12 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, emailType = 
   const [selectedAttachment, setSelectedAttachment] = useState<any>(null)
 
   useEffect(() => {
-    if (open && proposalId) {
+    if (open && (proposalId || reportId)) {
       fetchEmails()
       setCurrentView('list')
       setSelectedEmail(null)
     }
-  }, [open, proposalId])
+  }, [open, proposalId, reportId])
 
   const handleEmailClick = (email: EmailRecord) => {
     setSelectedEmail(email)
@@ -62,7 +64,12 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, emailType = 
   const fetchEmails = async () => {
     setLoading(true)
     try {
-      const emailData = await getSentEmailsForProposal(proposalId, emailType)
+      let emailData
+      if (emailType === "report") {
+        emailData = await getSentEmailsForReport(reportId!)
+      } else {
+        emailData = await getSentEmailsForProposal(proposalId!, emailType)
+      }
       setEmails(emailData as EmailRecord[])
     } catch (error) {
       console.error("Error fetching emails:", error)
