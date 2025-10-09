@@ -23,6 +23,8 @@ export default function SalesReportsPage() {
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [postedReportId, setPostedReportId] = useState<string>("")
+  const [showEmailSuccessDialog, setShowEmailSuccessDialog] = useState(false)
+  const [sentEmailReportId, setSentEmailReportId] = useState<string>("")
 
   const router = useRouter()
   const { user, userData } = useAuth()
@@ -43,6 +45,15 @@ export default function SalesReportsPage() {
       setShowSuccessDialog(true)
       // Clear the session storage
       sessionStorage.removeItem("lastPostedReportId")
+    }
+
+    // Check if we just sent an email
+    const lastSentEmailReportId = sessionStorage.getItem("lastSentEmailReportId")
+    if (lastSentEmailReportId) {
+      setSentEmailReportId(lastSentEmailReportId)
+      setShowEmailSuccessDialog(true)
+      // Clear the session storage
+      sessionStorage.removeItem("lastSentEmailReportId")
     }
   }, [])
 
@@ -335,6 +346,14 @@ export default function SalesReportsPage() {
 
       {/* Report Post Success Dialog */}
       <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />
+
+      {/* Email Send Success Dialog */}
+      <ReportPostSuccessDialog
+        open={showEmailSuccessDialog}
+        onOpenChange={setShowEmailSuccessDialog}
+        reportId={sentEmailReportId}
+        message="You have successfully sent a report!"
+      />
     </div>
   )
 }

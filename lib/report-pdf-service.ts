@@ -8,9 +8,20 @@ export async function generateReportPDF(reportId: string, siteName?: string | nu
   const jsPDF = (await import('jspdf')).default
 
   // Find the main report container
-  const reportContainer = document.querySelector('.max-w-6xl') as HTMLElement
+  console.log('DEBUG: Searching for report container with #report-container')
+  console.log('DEBUG: Report container element:', document.querySelector('#report-container'))
+  console.log('DEBUG: Current URL:', window.location.href)
+  console.log('DEBUG: Document body children:', document.body.children)
+
+  const reportContainer = document.querySelector('#report-container') as HTMLElement
+  console.log('DEBUG: Found report container:', reportContainer)
 
   if (!reportContainer) {
+    console.error('DEBUG: Report container not found. Available containers:')
+    const allContainers = document.querySelectorAll('[class*="container"], [class*="report"], main, article')
+    allContainers.forEach((el, i) => {
+      console.log(`DEBUG: Container ${i}:`, el.className, el.tagName, el)
+    })
     throw new Error("Report container not found")
   }
 

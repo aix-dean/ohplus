@@ -1329,7 +1329,7 @@ export default function QuotationsListPage() {
               </div>
             </div>
             <Button
-              onClick={() => router.push("/sales/quotations/compose/new")}
+              onClick={() => router.push("/sales/dashboard?tab=quotations")}
               className="bg-white border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-medium rounded-lg px-6 py-2"
             >
               Create Quotation
