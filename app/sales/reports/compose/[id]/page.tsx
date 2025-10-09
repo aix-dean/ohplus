@@ -64,7 +64,6 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   const [body, setBody] = useState("")
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [reportPdfFile, setReportPdfFile] = useState<File | null>(null)
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [companyName, setCompanyName] = useState<string>("Company")
 
   const [showAddTemplateDialog, setShowAddTemplateDialog] = useState(false)
@@ -309,16 +308,6 @@ ${user?.email || ""}`)
     }
   }, [loading, params.id, toast, router])
 
-  // Auto-redirect to reports list after showing success dialog
-  useEffect(() => {
-    if (showSuccessDialog) {
-      const timer = setTimeout(() => {
-        handleSuccessDialogClose()
-      }, 3000) // 3 seconds delay
-
-      return () => clearTimeout(timer)
-    }
-  }, [showSuccessDialog])
 
 
   const handleBack = () => {
@@ -386,9 +375,8 @@ ${user?.email || ""}`)
       if (companyName) {
         formData.append("companyName", companyName)
       }
-      if (user?.displayName) {
-        formData.append("userDisplayName", user?.displayName)
-      }
+      // Always send userDisplayName with fallback
+      formData.append("userDisplayName", user?.displayName || "Sales Executive")
       if (replyToEmail.trim()) {
         formData.append("replyTo", replyToEmail.trim())
       }
@@ -451,8 +439,9 @@ ${user?.email || ""}`)
         console.error("Error saving email record:", emailRecordError)
       }
 
-      // Show success dialog
-      setShowSuccessDialog(true)
+      // Navigate to reports page and show success dialog there
+      sessionStorage.setItem('lastSentEmailReportId', params.id)
+      router.push('/sales/reports')
     } catch (error) {
       console.error("Email sending error:", error)
       toast({
@@ -465,10 +454,6 @@ ${user?.email || ""}`)
     }
   }
 
-  const handleSuccessDialogClose = () => {
-    setShowSuccessDialog(false)
-    router.push("/sales/reports")
-  }
 
   const applyTemplate = (template: EmailTemplate) => {
     setSubject(template.subject)
@@ -909,14 +894,6 @@ ${user?.email || ""}`)
         </DialogContent>
       </Dialog>
 
-      {/* Success Dialog */}
-      <Dialog open={showSuccessDialog} onOpenChange={handleSuccessDialogClose}>
-        <DialogContent className="sm:max-w-[425px] flex flex-col items-center justify-center text-center p-8">
-          <h2 className="text-3xl font-bold mb-4">Congratulations!</h2>
-          <Image src="/party-popper.png" alt="Party Popper" width={120} height={120} className="mb-6" />
-          <p className="text-lg text-gray-700">You have successfully sent a report!</p>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

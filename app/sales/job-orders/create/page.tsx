@@ -45,10 +45,11 @@ import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
 import type { Quotation, ProjectComplianceItem } from "@/lib/types/quotation" // Import ProjectComplianceItem
 import type { Product } from "@/lib/firebase-service"
 import { type Client, updateClient, updateClientCompany, type ClientCompany, getClientCompanyById, createNotifications } from "@/lib/client-service" // Import updateClient, updateClientCompany, ClientCompany, and getClientCompanyById
-import { cn } from "@/lib/utils"
+import { cn, getProjectCompliance } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
 import { ComingSoonDialog } from "@/components/coming-soon-dialog"
 import { ComplianceConfirmationDialog } from "@/components/compliance-confirmation-dialog"
+import { ComplianceDialog } from "@/components/compliance-dialog"
 import { serverTimestamp, Timestamp } from "firebase/firestore"
 
 
@@ -152,6 +153,13 @@ export default function CreateJobOrderPage() {
   const [showComplianceDialog, setShowComplianceDialog] = useState(false)
   const [pendingJobOrderStatus, setPendingJobOrderStatus] = useState<JobOrderStatus | null>(null)
 
+  // Compliance dialog state
+  const [showComplianceDialogNew, setShowComplianceDialogNew] = useState(false)
+  const [selectedQuotationForCompliance, setSelectedQuotationForCompliance] = useState<any>(null)
+  const [uploadingFiles, setUploadingFiles] = useState(new Set<string>());
+
+  // View Quote button loading state for specific quotation ID
+  const [isViewQuoteLoading, setIsViewQuoteLoading] = useState(false)
 
   // Calculate derived values using useMemo - these will always be called
 
@@ -1283,652 +1291,124 @@ export default function CreateJobOrderPage() {
   console.log()
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 p-2">
-      <div className="flex items-center bg-white gap-4 mb-6">
+      <div className="flex items-center bg-white gap-4 mb-6 rounded-lg">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold text-gray-900">Create Job Order</h1>
+        <h1 className="text-2xl font-bold text-gray-900 py-4">Create Job Order</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl w-full mx-auto bg-gray-50 p-6 rounded-lg">
-        {/* Left Column: Booking Information */}
-        <div className="space-y-6 lg:pr-8 bg-white p-6 rounded-lg shadow-sm">
-          <h2 className="text-lg font-bold text-gray-900">Booking Information</h2>
-          <div className="text-gray-800">
-            <div className="space-y-0.5">
-              <a
-                href={`/sales/quotations/${quotation.id}`}
-                className="text-blue-600 font-bold text-base hover:underline"
+      <div className="flex flex-col gap-6 max-w-6xl w-full mx-auto bg-gray-50 p-6 rounded-lg">
+        {/* Left Column: Quotation Details */}
+        <div className="bg-white rounded-[10px] shadow-[-2px_4px_7.8px_0px_rgba(0,0,0,0.25)] p-4">
+          <div className="grid grid-cols-6 gap-4 items-center">
+            <div>
+              <p className="font-semibold text-[12px] text-[#333333]">Quotation ID</p>
+              <p className="font-normal text-[18px] text-[#333333]">{quotation.quotation_number}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-[12px] text-[#333333]">Site</p>
+              <p className="font-bold text-[18px] text-[#2d3fff]">{quotation.items?.name || quotation.items?.site_code || "N/A"}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-[12px] text-[#333333]">Client</p>
+              <p className="font-bold text-[18px] text-[#2d3fff]">{client?.name || "N/A"}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-[12px] text-[#333333]">Booking Dates</p>
+              <p className="font-normal text-[18px] text-[#333333]">{formatPeriod(quotation.start_date, quotation.end_date)}</p>
+            </div>
+            <div>
+              <p className="font-semibold text-[12px] text-[#333333]">Compliance</p>
+              <p
+                className="font-bold text-[18px] text-[#2d3fff] cursor-pointer"
+                onClick={() => {
+                  console.log("[DEBUG] quotationData:", quotationData);
+                  console.log("[DEBUG] quotationData?.quotation:", quotationData?.quotation);
+                  console.log("[DEBUG] quotationData?.quotation?.projectCompliance:", quotationData?.quotation?.projectCompliance);
+                  console.log("[DEBUG] selectedQuotationForCompliance will be set to:", quotationData);
+                  setSelectedQuotationForCompliance(quotationData)
+                  setShowComplianceDialogNew(true)
+                }}
               >
-                {quotation.quotation_number}
-              </a>
-              <p className="text-xs text-gray-600">Project ID: {quotation.id}</p>
+                ({getProjectCompliance(quotationData?.quotation).completed}/{getProjectCompliance(quotationData?.quotation).total})
+              </p>
             </div>
-            <div className="space-y-0.5 mt-3">
-              <div>
-                <p className="text-sm">
-                  <span className="font-semibold">Client Name:</span> {client?.name || "N/A"}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Contract Duration:</span> {totalDays > 0 ? `${totalDays} days` : "N/A"}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Contract Period:</span> {formatPeriod(quotation.start_date, quotation.end_date)}
-                </p>
-              </div>
-            </div>
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                className="bg-white border-2 border-[#c4c4c4] rounded-[10px] h-[35px] w-[140px]"
+                disabled={isViewQuoteLoading}
+                onClick={() => {
+                  // Handle loading state and navigation for specific quotation ID
+                  if (quotationId === "sycqON5DiDawhWLjd3QB") {
+                    setIsViewQuoteLoading(true);
+                    console.log("Loading state started for quotation ID:", quotationId);
 
+                    // Show loading state for 1.5 seconds, then proceed with same-tab navigation
+                    setTimeout(() => {
+                      setIsViewQuoteLoading(false);
+                      console.log("Loading state completed, proceeding with same-tab navigation for quotation ID:", quotationId);
 
-            {/* Products/Sites List */}
-            <div className="space-y-1">
-              <p className="text-sm font-semibold">Site:</p>
-              <div className="space-y-2">
-                {productTotals.map((productTotal, index) => {
-                  const item = quotation.items
-                  const product = products[index] || {}
+                      // Navigate in the same tab using router navigation
+                      router.push(`/sales/quotations/${quotation.id}`);
+                    }, 1500);
 
-                  return (
-                    <div key={index} className="flex items-center align-items-start gap-2 p-2 bg-gray-50 rounded-md border border-gray-200">
-                      <Image
-                        src={product.media?.[0]?.url || "/placeholder.svg?height=40&width=40&query=billboard"}
-                        alt={productTotal.productName || "Site image"}
-                        width={50}
-                        height={60}
-                        className="rounded-md object-cover"
-                      />
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm">{productTotal.siteCode}</p>
-                        <p className="text-xs text-gray-600">{productTotal.productName}</p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+                    return;
+                  }
 
-            {/* Totals Section */}
-            <div className="space-y-0.5 mt-3">
-              <div>
-                <p className="text-sm">
-                  <span className="font-semibold">Site Type:</span> {quotationData.quotation.items.content_type}
-                </p>
-                <p className="text-sm truncate">
-                  <span className="font-semibold">Site Location:</span> {quotationData.quotation.items.location || "N/A"}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Size:</span> {`${quotationData.quotation.items?.specs?.height || 0}ft (h) x ${quotationData.quotation.items?.specs?.width || 0}ft (w) `} 
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Illumination:</span> {"N/A"}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Lease Rate/Month:</span> {formatCurrency(productTotals[0].monthlyRate)}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Total Lease:</span> {formatCurrency(productTotals[0].subtotal)}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">12%VAT:</span> {formatCurrency(productTotals[0].vat)}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Total:</span> {formatCurrency(productTotals[0].total)}
-                </p>
-              </div>
-            </div>
+                  // Original navigation logic for other quotation IDs
+                  const handleViewQuotation = () => {
+                    try {
+                      // First try to open in a new tab/window
+                      const newWindow = window.open(`/sales/quotations/${quotation.id}`, '_blank');
 
-            {/* Client Compliance Documents */}
-            <div className="space-y-1.5 pt-4 border-t border-gray-200 mt-6">
-              <p className="text-sm font-semibold mb-2">Client Compliance:</p>
+                      // Check if popup was blocked (newWindow will be null)
+                      if (!newWindow) {
+                        throw new Error('Popup blocked');
+                      }
 
-              {/* DTI/BIR 2303 */}
-              <div className="flex items-center gap-2">
-                {dtiBirUrl ? (
-                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
-                ) : (
-                  <input
-                    type="radio"
-                    id="dti-bir-radio"
-                    name="client-compliance"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    checked={false}
-                    readOnly
-                  />
-                )}
-                <Label htmlFor="dti-bir-radio" className="text-sm flex-1">
-                  DTI/BIR 2303
-                </Label>
-                {dtiBirUrl ? (
-                  <a
-                    href={dtiBirUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
-                  >
-                    {getFileNameFromUrl(dtiBirUrl) || "DTI/BIR 2303"}
-                  </a>
-                ) : (
-                  <input
-                    type="file"
-                    id="dti-bir-upload"
-                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    className="hidden"
-                    onChange={(event) => {
-                      if (event.target.files && event.target.files[0]) {
-                        if (quotationData?.quotation.client_company_id) {
-                          handleFileUpload(
-                            event.target.files[0],
-                            "document",
-                            setDtiBirFile,
-                            setDtiBirUrl,
-                            setUploadingDtiBir,
-                            setDtiBirError,
-                            "documents/client-compliance/dti-bir/",
-                            quotationData.quotation.client_company_id, // Pass client ID
-                            "dti_bir_2303_url", // Field to update
-                          )
+                      // Optional: Add a small delay and check if window is still open
+                      setTimeout(() => {
+                        if (newWindow && newWindow.closed) {
+                          // Window was closed immediately, fall back to router navigation
+                          router.push(`/sales/quotations/${quotation.id}`);
                         }
-                      }
-                    }}
-                  />
-                )}
-                {!dtiBirUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs bg-transparent"
-                    onClick={() => document.getElementById("dti-bir-upload")?.click()}
-                    disabled={uploadingDtiBir}
-                  >
-                    {uploadingDtiBir ? (
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    ) : (
-                      <FileText className="mr-1 h-3 w-3" />
-                    )}
-                    {uploadingDtiBir ? "Uploading..." : "Upload"}
-                  </Button>
-                )}
-                {dtiBirError && <span className="text-xs text-red-500 ml-2">{dtiBirError}</span>}
-              </div>
+                      }, 100);
 
-              {/* GIS */}
-              <div className="flex items-center gap-2">
-                {gisUrl ? (
-                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
-                ) : (
-                  <input
-                    type="radio"
-                    id="gis-radio"
-                    name="client-compliance"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    checked={false}
-                    readOnly
-                  />
-                )}
-                <Label htmlFor="gis-radio" className="text-sm flex-1">
-                  GIS
-                </Label>
-                {gisUrl ? (
-                  <a
-                    href={gisUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
-                  >
-                    {getFileNameFromUrl(gisUrl) || "GIS"}
-                  </a>
-                ) : (
-                  <input
-                    type="file"
-                    id="gis-upload"
-                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    className="hidden"
-                    onChange={(event) => {
-                      if (event.target.files && event.target.files[0]) {
-                        if (quotationData?.quotation.client_company_id) {
-                          handleFileUpload(
-                            event.target.files[0],
-                            "document",
-                            setGisFile,
-                            setGisUrl,
-                            setUploadingGis,
-                            setGisError,
-                            "documents/client-compliance/gis/",
-                            quotationData.quotation.client_company_id, // Pass client ID
-                            "gis_url", // Field to update
-                          )
-                        }
-                      }
-                    }}
-                  />
-                )}
-                {!gisUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs bg-transparent"
-                    onClick={() => document.getElementById("gis-upload")?.click()}
-                    disabled={uploadingGis}
-                  >
-                    {uploadingGis ? (
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    ) : (
-                      <FileText className="mr-1 h-3 w-3" />
-                    )}
-                    {uploadingGis ? "Uploading..." : "Upload"}
-                  </Button>
-                )}
-                {gisError && <span className="text-xs text-red-500 ml-2">{gisError}</span>}
-              </div>
-
-              {/* ID with Signature */}
-              <div className="flex items-center gap-2">
-                {idSignatureUrl ? (
-                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
-                ) : (
-                  <input
-                    type="radio"
-                    id="id-signature-radio"
-                    name="client-compliance"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    checked={false}
-                    readOnly
-                  />
-                )}
-                <Label htmlFor="id-signature-radio" className="text-sm flex-1">
-                  ID with Signature
-                </Label>
-                {idSignatureUrl ? (
-                  <a
-                    href={idSignatureUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
-                  >
-                    {getFileNameFromUrl(idSignatureUrl) || "ID with Signature"}
-                  </a>
-                ) : (
-                  <input
-                    type="file"
-                    id="id-signature-upload"
-                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    className="hidden"
-                    onChange={(event) => {
-                      if (event.target.files && event.target.files[0]) {
-                        if (quotationData?.quotation.client_company_id) {
-                          handleFileUpload(
-                            event.target.files[0],
-                            "document",
-                            setIdSignatureFile,
-                            setIdSignatureUrl,
-                            setUploadingIdSignature,
-                            setIdSignatureError,
-                            "documents/client-compliance/id-signature/",
-                            quotationData.quotation.client_company_id, // Pass client ID
-                            "id_signature_url", // Field to update
-                          )
-                        }
-                      }
-                    }}
-                  />
-                )}
-                {!idSignatureUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs bg-transparent"
-                    onClick={() => document.getElementById("id-signature-upload")?.click()}
-                    disabled={uploadingIdSignature}
-                  >
-                    {uploadingIdSignature ? (
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    ) : (
-                      <FileText className="mr-1 h-3 w-3" />
-                    )}
-                    {uploadingIdSignature ? "Uploading..." : "Upload"}
-                  </Button>
-                )}
-                {idSignatureError && <span className="text-xs text-red-500 ml-2">{idSignatureError}</span>}
-              </div>
-
-            </div>
-
-            {/* Project Compliance Documents */}
-            <div className="space-y-1.5 pt-4 border-t border-gray-200 mt-6">
-              <p className="text-sm font-semibold mb-2">Project Compliance (Shared for all Job Orders):</p>
-              {/* Signed Quotation */}
-              <div className="flex items-center gap-2">
-                {signedQuotationUrl ? (
-                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
-                ) : (
-                  <input
-                    type="radio"
-                    id="signed-quotation-radio"
-                    name="project-compliance"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    checked={false}
-                    readOnly
-                  />
-                )}
-                <Label htmlFor="signed-quotation-radio" className="text-sm flex-1">
-                  Signed Quotation
-                </Label>
-                {signedQuotationUrl ? (
-                  <a
-                    href={signedQuotationUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
-                  >
-                    {quotationData?.quotation?.projectCompliance?.signedQuotation?.fileName || "Signed_Quotation"}
-                  </a>
-                ) : (
-                  <input
-                    type="file"
-                    id="signed-quotation-upload"
-                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    className="hidden"
-                    onChange={(event) => {
-                      if (event.target.files && event.target.files[0]) {
-                        if (quotationId) {
-                          handleFileUpload(
-                            event.target.files[0],
-                            "document",
-                            setSignedQuotationFile,
-                            setSignedQuotationUrl,
-                            setUploadingSignedQuotation,
-                            setSignedQuotationError,
-                            "documents/signed-quotations/",
-                            quotationId,
-                            "signedQuotation",
-                          )
-                        }
-                      }
-                    }}
-                  />
-                )}
-                {!signedQuotationUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs bg-transparent"
-                    onClick={() => document.getElementById("signed-quotation-upload")?.click()}
-                    disabled={uploadingSignedQuotation}
-                  >
-                    {uploadingSignedQuotation ? (
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    ) : (
-                      <FileText className="mr-1 h-3 w-3" />
-                    )}
-                    {uploadingSignedQuotation ? "Uploading..." : "Upload"}
-                  </Button>
-                )}
-                {signedQuotationError && <span className="text-xs text-red-500 ml-2">{signedQuotationError}</span>}
-              </div>
-
-              {/* Signed Contract */}
-              <div className="flex items-center gap-2">
-                {signedContractUrl ? (
-                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
-                ) : (
-                  <input
-                    type="radio"
-                    id="signed-contract-radio"
-                    name="project-compliance"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    checked={false}
-                    readOnly
-                  />
-                )}
-                <Label htmlFor="signed-contract-radio" className="text-sm flex-1">
-                  Signed Contract
-                </Label>
-                {signedContractUrl && (
-                  <a
-                    href={signedContractUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
-                  >
-                    {quotationData?.quotation?.projectCompliance?.signedContract?.fileName || "Signed_Contract"}
-                  </a>
-                )}
-                <input
-                  type="file"
-                  id="signed-contract-upload"
-                  accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="hidden"
-                  onChange={(event) => {
-                    if (event.target.files && event.target.files[0]) {
-                      if (quotationId) {
-                        handleFileUpload(
-                          event.target.files[0],
-                          "document",
-                          setSignedContractFile,
-                          setSignedContractUrl,
-                          setUploadingSignedContract,
-                          setSignedContractError,
-                          "documents/signed-contracts/",
-                          quotationId,
-                          "signedContract",
-                        )
-                      }
+                    } catch (error) {
+                      // If popup fails or is blocked, fall back to router navigation
+                      console.warn('Popup blocked or failed, falling back to navigation:', error);
+                      router.push(`/sales/quotations/${quotation.id}`);
                     }
-                  }}
-                />
-                {!signedContractUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs bg-transparent"
-                    onClick={() => document.getElementById("signed-contract-upload")?.click()}
-                    disabled={uploadingSignedContract}
-                  >
-                    {uploadingSignedContract ? (
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    ) : (
-                      <FileText className="mr-1 h-3 w-3" />
-                    )}
-                    {uploadingSignedContract ? "Uploading..." : "Upload"}
-                  </Button>
-                )}
-                {signedContractError && <span className="text-xs text-red-500 ml-2">{signedContractError}</span>}
-              </div>
+                  };
 
-              {/* PO/MO */}
-              <div className="flex items-center gap-2">
-                {poMoUrl ? (
-                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
+                  handleViewQuotation();
+                }}
+              >
+                {isViewQuoteLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <p className="font-medium text-[16px] text-[#333333]">Loading...</p>
+                  </>
                 ) : (
-                  <input
-                    type="radio"
-                    id="po-mo-radio"
-                    name="project-compliance"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    checked={false}
-                    readOnly
-                  />
+                  <p className="font-medium text-[16px] text-[#333333]">View Quote</p>
                 )}
-                <Label htmlFor="po-mo-radio" className="text-sm flex-1">
-                  Irrevocable PO
-                </Label>
-                {poMoUrl ? (
-                  <a
-                    href={poMoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
-                  >
-                    {quotationData?.quotation?.projectCompliance?.irrevocablePo?.fileName || "PO_MO"}
-                  </a>
-                ) : (
-                  <input
-                    type="file"
-                    id="po-mo-upload"
-                    accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    className="hidden"
-                    onChange={(event) => {
-                      if (event.target.files && event.target.files[0]) {
-                        if (quotationId) {
-                          handleFileUpload(
-                            event.target.files[0],
-                            "document",
-                            setPoMoFile,
-                            setPoMoUrl,
-                            setUploadingPoMo,
-                            setPoMoError,
-                            "documents/po-mo/",
-                            quotationId,
-                            "poMo",
-                          )
-                        }
-                      }
-                    }}
-                  />
-                )}
-                {!poMoUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs bg-transparent"
-                    onClick={() => document.getElementById("po-mo-upload")?.click()}
-                    disabled={uploadingPoMo}
-                  >
-                    {uploadingPoMo ? (
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    ) : (
-                      <FileText className="mr-1 h-3 w-3" />
-                    )}
-                    {uploadingPoMo ? "Uploading..." : "Upload"}
-                  </Button>
-                )}
-                {poMoError && <span className="text-xs text-red-500 ml-2">{poMoError}</span>}
-              </div>
-
-              {/* Final Artwork */}
-              <div className="flex items-center gap-2">
-                {finalArtworkUrl ? (
-                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
-                ) : (
-                  <input
-                    type="radio"
-                    id="final-artwork-radio"
-                    name="project-compliance"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    checked={false}
-                    readOnly
-                  />
-                )}
-                <Label htmlFor="final-artwork-radio" className="text-sm flex-1">
-                  Final Artwork
-                </Label>
-                {finalArtworkUrl ? (
-                  <a
-                    href={finalArtworkUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-xs truncate max-w-[150px]"
-                  >
-                    {quotationData?.quotation?.projectCompliance?.finalArtwork?.fileName || "Final Artwork"}
-                  </a>
-                ) : (
-                  <input
-                    type="file"
-                    id="final-artwork-upload"
-                    accept="image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    className="hidden"
-                    onChange={(event) => {
-                      if (event.target.files && event.target.files[0]) {
-                        const file = event.target.files[0]
-                        const fileType = file.type.startsWith('image/') ? "image" : "document"
-                        if (quotationId) {
-                          handleFileUpload(
-                            file,
-                            fileType,
-                            setFinalArtworkFile,
-                            setFinalArtworkUrl,
-                            setUploadingFinalArtwork,
-                            setFinalArtworkError,
-                            "documents/final-artwork/",
-                            quotationId,
-                            "finalArtwork",
-                          )
-                        }
-                      }
-                    }}
-                  />
-                )}
-                {!finalArtworkUrl && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2.5 text-xs bg-transparent"
-                    onClick={() => document.getElementById("final-artwork-upload")?.click()}
-                    disabled={uploadingFinalArtwork}
-                  >
-                    {uploadingFinalArtwork ? (
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    ) : (
-                      <FileText className="mr-1 h-3 w-3" />
-                    )}
-                    {uploadingFinalArtwork ? "Uploading..." : "Upload"}
-                  </Button>
-                )}
-                {finalArtworkError && <span className="text-xs text-red-500 ml-2">{finalArtworkError}</span>}
-              </div>
-
-              {/* Payment as Deposit/Advance */}
-              <div className="flex items-center gap-2">
-                {paymentAdvanceConfirmed ? (
-                  <CircleCheck className="h-4 w-4 text-white fill-green-500" />
-                ) : (
-                  <input
-                    type="radio"
-                    id="payment-advance-radio"
-                    name="project-compliance"
-                    className="form-radio h-4 w-4 text-blue-600"
-                    checked={false}
-                    readOnly
-                  />
-                )}
-                <Label htmlFor="payment-advance-radio" className="text-sm flex-1">
-                  Payment as Deposit/Advance
-                </Label>
-                <span className="text-xs text-gray-500">For Treasury's confirmation</span>
-              </div>
-
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Right Column: Job Order Forms */}
         <div className="space-y-4">
-          {missingCompliance.dtiBir ||
+          {!(missingCompliance.dtiBir ||
             missingCompliance.gis ||
             missingCompliance.idSignature ||
             missingCompliance.signedQuotation ||
             missingCompliance.signedContract ||
             missingCompliance.poMo ||
             missingCompliance.finalArtwork ||
-            missingCompliance.paymentAdvance ? (
-            <Alert variant="destructive" className="bg-red-100 border-red-400 text-red-700 py-2 px-3">
-              <AlertCircle className="h-4 w-4 text-red-500" />
-              <AlertTitle className="text-red-700 text-xs">
-                This client has some missing compliance requirements.
-              </AlertTitle>
-              <AlertDescription className="text-red-700 text-xs">
-                <ul className="list-disc list-inside ml-2">
-                  {missingCompliance.dtiBir && <li>- DTI/BIR 2303</li>}
-                  {missingCompliance.gis && <li>- GIS</li>}
-                  {missingCompliance.idSignature && <li>- ID with Signature</li>}
-                  {missingCompliance.signedQuotation && <li>- Signed Quotation</li>}
-                  {missingCompliance.signedContract && <li>- Signed Contract</li>}
-                  {missingCompliance.poMo && <li>- Irrevocable PO</li>}
-                  {missingCompliance.finalArtwork && <li>- Final Artwork</li>}
-                  {missingCompliance.paymentAdvance && <li>- Payment as Deposit/Advance</li>}
-                </ul>
-              </AlertDescription>
-            </Alert>
-          ) : (
+            missingCompliance.paymentAdvance) && (
             <Alert className="bg-green-100 border-green-400 text-green-700 py-2 px-3">
               <CircleCheck className="h-4 w-4 text-green-500" />
               <AlertTitle className="text-green-700 text-xs">
@@ -1939,25 +1419,59 @@ export default function CreateJobOrderPage() {
               </AlertDescription>
             </Alert>
           )}
-          <div className="bg-white p-6 rounded-lg shadow-sm">
-            <div className="flex justify-between items-center ">
-              <p className="text-xs flex-1 font-bold text-blue-600">
-                JO#
-              </p>
-              <h2 className="text-lg flex-1 font-bold text-gray-900 text-center">
-                Job Order
-              </h2>
-              <p className="text-xs flex-1 font-bold text-blue-600 text-right">
-                {new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
-              </p>
+          <div className="flex gap-6">
+            <div className="w-[303px]">
+              <div className="flex justify-center mb-2">
+                <div className="w-full aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
+                  {quotation.items?.media_url ? (
+                    <Image
+                      src={quotation.items.media_url}
+                      alt={quotation.items?.name || "Site image"}
+                      width={200}
+                      height={200}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className={`w-full h-full flex items-center justify-center ${quotation.items?.media_url ? 'hidden' : ''}`}
+                    style={{
+                      backgroundColor: '#f3f4f6',
+                      display: quotation.items?.media_url ? 'none' : 'flex'
+                    }}
+                  >
+                    <ImageIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                </div>
+              </div>
+              <p className="font-bold text-[20px] text-[#333333]">{quotation.items?.name || "Site Name"}</p>
+              <p className="font-normal text-[14px] text-[#333333]">{quotation.items?.location || "Location"}</p>
+              <div className="bg-white border-2 border-[#c4c4c4] rounded-[10px] h-[125px] mt-2 flex items-center justify-center">
+                <Input
+                  placeholder="Remarks"
+                  value={jobOrderForms[0]?.remarks || ""}
+                  onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
+                  className="w-full h-full border-none bg-transparent text-center font-medium text-[14px] text-[#a1a1a1]"
+                />
+              </div>
             </div>
-
-            <div className="space-y-4">
-              <div className="space-y-4 pt-6">
-
-
-                <div className="flex items-center space-x-2">
-                  <Label className="w-36 text-sm text-gray-800">JO Type</Label>
+            <div className="bg-white rounded-[10px] shadow-[-2px_4px_7.8px_0px_rgba(0,0,0,0.25)] p-6 w-[947px]">
+              <div className="flex justify-between items-center mb-6">
+                <p className="font-bold text-[20px] text-[#333333]">JO#</p>
+                <p className="font-bold text-[20px] text-[#333333]">{new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}</p>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <p className="font-semibold text-[14px] text-[#333333] w-[177px]">Date:</p>
+                  <p className="font-medium text-[14px] text-[#a1a1a1]">{new Date().toLocaleDateString()}</p>
+                </div>
+                <div className="flex items-center">
+                  <p className="font-semibold text-[14px] text-[#333333] w-[177px]">JO Type:</p>
                   <Select
                     onValueChange={(value: JobOrderType) => {
                       handleFormUpdate(0, "joType", value)
@@ -1965,13 +1479,11 @@ export default function CreateJobOrderPage() {
                     }}
                     value={jobOrderForms[0]?.joType}
                   >
-                    <SelectTrigger
-                      className={cn(
-                        "flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                        jobOrderForms[0]?.joTypeError && "border-red-500 focus-visible:ring-red-500",
-                      )}
-                    >
-                      <SelectValue placeholder="Choose JO Type" />
+                    <SelectTrigger className={cn(
+                      "w-[311px] bg-white text-gray-800 border-2 border-[#c4c4c4] rounded-[10px] h-[39px] text-[16px]",
+                      jobOrderForms[0]?.joTypeError && "border-red-500",
+                    )}>
+                      <SelectValue placeholder="Select Type" />
                     </SelectTrigger>
                     <SelectContent>
                       {joTypeOptions.map((type) => (
@@ -1982,285 +1494,177 @@ export default function CreateJobOrderPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="flex items-center space-x-2">
-                  <Label className="w-36 text-sm text-gray-800">Campaign Name</Label>
+                <div className="flex items-center">
+                  <p className="font-semibold text-[14px] text-[#333333] w-[177px]">Campaign Name:</p>
                   <Input
-                    placeholder=""
+                    placeholder="Campaign Name"
                     value={jobOrderForms[0]?.campaignName || ""}
                     onChange={(e) => handleFormUpdate(0, "campaignName", e.target.value)}
-                    className="flex-1 bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
+                    className="w-[311px] bg-white text-gray-800 border-2 border-[#c4c4c4] rounded-[10px] h-[39px] text-[16px]"
                   />
                 </div>
-
-                <div className="flex items-center space-x-2">
-                  <Label className="w-36 text-sm text-gray-800">Deadline</Label>
-                  <div className="flex-1 flex gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "flex-1 justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9",
-                            !jobOrderForms[0]?.deadline && "text-gray-500",
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                          {jobOrderForms[0]?.deadline ? (
-                            format(jobOrderForms[0].deadline, "PPP")
-                          ) : (
-                            <span>Select Date</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={jobOrderForms[0]?.deadline}
-                          onSelect={(date) => handleFormUpdate(0, "deadline", date)}
-                          disabled={{ before: new Date() }} // Disable past dates
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Button
-                      variant="outline"
-                      className="w-24 h-9 text-xs bg-transparent"
-                      onClick={() => setShowComingSoonDialog(true)}
-                    >
-                      Timeline
-                    </Button>
-                  </div>
-                </div>
-
-                {jobOrderForms[0]?.joType !== "Monitoring" && (
-                  <div className="flex items-center space-x-2">
-                    <Label className="w-36 text-sm text-gray-800">Material Spec</Label>
-                    <Select
-                      onValueChange={(value) => handleFormUpdate(0, "materialSpec", value)}
-                      value={jobOrderForms[0]?.materialSpec}
-                    >
-                      <SelectTrigger className="flex-1 bg-white text-gray-800 border-gray-300 hover:bg-gray-50 text-sm h-9">
-                        <SelectValue placeholder="Choose Material Spec" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {materialSpecOptions.map((spec) => (
-                          <SelectItem key={spec} value={spec} className="text-sm">
-                            {spec}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-                {/* Combined Attachment Upload in Single Line */}
-                <div className="flex items-start space-x-2">
-                  <Label className="w-36 text-sm text-gray-800">Attachment</Label>
-                </div>
-                <div className="flex items-start space-x-2">
-
-                  <div className="flex items-center align-center gap-4 flex-1">
-                    {/* Final Artwork */}
-                    <div className="flex flex-col items-center gap-2">
-                      {finalArtworkUrl ? (
-                        <div className="flex items-center gap-2">
-                          {isImageFile(null, finalArtworkUrl) ? (
-                            <div className="relative inline-block">
-                              <Image
-                                src={finalArtworkUrl}
-                                alt="Final Artwork"
-                                width={100}
-                                height={100}
-                                className="rounded-md object-cover shadow-md"
-                              />
-                              {jobOrderForms[0]?.joType === "Change Material" && (
-                                <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                                  <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="relative inline-block">
-                              <FileText className="h-20 w-20 text-blue-600" />
-                              {jobOrderForms[0]?.joType === "Change Material" && (
-                                <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                                  <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                        </div>
-                      ) : jobOrderForms[0]?.materialSpecAttachmentUrl ? (
-                        <div className="flex items-center gap-2">
-                          {isImageFile(jobOrderForms[0].materialSpecAttachmentFile?.name || null, jobOrderForms[0].materialSpecAttachmentUrl) ? (
-                            <Image
-                              src={jobOrderForms[0].materialSpecAttachmentUrl}
-                              alt={jobOrderForms[0].materialSpecAttachmentFile?.name || "Attachment"}
-                              width={50}
-                              height={50}
-                              className="rounded-md object-cover shadow-md"
-                            />
-                          ) : (
-                            <>
-                              <FileText className="h-5 w-5 text-blue-600" />
-                              <span className="text-xs text-blue-600">{jobOrderForms[0].materialSpecAttachmentFile?.name || "Attachment"}</span>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        <>
-                          <input
-                            type="file"
-                            id="material-spec-attachment-upload-0"
-                            accept="image/*,application/pdf"
-                            className="hidden"
-                            onChange={(event) => {
-                              if (event.target.files && event.target.files[0]) {
-                                handleMaterialSpecAttachmentUpload(0, event.target.files[0])
-                              }
-                            }}
-                          />
-                          <Button
-                            variant="outline"
-                            className="w-[100px] h-[100px] flex flex-col items-center justify-center bg-gray-300 border-2 border-gray-300 relative"
-                          >
-
-                            {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <ImageIcon  className="h-20 w-20 text-white" />
-                            )}
-                            {jobOrderForms[0]?.joType === "Change Material" && (
-                              <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                                <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">OLD</span>
-                              </div>
-                            )}
-                            <span className="text-xs mt-1">
-                              {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? "Uploading..." : ""}
-                            </span>
-                          </Button>
-                        </>
-                      )}
-                      {jobOrderForms[0]?.materialSpecAttachmentError && (
-                        <p className="text-xs text-red-500">{jobOrderForms[0].materialSpecAttachmentError}</p>
-                      )}
-                    </div>
-                    {jobOrderForms[0]?.joType === "Change Material" && (
-                      <>
-                        <div className="flex items-center justify-center">
-                          <ArrowRight className="h-[100px] w-[100px] text-gray-400" />
-                        </div>
-
-                        {/* new upload*/}
-                        <div className="flex flex-col items-center gap-2">
-                      <input
-                        type="file"
-                        id="attachment-upload-0"
-                        accept="image/*,application/pdf"
-                        className="hidden"
-                        onChange={(event) => {
-                          if (event.target.files && event.target.files[0]) {
-                            handleProductAttachmentUpload(0, event.target.files[0])
-                          }
-                        }}
+                <div className="flex items-center">
+                  <p className="font-semibold text-[14px] text-[#333333] w-[177px]">Deadline:</p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-[311px] justify-start text-left font-normal bg-white text-gray-800 border-2 border-[#c4c4c4] rounded-[10px] h-[39px] text-[16px]"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {jobOrderForms[0]?.deadline ? format(jobOrderForms[0].deadline, "PPP") : "Select Date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={jobOrderForms[0]?.deadline}
+                        onSelect={(date) => handleFormUpdate(0, "deadline", date)}
+                        disabled={{ before: new Date() }}
                       />
-                      {jobOrderForms[0]?.attachmentUrl ? (
-                        <div className="flex items-center gap-2 relative">
-                          {isImageFile(jobOrderForms[0].attachmentFile?.name || null, jobOrderForms[0].attachmentUrl) ? (
-                            <Image
-                              src={jobOrderForms[0].attachmentUrl}
-                              alt={jobOrderForms[0].attachmentFile?.name || "Attachment"}
-                              width={100}
-                              height={100}
-                              className="rounded-md object-cover shadow-md"
-                            />
-                          ) : (
-                            <>
-                              <FileText className="h-5 w-5 text-blue-600" />
-                              <span className="text-xs text-blue-600">{jobOrderForms[0].attachmentFile?.name || "Attachment"}</span>
-                            </>
-                          )}
-                          <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                            <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="flex items-center">
+                  <p className="font-semibold text-[14px] text-[#333333] w-[177px]">Material Spec:</p>
+                  <Select
+                    onValueChange={(value) => handleFormUpdate(0, "materialSpec", value)}
+                    value={jobOrderForms[0]?.materialSpec}
+                  >
+                    <SelectTrigger className="w-[311px] bg-white text-gray-800 border-2 border-[#c4c4c4] rounded-[10px] h-[39px] text-[16px]">
+                      <SelectValue placeholder="Choose Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {materialSpecOptions.map((spec) => (
+                        <SelectItem key={spec} value={spec} className="text-sm">
+                          {spec}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-start">
+                  <p className="font-semibold text-[14px] text-[#333333] w-[177px]">Attachments:</p>
+                  <div className="w-[311px]">
+                    {jobOrderForms[0]?.materialSpecAttachmentUrl ? (
+                      // Show preview when file is uploaded
+                      <div className="bg-white border-2 border-[#c4c4c4] rounded-[10px] w-[131px] aspect-square flex flex-col relative p-2">
+                        {isImageFile(jobOrderForms[0]?.materialSpecAttachmentFile?.name || "", jobOrderForms[0]?.materialSpecAttachmentUrl || "") ? (
+                          // Image file preview with loading and error handling
+                          <div className="relative w-full h-full flex items-center justify-center">
+                            {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? (
+                              // Loading state
+                              <div className="flex flex-col items-center justify-center w-full h-full">
+                                <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-2" />
+                                <span className="text-xs text-gray-500">Loading image...</span>
+                              </div>
+                            ) : (
+                              // Image display with error fallback
+                              <>
+                                <Image
+                                  src={jobOrderForms[0].materialSpecAttachmentUrl}
+                                  alt={jobOrderForms[0]?.materialSpecAttachmentFile?.name || "Uploaded image"}
+                                  fill
+                                  className="object-cover rounded-md"
+                                  sizes="311px"
+                                  onLoad={() => {
+                                    // Image loaded successfully
+                                    console.log("Image loaded successfully");
+                                  }}
+                                  onError={(e) => {
+                                    console.error("Image failed to load:", e);
+                                    // Hide the image and show fallback
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const fallback = target.nextElementSibling as HTMLElement;
+                                    if (fallback) {
+                                      fallback.style.display = 'flex';
+                                    }
+                                  }}
+                                />
+                                {/* Fallback icon when image fails to load */}
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 rounded-md hidden">
+                                  <ImageIcon className="w-8 h-8 text-gray-400 mb-1" />
+                                  <span className="text-xs text-gray-500 text-center px-2">
+                                    Failed to load image
+                                  </span>
+                                </div>
+                              </>
+                            )}
                           </div>
-                        </div>
-                      ) : (
+                        ) : (
+                          // Non-image file preview (existing logic)
+                          <div className="flex flex-col items-center justify-center h-full">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileText className="w-6 h-6 text-gray-600" />
+                              <span className="font-medium text-xs text-gray-800 truncate max-w-[200px]" title={jobOrderForms[0]?.materialSpecAttachmentFile?.name || "Uploaded file"}>
+                                {jobOrderForms[0]?.materialSpecAttachmentFile?.name || "Uploaded file"}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Remove button - positioned in top-right corner */}
+
                         <Button
-                          variant="outline"
-                          className="w-[100px] h-[100px] flex flex-col items-center justify-center bg-gray-300 border-2 border-gray-300 relative"
-                          onClick={() => document.getElementById("attachment-upload-0")?.click()}
-                          disabled={jobOrderForms[0]?.uploadingAttachment}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleFormUpdate(0, "materialSpecAttachmentFile", null)
+                            handleFormUpdate(0, "materialSpecAttachmentUrl", null)
+                            handleFormUpdate(0, "materialSpecAttachmentError", null)
+                          }}
+                          className="absolute top-1 right-1 h-6 w-6 p-0 text-gray-500 hover:text-red-500 bg-white bg-opacity-75 rounded-full"
                         >
-                          {jobOrderForms[0]?.uploadingAttachment ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Upload className="h-20 w-20 text-white" />
-                          )}
-                          <div className="absolute inset-0 flex items-start justify-start rounded-md">
-                            <span className="text-white font-bold italic text-[0.625rem] bg-gray-500 px-2">NEW</span>
-                          </div>
-                          <span className="text-xs mt-1">
-                            {jobOrderForms[0]?.uploadingAttachment ? "Uploading..." : ""}
-                          </span>
+                          <XCircle className="w-4 h-4" />
                         </Button>
-                      )}
-                      {jobOrderForms[0]?.attachmentError && (
-                        <p className="text-xs text-red-500">{jobOrderForms[0].attachmentError}</p>
-                      )}
+                      </div>
+                    ) : (
+                      // Show upload area when no file is uploaded
+                      <div className="bg-[#c4c4c4] opacity-50 rounded-[10px] w-[131px] aspect-square flex items-center justify-center relative cursor-pointer hover:opacity-70 transition-opacity" onClick={() => document.getElementById("material-spec-attachment-upload-0")?.click()}>
+                        <p className="font-semibold text-[10.267px] text-[#4e4e4e] text-center">Upload</p>
+                        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                          <Upload className="w-[45.557px] h-[45.557px] opacity-50" />
                         </div>
-                      </>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      id="material-spec-attachment-upload-0"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      onChange={(event) => {
+                        if (event.target.files && event.target.files[0]) {
+                          handleMaterialSpecAttachmentUpload(0, event.target.files[0])
+                        }
+                      }}
+                    />
+                    {jobOrderForms[0]?.materialSpecAttachmentError && (
+                      <p className="text-xs text-red-500">{jobOrderForms[0].materialSpecAttachmentError}</p>
                     )}
                   </div>
                 </div>
-
-                <div className="flex items-start space-x-2">
-                  <Label className="w-36 text-sm text-gray-800">Remarks</Label>
-                  <Input
-                    placeholder="Remarks..."
-                    value={jobOrderForms[0]?.remarks || ""}
-                    onChange={(e) => handleFormUpdate(0, "remarks", e.target.value)}
-                    className="flex-1 bg-white text-gray-800 border-gray-300 placeholder:text-gray-500 text-sm h-9"
-                  />
+                <div className="flex items-center">
+                  <p className="font-semibold text-[14px] text-[#333333] w-[177px]">Sales:</p>
+                  <p className="font-medium text-[14px] text-[#a1a1a1]">{userData?.first_name} {userData?.last_name}</p>
                 </div>
-
-                <div className="flex items-center space-x-2">
-                  <Label className="w-36 text-sm text-gray-800">Requested By</Label>
-                  <Input
-                    value={`${userData?.first_name} ${userData?.last_name}` || "(Auto-Generated)"}
-                    disabled
-                    className="flex-1 bg-gray-100 text-gray-600 text-sm h-9"
-                  />
-                </div>
-
               </div>
-            </div>
-
-            <p className="text-xs text-gray-500 mt-4 text-center">
-              This Job Order will be forwarded to your Logistics Team.
-            </p>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 pt-4 justify-end">
-              <Button
-                variant="outline"
-                onClick={() => handleCreateJobOrders("draft")}
-                disabled={isSubmitting}
-                className="bg-transparent text-gray-800 border-gray-300 hover:bg-gray-50"
-              >
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                Save as Draft
-              </Button>
-              <Button
-                onClick={() => handleCreateJobOrders("pending")}
-                disabled={isSubmitting}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                Create JO
-              </Button>
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white border-[#c4c4c4] border-[1.5px] rounded-[50px] h-[112px] w-[440px] flex items-center justify-center gap-4 mx-auto mt-4">
+        <Button
+          onClick={() => handleCreateJobOrders("pending")}
+          disabled={isSubmitting}
+          className="bg-[#1d0beb] text-white font-bold text-[24px] h-[61px] w-[175px] rounded-[15px]"
+        >
+          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Send JO"}
+        </Button>
+        <p className="font-semibold text-[16px] text-[#333333] underline cursor-pointer" onClick={() => handleCreateJobOrders("draft")}>
+          Save as Draft
+        </p>
       </div>
 
 
@@ -2285,6 +1689,17 @@ export default function CreateJobOrderPage() {
           { name: "Final Artwork", completed: !missingCompliance.finalArtwork, type: "upload" },
           { name: "Payment as Deposit/Advance", completed: !missingCompliance.paymentAdvance, type: "confirmation" },
         ]}
+      />
+
+      {/* Compliance Dialog */}
+      <ComplianceDialog
+        open={showComplianceDialogNew}
+        onOpenChange={setShowComplianceDialogNew}
+        quotation={selectedQuotationForCompliance?.quotation}
+        onFileUpload={() => {}}
+        uploadingFiles={uploadingFiles}
+        userEmail={userData?.email || ""}
+        viewOnly={true}
       />
     </div>
   )

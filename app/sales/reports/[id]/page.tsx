@@ -556,7 +556,7 @@ export default function SalesReportViewPage() {
       <div className="relative flex justify-center">
         <div className="absolute left-4 top-6 z-10">
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col items-center">
+            {/* <div className="flex flex-col items-center">
               <Button
                 onClick={handleEdit}
                 className="bg-white hover:bg-gray-50 text-gray-600 border border-gray-300 p-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
@@ -565,7 +565,7 @@ export default function SalesReportViewPage() {
                 <Edit className="h-5 w-5" />
               </Button>
               <span className="text-xs text-gray-600 mt-1 font-medium">Edit</span>
-            </div>
+            </div> */}
 
             <div className="flex flex-col items-center">
               <Button
@@ -592,7 +592,7 @@ export default function SalesReportViewPage() {
           </div>
         </div>
 
-        <div className="mb-8 bg-white shadow-lg rounded-lg" style={{ width: '210mm', minHeight: '297mm', maxWidth: 'none' }}>
+        <div id="report-container" className="mb-8 bg-white shadow-lg rounded-lg" style={{ width: '210mm', minHeight: '297mm', maxWidth: 'none' }}>
           <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-blue-900"></div>
