@@ -128,7 +128,7 @@ export default function BookingDetailPage() {
   }
 
   const getComplianceStatus = (item: any) => {
-    if (item.status === "completed") {
+    if (item.fileUrl) {
       return { icon: CheckCircle, color: "text-green-600", bgColor: "bg-green-50" }
     } else if (item.status === "confirmation") {
       return { icon: Clock, color: "text-yellow-600", bgColor: "bg-yellow-50" }
@@ -353,14 +353,14 @@ export default function BookingDetailPage() {
                               <Badge
                                 variant="outline"
                                 className={`text-sm px-3 py-1 ${
-                                  item.status === "completed"
+                                  item.fileUrl
                                     ? "bg-green-100 text-green-800 border-green-300"
                                     : item.status === "confirmation"
                                     ? "bg-yellow-100 text-yellow-800 border-yellow-300"
                                     : "bg-gray-100 text-gray-800 border-gray-300"
                                 }`}
                               >
-                                {item.status === "completed"
+                                {item.fileUrl
                                   ? "Completed"
                                   : item.status === "confirmation"
                                   ? "Pending Confirmation"
@@ -397,19 +397,28 @@ export default function BookingDetailPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-base font-medium text-gray-700">Subtotal</span>
                       <span className="text-xl text-gray-900">
-                        ₱{booking.costDetails?.total?.toLocaleString() || booking.total_cost?.toLocaleString() || booking.cost?.toLocaleString() || "0"}
+                        ₱{(() => {
+                          const value = booking.costDetails?.total || booking.total_cost || booking.cost || 0;
+                          return Number(value).toFixed(2);
+                        })()}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-base font-medium text-gray-700">12% Vat</span>
                       <span className="text-xl text-gray-900">
-                        ₱{(booking.costDetails?.total * 0.12).toLocaleString()}
+                        ₱{(() => {
+                          const subtotal = booking.costDetails?.total || booking.total_cost || booking.cost || 0;
+                          return (subtotal * 0.12).toFixed(2);
+                        })()}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-base font-medium text-gray-700">Total Cost</span>
                       <span className="text-xl font-bold text-gray-900">
-                        ₱{(booking.costDetails?.total + (booking.costDetails?.total * 0.12)).toLocaleString() || "0"}
+                        ₱{(() => {
+                          const subtotal = booking.costDetails?.total || booking.total_cost || booking.cost || 0;
+                          return (subtotal + (subtotal * 0.12)).toFixed(2);
+                        })()}
                       </span>
                     </div>
                   </div>
@@ -514,7 +523,7 @@ export default function BookingDetailPage() {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Completed:</span>
                   <span className="font-medium text-green-600">
-                    {complianceItems.filter(item => item.status === "completed").length}
+                    {complianceItems.filter(item => item.fileUrl).length}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
