@@ -9,12 +9,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient, updateClient, type Client, type ClientCompany } from "@/lib/client-service"
 import { toast } from "sonner"
-import { Plus } from "lucide-react"
+import { Plus, X } from "lucide-react"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service" // Import the upload function
 import { useAuth } from "@/contexts/auth-context" // Import useAuth
 import { collection, getDocs, addDoc, updateDoc, doc, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { loadGoogleMaps } from "@/lib/google-maps-loader" // Import Google Maps loader
+import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
 
 interface ClientDialogProps {
   client?: Client
@@ -47,9 +47,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
   const gisFileInputRef = useRef<HTMLInputElement>(null)
   const idFileInputRef = useRef<HTMLInputElement>(null)
 
-  // Address autocomplete ref
-  const addressInputRef = useRef<HTMLInputElement>(null)
-  const addressAutocompleteRef = useRef<any>(null)
 
   const [formData, setFormData] = useState({
     clientType: client?.clientType || "",
@@ -65,8 +62,10 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     firstName: "", // Contact Person First Name
     lastName: "", // Contact Person Last Name
     designation: client?.designation || "", // New field
-    contactPhone: client?.phone || "+63", // Separate field for contact phone with +63 prefix
-    email: client?.email || "", // Contact Details Email
+    contactPhone: client?.phone || "+63", // Primary contact phone
+    email: client?.email || "", // Primary email
+    contactPhone_sub: client?.phone_sub || "", // Secondary contact phone (optional)
+    email_sub: client?.email_sub || "", // Secondary email (optional)
     user_company_id: client?.user_company_id || userData?.company_id || "", // New field
   })
 
@@ -136,6 +135,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         designation: client?.designation || "",
         contactPhone: client?.phone || "+63",
         email: client?.email || "",
+        contactPhone_sub: client?.phone_sub || "",
+        email_sub: client?.email_sub || "",
         user_company_id: client?.user_company_id || userData?.company_id || "", // New field
       })
       setLogoFile(null) // Clear selected file
@@ -157,43 +158,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       })
       fetchCompanies()
 
-      // Initialize Google Places Autocomplete for address field
-      const initializeAutocomplete = async () => {
-        try {
-          await loadGoogleMaps()
-          if (window.google && window.google.maps && window.google.maps.places && addressInputRef.current) {
-            const { Autocomplete } = window.google.maps.places
-            addressAutocompleteRef.current = new Autocomplete(addressInputRef.current, {
-              componentRestrictions: { country: "ph" }, // Restrict to Philippines
-              fields: ["place_id", "geometry", "name", "formatted_address"],
-            })
-
-            // Set initial value after autocomplete is attached
-            addressInputRef.current.value = formData.address
-
-            addressAutocompleteRef.current.addListener("place_changed", () => {
-              const place = addressAutocompleteRef.current.getPlace()
-              if (place && place.formatted_address) {
-                setFormData((prev) => ({ ...prev, address: place.formatted_address }))
-              }
-            })
-          }
-        } catch (error) {
-          console.warn("Failed to initialize address autocomplete:", error)
-        }
-      }
-
-      // Small delay to ensure DOM is ready
-      setTimeout(initializeAutocomplete, 100)
     }
   }, [open, client, userData?.company_id]) // Added userData?.company_id to dependency array
 
-  // Sync input value when formData.address changes (e.g., from company selection)
-  useEffect(() => {
-    if (addressInputRef.current && addressAutocompleteRef.current) {
-      addressInputRef.current.value = formData.address
-    }
-  }, [formData.address])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -235,8 +202,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
   }
 
 
-  const handlePhoneInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\s/g, '') // Remove spaces
+  const handlePhoneInput = (field: 'contactPhone' | 'contactPhone_sub', value: string) => {
+    value = value.replace(/\s/g, '') // Remove spaces
 
     // Always ensure +63 prefix is present
     if (!value.startsWith('+63')) {
@@ -254,7 +221,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     }
 
     // Update form data
-    setFormData((prev) => ({ ...prev, contactPhone: value }))
+    setFormData((prev) => ({ ...prev, [field]: value }))
 
     // Clear validation errors when user types
     if (validationErrors.phoneFormat || validationErrors.contactPhone) {
@@ -263,6 +230,15 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         phoneFormat: false,
         contactPhone: false
       }))
+    }
+  }
+
+  const handleEmailInput = (field: 'email' | 'email_sub', value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+
+    // Clear validation error when field is filled
+    if (validationErrors.email) {
+      setValidationErrors((prev) => ({ ...prev, email: false }))
     }
   }
 
@@ -352,7 +328,10 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
           firstName: "",
           lastName: "",
           designation: "",
+          contactPhone: "+63",
           email: "",
+          contactPhone_sub: "",
+          email_sub: "",
         }))
         setLogoPreviewUrl(selectedCompany.companyLogoUrl || null)
         setShowNewCompanyInput(false)
@@ -519,13 +498,15 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       newValidationErrors.designation = false
     }
 
-    if (!formData.contactPhone.trim()) {
+    // Validate primary contact phone - required
+    if (!formData.contactPhone.trim() || formData.contactPhone === '+63') {
       newValidationErrors.contactPhone = true
       hasErrors = true
     } else {
       newValidationErrors.contactPhone = false
     }
 
+    // Validate primary email - required
     if (!formData.email.trim()) {
       newValidationErrors.email = true
       hasErrors = true
@@ -533,19 +514,13 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       newValidationErrors.email = false
     }
 
-    // Validate phone format (only if phone is provided and has content beyond +63)
-    if (formData.contactPhone.trim()) {
-      if (formData.contactPhone === '+63') {
-        // If only +63 is entered, it's incomplete
-        newValidationErrors.phoneFormat = true
-        hasErrors = true
-      } else if (!validatePhoneFormat(formData.contactPhone)) {
-        // If format is invalid
-        newValidationErrors.phoneFormat = true
-        hasErrors = true
-      } else {
-        newValidationErrors.phoneFormat = false
-      }
+    // Validate phone formats
+    if (formData.contactPhone.trim() && formData.contactPhone !== '+63' && !validatePhoneFormat(formData.contactPhone)) {
+      newValidationErrors.phoneFormat = true
+      hasErrors = true
+    } else if (formData.contactPhone_sub.trim() && formData.contactPhone_sub !== '+63' && !validatePhoneFormat(formData.contactPhone_sub)) {
+      newValidationErrors.phoneFormat = true
+      hasErrors = true
     } else {
       newValidationErrors.phoneFormat = false
     }
@@ -607,8 +582,10 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         company: finalCompanyName,
         companyLogoUrl: finalCompanyLogoUrl, // Use the uploaded URL or existing one
         name: `${formData.firstName} ${formData.lastName}`.trim() || "",
-        email: formData.email || "",
-        phone: formData.contactPhone || "",
+        email: formData.email.trim(),
+        phone: formData.contactPhone.trim(),
+        email_sub: formData.email_sub.trim() || undefined,
+        phone_sub: formData.contactPhone_sub.trim() || undefined,
         industry: formData.industry || "",
         address: formData.address || "",
         designation: formData.designation || "",
@@ -742,16 +719,13 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                   )}
 
                   <div className="space-y-2">
-                    <Label htmlFor="address" className="text-[#333333] text-sm font-medium">
+                    <Label className="text-[#333333] text-sm font-medium">
                       Company Address
                     </Label>
-                    <Input
-                      ref={addressInputRef}
-                      id="address"
-                      name="address"
-                      placeholder="Start typing to search for addresses..."
-                      className="h-10 border-[#c4c4c4]"
-                      onBlur={(e) => setFormData((prev) => ({ ...prev, address: e.target.value }))}
+                    <GooglePlacesAutocomplete
+                      value={formData.address}
+                      onChange={(value) => setFormData((prev) => ({ ...prev, address: value }))}
+                      placeholder="Enter company address"
                     />
                   </div>
 
@@ -895,39 +869,48 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="contactPhone" className="text-[#a1a1a1] text-sm">
+                  <Label className="text-[#a1a1a1] text-sm">
                     Contact No. <span className="text-[#f95151]">*</span>
                   </Label>
                   <Input
-                    id="contactPhone"
-                    name="contactPhone"
                     value={formData.contactPhone}
-                    onChange={handlePhoneInput}
+                    onChange={(e) => handlePhoneInput('contactPhone', e.target.value)}
                     placeholder="Enter 10 digits"
-                    className={`h-10 border-[#c4c4c4] ${(validationErrors.contactPhone || validationErrors.phoneFormat) ? 'border-[#f95151]' : ''}`}
+                    className={`h-10 border-[#c4c4c4] mb-2 ${(validationErrors.contactPhone || validationErrors.phoneFormat) ? 'border-[#f95151]' : ''}`}
+                  />
+                  <Input
+                    value={formData.contactPhone_sub}
+                    onChange={(e) => handlePhoneInput('contactPhone_sub', e.target.value)}
+                    placeholder="Additional contact no. (optional)"
+                    className="h-10 border-[#c4c4c4]"
                   />
                   {validationErrors.contactPhone && (
-                    <p className="text-sm text-[#f95151]">Phone number is required</p>
+                    <p className="text-sm text-[#f95151]">Primary phone number is required</p>
                   )}
                   {validationErrors.phoneFormat && !validationErrors.contactPhone && (
-                    <p className="text-sm text-[#f95151]">Please enter exactly 10 digits</p>
+                    <p className="text-sm text-[#f95151]">Please enter valid phone numbers</p>
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="email" className="text-[#a1a1a1] text-sm">
+                  <Label className="text-[#a1a1a1] text-sm">
                     Email Address <span className="text-[#f95151]">*</span>
                   </Label>
                   <Input
-                    id="email"
-                    name="email"
                     type="email"
                     value={formData.email}
-                    onChange={handleChange}
+                    onChange={(e) => handleEmailInput('email', e.target.value)}
                     placeholder="Email Address"
-                    className={`h-10 border-[#c4c4c4] ${validationErrors.email ? 'border-[#f95151]' : ''}`}
+                    className={`h-10 border-[#c4c4c4] mb-2 ${validationErrors.email ? 'border-[#f95151]' : ''}`}
+                  />
+                  <Input
+                    type="email"
+                    value={formData.email_sub}
+                    onChange={(e) => handleEmailInput('email_sub', e.target.value)}
+                    placeholder="Additional email (optional)"
+                    className="h-10 border-[#c4c4c4]"
                   />
                   {validationErrors.email && (
-                    <p className="text-sm text-[#f95151]">Email address is required</p>
+                    <p className="text-sm text-[#f95151]">Primary email address is required</p>
                   )}
                 </div>
               </div>
@@ -948,6 +931,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
             </div>
           </div>
         </form>
+
+        <style>{`.pac-container { z-index: 9999 !important; }`}</style>
 
         {/* Hidden file inputs for compliance documents */}
         <input
