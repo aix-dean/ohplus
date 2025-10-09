@@ -1291,11 +1291,11 @@ export default function CreateJobOrderPage() {
   console.log()
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 p-2">
-      <div className="flex items-center bg-white gap-4 mb-6">
+      <div className="flex items-center bg-white gap-4 mb-6 rounded-lg">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold text-gray-900">Create Job Order</h1>
+        <h1 className="text-2xl font-bold text-gray-900 py-4">Create Job Order</h1>
       </div>
 
       <div className="flex flex-col gap-6 max-w-6xl w-full mx-auto bg-gray-50 p-6 rounded-lg">
@@ -1546,12 +1546,88 @@ export default function CreateJobOrderPage() {
                 <div className="flex items-start">
                   <p className="font-semibold text-[14px] text-[#333333] w-[177px]">Attachments:</p>
                   <div className="w-[311px]">
-                    <div className="bg-[#c4c4c4] opacity-50 rounded-[10px] h-[131px] flex items-center justify-center relative cursor-pointer" onClick={() => document.getElementById("material-spec-attachment-upload-0")?.click()}>
-                      <p className="font-semibold text-[10.267px] text-[#4e4e4e] text-center">Upload</p>
-                      <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                        <Upload className="w-[45.557px] h-[45.557px] opacity-50" />
+                    {jobOrderForms[0]?.materialSpecAttachmentUrl ? (
+                      // Show preview when file is uploaded
+                      <div className="bg-white border-2 border-[#c4c4c4] rounded-[10px] w-[131px] aspect-square flex flex-col relative p-2">
+                        {isImageFile(jobOrderForms[0]?.materialSpecAttachmentFile?.name || "", jobOrderForms[0]?.materialSpecAttachmentUrl || "") ? (
+                          // Image file preview with loading and error handling
+                          <div className="relative w-full h-full flex items-center justify-center">
+                            {jobOrderForms[0]?.uploadingMaterialSpecAttachment ? (
+                              // Loading state
+                              <div className="flex flex-col items-center justify-center w-full h-full">
+                                <Loader2 className="w-8 h-8 animate-spin text-gray-400 mb-2" />
+                                <span className="text-xs text-gray-500">Loading image...</span>
+                              </div>
+                            ) : (
+                              // Image display with error fallback
+                              <>
+                                <Image
+                                  src={jobOrderForms[0].materialSpecAttachmentUrl}
+                                  alt={jobOrderForms[0]?.materialSpecAttachmentFile?.name || "Uploaded image"}
+                                  fill
+                                  className="object-cover rounded-md"
+                                  sizes="311px"
+                                  onLoad={() => {
+                                    // Image loaded successfully
+                                    console.log("Image loaded successfully");
+                                  }}
+                                  onError={(e) => {
+                                    console.error("Image failed to load:", e);
+                                    // Hide the image and show fallback
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    const fallback = target.nextElementSibling as HTMLElement;
+                                    if (fallback) {
+                                      fallback.style.display = 'flex';
+                                    }
+                                  }}
+                                />
+                                {/* Fallback icon when image fails to load */}
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50 rounded-md hidden">
+                                  <ImageIcon className="w-8 h-8 text-gray-400 mb-1" />
+                                  <span className="text-xs text-gray-500 text-center px-2">
+                                    Failed to load image
+                                  </span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          // Non-image file preview (existing logic)
+                          <div className="flex flex-col items-center justify-center h-full">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileText className="w-6 h-6 text-gray-600" />
+                              <span className="font-medium text-xs text-gray-800 truncate max-w-[200px]" title={jobOrderForms[0]?.materialSpecAttachmentFile?.name || "Uploaded file"}>
+                                {jobOrderForms[0]?.materialSpecAttachmentFile?.name || "Uploaded file"}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Remove button - positioned in top-right corner */}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleFormUpdate(0, "materialSpecAttachmentFile", null)
+                            handleFormUpdate(0, "materialSpecAttachmentUrl", null)
+                            handleFormUpdate(0, "materialSpecAttachmentError", null)
+                          }}
+                          className="absolute top-1 right-1 h-6 w-6 p-0 text-gray-500 hover:text-red-500 bg-white bg-opacity-75 rounded-full"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </Button>
                       </div>
-                    </div>
+                    ) : (
+                      // Show upload area when no file is uploaded
+                      <div className="bg-[#c4c4c4] opacity-50 rounded-[10px] w-[131px] aspect-square flex items-center justify-center relative cursor-pointer hover:opacity-70 transition-opacity" onClick={() => document.getElementById("material-spec-attachment-upload-0")?.click()}>
+                        <p className="font-semibold text-[10.267px] text-[#4e4e4e] text-center">Upload</p>
+                        <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                          <Upload className="w-[45.557px] h-[45.557px] opacity-50" />
+                        </div>
+                      </div>
+                    )}
                     <input
                       type="file"
                       id="material-spec-attachment-upload-0"
