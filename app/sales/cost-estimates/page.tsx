@@ -446,6 +446,18 @@ function CostEstimatesPageContent() {
         return
       }
 
+      // Check if cost estimate has start and end dates
+      if (!costEstimate.startDate || !costEstimate.endDate) {
+        // Extract site IDs from line items
+        const siteIds = costEstimate.lineItems.map(item => item.id)
+        const sitesParam = encodeURIComponent(JSON.stringify(siteIds))
+        const clientId = costEstimate.client?.id
+
+        // Redirect to quotations select-dates page
+        router.push(`/sales/quotations/select-dates?sites=${sitesParam}&clientId=${clientId}`)
+        return
+      }
+
       // Import required functions
       const { createQuotation, generateQuotationNumber } = await import("@/lib/quotation-service")
       const { Timestamp } = await import("firebase/firestore")
