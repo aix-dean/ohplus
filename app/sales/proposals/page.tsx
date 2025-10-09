@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { format } from "date-fns"
 import { getPaginatedProposalsByUserId, getProposalsCountByUserId, downloadProposalPDF } from "@/lib/proposal-service"
+import { searchProposals } from "@/lib/algolia-service"
 import { createMultipleCostEstimates } from "@/lib/cost-estimate-service"
 import type { Proposal } from "@/lib/types/proposal"
 import { useResponsive } from "@/hooks/use-responsive"
@@ -48,6 +49,7 @@ function ProposalsPageContent() {
   const [lastDoc, setLastDoc] = useState<any>(null)
   const [hasMore, setHasMore] = useState(false)
   const [totalCount, setTotalCount] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
   const itemsPerPage = 10
   const { user, userData } = useAuth()
   const router = useRouter()
@@ -262,13 +264,13 @@ function ProposalsPageContent() {
 
   useEffect(() => {
     if (user?.uid) {
-      loadProposals(1, true) // Reset to first page when user changes
+      loadProposals(1) // Reset to first page when user changes
     }
   }, [user])
 
   useEffect(() => {
     if (user?.uid) {
-      loadProposals(1, true) // Reset to first page when search changes
+      loadProposals(1) // Reset to first page when search changes
     }
   }, [searchTerm])
 
@@ -282,52 +284,125 @@ function ProposalsPageContent() {
     }
   }, [searchParams])
 
-  const loadProposals = async (page = 1, resetLastDoc = true) => {
+  const loadProposals = async (page = 1) => {
     if (!user?.uid) return
 
     setLoading(true)
     try {
-      const lastDocToUse = resetLastDoc ? null : lastDoc
-      const result = await getPaginatedProposalsByUserId(
+      // Try Algolia search first
+      const algoliaPage = page - 1 // Algolia uses 0-based pagination
+      const result = await searchProposals(
+        searchTerm,
         userData?.company_id || "",
-        itemsPerPage,
-        lastDocToUse,
-        searchTerm,
-        null
+        algoliaPage,
+        itemsPerPage
       )
 
-      setProposals(result.items)
-      setFilteredProposals(result.items)
-      setLastDoc(result.lastDoc)
-      setHasMore(result.hasMore)
-      setCurrentPage(page)
+      console.log("Algolia search result:", result)
 
-      // Get total count for display
-      const count = await getProposalsCountByUserId(
-        user.uid,
-        searchTerm,
-        null
-      )
-      setTotalCount(count)
+      // If Algolia returns results and they look like proposal data, use them
+      if (result.nbHits > 0 && result.hits.length > 0 && result.hits[0].proposalNumber) {
+        // Transform Algolia hits to Proposal objects
+        const transformedProposals: Proposal[] = result.hits.map((hit: any) => ({
+          id: hit.id || hit.objectID,
+          proposalNumber: hit.proposalNumber || hit.proposal_number || hit.proposalNumber,
+          title: hit.title,
+          client: {
+            id: hit.id || hit.objectID, // Using proposal id as client id for now
+            company: hit.client_company || hit.clientCompany || hit['client.company'] || '',
+            contactPerson: hit.client_contactPerson || hit.clientContactPerson || hit['client.contactPerson'] || '',
+            name: hit.client_name || hit.clientName || hit['client.name'] || '',
+            email: hit.client_email || hit.clientEmail || hit['client.email'] || '',
+            phone: '',
+            address: '',
+            industry: '',
+            designation: '',
+          },
+          products: hit.products || [],
+          totalAmount: hit.totalAmount || hit.total_amount || 0,
+          validUntil: new Date(), // Default value
+          createdBy: user.uid,
+          companyId: hit.company_id || hit.companyId,
+          status: hit.status || 'draft',
+          createdAt: hit.createdAt || hit.created_at ? new Date(hit.createdAt || hit.created_at) : new Date(),
+          updatedAt: new Date(),
+        }))
+
+        setProposals(transformedProposals)
+        setFilteredProposals(transformedProposals)
+        setCurrentPage(page)
+        setTotalCount(result.nbHits)
+        setTotalPages(result.nbPages)
+      } else {
+        // Fallback to local search if Algolia has no results
+        console.log("No results from Algolia, falling back to local search")
+        const lastDocToUse = null // Reset for fallback
+        const result = await getPaginatedProposalsByUserId(
+          userData?.company_id || "",
+          itemsPerPage,
+          lastDocToUse,
+          searchTerm,
+          null
+        )
+
+        setProposals(result.items)
+        setFilteredProposals(result.items)
+        setLastDoc(result.lastDoc)
+        setHasMore(result.hasMore)
+        setCurrentPage(page)
+
+        // Get total count for display
+        const count = await getProposalsCountByUserId(
+          user.uid,
+          searchTerm,
+          null
+        )
+        setTotalCount(count)
+        setTotalPages(Math.ceil(count / itemsPerPage))
+      }
     } catch (error) {
-      console.error("Error loading proposals:", error)
+      console.error("Error loading proposals with Algolia, trying local search:", error)
+      // Fallback to local search on error
+      try {
+        const lastDocToUse = null
+        const result = await getPaginatedProposalsByUserId(
+          userData?.company_id || "",
+          itemsPerPage,
+          lastDocToUse,
+          searchTerm,
+          null
+        )
+
+        setProposals(result.items)
+        setFilteredProposals(result.items)
+        setLastDoc(result.lastDoc)
+        setHasMore(result.hasMore)
+        setCurrentPage(page)
+
+        const count = await getProposalsCountByUserId(
+          user.uid,
+          searchTerm,
+          null
+        )
+        setTotalCount(count)
+        setTotalPages(Math.ceil(count / itemsPerPage))
+      } catch (localError) {
+        console.error("Error with local search as well:", localError)
+      }
     } finally {
       setLoading(false)
     }
   }
 
   const handleNextPage = () => {
-    if (hasMore) {
-      loadProposals(currentPage + 1, false)
+    if (currentPage < totalPages) {
+      loadProposals(currentPage + 1)
     }
   }
 
   const handlePreviousPage = () => {
     if (currentPage > 1) {
-      // For previous page, we need to reset and load from the beginning
-      // This is a limitation of Firestore cursor-based pagination
-      setLastDoc(null)
-      loadProposals(currentPage - 1, true)
+      loadProposals(currentPage - 1)
     }
   }
 
@@ -515,7 +590,7 @@ function ProposalsPageContent() {
                 variant="outline"
                 size="sm"
                 onClick={handleNextPage}
-                disabled={!hasMore || loading}
+                disabled={currentPage >= totalPages || loading}
               >
                 Next
               </Button>

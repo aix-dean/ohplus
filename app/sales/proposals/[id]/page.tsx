@@ -2228,7 +2228,7 @@ export default function ProposalDetailsPage() {
 
             {/* Average Daily Traffic Count */}
             <div className="mb-2">
-              <p className="mb-0">Average Daily Traffic Count:</p>
+              <p className="mb-0">Average Monthly Traffic Count:</p>
               {isEditMode ? (
                 <input
                   value={editableProducts[product.id]?.traffic || ''}

@@ -286,6 +286,32 @@ function SalesDashboardContent() {
     const tab = searchParams.get('tab')
     const action = searchParams.get('action')
 
+    if (action === 'create-cost-estimate') {
+      // Reset all modes first
+      setProposalCreationMode(false)
+      setCeQuoteMode(false)
+      setCeMode(false)
+      setQuoteMode(false)
+      setSelectedClientForProposal(null)
+      setDashboardClientSearchTerm("")
+      setSelectedProducts([])
+      setSelectedSites([])
+
+      // Activate CE mode
+      setTimeout(() => {
+        setCeMode(true)
+        setQuoteMode(false)
+        setCeQuoteMode(true)
+        setProposalCreationMode(false)
+      }, 100)
+
+      // Clean up URL parameter
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('action')
+      window.history.replaceState({}, '', newUrl.toString())
+      return
+    }
+
     // Handle action parameter for direct mode activation (from proposals page)
     if (action && userData?.company_id) {
       // Reset all modes first
@@ -1335,7 +1361,7 @@ function SalesDashboardContent() {
       // Assume digital products have content_type containing "digital" or "led"
       // Static products are everything else
       const contentType = product.content_type?.toLowerCase() || ""
-      const isDigital = contentType.includes("digital") || contentType.includes("led") || contentType.includes("screen")
+      const isDigital = contentType.includes("digital") || contentType.includes("led") || contentType.includes("screen") || contentType.includes("dynamic")  
 
       if (selectedDisplayType === "digital") {
         if (!isDigital) return false

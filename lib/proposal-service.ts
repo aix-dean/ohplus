@@ -648,6 +648,7 @@ export async function getPaginatedProposals(
           (statusFilter === "all" || !statusFilter || proposal.status === statusFilter) &&
           (proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
             proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm) ||
+            proposal.client.contactPerson.toLowerCase().includes(lowerCaseSearchTerm) ||
             (proposal.proposalNumber && proposal.proposalNumber.toLowerCase().includes(lowerCaseSearchTerm))), // Include proposalNumber in search
       )
     }
@@ -708,6 +709,7 @@ export async function getPaginatedProposalsByUserId(
         (proposal) =>
           proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
           proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm) ||
+          proposal.client.contactPerson.toLowerCase().includes(lowerCaseSearchTerm) ||
           (proposal.proposalNumber && proposal.proposalNumber.toLowerCase().includes(lowerCaseSearchTerm)),
       )
     }
@@ -759,6 +761,7 @@ export async function getProposalsCountByUserId(
         (proposal) =>
           proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
           proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm) ||
+          proposal.client.contactPerson.toLowerCase().includes(lowerCaseSearchTerm) ||
           (proposal.proposalNumber && proposal.proposalNumber.toLowerCase().includes(lowerCaseSearchTerm)),
       )
       return filteredProposals.length
@@ -811,6 +814,7 @@ export async function getProposalsCount(searchTerm = "", statusFilter: string | 
           (statusFilter === "all" || !statusFilter || proposal.status === statusFilter) &&
           (proposal.title.toLowerCase().includes(lowerCaseSearchTerm) ||
             proposal.client.company.toLowerCase().includes(lowerCaseSearchTerm) ||
+            proposal.client.contactPerson.toLowerCase().includes(lowerCaseSearchTerm) ||
             (proposal.proposalNumber && proposal.proposalNumber.toLowerCase().includes(lowerCaseSearchTerm))), // Include proposalNumber in count search
       )
       count = filteredProposals.length

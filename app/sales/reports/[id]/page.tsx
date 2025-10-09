@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, use } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,7 @@ export default function SalesReportViewPage() {
   const router = useRouter()
   const params = useParams()
   const [report, setReport] = useState<ReportData | null>(null)
+  const [reportId, setReportId] = useState<string>("")
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [posting, setPosting] = useState(false)
@@ -48,10 +49,18 @@ export default function SalesReportViewPage() {
   const reportContentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (params.id) {
-      loadReportData(params.id as string)
+    const getParams = async () => {
+      const resolvedParams = await params
+      setReportId(resolvedParams.id as string)
     }
-  }, [params.id])
+    getParams()
+  }, [params])
+
+  useEffect(() => {
+    if (reportId) {
+      loadReportData(reportId)
+    }
+  }, [reportId])
 
   useEffect(() => {
     if (user?.uid) {
@@ -70,13 +79,20 @@ export default function SalesReportViewPage() {
       // Scroll to load all maps before generating PDF
       setTimeout(async () => {
         try {
-          // Find all page containers (similar to proposals)
-          const pageContainers = document.querySelectorAll('[class*="mx-24 mb-8 bg-white shadow-lg"]')
+          // Dynamic imports for client-side libraries
+          // @ts-ignore
+          const { default: html2canvas } = await import('html2canvas')
+          // @ts-ignore
+          const { default: jsPDF } = await import('jspdf')
+
+          // Find all page containers
+          const pageContainers = document.querySelectorAll('#report-pdf-container')
 
           if (pageContainers.length === 0) {
             throw new Error("No report pages found")
           }
 
+          // @ts-ignore
           const pdf = new jsPDF({
             orientation: 'landscape',
             unit: 'mm',
@@ -93,6 +109,7 @@ export default function SalesReportViewPage() {
             container.style.overflow = 'visible'
 
             // Capture the page with html2canvas
+            // @ts-ignore
             const canvas = await html2canvas(container, {
               scale: 3, // Higher quality like proposals
               useCORS: true,
@@ -432,7 +449,7 @@ export default function SalesReportViewPage() {
   }
 
   const handleEdit = () => {
-    router.push(`/sales/reports/${params.id}/edit`)
+    router.push(`/sales/reports/${reportId}/edit`)
   }
 
   const calculateInstallationDuration = (startDate: string | any, endDate: string | any) => {
@@ -592,7 +609,7 @@ export default function SalesReportViewPage() {
           </div>
         </div>
 
-        <div id="report-container" className="mb-8 bg-white shadow-lg rounded-lg" style={{ width: '210mm', minHeight: '297mm', maxWidth: 'none' }}>
+        <div id="report-pdf-container" className="mb-8 bg-white shadow-lg rounded-lg" style={{ width: '210mm', minHeight: '297mm', maxWidth: 'none' }}>
           <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-blue-900"></div>

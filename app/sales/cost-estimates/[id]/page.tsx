@@ -108,6 +108,43 @@ const formatDurationDisplay = (durationDays: number | null | undefined): string 
   return durationDays === 1 ? "1 day" : `${durationDays} days`
 }
 
+// Calculate prorated price based on actual calendar months and days
+const calculateProratedPrice = (price: number, startDate: Date, endDate: Date): number => {
+  let total = 0;
+  let currentDate = new Date(startDate);
+
+  while (currentDate <= endDate) {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    // Get days in this month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Daily price for this month
+    const dailyRate = price / daysInMonth;
+
+    // Determine start and end days for this month
+    let startDay = (currentDate.getMonth() === startDate.getMonth() && currentDate.getFullYear() === startDate.getFullYear())
+      ? startDate.getDate()
+      : 1;
+
+    let endDay = (currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear())
+      ? endDate.getDate()
+      : daysInMonth;
+
+    // Days counted in this month
+    const daysCounted = (endDay - startDay + 1);
+
+    // Add to total
+    total += dailyRate * daysCounted;
+
+    // Move to next month
+    currentDate = new Date(year, month + 1, 1);
+  }
+
+  return total;
+}
+
 const getDateObject = (date: any): Date | undefined => {
   if (date === null || date === undefined) return undefined
   if (date instanceof Date) return date
@@ -197,7 +234,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [generatingPDFsForSend, setGeneratingPDFsForSend] = useState(false)
 
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
-    console.log("[v0] All line items:", lineItems)
 
     const siteGroups: { [siteName: string]: CostEstimateLineItem[] } = {}
 
@@ -221,7 +257,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     })
 
     if (Object.keys(siteGroups).length === 0) {
-      console.log("[v0] No billboard rental items found, treating as single site with all items")
       siteGroups["Single Site"] = lineItems
     } else {
       // Check for orphaned items (items not associated with any site)
@@ -232,7 +267,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
       const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
       if (orphanedItems.length > 0) {
-        console.log("[v0] Found orphaned items:", orphanedItems)
         const siteNames = Object.keys(siteGroups)
         siteNames.forEach((siteName) => {
           // Create copies of orphaned items for each site to avoid reference issues
@@ -242,7 +276,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       }
     }
 
-    console.log("[v0] Final site groups:", siteGroups)
     return siteGroups
   }
 
@@ -297,7 +330,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
       if (startDate && endDate) {
         const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-        const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        const newDurationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1
         updatedTempValues.durationDays = newDurationDays
       }
     }
@@ -350,151 +383,155 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       // Create a deep copy of the cost estimate to ensure React detects changes
       const updatedCostEstimate = JSON.parse(JSON.stringify(costEstimate))
 
-    const siteGroups = groupLineItemsBySite(updatedCostEstimate.lineItems || [])
-    const siteNames = Object.keys(siteGroups)
-    const currentSiteName = siteNames[currentProductIndex]
-    const currentSiteItems = siteGroups[currentSiteName] || []
+      const siteGroups = groupLineItemsBySite(updatedCostEstimate.lineItems || [])
+      const siteNames = Object.keys(siteGroups)
+      const currentSiteName = siteNames[currentProductIndex]
+      const currentSiteItems = siteGroups[currentSiteName] || []
 
-    console.log("[v0] Editing site:", currentSiteName, "with items:", currentSiteItems.length)
+      console.log("[v0] Editing site:", currentSiteName, "with items:", currentSiteItems.length)
 
-    const currentSiteRentalItem = currentSiteItems.find((item) => item.category.includes("Billboard Rental"))
-    const currentSiteId = currentSiteRentalItem?.id
+      const currentSiteRentalItem = currentSiteItems.find((item) => item.category.includes("Billboard Rental"))
+      const currentSiteId = currentSiteRentalItem?.id
 
-    // Apply all temp values to the cost estimate - but only for current site
-    Object.entries(tempValues).forEach(([fieldName, newValue]) => {
-      switch (fieldName) {
-        case "terms_and_conditions":
-          updatedCostEstimate.template = {
-            ...updatedCostEstimate.template,
-            terms_and_conditions: newValue,
-          }
-          break
-        case "salutation":
-          updatedCostEstimate.template = {
-            ...updatedCostEstimate.template,
-            salutation: newValue,
-          }
-          break
-        case "greeting":
-          updatedCostEstimate.template = {
-            ...updatedCostEstimate.template,
-            greeting: newValue,
-          }
-          break
-        case "signature_position":
-          updatedCostEstimate.signature_position = newValue
-          break
-        case "closing_message":
-          updatedCostEstimate.template = {
-            ...updatedCostEstimate.template,
-            closing_message: newValue,
-          }
-          break
-        case "site_notes":
-          updatedCostEstimate.items = {
-            ...updatedCostEstimate.items,
-            site_notes: newValue,
-          }
-          break
-        case "price_notes":
-          updatedCostEstimate.items = {
-            ...updatedCostEstimate.items,
-            price_notes: newValue,
-          }
-          break
-        case "unitPrice":
-          const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
-            const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-            if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
-              const newTotal = newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
-              console.log("[v0] Updating price for item:", item.id, "from", item.unitPrice, "to", newValue)
-              return { ...item, unitPrice: newValue, total: newTotal }
+      // Apply all temp values to the cost estimate - but only for current site
+      Object.entries(tempValues).forEach(([fieldName, newValue]) => {
+        switch (fieldName) {
+          case "terms_and_conditions":
+            updatedCostEstimate.template = {
+              ...(updatedCostEstimate.template || {}),
+              terms_and_conditions: newValue,
             }
-            return item
-          })
-          updatedCostEstimate.lineItems = updatedLineItems
-          updatedCostEstimate.totalAmount = updatedLineItems.reduce((sum, item) => sum + item.total, 0)
-          break
-
-        case "durationDays":
-          updatedCostEstimate.durationDays = newValue
-          const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
-            const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-            if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
-              const newTotal = item.unitPrice * (newValue / 30)
-              console.log("[v0] Updating duration for item:", item.id, "new total:", newTotal)
-              return { ...item, total: newTotal }
+            break
+          case "salutation":
+            updatedCostEstimate.template = {
+              ...(updatedCostEstimate.template || {}),
+              salutation: newValue,
             }
-            return item
-          })
-          updatedCostEstimate.lineItems = recalculatedItems
-          updatedCostEstimate.totalAmount = recalculatedItems.reduce((sum, item) => sum + item.total, 0)
-
-          if (updatedCostEstimate.startDate) {
-            const newEndDate = new Date(updatedCostEstimate.startDate)
-            newEndDate.setDate(newEndDate.getDate() + newValue)
-            updatedCostEstimate.endDate = newEndDate
-          }
-          break
-
-
-        case "startDate":
-        case "endDate":
-          updatedCostEstimate[fieldName] = newValue
-          if (updatedCostEstimate.startDate && updatedCostEstimate.endDate) {
-            const diffTime = Math.abs(new Date(updatedCostEstimate.endDate).getTime() - new Date(updatedCostEstimate.startDate).getTime())
-            const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-            updatedCostEstimate.durationDays = newDurationDays
-
-            const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
+            break
+          case "greeting":
+            updatedCostEstimate.template = {
+              ...(updatedCostEstimate.template || {}),
+              greeting: newValue,
+            }
+            break
+          case "signature_position":
+            updatedCostEstimate.signature_position = newValue
+            break
+          case "closing_message":
+            updatedCostEstimate.template = {
+              ...updatedCostEstimate.template,
+              closing_message: newValue,
+            }
+            break
+          case "site_notes":
+            updatedCostEstimate.items = {
+              ...updatedCostEstimate.items,
+              site_notes: newValue,
+            }
+            break
+          case "price_notes":
+            updatedCostEstimate.items = {
+              ...updatedCostEstimate.items,
+              price_notes: newValue,
+            }
+            break
+          case "unitPrice":
+            const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
               const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
               if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
-                const newTotal = item.unitPrice * (newDurationDays / 30)
-                console.log("[v0] Updating date-based duration for item:", item.id, "new total:", newTotal)
+                const newTotal = updatedCostEstimate.startDate && updatedCostEstimate.endDate
+                  ? calculateProratedPrice(newValue, updatedCostEstimate.startDate, updatedCostEstimate.endDate)
+                  : newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
+                console.log("[v0] Updating price for item:", item.id, "from", item.unitPrice, "to", newValue)
+                return { ...item, unitPrice: newValue, total: newTotal }
+              }
+              return item
+            })
+            updatedCostEstimate.lineItems = updatedLineItems
+            updatedCostEstimate.totalAmount = updatedLineItems.reduce((sum, item) => sum + item.total, 0)
+            break
+
+          case "durationDays":
+            updatedCostEstimate.durationDays = newValue
+            const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
+              const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+              if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
+                const newTotal = updatedCostEstimate.startDate && updatedCostEstimate.endDate
+                  ? calculateProratedPrice(item.unitPrice, updatedCostEstimate.startDate, updatedCostEstimate.endDate)
+                  : item.unitPrice * (newValue / 30)
+                console.log("[v0] Updating duration for item:", item.id, "new total:", newTotal)
                 return { ...item, total: newTotal }
               }
               return item
             })
-            updatedCostEstimate.lineItems = durationUpdatedItems
-            updatedCostEstimate.totalAmount = durationUpdatedItems.reduce((sum, item) => sum + item.total, 0)
-          }
-          break
+            updatedCostEstimate.lineItems = recalculatedItems
+            updatedCostEstimate.totalAmount = recalculatedItems.reduce((sum, item) => sum + item.total, 0)
 
-        case "closing_message":
-          updatedCostEstimate.template = {
-            ...updatedCostEstimate.template,
-            closing_message: newValue,
-          }
-          break
-
-        case "height":
-        case "width":
-          // Update the specs of the billboard rental item for the current site only
-          // Find the billboard rental item that belongs to the current site
-          const billboardItemToUpdate = updatedCostEstimate.lineItems.find((item) => {
-            if (!item.category.includes("Billboard Rental")) return false
-
-            // Check if this item belongs to the current site by checking if it exists in currentSiteItems
-            return currentSiteItems.some((siteItem) => siteItem.id === item.id)
-          })
-
-          if (billboardItemToUpdate) {
-            if (!billboardItemToUpdate.specs) {
-              billboardItemToUpdate.specs = {}
+            if (updatedCostEstimate.startDate) {
+              const newEndDate = new Date(updatedCostEstimate.startDate)
+              newEndDate.setDate(newEndDate.getDate() + newValue - 1) // -1 because duration is inclusive
+              updatedCostEstimate.endDate = newEndDate
             }
-            if (fieldName === "height") {
-              billboardItemToUpdate.specs.height = newValue
-              console.log(`[v0] Updated height to ${newValue} for item:`, billboardItemToUpdate.id)
-            } else if (fieldName === "width") {
-              billboardItemToUpdate.specs.width = newValue
-              console.log(`[v0] Updated width to ${newValue} for item:`, billboardItemToUpdate.id)
+            break
+
+
+          case "startDate":
+          case "endDate":
+            updatedCostEstimate[fieldName] = newValue
+            if (updatedCostEstimate.startDate && updatedCostEstimate.endDate) {
+              const diffTime = Math.abs(new Date(updatedCostEstimate.endDate).getTime() - new Date(updatedCostEstimate.startDate).getTime())
+              const newDurationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1
+              updatedCostEstimate.durationDays = newDurationDays
+
+              const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
+                const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+                if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
+                  const newTotal = calculateProratedPrice(item.unitPrice, updatedCostEstimate.startDate, updatedCostEstimate.endDate)
+                  console.log("[v0] Updating date-based duration for item:", item.id, "new total:", newTotal)
+                  return { ...item, total: newTotal }
+                }
+                return item
+              })
+              updatedCostEstimate.lineItems = durationUpdatedItems
+              updatedCostEstimate.totalAmount = durationUpdatedItems.reduce((sum, item) => sum + item.total, 0)
             }
-          } else {
-            console.log(`[v0] Could not find billboard item to update for field: ${fieldName}`)
-          }
-          break
-      }
-    })
+            break
+
+          case "closing_message":
+            updatedCostEstimate.template = {
+              ...(updatedCostEstimate.template || {}),
+              closing_message: newValue,
+            }
+            break
+
+          case "height":
+          case "width":
+            // Update the specs of the billboard rental item for the current site only
+            // Find the billboard rental item that belongs to the current site
+            const billboardItemToUpdate = updatedCostEstimate.lineItems.find((item) => {
+              if (!item.category.includes("Billboard Rental")) return false
+
+              // Check if this item belongs to the current site by checking if it exists in currentSiteItems
+              return currentSiteItems.some((siteItem) => siteItem.id === item.id)
+            })
+
+            if (billboardItemToUpdate) {
+              if (!billboardItemToUpdate.specs) {
+                billboardItemToUpdate.specs = {}
+              }
+              if (fieldName === "height") {
+                billboardItemToUpdate.specs.height = newValue
+                console.log(`[v0] Updated height to ${newValue} for item:`, billboardItemToUpdate.id)
+              } else if (fieldName === "width") {
+                billboardItemToUpdate.specs.width = newValue
+                console.log(`[v0] Updated width to ${newValue} for item:`, billboardItemToUpdate.id)
+              }
+            } else {
+              console.log(`[v0] Could not find billboard item to update for field: ${fieldName}`)
+            }
+            break
+        }
+      })
 
       // Remove the id field from update data as it's not needed for Firestore update
       const { id, ...updateDataWithoutId } = updatedCostEstimate
@@ -503,6 +540,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       const cleanData = (obj: any): any => {
         if (obj === null || obj === undefined) return obj
         if (typeof obj !== 'object') return obj
+        if (obj instanceof Date) return obj // Preserve Date objects
         if (Array.isArray(obj)) return obj.map(cleanData)
 
         const cleaned: any = {}
@@ -837,7 +875,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     setGeneratingPDFsForSend(true)
     try {
       let generatedCount = 0
-            // Generate PDFs for all related cost estimates
+      // Generate PDFs for all related cost estimates
       if (relatedCostEstimates.length > 1) {
         // Generate and update PDFs for all related cost estimates
         const updatedRelatedEstimates = [...relatedCostEstimates]
@@ -1047,110 +1085,82 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
   const handleDownloadPDF = async (userData: any) => {
     if (!costEstimate) return
-    console.log(`users all data: ${userData}`)
 
-    // Check if there are multiple related cost estimates (same page_id)
-    if (relatedCostEstimates.length > 1) {
-      setDownloadingPDF(true)
-      try {
-        let generatedCount = 0
-        // Generate and update PDFs for all related cost estimates (only if not already generated)
-        const updatedRelatedEstimates = [...relatedCostEstimates]
-        for (let i = 0; i < relatedCostEstimates.length; i++) {
-          const estimate = relatedCostEstimates[i]
-
-          // Check if PDF already exists
-          if (!estimate.pdf) {
-            // Generate PDF and get URL/password
-            const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(estimate, userData)
-
-            // Update the cost estimate with PDF URL and password
-            await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password })
-            // Update the local state
-            updatedRelatedEstimates[i] = { ...estimate, pdf: pdfUrl, password: password }
-            generatedCount++
-          }
-
-          // Download the PDF from the stored URL
-          if (updatedRelatedEstimates[i].pdf) {
-            const link = document.createElement('a')
-            link.href = updatedRelatedEstimates[i].pdf!
-            link.download = `${estimate.costEstimateNumber || estimate.id}.pdf`
-            link.target = '_blank'
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-          }
-        }
-        setRelatedCostEstimates(updatedRelatedEstimates)
-        toast({
-          title: "PDFs Generated",
-          description: `${generatedCount > 0 ? `${generatedCount} PDF(s) generated and ` : ""}${relatedCostEstimates.length} PDF files have been downloaded for all pages.`,
-        })
-      } catch (error) {
-        console.error("Error downloading multiple PDFs:", error)
-        toast({
-          title: "Error",
-          description: "Failed to generate PDFs. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setDownloadingPDF(false)
-      }
-      return
-    }
-
-    // Ensure PDF is generated and saved before downloading for single cost estimate
-    try {
-      await generatePDFIfNeeded(costEstimate)
-    } catch (error) {
-      // Error is already handled in generatePDFIfNeeded
-      return
-    }
-
-    // Check if current cost estimate has multiple sites
-    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
-    const sites = Object.keys(siteGroups)
-
-    if (sites.length > 1) {
-      setDownloadingPDF(true)
-      try {
-        await generateSeparateCostEstimatePDFs(costEstimate, undefined, userData ? {
-          first_name: userData.first_name || undefined,
-          last_name: userData.last_name || undefined,
-          email: userData.email || undefined,
-          company_id: userData.company_id || undefined,
-        } : undefined)
-        toast({
-          title: "PDFs Generated",
-          description: `${sites.length} separate PDF files have been downloaded for each product.`,
-        })
-      } catch (error) {
-        console.error("Error downloading separate PDFs:", error)
-        toast({
-          title: "Error",
-          description: "Failed to generate separate PDFs. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setDownloadingPDF(false)
-      }
-      return
-    }
-
-    // Single site - download directly
+    console.log('[PDF_DOWNLOAD] Starting PDF download process for cost estimate:', costEstimate.id)
     setDownloadingPDF(true)
     try {
-      await generateCostEstimatePDF(costEstimate, undefined, false, undefined, userData )
+      // Check if there are multiple related cost estimates
+      const estimatesToDownload = relatedCostEstimates.length > 1 ? relatedCostEstimates : [costEstimate]
+
+      console.log('[PDF_DOWNLOAD] Downloading PDFs for', estimatesToDownload.length, 'cost estimate(s)')
+
+      for (let i = 0; i < estimatesToDownload.length; i++) {
+        const estimate = estimatesToDownload[i]
+
+        // Fetch fresh cost estimate data from database to check current PDF field
+        console.log(`[PDF_DOWNLOAD] Fetching fresh cost estimate data for ${estimate.id}...`)
+        const freshCostEstimate = await getCostEstimate(estimate.id)
+        if (!freshCostEstimate) {
+          throw new Error(`Cost estimate ${estimate.id} not found`)
+        }
+
+        // Check if PDF field has value
+        let pdfUrl = freshCostEstimate.pdf
+        let wasExisting = !!pdfUrl
+        if (!pdfUrl) {
+          // Generate PDF if field is null or doesn't exist
+          const result = await generatePDFIfNeeded(freshCostEstimate)
+          pdfUrl = result.pdfUrl
+          wasExisting = false
+        } else {
+          console.log('[PDF_DOWNLOAD] Using existing PDF URL from database:', pdfUrl)
+        }
+
+        if (!pdfUrl) {
+          console.error('[PDF_DOWNLOAD] No PDF URL available after generation')
+          throw new Error("Failed to generate PDF")
+        }
+
+        console.log('[PDF_DOWNLOAD] PDF URL available:', pdfUrl, 'existing:', wasExisting)
+
+        // Download the PDF
+        const response = await fetch(pdfUrl)
+        if (!response.ok) {
+          throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`)
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${freshCostEstimate.costEstimateNumber || freshCostEstimate.id || 'cost-estimate'}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.open(url, '_blank')
+
+        // Revoke blob URL after a short delay (to keep tab valid)
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url)
+        }, 2000)
+
+        // Add a small delay between downloads to ensure proper file naming
+        if (i < estimatesToDownload.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+      }
+
+      console.log('[PDF_DOWNLOAD] PDF download initiated successfully')
+
       toast({
-        title: "PDF Generated",
-        description: "Cost estimate PDF has been downloaded.",
+        title: "Success",
+        description: `PDF${estimatesToDownload.length > 1 ? 's' : ''} downloaded successfully`,
       })
     } catch (error) {
-      console.error("Error downloading PDF:", error)
+      console.error("[PDF_DOWNLOAD] Error in PDF download process:", error)
       toast({
         title: "Error",
-        description: "Failed to generate PDF. Please try again.",
+        description: `Failed to download PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       })
     } finally {
@@ -1593,27 +1603,54 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const renderCostEstimationBlock = (siteName: string, siteLineItems: CostEstimateLineItem[], pageNumber: number) => {
     const currentCostEstimate = editableCostEstimate || costEstimate
     if (!currentCostEstimate) return null
-    console.log(`Data of Cost Estimate: ${JSON.stringify(currentCostEstimate)}`)
 
     // Calculate preview total using tempValues if available
     const previewSiteTotal = siteLineItems.reduce((sum, item) => {
       let itemTotal = item.total
 
-      // Apply unitPrice changes
-      if (tempValues.unitPrice !== undefined && item.category.includes("Billboard Rental")) {
-        const duration = tempValues.durationDays !== undefined ? tempValues.durationDays : (costEstimate?.durationDays || 30)
-        itemTotal = tempValues.unitPrice * (duration / 30)
-      }
+      // Determine effective dates and duration for calculation
+      const effectiveStartDate = tempValues.startDate || costEstimate?.startDate
+      const effectiveEndDate = tempValues.endDate || costEstimate?.endDate
+      const effectiveDuration = tempValues.durationDays !== undefined ? tempValues.durationDays : costEstimate?.durationDays
 
-      // Apply duration changes
-      if (tempValues.durationDays !== undefined && item.category.includes("Billboard Rental") && tempValues.unitPrice === undefined) {
-        itemTotal = item.unitPrice * (tempValues.durationDays / 30)
+      if (item.category.includes("Billboard Rental")) {
+        // Apply unitPrice changes
+        if (tempValues.unitPrice !== undefined) {
+          if (effectiveStartDate && effectiveEndDate) {
+            itemTotal = calculateProratedPrice(tempValues.unitPrice, effectiveStartDate, effectiveEndDate)
+          } else {
+            const duration = effectiveDuration || 30
+            itemTotal = tempValues.unitPrice * (duration / 30)
+          }
+        }
+        // Apply duration changes (only if unitPrice not changed)
+        else if (tempValues.durationDays !== undefined) {
+          if (effectiveStartDate && effectiveEndDate) {
+            itemTotal = calculateProratedPrice(item.unitPrice, effectiveStartDate, effectiveEndDate)
+          } else {
+            itemTotal = item.unitPrice * (tempValues.durationDays / 30)
+          }
+        }
+        // If no changes, use existing total or calculate from unitPrice
+        else {
+          if (effectiveStartDate && effectiveEndDate) {
+            itemTotal = calculateProratedPrice(item.unitPrice, effectiveStartDate, effectiveEndDate)
+          } else {
+            const duration = effectiveDuration || 30
+            itemTotal = item.unitPrice * (duration / 30)
+          }
+        }
+      } else {
+        // For non-billboard items, ensure total is calculated if not set
+        if (item.total === 0 && item.unitPrice && item.quantity) {
+          itemTotal = item.unitPrice * item.quantity
+        }
       }
 
       return sum + itemTotal
     }, 0)
 
-    const siteTotal = Object.keys(tempValues).length > 0 ? previewSiteTotal : siteLineItems.reduce((sum, item) => sum + item.total, 0)
+    const siteTotal = previewSiteTotal
     const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.lineItems[0]?.description
 
     const baseCENumber = costEstimate?.costEstimateNumber || costEstimate?.id
@@ -1637,430 +1674,427 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             <p className="text-base">{format(new Date(), "MMMM dd, yyyy")}</p>
           </div>
 
-        {/* Client and RFQ Info */}
-        <div className="flex justify-between items-start mb-8">
-          <div className="text-left">
-            <p className="text-base ">{currentCostEstimate.client?.name || "Client Name"}</p>
-            <p className="text-base ">{currentCostEstimate.client?.designation || "Position"}</p>
-            <p className="text-base font-bold">{currentCostEstimate.client?.company || "COMPANY NAME"}</p>
+          {/* Client and RFQ Info */}
+          <div className="flex justify-between items-start mb-8">
+            <div className="text-left">
+              <p className="text-base ">{currentCostEstimate.client?.name || "Client Name"}</p>
+              <p className="text-base ">{currentCostEstimate.client?.designation || "Position"}</p>
+              <p className="text-base font-bold">{currentCostEstimate.client?.company || "COMPANY NAME"}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-base">RFQ. No. {uniqueCENumber}</p>
+            </div>
           </div>
-          <div className="text-right">
-            <p className="text-base">RFQ. No. {uniqueCENumber}</p>
+
+          <div className="text-center mb-8">
+            <h1 className="text-xl font-bold text-gray-900 mb-4">{adjustedTitle} Cost Estimate</h1>
           </div>
-        </div>
 
-        <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{adjustedTitle} Cost Estimate</h1>
-        </div>
+          {/* Salutation */}
+          <div className="text-left mb-4">
+            <p className="text-base">
+              Dear {isEditing && editingField === "salutation" ? (
+                <select
+                  value={tempValues.salutation || currentCostEstimate.template?.salutation}
+                  onChange={(e) => updateTempValues("salutation", e.target.value)}
+                  className="border border-gray-300 rounded px-1 py-0 text-sm"
+                  onBlur={() => setEditingField(null)}
+                >
+                  <option value="Mr.">Mr.</option>
+                  <option value="Ms.">Ms.</option>
+                  <option value="Mrs.">Mrs.</option>
+                  <option value="Miss">Miss</option>
+                </select>
+              ) : (
+                <span
+                  className={isEditing ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
+                  onClick={() => isEditing && handleFieldEdit("salutation", tempValues.salutation || currentCostEstimate.template?.salutation || "Mr.")}
+                  title={isEditing ? "Click to edit salutation" : ""}
+                >
+                  {tempValues.salutation || currentCostEstimate.template?.salutation || "Mr."}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </span>
+              )} {currentCostEstimate?.client?.name?.split(' ').pop() || 'Client'},
+            </p>
+          </div>
 
-        {/* Salutation */}
-        <div className="text-left mb-4">
-          <p className="text-base">
-            Dear {isEditing && editingField === "salutation" ? (
-              <select
-                value={tempValues.salutation || currentCostEstimate.template?.salutation}
-                onChange={(e) => updateTempValues("salutation", e.target.value)}
-                className="border border-gray-300 rounded px-1 py-0 text-sm"
-                onBlur={() => setEditingField(null)}
-              >
-                <option value="Mr.">Mr.</option>
-                <option value="Ms.">Ms.</option>
-                <option value="Mrs.">Mrs.</option>
-                <option value="Miss">Miss</option>
-              </select>
+          {/* Greeting */}
+          <div className="text-left mb-8">
+            {isEditing && editingField === "greeting" ? (
+              <textarea
+                value={tempValues.greeting || currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
+                onChange={(e) => updateTempValues("greeting", e.target.value)}
+                className="w-full text-left text-base border border-gray-300 rounded p-2"
+                rows={2}
+                placeholder="Enter greeting text"
+              />
             ) : (
-              <span
-                className={isEditing ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
-                onClick={() => isEditing && handleFieldEdit("salutation", currentCostEstimate.template?.salutation || "Mr.")}
-                title={isEditing ? "Click to edit salutation" : ""}
+              <div
+                className={isEditing ? "cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
+                onClick={() => isEditing && handleFieldEdit("greeting", tempValues.greeting || currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`)}
+                title={isEditing ? "Click to edit greeting" : ""}
               >
-                {currentCostEstimate.template?.salutation || "Mr."}
+                <p className="text-base">
+                  {tempValues.greeting || currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
+                </p>
                 {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </span>
-            )} {currentCostEstimate?.client?.name?.split(' ').pop() || 'Client'},
-          </p>
-        </div>
+              </div>
+            )}
+          </div>
 
-        {/* Greeting */}
-        <div className="text-left mb-8">
-          {isEditing && editingField === "greeting" ? (
-            <textarea
-              value={tempValues.greeting || currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
-              onChange={(e) => updateTempValues("greeting", e.target.value)}
-              className="w-full text-left text-base border border-gray-300 rounded p-2"
-              rows={2}
-              placeholder="Enter greeting text"
-            />
-          ) : (
+          {/* Details Header */}
+          <div className="text-left mb-1">
+            <p className="text-base font-semibold">Site details:</p>
+          </div>
+
+          {/* Details Section with editable fields */}
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Type:</span>
+              <span className="text-gray-700">{siteLineItems[0]?.content_type || "Rental"}</span>
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Size:</span>
+              <span className="text-gray-700">
+                {siteLineItems[0]?.specs?.height ? `${siteLineItems[0].specs.height}ft (H)` : "N/A"} x {siteLineItems[0]?.specs?.width ? `${siteLineItems[0].specs.width}ft (W)` : "N/A"}
+              </span>
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Contract Duration:</span>
+              {isEditing && editingField === "durationDays" ? (
+                <div className="flex items-center gap-2 ml-1">
+                  <Input
+                    type="number"
+                    value={tempValues.durationDays || ""}
+                    onChange={(e) => updateTempValues("durationDays", Number.parseInt(e.target.value) || 0)}
+                    className="w-24 h-6 text-sm"
+                    placeholder={currentCostEstimate?.durationDays?.toString() || "0"}
+                    onBlur={() => setEditingField(null)}
+                  />
+                  <span className="text-sm text-gray-600">days</span>
+                </div>
+              ) : (
+                <span
+                  className={`text-gray-700 ${isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                    }`}
+                  onClick={() => isEditing && handleFieldEdit("durationDays", tempValues.durationDays || currentCostEstimate?.durationDays || 0)}
+                  title={isEditing ? "Click to edit contract duration" : ""}
+                >
+                  {formatDurationDisplay(tempValues.durationDays || currentCostEstimate?.durationDays || 0)}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Contract Period:</span>
+              {isEditing && editingField === "contractPeriod" ? (
+                <div className="flex items-center gap-2 ml-1">
+                  <Input
+                    type="date"
+                    value={formatDateForInput(tempValues.startDate)}
+                    onChange={(e) => updateTempValues("startDate", new Date(e.target.value))}
+                    className="w-36 h-8 text-sm border-gray-300 rounded-md"
+                    onBlur={() => setEditingField(null)}
+                  />
+                  <span className="text-gray-500">-</span>
+                  <Input
+                    type="date"
+                    value={formatDateForInput(tempValues.endDate)}
+                    onChange={(e) => updateTempValues("endDate", new Date(e.target.value))}
+                    className="w-36 h-8 text-sm border-gray-300 rounded-md"
+                    onBlur={() => setEditingField(null)}
+                  />
+                </div>
+              ) : (
+                <span
+                  className={`text-gray-700 ${isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                    }`}
+                  onClick={() =>
+                    isEditing &&
+                    handleFieldEdit("contractPeriod", {
+                      startDate: tempValues.startDate || currentCostEstimate?.startDate,
+                      endDate: tempValues.endDate || currentCostEstimate?.endDate,
+                    })
+                  }
+                  title={isEditing ? "Click to edit contract period" : ""}
+                >
+                  {(tempValues.startDate || currentCostEstimate?.startDate) && (tempValues.endDate || currentCostEstimate?.endDate)
+                    ? `${formatDate(tempValues.startDate || currentCostEstimate?.startDate)} - ${formatDate(tempValues.endDate || currentCostEstimate?.endDate)}`
+                    : "—"}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </span>
+              )}
+            </div>
+
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Proposal to:</span>
+              <span className="text-gray-700">{currentCostEstimate?.client?.company || "CLIENT COMPANY NAME"}</span>
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Lease rate per month:</span>
+
+              {isEditing && editingField === "unitPrice" ? (
+                <div className="flex items-center gap-2 ml-1">
+                  <Input
+                    type="number"
+                    value={tempValues.unitPrice || ""}
+                    onChange={(e) => updateTempValues("unitPrice", Number.parseFloat(e.target.value) || 0)}
+                    className="w-32 h-6 text-sm"
+                    placeholder={monthlyRate?.toString() || "0.00"}
+                    onBlur={() => setEditingField(null)}
+                  />
+                  <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
+                </div>
+              ) : (
+                <span
+                  className={`text-gray-700 ${isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                    }`}
+                  onClick={() => isEditing && handleFieldEdit("unitPrice", tempValues.unitPrice || monthlyRate)}
+                  title={isEditing ? "Click to edit lease rate" : ""}
+                >
+                  PHP {(tempValues.unitPrice || monthlyRate).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </span>
+              )}
+            </div>
+
+          </div>
+
+          {/* Site Notes */}
+          {isEditing && editingField === "site_notes" ? (
+            <div className="mt-4">
+              <textarea
+                value={tempValues.site_notes || currentCostEstimate?.items?.site_notes || ""}
+                onChange={(e) => updateTempValues("site_notes", e.target.value)}
+                className="w-full text-base border border-gray-300 rounded p-2"
+                rows={3}
+                placeholder="Enter site notes"
+                onBlur={() => setEditingField(null)}
+              />
+            </div>
+          ) : (tempValues.site_notes || currentCostEstimate?.items?.site_notes) ? (
             <div
-              className={isEditing ? "cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
-              onClick={() => isEditing && handleFieldEdit("greeting", currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`)}
-              title={isEditing ? "Click to edit greeting" : ""}
+              className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
+              onClick={() => isEditing && handleFieldEdit("site_notes", tempValues.site_notes || currentCostEstimate.items?.site_notes || "")}
+              title={isEditing ? "Click to edit site notes" : ""}
             >
-              <p className="text-base">
-                {currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
-              </p>
+              <p className="text-sm italic"><strong>Note:</strong> {tempValues.site_notes || currentCostEstimate.items?.site_notes}</p>
               {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
             </div>
-          )}
-        </div>
+          ) : isEditing ? (
+            <div
+              className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
+              onClick={() => handleFieldEdit("site_notes", tempValues.site_notes || "")}
+              title="Click to add site notes"
+            >
+              <p className="text-base">+ Add site notes</p>
+            </div>
+          ) : null}
 
-        {/* Details Header */}
-        <div className="text-left mb-1">
-          <p className="text-base font-semibold">Site details:</p>
-        </div>
-
-        {/* Details Section with editable fields */}
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Type:</span>
-            <span className="text-gray-700">{siteLineItems[0]?.content_type || "Rental"}</span>
-          </div>
-
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Size:</span>
-            <span className="text-gray-700">
-              {siteLineItems[0]?.specs?.height ? `${siteLineItems[0].specs.height}ft (H)` : "N/A"} x {siteLineItems[0]?.specs?.width ? `${siteLineItems[0].specs.width}ft (W)` : "N/A"}
-            </span>
-          </div>
-
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Contract Duration:</span>
-            {isEditing && editingField === "durationDays" ? (
-              <div className="flex items-center gap-2 ml-1">
-                <Input
-                  type="number"
-                  value={tempValues.durationDays || ""}
-                  onChange={(e) => updateTempValues("durationDays", Number.parseInt(e.target.value) || 0)}
-                  className="w-24 h-6 text-sm"
-                  placeholder={currentCostEstimate?.durationDays?.toString() || "0"}
-                  onBlur={() => setEditingField(null)}
-                />
-                <span className="text-sm text-gray-600">days</span>
+          <p className="font-bold mt-2">Price breakdown:</p>
+          {/* Pricing Table */}
+          <div className="px-4 pt-2">
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-700">Lease rate per month</span>
+                <span className="text-gray-900">PHP {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
               </div>
-            ) : (
-              <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
-                onClick={() => isEditing && handleFieldEdit("durationDays", tempValues.durationDays || currentCostEstimate?.durationDays || 0)}
-                title={isEditing ? "Click to edit contract duration" : ""}
-              >
-                {formatDurationDisplay(tempValues.durationDays || currentCostEstimate?.durationDays || 0)}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Contract Period:</span>
-            {isEditing && editingField === "contractPeriod" ? (
-              <div className="flex items-center gap-2 ml-1">
-                <Input
-                  type="date"
-                  value={formatDateForInput(tempValues.startDate)}
-                  onChange={(e) => updateTempValues("startDate", new Date(e.target.value))}
-                  className="w-36 h-8 text-sm border-gray-300 rounded-md"
-                  onBlur={() => setEditingField(null)}
-                />
-                <span className="text-gray-500">-</span>
-                <Input
-                  type="date"
-                  value={formatDateForInput(tempValues.endDate)}
-                  onChange={(e) => updateTempValues("endDate", new Date(e.target.value))}
-                  className="w-36 h-8 text-sm border-gray-300 rounded-md"
-                  onBlur={() => setEditingField(null)}
-                />
+              <div className="flex justify-between">
+                <span className="text-gray-700">Contract duration</span>
+                <span className="text-gray-900">x {formatDurationDisplay(tempValues.durationDays || currentCostEstimate?.durationDays || 30)}</span>
               </div>
-            ) : (
-              <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
-                onClick={() =>
-                  isEditing &&
-                  handleFieldEdit("contractPeriod", {
-                    startDate: tempValues.startDate || currentCostEstimate?.startDate,
-                    endDate: tempValues.endDate || currentCostEstimate?.endDate,
-                  })
-                }
-                title={isEditing ? "Click to edit contract period" : ""}
-              >
-                {(tempValues.startDate || currentCostEstimate?.startDate) && (tempValues.endDate || currentCostEstimate?.endDate)
-                  ? `${formatDate(tempValues.startDate || currentCostEstimate?.startDate)} - ${formatDate(tempValues.endDate || currentCostEstimate?.endDate)}`
-                  : "—"}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </span>
-            )}
-          </div>
-
-          <div className="flex">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Proposal to:</span>
-            <span className="text-gray-700">{currentCostEstimate?.client?.company || "CLIENT COMPANY NAME"}</span>
-          </div>
-
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Lease rate per month:</span>
-
-            {isEditing && editingField === "unitPrice" ? (
-              <div className="flex items-center gap-2 ml-1">
-                <Input
-                  type="number"
-                  value={tempValues.unitPrice || ""}
-                  onChange={(e) => updateTempValues("unitPrice", Number.parseFloat(e.target.value) || 0)}
-                  className="w-32 h-6 text-sm"
-                  placeholder={monthlyRate?.toString() || "0.00"}
-                  onBlur={() => setEditingField(null)}
-                />
-                <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Total lease</span>
+                <span className="text-gray-900">PHP {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-            ) : (
-              <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
-                onClick={() => isEditing && handleFieldEdit("unitPrice", tempValues.unitPrice || monthlyRate)}
-                title={isEditing ? "Click to edit lease rate" : ""}
-              >
-                PHP {(tempValues.unitPrice || monthlyRate).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </span>
-            )}
-          </div>
-
-        </div>
-
-        {/* Site Notes */}
-        {isEditing && editingField === "site_notes" ? (
-          <div className="mt-4">
-            <textarea
-              value={tempValues.site_notes || currentCostEstimate?.items?.site_notes || ""}
-              onChange={(e) => updateTempValues("site_notes", e.target.value)}
-              className="w-full text-base border border-gray-300 rounded p-2"
-              rows={3}
-              placeholder="Enter site notes"
-              onBlur={() => setEditingField(null)}
-            />
-          </div>
-        ) : (tempValues.site_notes || currentCostEstimate?.items?.site_notes) ? (
-          <div
-            className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
-            onClick={() => isEditing && handleFieldEdit("site_notes", tempValues.site_notes || currentCostEstimate.items?.site_notes || "")}
-            title={isEditing ? "Click to edit site notes" : ""}
-          >
-            <p className="text-sm italic"><strong>Note:</strong> {tempValues.site_notes || currentCostEstimate.items?.site_notes}</p>
-            {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-          </div>
-        ) : isEditing ? (
-          <div
-            className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
-            onClick={() => handleFieldEdit("site_notes", tempValues.site_notes || "")}
-            title="Click to add site notes"
-          >
-            <p className="text-base">+ Add site notes</p>
-          </div>
-        ) : null}
-
-        <p className="font-bold mt-2">Price breakdown:</p>
-        {/* Pricing Table */}
-        <div className="px-4 pt-2">
-          <div className="space-y-1">
-            <div className="flex justify-between">
-              <span className="text-gray-700">Lease rate per month</span>
-              <span className="text-gray-900">PHP {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-700">Contract duration</span>
-              <span className="text-gray-900">x {currentCostEstimate.durationDays ? `${formatDurationDisplay(currentCostEstimate.durationDays)}` :  "1 month"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-700">Total lease</span>
-              <span className="text-gray-900">PHP {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-700">Add: VAT</span>
-              <span className="text-gray-900">PHP {(siteTotal * 0.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="border-t pt-1 mt-1">
-              <div className="flex justify-between font-bold text-lg">
-                <span className="text-gray-900">Total</span>
-                <span className="text-gray-900">PHP {(siteTotal * 1.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Add: VAT</span>
+                <span className="text-gray-900">PHP {(siteTotal * 0.12).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="border-t pt-1 mt-1">
+                <div className="flex justify-between font-bold text-lg">
+                  <span className="text-gray-900">Total</span>
+                  <span className="text-gray-900">PHP {(siteTotal * 1.12).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Price Notes */}
-        {isEditing && editingField === "price_notes" ? (
-          <div className="mt-4">
-            <textarea
-              value={tempValues.price_notes || currentCostEstimate?.items?.price_notes || ""}
-              onChange={(e) => updateTempValues("price_notes", e.target.value)}
-              className="w-full text-base border border-gray-300 rounded p-2"
-              rows={3}
-              placeholder="Enter price notes"
-              onBlur={() => setEditingField(null)}
-            />
-          </div>
-        ) : (tempValues.price_notes || currentCostEstimate?.items?.price_notes) ? (
-          <div
-            className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
-            onClick={() => isEditing && handleFieldEdit("price_notes", tempValues.price_notes || currentCostEstimate.items?.price_notes || "")}
-            title={isEditing ? "Click to edit price notes" : ""}
-          >
-            <p className="text-sm italic mb-[15px]"><strong>Note:</strong> {tempValues.price_notes || currentCostEstimate.items?.price_notes}</p>
-            {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-          </div>
-        ) : isEditing ? (
-          <div
-            className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
-            onClick={() => handleFieldEdit("price_notes", tempValues.price_notes || "")}
-            title="Click to add price notes"
-          >
-            <p className="text-base">+ Add price notes</p>
-          </div>
-        ) : null}
+          {/* Price Notes */}
+          {isEditing && editingField === "price_notes" ? (
+            <div className="mt-4">
+              <textarea
+                value={tempValues.price_notes || currentCostEstimate?.items?.price_notes || ""}
+                onChange={(e) => updateTempValues("price_notes", e.target.value)}
+                className="w-full text-base border border-gray-300 rounded p-2"
+                rows={3}
+                placeholder="Enter price notes"
+                onBlur={() => setEditingField(null)}
+              />
+            </div>
+          ) : (tempValues.price_notes || currentCostEstimate?.items?.price_notes) ? (
+            <div
+              className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
+              onClick={() => isEditing && handleFieldEdit("price_notes", tempValues.price_notes || currentCostEstimate.items?.price_notes || "")}
+              title={isEditing ? "Click to edit price notes" : ""}
+            >
+              <p className="text-sm italic mb-[15px]"><strong>Note:</strong> {tempValues.price_notes || currentCostEstimate.items?.price_notes}</p>
+              {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+            </div>
+          ) : isEditing ? (
+            <div
+              className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
+              onClick={() => handleFieldEdit("price_notes", tempValues.price_notes || "")}
+              title="Click to add price notes"
+            >
+              <p className="text-base">+ Add price notes</p>
+            </div>
+          ) : null}
 
-        {/* Terms and Conditions */}
-        <div className="mb-8 mt-2">
-          <p className="font-semibold mb-4">Terms and Conditions:</p>
-          <div className="space-y-2 text-sm">
-            {(isEditing
-              ? tempValues.terms_and_conditions || currentCostEstimate?.template?.terms_and_conditions || [
+          {/* Terms and Conditions */}
+          <div className="mb-8 mt-2">
+            <p className="font-semibold mb-4">Terms and Conditions:</p>
+            <div className="space-y-2 text-sm">
+              {(isEditing
+                ? tempValues.terms_and_conditions || currentCostEstimate?.template?.terms_and_conditions || [
                   "Cost Estimate validity: 5 working days.",
                   "Site availability: First-come-first-served basis. Official documents required.",
                   "Payment terms: One month advance and two months security deposit.",
                   "Payment deadline: 7 days before rental start.",
                 ]
-              : currentCostEstimate?.template?.terms_and_conditions || [
+                : currentCostEstimate?.template?.terms_and_conditions || [
                   "Cost Estimate validity: 5 working days.",
                   "Site availability: First-come-first-served basis. Official documents required.",
                   "Payment terms: One month advance and two months security deposit.",
                   "Payment deadline: 7 days before rental start.",
                 ]
-            ).map((term: string, index: number) => (
-              <div key={index} className="flex items-start gap-2">
-                <span className="flex-shrink-0">{index + 1}.</span>
-                {isEditing ? (
-                  <div className="flex-1 flex items-center gap-2">
-                    <textarea
-                      value={term}
-                      onChange={(e) => handleUpdateTerm(index, e.target.value)}
-                      className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px]"
-                      placeholder="Enter term and condition"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveTerm(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <span className="flex-1">{term}</span>
-                )}
-              </div>
-            ))}
-            {isEditing && (
-              <div className="mt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddTerm}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  + Add Term
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Closing Message */}
-        {isEditing && editingField === "closing_message" ? (
-          <div className="mb-8">
-            <textarea
-              value={tempValues.closing_message || currentCostEstimate?.template?.closing_message || ""}
-              onChange={(e) => updateTempValues("closing_message", e.target.value)}
-              className="w-full text-base border border-gray-300 rounded p-2"
-              rows={3}
-              placeholder="Enter closing message (optional)"
-              onBlur={() => setEditingField(null)}
-            />
-          </div>
-        ) : (tempValues.closing_message || currentCostEstimate?.template?.closing_message) ? (
-          <div
-            className={isEditing ? "mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mb-8"}
-            onClick={() => isEditing && handleFieldEdit("closing_message", tempValues.closing_message || currentCostEstimate?.template?.closing_message || "")}
-            title={isEditing ? "Click to edit closing message" : ""}
-          >
-            <p className="text-base">{tempValues.closing_message || currentCostEstimate?.template?.closing_message}</p>
-            {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-          </div>
-        ) : isEditing ? (
-          <div
-            className="mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
-            onClick={() => handleFieldEdit("closing_message", tempValues.closing_message || "")}
-            title="Click to add closing message"
-          >
-            <p className="text-base">+ Add closing message</p>
-          </div>
-        ) : null}
-
-        <div className="space-y-8 mb-8">
-          <div className="text-left">
-            <p className="mb-16">Very truly yours,</p>
-            <div>
-              <div className="border-b border-gray-400 w-48 mb-2"></div>
-              <p className="font-medium">
-                {userData?.first_name && userData?.last_name
-                  ? `${userData.first_name} ${userData.last_name}`
-                  : "Golden Touch Imaging Specialist"}
-              </p>
-              {isEditing && editingField === "signature_position" ? (
-                <Input
-                  type="text"
-                  value={tempValues.signature_position || ""}
-                  onChange={(e) => updateTempValues("signature_position", e.target.value)}
-                  className="w-32 h-6 text-sm"
-                  placeholder={currentCostEstimate?.signature_position ?? "Position"}
-                  onBlur={() => setEditingField(null)}
-                />
-              ) : (
-                <p
-                  className={`text-sm ${isEditing ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}`}
-                  onClick={() => isEditing && handleFieldEdit("signature_position", tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "")}
-                  title={isEditing ? "Click to edit position" : ""}
-                >
-                  {tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "Account Manager"}
-                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-                </p>
+              ).map((term: string, index: number) => (
+                <div key={index} className="flex items-start gap-2">
+                  <span className="flex-shrink-0">{index + 1}.</span>
+                  {isEditing ? (
+                    <div className="flex-1 flex items-center gap-2">
+                      <textarea
+                        value={term}
+                        onChange={(e) => handleUpdateTerm(index, e.target.value)}
+                        className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px]"
+                        placeholder="Enter term and condition"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveTerm(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="flex-1">{term}</span>
+                  )}
+                </div>
+              ))}
+              {isEditing && (
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddTerm}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    + Add Term
+                  </Button>
+                </div>
               )}
             </div>
           </div>
-        </div>
 
-        <div className="text-center text-xs text-gray-600 mt-8 border-t pt-4">
-          <p className="font-semibold">{companyData?.name || "Company Name"}</p>
-          <p>{formatCompanyAddress(companyData)}</p>
-          <span className="text-center gap-1 flex-1">{companyData?.phone && `Tel no: ${companyData.phone}`}|{companyData?.email && `Email: ${companyData.email}`}</span>
-        </div>
+          {/* Closing Message */}
+          {isEditing && editingField === "closing_message" ? (
+            <div className="mb-8">
+              <textarea
+                value={tempValues.closing_message || currentCostEstimate?.template?.closing_message || ""}
+                onChange={(e) => updateTempValues("closing_message", e.target.value)}
+                className="w-full text-base border border-gray-300 rounded p-2"
+                rows={3}
+                placeholder="Enter closing message (optional)"
+                onBlur={() => setEditingField(null)}
+              />
+            </div>
+          ) : (tempValues.closing_message || currentCostEstimate?.template?.closing_message) ? (
+            <div
+              className={isEditing ? "mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mb-8"}
+              onClick={() => isEditing && handleFieldEdit("closing_message", tempValues.closing_message || currentCostEstimate?.template?.closing_message || "")}
+              title={isEditing ? "Click to edit closing message" : ""}
+            >
+              <p className="text-base">{tempValues.closing_message || currentCostEstimate?.template?.closing_message}</p>
+              {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+            </div>
+          ) : isEditing ? (
+            <div
+              className="mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
+              onClick={() => handleFieldEdit("closing_message", tempValues.closing_message || "")}
+              title="Click to add closing message"
+            >
+              <p className="text-base">+ Add closing message</p>
+            </div>
+          ) : null}
+
+          <div className="space-y-8 mb-8">
+            <div className="text-left">
+              <p className="mb-16">Very truly yours,</p>
+              <div>
+                <div className="border-b border-gray-400 w-48 mb-2"></div>
+                <p className="font-medium">
+                  {userData?.first_name && userData?.last_name
+                    ? `${userData.first_name} ${userData.last_name}`
+                    : "Golden Touch Imaging Specialist"}
+                </p>
+                {isEditing && editingField === "signature_position" ? (
+                  <Input
+                    type="text"
+                    value={tempValues.signature_position || ""}
+                    onChange={(e) => updateTempValues("signature_position", e.target.value)}
+                    className="w-32 h-6 text-sm"
+                    placeholder={currentCostEstimate?.signature_position ?? "Position"}
+                    onBlur={() => setEditingField(null)}
+                  />
+                ) : (
+                  <p
+                    className={`text-sm ${isEditing ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}`}
+                    onClick={() => isEditing && handleFieldEdit("signature_position", tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "")}
+                    title={isEditing ? "Click to edit position" : ""}
+                  >
+                    {tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "Account Manager"}
+                    {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center text-xs text-gray-600 mt-8 border-t pt-4">
+            <p className="font-semibold">{companyData?.name || "Company Name"}</p>
+            <p>{formatCompanyAddress(companyData)}</p>
+            <span className="text-center gap-1 flex-1">{companyData?.phone && `Tel no: ${companyData.phone}`}|{companyData?.email && `Email: ${companyData.email}`}</span>
+          </div>
         </div>
       </div>
     )
@@ -2224,7 +2258,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                 </Button>
               </div>
               <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
-                {costEstimate?.client?.company || "Client"}
+                {costEstimate?.lineItems[0].description || "Client"}
               </div>
             </div>
 
@@ -2590,9 +2624,8 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                   return (
                     <div
                       key={siteName}
-                      className={`relative border rounded-lg p-4 cursor-pointer transition-all ${
-                        isSelected ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
-                      }`}
+                      className={`relative border rounded-lg p-4 cursor-pointer transition-all ${isSelected ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
+                        }`}
                       onClick={() => handlePageToggle(index)}
                     >
                       {/* Checkbox */}

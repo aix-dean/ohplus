@@ -88,6 +88,10 @@ export async function POST(request: Request) {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
       apiKey = process.env.ALGOLIA_ADMIN_API_KEY
       finalIndexName = 'reports'
+    } else if (indexName === 'proposals') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
+      apiKey = process.env.ALGOLIA_ADMIN_API_KEY
+      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_INDEX_NAME
     } else {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
       apiKey = process.env.ALGOLIA_ADMIN_API_KEY
@@ -145,6 +149,9 @@ export async function POST(request: Request) {
     } else if (indexName === 'reports') {
       attributesToRetrieve = "siteName,date,reportType,createdByName,category,companyId,status,created"
       attributesToHighlight = "siteName,reportType,createdByName"
+    } else if (indexName === 'proposals') {
+      attributesToRetrieve = "id,proposalNumber,title,client_company,client_contactPerson,client_name,client_email,status,createdAt,company_id,totalAmount,products"
+      attributesToHighlight = "proposalNumber,title,client_company,client_contactPerson"
     }
 
     const searchParams: any = {
