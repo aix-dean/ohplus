@@ -284,6 +284,34 @@ function SalesDashboardContent() {
     const mode = searchParams.get('mode')
     const clientId = searchParams.get('clientId')
     const tab = searchParams.get('tab')
+    const action = searchParams.get('action')
+
+    // Handle action parameter for direct mode activation (from proposals page)
+    if (action && userData?.company_id) {
+      // Reset all modes first
+      setProposalCreationMode(false)
+      setCeQuoteMode(false)
+      setCeMode(false)
+      setQuoteMode(false)
+      setSelectedClientForProposal(null)
+      setDashboardClientSearchTerm("")
+      setSelectedProducts([])
+      setSelectedSites([])
+
+      // Activate the appropriate mode based on action parameter
+      setTimeout(() => {
+        if (action === 'create-proposal') {
+          setProposalCreationMode(true)
+          setCeQuoteMode(false)
+        }
+      }, 100)
+
+      // Clean up URL parameters
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('action')
+      window.history.replaceState({}, '', newUrl.toString())
+      return
+    }
 
     // Handle tab parameter for direct mode activation (from product page buttons)
     if (tab && userData?.company_id) {

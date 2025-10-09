@@ -443,8 +443,10 @@ function ProposalsPageContent() {
   }
 
   const handleCreateQuotation = (proposal: Proposal) => {
-    // Navigate to create quotation page
-    router.push(`/sales/quotations/create?proposal=${proposal.id}`)
+    // Navigate to the date selection page with proposal data
+    const siteIdsParam = encodeURIComponent(JSON.stringify(proposal.products.map(site => site.id)))
+    const clientIdParam = encodeURIComponent(proposal.client.id)
+    router.push(`/sales/quotations/select-dates?sites=${siteIdsParam}&clientId=${clientIdParam}`)
   }
 
   const handleViewSentHistory = (proposal: Proposal) => {
