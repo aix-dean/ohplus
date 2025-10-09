@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, MoreVertical, Plus, Printer, Eye, Edit, Trash2 } from "lucide-react"
+import { Search, MoreVertical, Plus, Printer, Eye, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -158,9 +158,6 @@ export default function SalesReportsPage() {
     router.push(`/sales/reports/${reportId}`)
   }
 
-  const handleEditReport = (reportId: string) => {
-    router.push(`/sales/reports/${reportId}/edit`)
-  }
 
   const handleDeleteReport = (reportId: string) => {
     // Implement delete functionality
@@ -289,10 +286,6 @@ export default function SalesReportsPage() {
                           <DropdownMenuItem onClick={() => handleViewReport(report.id!)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Report
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditReport(report.id!)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit Report
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handlePrintReport(report)}>
                             <Printer className="mr-2 h-4 w-4" />

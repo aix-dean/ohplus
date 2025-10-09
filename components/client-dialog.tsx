@@ -724,7 +724,9 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                     </Label>
                     <GooglePlacesAutocomplete
                       value={formData.address}
-                      onChange={(value) => setFormData((prev) => ({ ...prev, address: value }))}
+                      onChange={(value) => {
+                        setFormData((prev) => ({ ...prev, address: value }))
+                      }}
                       placeholder="Enter company address"
                     />
                   </div>
@@ -932,7 +934,7 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
           </div>
         </form>
 
-        <style>{`.pac-container { z-index: 9999 !important; }`}</style>
+        <style>{`.pac-container { z-index: 9999 !important; } .autocomplete-dropdown { z-index: 9998 !important; }`}</style>
 
         {/* Hidden file inputs for compliance documents */}
         <input
