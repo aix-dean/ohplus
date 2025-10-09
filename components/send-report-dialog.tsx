@@ -11,6 +11,40 @@ import type { ReportData } from "@/lib/report-service"
 import { getProductById } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/report-pdf-service"
 
+// IndexedDB utility for storing PDF blobs
+const openPDFDB = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('ReportPDFs', 1)
+
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => resolve(request.result)
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result
+      if (!db.objectStoreNames.contains('pdfs')) {
+        db.createObjectStore('pdfs')
+      }
+    }
+  })
+}
+
+const storePDFFromIndexedDB = async (key: string, blob: Blob, filename: string): Promise<void> => {
+  const db = await openPDFDB()
+  const transaction = db.transaction(['pdfs'], 'readwrite')
+  const store = transaction.objectStore('pdfs')
+  const data = {
+    blob,
+    filename,
+    timestamp: Date.now()
+  }
+  await new Promise<void>((resolve, reject) => {
+    const request = store.put(data, key)
+    request.onsuccess = () => resolve()
+    request.onerror = () => reject(request.error)
+  })
+  db.close()
+}
+
 interface SendReportDialogProps {
   isOpen: boolean
   onClose: () => void
@@ -80,25 +114,18 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
       const siteName = report.siteName || report.client || 'Unknown'
       const pdfFile = await generateReportPDF(report.id || 'unknown', siteName)
 
-      // Store PDF in sessionStorage
-      const arrayBuffer = await pdfFile.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-      let binaryString = ''
-      for (let i = 0; i < uint8Array.length; i++) {
-        binaryString += String.fromCharCode(uint8Array[i])
-      }
-      const base64Data = btoa(binaryString)
-      const pdfData = {
-        name: pdfFile.name,
-        data: base64Data,
-        type: pdfFile.type
-      }
-      sessionStorage.setItem('report-pdf', JSON.stringify(pdfData))
+      // Generate unique key for IndexedDB
+      const pdfKey = `report-pdf-${report.id}-${Date.now()}`
 
-      // Close dialog and navigate to compose page
+      // Store PDF in IndexedDB
+      await storePDFFromIndexedDB(pdfKey, pdfFile, pdfFile.name)
+
+      // Close dialog and navigate to compose page with pdfKey
       onClose()
       const department = pathname.includes('/admin') ? 'admin' : 'sales'
-      const queryParams = report.client_email ? `?to=${encodeURIComponent(report.client_email)}` : ''
+      const queryParams = report.client_email
+        ? `?to=${encodeURIComponent(report.client_email)}&pdfKey=${encodeURIComponent(pdfKey)}`
+        : `?pdfKey=${encodeURIComponent(pdfKey)}`
       router.push(`/${department}/reports/compose/${report.id}${queryParams}`)
     } catch (error) {
       console.error("Error generating PDF for email:", error)

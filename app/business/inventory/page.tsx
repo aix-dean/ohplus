@@ -105,7 +105,7 @@ export default function BusinessInventoryPage() {
 
   // Form state
   const [siteType, setSiteType] = useState<"static" | "digital">("static")
-  const [category, setCategory] = useState("LED")
+  const [category, setCategory] = useState(STATIC_CATEGORIES[0])
   const [siteName, setSiteName] = useState("")
   const [location, setLocation] = useState("")
   const [locationLabel, setLocationLabel] = useState("")
@@ -118,7 +118,6 @@ export default function BusinessInventoryPage() {
   const [description, setDescription] = useState("")
   const [selectedAudience, setSelectedAudience] = useState<string[]>([])
   const [dailyTraffic, setDailyTraffic] = useState("")
-  const [trafficUnit, setTrafficUnit] = useState<"daily" | "weekly" | "monthly">("monthly")
   const [price, setPrice] = useState("0")
   const [priceUnit, setPriceUnit] = useState<"per spot" | "per day" | "per month">("per month")
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
@@ -538,7 +537,7 @@ export default function BusinessInventoryPage() {
 
     // Reset form to defaults
     setSiteType("static")
-    setCategory("LED")
+    setCategory(STATIC_CATEGORIES[0])
     setSiteName("")
     setLocation("")
     setLocationLabel("")
@@ -551,7 +550,6 @@ export default function BusinessInventoryPage() {
     setDescription("")
     setSelectedAudience([])
     setDailyTraffic("")
-    setTrafficUnit("monthly")
     setPrice("0")
     setPriceUnit("per month")
     setUploadedFiles([])
@@ -824,7 +822,7 @@ export default function BusinessInventoryPage() {
 
       // Reset form
       setSiteType("static")
-      setCategory("LED")
+      setCategory(STATIC_CATEGORIES[0])
       setSiteName("")
       setLocation("")
       setLocationLabel("")
@@ -837,7 +835,6 @@ export default function BusinessInventoryPage() {
       setDescription("")
       setSelectedAudience([])
       setDailyTraffic("")
-      setTrafficUnit("monthly")
       setPrice("0")
       setPriceUnit("per month")
       setUploadedFiles([])
@@ -1287,6 +1284,7 @@ export default function BusinessInventoryPage() {
               <div>
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Location Label:</Label>
                 <Input
+                  placeholder="e.g., Near Mall, Highway Side"
                   className="border-[#c4c4c4]"
                   value={locationLabel}
                   onChange={(e) => setLocationLabel(e.target.value)}
@@ -1301,6 +1299,7 @@ export default function BusinessInventoryPage() {
                     <Label className="text-[#4e4e4e] text-sm mb-1 block">Height:</Label>
                     <Input
                       type="number"
+                      placeholder="e.g., 10"
                       className="border-[#c4c4c4]"
                       value={height}
                       onChange={(e) => setHeight(e.target.value)}
@@ -1311,6 +1310,7 @@ export default function BusinessInventoryPage() {
                     <Label className="text-[#4e4e4e] text-sm mb-1 block">Width:</Label>
                     <Input
                       type="number"
+                      placeholder="e.g., 20"
                       className="border-[#c4c4c4]"
                       value={width}
                       onChange={(e) => setWidth(e.target.value)}
@@ -1336,6 +1336,7 @@ export default function BusinessInventoryPage() {
                 <div className="flex gap-3">
                   <Input
                     type="number"
+                    placeholder="e.g., 5"
                     className="flex-1 border-[#c4c4c4]"
                     value={elevation}
                     onChange={(e) => setElevation(e.target.value)}
@@ -1360,7 +1361,7 @@ export default function BusinessInventoryPage() {
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Description:</Label>
                 <Textarea
                   className="min-h-[120px] border-[#c4c4c4] resize-none"
-                  placeholder=""
+                  placeholder="Describe the site location, visibility, and any special features..."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                 />
@@ -1391,25 +1392,14 @@ export default function BusinessInventoryPage() {
 
               {/* Traffic */}
               <div>
-                <Label className="text-[#4e4e4e] font-medium mb-3 block">Traffic:</Label>
-                <div className="flex gap-3">
-                  <Input
-                    type="number"
-                    className="flex-1 border-[#c4c4c4]"
-                    value={dailyTraffic}
-                    onChange={(e) => setDailyTraffic(e.target.value)}
-                  />
-                  <Select value={trafficUnit} onValueChange={(value: "daily" | "weekly" | "monthly") => setTrafficUnit(value)}>
-                    <SelectTrigger className="w-24 border-[#c4c4c4]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">daily</SelectItem>
-                      <SelectItem value="weekly">weekly</SelectItem>
-                      <SelectItem value="monthly">monthly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Monthly Traffic Count:</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g., 50000"
+                  className="border-[#c4c4c4]"
+                  value={dailyTraffic}
+                  onChange={(e) => setDailyTraffic(e.target.value)}
+                />
               </div>
 
               {/* Photo Upload */}
@@ -1520,6 +1510,7 @@ export default function BusinessInventoryPage() {
                 <div className="flex gap-3">
                   <Input
                     type="number"
+                    placeholder="e.g., 15000"
                     className="flex-1 border-[#c4c4c4]"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
