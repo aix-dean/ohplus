@@ -256,7 +256,7 @@ export function ComplianceDialog({
         {!viewOnly && (
           <div className="flex justify-end pb-4 pr-4">
             <Button
-              disabled={completed === 0}
+              disabled={completed === 0 || quotation?.status === "reserved"}
               onClick={() => {
                 if (onMarkAsReserved) {
                   onMarkAsReserved(quotation)

@@ -1078,6 +1078,24 @@ export default function ProposalDetailsPage() {
               updatedProduct.specs_rental = { ...updatedProduct.specs_rental, traffic_count: traffic }
             }
           }
+          if (editable.dimension) {
+            // Parse dimension string like "10ft (H) x 20ft (W)"
+            const dimensionRegex = /(\d+(?:\.\d+)?)ft\s*\(H\)\s*x\s*(\d+(?:\.\d+)?)ft\s*\(W\)/i
+            const match = editable.dimension.match(dimensionRegex)
+            if (match) {
+              const height = parseFloat(match[1])
+              const width = parseFloat(match[2])
+              if (!isNaN(height) && !isNaN(width) && updatedProduct.specs_rental) {
+                updatedProduct.specs_rental = { ...updatedProduct.specs_rental, height, width }
+              }
+            }
+          }
+          if (editable.type) {
+            if (!updatedProduct.categories) {
+              updatedProduct.categories = []
+            }
+            updatedProduct.categories[0] = editable.type
+          }
           return updatedProduct
         }
         return product
