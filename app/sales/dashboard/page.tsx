@@ -416,7 +416,7 @@ function SalesDashboardContent() {
       // Fetch and select the client
       const fetchClient = async () => {
         try {
-          const clientsRef = collection(db, "client_company")
+          const clientsRef = collection(db, "client_db")
           const clientDoc = await getDoc(doc(clientsRef, clientId))
 
           if (clientDoc.exists()) {
@@ -424,13 +424,13 @@ function SalesDashboardContent() {
             const client: Client = {
               id: clientDoc.id,
               name: clientData.contactPersons?.[0]?.name || clientData.name || "",
-              company: clientData.name || "",
-              email: clientData.contactPersons?.[0]?.email || "",
-              phone: clientData.contactPersons?.[0]?.phone || "",
+              company: clientData.company || "",
+              email: clientData.email || "",
+              phone: clientData.phone || "",
               address: clientData.address || "",
               industry: clientData.industry || "",
-              designation: clientData.contactPersons?.[0]?.position || "",
-              company_id: clientData.user_company_id || "",
+              designation: clientData.designation || "",
+              company_id: clientData.company_id || "",
               status: "lead",
               created: new Date(),
               updated: new Date(),
