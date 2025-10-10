@@ -79,7 +79,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
     contactPhone: false,
     email: false,
     phoneFormat: false,
-    websiteFormat: false,
     prefix: false,
   })
 
@@ -153,7 +152,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
         contactPhone: false,
         email: false,
         phoneFormat: false,
-        websiteFormat: false,
         prefix: false,
       })
       fetchCompanies()
@@ -525,18 +523,6 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       newValidationErrors.phoneFormat = false
     }
 
-    // Validate website URL format (only if provided)
-    if (formData.website.trim()) {
-      const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/
-      if (!urlRegex.test(formData.website)) {
-        newValidationErrors.websiteFormat = true
-        hasErrors = true
-      } else {
-        newValidationErrors.websiteFormat = false
-      }
-    } else {
-      newValidationErrors.websiteFormat = false
-    }
 
     setValidationErrors(newValidationErrors)
 
@@ -782,11 +768,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
                       value={formData.website}
                       onChange={handleChange}
                       placeholder="https://example.com"
-                      className={`h-10 border-[#c4c4c4] ${validationErrors.websiteFormat ? 'border-[#f95151]' : ''}`}
+                      className="h-10 border-[#c4c4c4]"
                     />
-                    {validationErrors.websiteFormat && (
-                      <p className="text-sm text-[#f95151]">Please enter a valid URL (e.g., https://example.com)</p>
-                    )}
                   </div>
                 </>
               )}
