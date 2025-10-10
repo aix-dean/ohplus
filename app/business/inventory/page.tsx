@@ -102,6 +102,7 @@ export default function BusinessInventoryPage() {
   // Add site dialog state
   const [showAddSiteDialog, setShowAddSiteDialog] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<string[]>([])
 
   // Form state
   const [siteType, setSiteType] = useState<"static" | "digital">("static")
@@ -664,6 +665,15 @@ export default function BusinessInventoryPage() {
       // Only open dialog if all checks pass
       console.log("All checks passed after company update, opening add site dialog")
       setShowAddSiteDialog(true)
+      setValidationErrors([])
+ 
+      // Show info about required fields
+      setTimeout(() => {
+        toast({
+          title: "Required Fields",
+          description: "Fields marked with * are required: Site Name, Location, and Price.",
+        })
+      }, 500)
     }, 500) // Wait 0.5 seconds for updates to propagate
   }
 
@@ -703,38 +713,23 @@ export default function BusinessInventoryPage() {
 
     setIsSubmitting(true)
 
-    // Validation
+    // Clear previous validation errors
+    setValidationErrors([])
+
+    // Validation - collect all errors
+    const errors: string[] = []
+
     if (!siteName.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Site name is required.",
-        variant: "destructive",
-      })
-      setIsSubmitting(false)
-      return
+      errors.push("Site name")
     }
 
     if (!location.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Location is required.",
-        variant: "destructive",
-      })
-      setIsSubmitting(false)
-      return
+      errors.push("Location")
     }
 
     if (!price.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Price is required.",
-        variant: "destructive",
-      })
-      setIsSubmitting(false)
-      return
-    }
-
-    if (price.trim() && isNaN(Number(price))) {
+      errors.push("Price")
+    } else if (isNaN(Number(price))) {
       toast({
         title: "Validation Error",
         description: "Price must be a valid number.",
@@ -758,6 +753,22 @@ export default function BusinessInventoryPage() {
       toast({
         title: "Validation Error",
         description: "Width must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    // Show validation error for missing required fields
+    if (errors.length > 0) {
+      setValidationErrors(errors)
+      const errorMessage = errors.length === 1
+        ? `${errors[0]} is required.`
+        : `The following fields are required: ${errors.join(", ")}.`
+
+      toast({
+        title: "Required Fields Missing",
+        description: errorMessage,
         variant: "destructive",
       })
       setIsSubmitting(false)
@@ -790,6 +801,7 @@ export default function BusinessInventoryPage() {
         specs_rental: {
           audience_types: selectedAudience,
           location,
+          location_label: locationLabel,
           ...(geopoint && { geopoint }),
           traffic_count: parseInt(dailyTraffic) || null,
           height: parseFloat(height) || null,
@@ -1207,6 +1219,31 @@ export default function BusinessInventoryPage() {
             <DialogTitle className="text-2xl font-semibold text-[#333333]">+Add site</DialogTitle>
           </DialogHeader>
 
+          {/* Validation Errors Display */}
+          {validationErrors.length > 0 && (
+            <div className="mx-6 mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Please fill in the required fields:
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <ul role="list" className="list-disc pl-5 space-y-1">
+                      {validationErrors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
             {/* Left Column */}
             <div className="space-y-6">
@@ -1258,7 +1295,9 @@ export default function BusinessInventoryPage() {
 
               {/* Site Name */}
               <div>
-                <Label className="text-[#4e4e4e] font-medium mb-3 block">Site Name:</Label>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">
+                  Site Name: <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   placeholder="Site Name"
                   className="border-[#c4c4c4]"
@@ -1269,7 +1308,9 @@ export default function BusinessInventoryPage() {
 
               {/* Location */}
               <div>
-                <Label className="text-[#4e4e4e] font-medium mb-3 block">Location:</Label>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">
+                  Location: <span className="text-red-500">*</span>
+                </Label>
                 <GooglePlacesAutocomplete
                   value={location}
                   onChange={setLocation}
@@ -1506,7 +1547,9 @@ export default function BusinessInventoryPage() {
 
               {/* Price */}
               <div>
-                <Label className="text-[#4e4e4e] font-medium mb-3 block">Price:</Label>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">
+                  Price: <span className="text-red-500">*</span>
+                </Label>
                 <div className="flex gap-3">
                   <Input
                     type="number"
