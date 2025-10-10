@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Skeleton } from "@/components/ui/skeleton"
 import Image from "next/image"
 import { CalendarIcon, Loader2 } from "lucide-react"
 import { Timestamp } from "firebase/firestore"
@@ -30,6 +31,8 @@ export default function SelectDatesPage() {
   const [selectedSites, setSelectedSites] = useState<Product[]>([])
   const [selectedClient, setSelectedClient] = useState<Client | null>(null)
   const [siteBookings, setSiteBookings] = useState<Record<string, Booking[]>>({})
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false)
+  const [siteIds, setSiteIds] = useState<string[]>([])
 
   useEffect(() => {
     const sitesParam = searchParams.get("sites")
@@ -45,12 +48,14 @@ export default function SelectDatesPage() {
 
     if (sitesParam) {
       try {
-        const siteIds = JSON.parse(decodeURIComponent(sitesParam))
-        console.log(`Parsed site IDs:`, siteIds)
+        const parsedSiteIds = JSON.parse(decodeURIComponent(sitesParam))
+        console.log(`Parsed site IDs:`, parsedSiteIds)
+        setSiteIds(parsedSiteIds)
         const fetchProducts = async () => {
+          setIsLoadingProducts(true)
           const products: Product[] = []
           const bookingsMap: Record<string, Booking[]> = {}
-          for (const siteId of siteIds) {
+          for (const siteId of parsedSiteIds) {
             const product = await getProductById(siteId)
             if (product) products.push(product)
 
@@ -60,11 +65,15 @@ export default function SelectDatesPage() {
           }
           setSelectedSites(products)
           setSiteBookings(bookingsMap)
+          setIsLoadingProducts(false)
         }
         fetchProducts()
       } catch (error) {
         console.error("Error parsing site IDs:", error)
+        setIsLoadingProducts(false)
       }
+    } else {
+      setSiteIds([])
     }
    }, [searchParams])
 
@@ -305,6 +314,36 @@ export default function SelectDatesPage() {
     d.setDate(d.getDate() + 1)
     return d.toISOString().split("T")[0]
   }
+
+  const renderSkeletonSiteCard = (siteId: string) => (
+    <div key={siteId} className="border rounded-lg p-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Left: Site card skeleton */}
+        <div className="bg-gray-100 rounded-lg overflow-hidden">
+          <Skeleton className="h-40 w-full" />
+          <div className="p-3 space-y-1">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-4 w-1/4" />
+          </div>
+        </div>
+
+        {/* Right: Calendars skeleton */}
+        <div className="md:col-span-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="text-center">
+                <Skeleton className="h-6 w-24 mx-auto mb-2" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-white p-6">
       <div className="max-w-7xl mx-auto">
@@ -350,7 +389,7 @@ export default function SelectDatesPage() {
           <div className="justify-end md:ml-auto flex items-end">
             <Button
               onClick={handleCreateQuotation}
-              disabled={!startDate || !endDate || isCreating || hasOverlaps}
+              disabled={!startDate || !endDate || isCreating || hasOverlaps || isLoadingProducts}
               className="px-8 py-3 text-lg font-semibold"
             >
               {isCreating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Creating...</> : "Next →"}
@@ -359,88 +398,90 @@ export default function SelectDatesPage() {
         </div>
         {/* Sites with calendars */}
         <div className="space-y-6">
-          {selectedSites.map((site) => {
-            const bookedRanges = getBookedRanges(site.id!)
-            const overlap = startDate && endDate && checkOverlap(site.id!, new Date(startDate), new Date(endDate))
-            return (
-              <div key={site.id} className="border rounded-lg p-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  {/* Left: Site card */}
-                  <div className="bg-gray-100 rounded-lg overflow-hidden">
-                    <div className="h-40 relative">
-                      {site.media && site.media.length > 0 ? (
-                        <Image
-                          src={site.media[0].url}
-                          alt={site.name}
-                          fill
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="h-full bg-gray-300 flex items-center justify-center text-gray-500">
-                          No Image
+          {isLoadingProducts
+            ? siteIds.map(renderSkeletonSiteCard)
+            : selectedSites.map((site) => {
+              const bookedRanges = getBookedRanges(site.id!)
+              const overlap = startDate && endDate && checkOverlap(site.id!, new Date(startDate), new Date(endDate))
+              return (
+                <div key={site.id} className="border rounded-lg p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    {/* Left: Site card */}
+                    <div className="bg-gray-100 rounded-lg overflow-hidden">
+                      <div className="h-40 relative">
+                        {site.media && site.media.length > 0 ? (
+                          <Image
+                            src={site.media[0].url}
+                            alt={site.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="h-full bg-gray-300 flex items-center justify-center text-gray-500">
+                            No Image
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3 text-sm space-y-1">
+                        <p className="text-gray-500">{site.site_code || "Site Code"}</p>
+                        <p className="font-medium">{site.name}</p>
+                        <p className="font-medium truncate">
+                          {site.specs_rental?.location || (site as any).light?.location || "Location"}
+                        </p>
+                        <p className="font-medium">₱{site.price}</p>
+                      </div>
+                    </div>
+
+                    {/* Right: Calendars */}
+                    <div className="md:col-span-3">
+                      {/* Navigation controls */}
+                      {shouldShowAllMonths && (
+                        <div className="flex justify-between items-center mb-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMonthOffset(Math.max(0, monthOffset - 1))}
+                            disabled={!canGoLeft}
+                          >
+                            ← Previous
+                          </Button>
+                          <span className="text-sm text-gray-600">
+                            Showing months {monthOffset + 1} - {Math.min(monthOffset + 3, allMonths.length)} of {allMonths.length}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setMonthOffset(Math.min(allMonths.length - 3, monthOffset + 1))}
+                            disabled={!canGoRight}
+                          >
+                            Next →
+                          </Button>
                         </div>
                       )}
-                    </div>
-                    <div className="p-3 text-sm space-y-1">
-                      <p className="text-gray-500">{site.site_code || "Site Code"}</p>
-                      <p className="font-medium">{site.name}</p>
-                      <p className="font-medium truncate">
-                        {site.specs_rental?.location || (site as any).light?.location || "Location"}
-                      </p>
-                      <p className="font-medium">₱{site.price}</p>
-                    </div>
-                  </div>
-
-                  {/* Right: Calendars */}
-                  <div className="md:col-span-3">
-                    {/* Navigation controls */}
-                    {shouldShowAllMonths && (
-                      <div className="flex justify-between items-center mb-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setMonthOffset(Math.max(0, monthOffset - 1))}
-                          disabled={!canGoLeft}
-                        >
-                          ← Previous
-                        </Button>
-                        <span className="text-sm text-gray-600">
-                          Showing months {monthOffset + 1} - {Math.min(monthOffset + 3, allMonths.length)} of {allMonths.length}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setMonthOffset(Math.min(allMonths.length - 3, monthOffset + 1))}
-                          disabled={!canGoRight}
-                        >
-                          Next →
-                        </Button>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {monthsToShow.map(({ month, year }) => (
+                          <div key={`${year}-${month}`}>
+                            {renderCalendar(month, year, bookedRanges)}
+                          </div>
+                        ))}
                       </div>
-                    )}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {monthsToShow.map(({ month, year }) => (
-                        <div key={`${year}-${month}`}>
-                          {renderCalendar(month, year, bookedRanges)}
-                        </div>
-                      ))}
                     </div>
                   </div>
-                </div>
 
-                {/* Overlap warning */}
-                {overlap && (
-                  <div className="mt-2 flex justify-between items-center text-sm text-red-500 italic">
-                    <span>
-                      There is a booking overlap from October 16, 2025 to October 30, 2025
-                    </span>
-                    <Button variant="destructive" size="sm" onClick={() => removeSite(site.id!)}>
-                      Remove
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+                  {/* Overlap warning */}
+                  {overlap && (
+                    <div className="mt-2 flex justify-between items-center text-sm text-red-500 italic">
+                      <span>
+                        There is a booking overlap from October 16, 2025 to October 30, 2025
+                      </span>
+                      <Button variant="destructive" size="sm" onClick={() => removeSite(site.id!)}>
+                        Remove
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
         </div>
 
       </div>
