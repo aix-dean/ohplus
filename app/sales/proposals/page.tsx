@@ -506,7 +506,7 @@ function ProposalsPageContent() {
       })
 
       // Navigate to the cost estimates page or the first created CE
-      router.push(`/sales/cost-estimates`)
+      router.push(`/sales/cost-estimates/${costEstimateIds[0]}`)
     } catch (error) {
       console.error("Error creating cost estimates from proposal:", error)
       toast({

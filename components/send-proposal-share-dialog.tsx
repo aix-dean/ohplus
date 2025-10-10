@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -80,9 +80,18 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal, templateSet
   const router = useRouter()
   const [proposalUrl] = useState(`https://mrk.ohplus.ph/pr/${proposal.id}`)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (copied) {
+      const timer = setTimeout(() => setCopied(false), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [copied])
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(proposalUrl)
+      setCopied(true)
       toast({
         title: "Link copied!",
         description: "The proposal link has been copied to your clipboard.",
@@ -226,7 +235,7 @@ export function SendProposalShareDialog({ isOpen, onClose, proposal, templateSet
               size="sm"
               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium"
             >
-              COPY LINK
+              {copied ? "Copied!" : "Copy Link"}
             </Button>
           </div>
         </div>
