@@ -868,7 +868,18 @@ export default function BusinessEditProductPage() {
               <GooglePlacesAutocomplete
                 value={formData.specs_rental.location}
                 onChange={handleLocationChange}
+                onGeopointChange={(geopoint) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    specs_rental: {
+                      ...prev.specs_rental,
+                      geopoint: geopoint || [0, 0],
+                    },
+                  }))
+                }}
                 placeholder="Enter site location"
+                enableMap={true}
+                mapHeight="250px"
                 required
                 disabled={loading}
               />

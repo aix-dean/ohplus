@@ -203,7 +203,7 @@ export function ComplianceDialog({
                         className="text-[12px] text-[#2d3fff] cursor-pointer flex items-center justify-center gap-1"
                         onClick={() => item.fileUrl && handleViewFile(item.fileUrl, item.key)}
                       >
-                        {getDisplayFilename(item.key)}
+                        {item.file}
                         <img src={item.status === "accepted" ? "/approve_sign.png" : "/exclamation_sign.png"} alt={item.status === "accepted" ? "approved" : "warning"} className="w-4 h-4" />
                       </span>
                     ) : (
