@@ -500,7 +500,8 @@ export default function QuotationsListPage() {
       const quotationRef = doc(db, "quotations", quotationId)
       const updateData: { [key: string]: any } = {
         [`projectCompliance.${complianceType}`]: {
-          status: "uploaded",
+          status: "completed",
+          completed: true,
           fileUrl: downloadURL,
           fileName: file.name,
           uploadedAt: serverTimestamp(),
@@ -546,10 +547,12 @@ export default function QuotationsListPage() {
             ...updatedQuotation.projectCompliance,
             [complianceType]: {
               ...updatedQuotation.projectCompliance?.[complianceType],
-              status: "uploaded",
+              status: "completed",
+              completed: true,
               fileUrl: downloadURL,
               fileName: file.name,
               uploadedBy: user?.uid,
+              uploadedAt: new Date(),
             }
           }
         })

@@ -525,18 +525,8 @@ export function ClientDialog({ client, onSuccess, open, onOpenChange }: ClientDi
       newValidationErrors.phoneFormat = false
     }
 
-    // Validate website URL format (only if provided)
-    if (formData.website.trim()) {
-      const urlRegex = /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/
-      if (!urlRegex.test(formData.website)) {
-        newValidationErrors.websiteFormat = true
-        hasErrors = true
-      } else {
-        newValidationErrors.websiteFormat = false
-      }
-    } else {
-      newValidationErrors.websiteFormat = false
-    }
+    // Website validation removed - no format restriction
+    newValidationErrors.websiteFormat = false
 
     setValidationErrors(newValidationErrors)
 
