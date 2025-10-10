@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useCallback, useRef, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -21,6 +22,7 @@ interface GoogleMapsLocationPickerProps {
   onLocationSelect: (location: Location) => void
   currentLocation?: Location | null
   children: React.ReactNode
+  inline?: boolean
 }
 
 declare global {
@@ -34,6 +36,7 @@ export function GoogleMapsLocationPicker({
   onLocationSelect,
   currentLocation,
   children,
+  inline = false,
 }: GoogleMapsLocationPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -104,6 +107,10 @@ export function GoogleMapsLocationPicker({
       }
 
       setSelectedLocation(location)
+
+      if (inline) {
+        onLocationSelect(location)
+      }
     })
 
     // Handle map click
@@ -136,6 +143,10 @@ export function GoogleMapsLocationPicker({
       }
 
       setSelectedLocation(location)
+
+      if (inline) {
+        onLocationSelect(location)
+      }
     })
 
     // Initialize autocomplete for search
@@ -161,6 +172,10 @@ export function GoogleMapsLocationPicker({
           markerRef.current.setPosition(place.geometry.location)
 
           setSelectedLocation(location)
+
+          if (inline) {
+            onLocationSelect(location)
+          }
         }
       })
     }
@@ -168,7 +183,7 @@ export function GoogleMapsLocationPicker({
 
   // Load Google Maps script
   useEffect(() => {
-    if (!isOpen) return
+    if (!inline && !isOpen) return
 
     const initializeMaps = async () => {
       try {
@@ -183,7 +198,7 @@ export function GoogleMapsLocationPicker({
     }
 
     initializeMaps()
-  }, [isOpen, initializeMap])
+  }, [inline, isOpen, initializeMap])
 
   // Handle search
   const handleSearch = async () => {
@@ -228,6 +243,10 @@ export function GoogleMapsLocationPicker({
     setSelectedLocation(location)
     setSearchResults([])
     setSearchQuery("")
+
+    if (inline) {
+      onLocationSelect(location)
+    }
   }
 
   // Handle location confirmation
@@ -236,6 +255,53 @@ export function GoogleMapsLocationPicker({
       onLocationSelect(selectedLocation)
       setIsOpen(false)
     }
+  }
+
+  if (inline) {
+    return (
+      <div className="relative">
+        <Popover open={isOpen} onOpenChange={setIsOpen}>
+          <PopoverTrigger asChild>
+            {children}
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-0" align="start">
+            <div className="p-4 space-y-2">
+              {/* Search Section */}
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <Input
+                    ref={searchInputRef}
+                    placeholder="Search address..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                    className="h-8"
+                  />
+                </div>
+                <Button onClick={handleSearch} disabled={isSearching || !searchQuery.trim()} size="sm">
+                  {isSearching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+                </Button>
+              </div>
+
+              {/* Search Results */}
+              {searchResults.length > 0 && (
+                <div className="max-h-40 overflow-y-auto border rounded-md">
+                  {searchResults.map((result, index) => (
+                    <button
+                      key={index}
+                      className="w-full text-left p-2 hover:bg-gray-50 border-b last:border-b-0 text-sm"
+                      onClick={() => handleSearchResultSelect(result)}
+                    >
+                      <span className="truncate">{result.address}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    )
   }
 
   return (

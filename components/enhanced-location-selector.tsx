@@ -17,18 +17,37 @@ interface EnhancedLocationSelectorProps {
   onLocationChange: (locationKey: string, customLocation?: Location) => void
   customLocation?: Location | null
   className?: string
+  inline?: boolean
 }
 
 export function EnhancedLocationSelector({
   onLocationChange,
   customLocation,
   className,
+  inline = false,
 }: EnhancedLocationSelectorProps) {
   const [selectedCustomLocation, setSelectedCustomLocation] = useState<Location | null>(customLocation || null)
 
   const handleCustomLocationSelect = (location: Location) => {
     setSelectedCustomLocation(location)
     onLocationChange("custom", location)
+  }
+
+  if (inline) {
+    return (
+      <div className={`relative ${className}`}>
+        <GoogleMapsLocationPicker
+          onLocationSelect={handleCustomLocationSelect}
+          currentLocation={selectedCustomLocation}
+          inline={true}
+        >
+          <Button variant="outline" className="flex items-center gap-2 bg-transparent w-full justify-start">
+            <Map className="h-4 w-4" />
+            {selectedCustomLocation ? selectedCustomLocation.address : "Select Location"}
+          </Button>
+        </GoogleMapsLocationPicker>
+      </div>
+    )
   }
 
   return (
