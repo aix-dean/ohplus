@@ -180,6 +180,11 @@ export default function ClientInformationPage() {
     email: "",
   })
 
+  // Contact selection for proposal/ce/quotation creation
+  const [showSelectContactDialog, setShowSelectContactDialog] = useState(false)
+  const [selectedContact, setSelectedContact] = useState<any | null>(null)
+  const [creationMode, setCreationMode] = useState<'proposal' | 'cost_estimate' | 'quotation'>('proposal')
+
   // Validation states for contact forms
   const [addContactValidationErrors, setAddContactValidationErrors] = useState({
     name: false,
@@ -654,6 +659,39 @@ export default function ClientInformationPage() {
     } catch (error) {
       console.error("Error loading company contacts:", error)
       toast.error("Failed to load company contacts")
+    } finally {
+      setLoadingContacts(false)
+    }
+  }
+
+  const loadContactsForProposal = async () => {
+    setLoadingContacts(true)
+    try {
+      const clientsCollectionRef = collection(db, "client_db")
+      const q = query(
+        clientsCollectionRef,
+        where("company_id", "==", clientId),
+        where("deleted", "==", false)
+      )
+      const querySnapshot = await getDocs(q)
+
+      const fetchedContacts: any[] = querySnapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          name: data.name || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          designation: data.designation || "",
+          status: data.status || "",
+          created: data.created ? data.created.toDate() : new Date(),
+        }
+      })
+
+      setCompanyContacts(fetchedContacts)
+    } catch (error) {
+      console.error("Error loading contacts for proposal:", error)
+      toast.error("Failed to load contacts")
     } finally {
       setLoadingContacts(false)
     }
@@ -1619,6 +1657,89 @@ export default function ClientInformationPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Select Contact Dialog */}
+      <Dialog open={showSelectContactDialog} onOpenChange={setShowSelectContactDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">
+              Select Contact for {creationMode === 'proposal' ? 'Proposal' : creationMode === 'cost_estimate' ? 'Cost Estimate' : 'Quotation'}
+            </DialogTitle>
+            <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <X className="h-4 w-4" />
+            </DialogClose>
+          </DialogHeader>
+
+          <div className="py-4">
+            <p className="text-sm text-gray-600 mb-4">
+              Please select a contact person for this {creationMode === 'proposal' ? 'proposal' : creationMode === 'cost_estimate' ? 'cost estimate' : 'quotation'}. The document will be associated with the selected contact.
+            </p>
+
+            {loadingContacts ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-sm text-gray-500 mt-2">Loading contacts...</p>
+              </div>
+            ) : companyContacts.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-medium text-gray-700">Name</TableHead>
+                      <TableHead className="font-medium text-gray-700">Designation</TableHead>
+                      <TableHead className="font-medium text-gray-700">Email</TableHead>
+                      <TableHead className="font-medium text-gray-700">Select</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companyContacts.map((contact) => (
+                      <TableRow key={contact.id}>
+                        <TableCell className="font-medium text-gray-900">{contact.name}</TableCell>
+                        <TableCell className="text-gray-700">{contact.designation || "N/A"}</TableCell>
+                        <TableCell className="text-gray-700">{contact.email}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant={selectedContact?.id === contact.id ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setSelectedContact(contact)}
+                            className={selectedContact?.id === contact.id ? "bg-blue-600 hover:bg-blue-700" : ""}
+                          >
+                            {selectedContact?.id === contact.id ? "Selected" : "Select"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No contacts found for this company.</p>
+                <p className="text-sm">Please add contacts first.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSelectContactDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedContact) {
+                  router.push(`/sales/dashboard?mode=${creationMode}&clientId=${selectedContact.id}`)
+                  setShowSelectContactDialog(false)
+                  setSelectedContact(null)
+                }
+              }}
+              disabled={!selectedContact}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Create {creationMode === 'proposal' ? 'Proposal' : creationMode === 'cost_estimate' ? 'Cost Estimate' : 'Quotation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
@@ -1645,7 +1766,11 @@ export default function ClientInformationPage() {
                     />
                   </div>
                   <Button
-                    onClick={() => router.push(`/sales/dashboard?mode=proposal&clientId=${clientId}`)}
+                    onClick={() => {
+                      loadContactsForProposal()
+                      setCreationMode('proposal')
+                      setShowSelectContactDialog(true)
+                    }}
                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
                   >
                     <Plus className="h-4 w-4" />
@@ -1726,7 +1851,11 @@ export default function ClientInformationPage() {
                     />
                   </div>
                   <Button
-                    onClick={() => router.push(`/sales/dashboard?mode=cost_estimate&clientId=${clientId}`)}
+                    onClick={() => {
+                      loadContactsForProposal()
+                      setCreationMode('cost_estimate')
+                      setShowSelectContactDialog(true)
+                    }}
                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
                   >
                     <Plus className="h-4 w-4" />
@@ -1813,7 +1942,11 @@ export default function ClientInformationPage() {
                     />
                   </div>
                   <Button
-                    onClick={() => router.push(`/sales/dashboard?mode=quotation&clientId=${clientId}`)}
+                    onClick={() => {
+                      loadContactsForProposal()
+                      setCreationMode('quotation')
+                      setShowSelectContactDialog(true)
+                    }}
                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
                   >
                     <Plus className="h-4 w-4" />
