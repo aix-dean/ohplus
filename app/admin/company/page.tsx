@@ -400,7 +400,7 @@ export default function AdminCompanyPage() {
                     value={formData.website}
                     onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
                     disabled={!isEditing}
-                    placeholder="https://www.company.com"
+                    placeholder="Enter website"
                     className="h-8 text-sm"
                   />
                 </div>
