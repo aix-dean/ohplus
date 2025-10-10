@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Copy } from "lucide-react"
 import type { Quotation } from "@/lib/types/quotation"
 import Image from "next/image"
+import { useEffect, useState } from "react"
 
 interface SendQuotationOptionsDialogProps {
   isOpen: boolean
@@ -27,11 +28,20 @@ export function SendQuotationOptionsDialog({
   companyData,
 }: SendQuotationOptionsDialogProps) {
   const { toast } = useToast()
+  const [copied, setCopied] = useState(false)
+
+    useEffect(() => {
+    if (copied) {
+      const timer = setTimeout(() => setCopied(false), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [copied])
 
   const publicViewUrl = `https://mrk.ohplus.ph/q/${quotation.id}`
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(publicViewUrl)
+    setCopied(true)
     toast({
       title: "Link Copied!",
       description: "The public view link has been copied to your clipboard.",
@@ -115,7 +125,7 @@ export function SendQuotationOptionsDialog({
               size="sm"
               className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 font-medium"
             >
-              COPY LINK
+              {copied ? "Copied!" : "Copy Link"}
             </Button>
           </div>
         </div>
