@@ -1,4 +1,4 @@
-import { db } from "@/lib/firebase"
+import { db, storage } from "@/lib/firebase"
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import {
   collection,
@@ -16,6 +16,7 @@ import {
   startAfter,
   deleteDoc,
 } from "firebase/firestore"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import type { CostEstimate, CostEstimateStatus, CostEstimateLineItem } from "@/lib/types/cost-estimate"
 import type { Proposal } from "@/lib/types/proposal"
 import { calculateProratedPrice } from "@/lib/quotation-service"
@@ -420,6 +421,11 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((docSnap) => {
       const data = docSnap.data()
+      console.log(`[DEBUG] getCostEstimatesByPageId data for ${docSnap.id}:`, {
+        pdf: data.pdf,
+        password: data.password,
+        allFields: Object.keys(data)
+      })
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
@@ -444,6 +450,8 @@ export async function getCostEstimatesByProposalId(proposalId: string): Promise<
         signature_position: data.signature_position || undefined,
         items: data.items || undefined,
         template: data.template || undefined,
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -487,6 +495,8 @@ export async function getCostEstimate(id: string): Promise<CostEstimate | null> 
       signature_position: data.signature_position || undefined,
       items: data.items || undefined,
       template: data.template || undefined,
+      pdf: data.pdf || undefined,
+      password: data.password || undefined,
     } as CostEstimate
   } catch (error) {
     console.error("Error fetching cost estimate:", error)
@@ -578,6 +588,11 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
     const querySnapshot = await getDocs(q)
     return querySnapshot.docs.map((docSnap) => {
       const data = docSnap.data()
+      console.log(`[DEBUG] getCostEstimate data for ${docSnap.id}:`, {
+        pdf: data.pdf,
+        password: data.password,
+        allFields: Object.keys(data)
+      })
       return {
         id: docSnap.id,
         proposalId: data.proposalId || null,
@@ -602,6 +617,8 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         signature_position: data.signature_position || undefined,
         items: data.items || undefined,
         template: data.template || undefined,
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -667,6 +684,8 @@ export async function getPaginatedCostEstimates(
         signature_position: data.signature_position || undefined,
         items: data.items || undefined,
         template: data.template || undefined,
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
 
@@ -728,6 +747,8 @@ export async function getCostEstimatesByCreatedBy(userId: string): Promise<CostE
         signature_position: data.signature_position || undefined,
         items: data.items || undefined,
         template: data.template || undefined,
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
   } catch (error) {
@@ -781,6 +802,8 @@ export async function getPaginatedCostEstimatesByCreatedBy(
         endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
         validUntil: safeToDate(data.validUntil),
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
     })
 
@@ -809,6 +832,7 @@ export async function createMultipleCostEstimates(
     const companyId = options?.company_id || ""
 
     // Create a separate cost estimate for each site
+    const baseTimestamp = Date.now()
     for (let i = 0; i < sitesData.length; i++) {
       const site = sitesData[i]
       const durationDays = calculateDurationDays(options?.startDate || null, options?.endDate || null)
@@ -841,7 +865,7 @@ export async function createMultipleCostEstimates(
       // Calculate total amount for this site
       totalAmount = lineItems.reduce((sum, item) => sum + item.total, 0)
 
-      const costEstimateNumber = `CE${Date.now()}-${site.id.slice(-4)}` // Generate unique CE number for each site
+      const costEstimateNumber = `CE${baseTimestamp + i}` // Generate unique CE number for each site
 
       const newCostEstimateRef = await addDoc(collection(db, COST_ESTIMATES_COLLECTION), {
         proposalId: null, // No associated proposal
@@ -1009,6 +1033,8 @@ export async function getCostEstimatesByProductIdAndCompanyId(productId: string,
         endDate: safeToDate(data.endDate),
         durationDays: data.durationDays || null,
         validUntil: safeToDate(data.validUntil),
+        pdf: data.pdf || undefined,
+        password: data.password || undefined,
       } as CostEstimate
 
       // Check if the cost estimate matches the product ID and company ID
@@ -1030,10 +1056,79 @@ export async function getCostEstimatesByProductIdAndCompanyId(productId: string,
 // Generate PDF and upload to Firebase storage with password protection
 export async function generateAndUploadCostEstimatePDF(
   costEstimate: CostEstimate,
-  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string }
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
+  companyData?: {name: string, address?: any, phone?: string, email?: string, website?: string},
 ): Promise<{ pdfUrl: string; password: string }> {
+  console.log('[PDF_GENERATE] Starting PDF generation and upload for cost estimate:', costEstimate.id)
   try {
-    // Generate the PDF blob using the API
+    // Always fetch fresh company data and logo to ensure consistency
+    let logoDataUrl = null
+    let finalCompanyData = companyData
+
+    console.log('[PDF_GENERATE] Company ID from userData or costEstimate:', userData?.company_id || costEstimate.company_id)
+
+    // Always try to fetch company data and logo from database
+    const companyId = userData?.company_id || costEstimate.company_id
+    if (companyId) {
+      console.log('[PDF_GENERATE] Fetching company data for ID:', companyId)
+      try {
+        const companyDoc = await getDoc(doc(db, "companies", companyId))
+        if (companyDoc.exists()) {
+          const companyInfo = companyDoc.data()
+          console.log('[PDF_GENERATE] Company data found:', companyInfo.name)
+
+          // Merge provided companyData with fresh database data
+          finalCompanyData = {
+            name: finalCompanyData?.name || companyInfo.name || "Company Name",
+            address: finalCompanyData?.address || companyInfo.address,
+            phone: finalCompanyData?.phone || companyInfo.phone || companyInfo.telephone || companyInfo.contact_number,
+            email: finalCompanyData?.email || companyInfo.email,
+            website: finalCompanyData?.website || companyInfo.website || companyInfo.company_website,
+          }
+
+          // Always fetch logo from database
+          if (companyInfo?.logo) {
+            console.log('[PDF_GENERATE] Fetching company logo from:', companyInfo.logo)
+            const logoResponse = await fetch(companyInfo.logo)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              const logoArrayBuffer = await logoBlob.arrayBuffer()
+              const logoBase64 = Buffer.from(logoArrayBuffer).toString('base64')
+              const mimeType = logoBlob.type || 'image/png'
+              logoDataUrl = `data:${mimeType};base64,${logoBase64}`
+              console.log('[PDF_GENERATE] Logo fetched and converted to base64, length:', logoBase64.length)
+            } else {
+              console.warn('[PDF_GENERATE] Failed to fetch logo, status:', logoResponse.status)
+            }
+          } else {
+            console.log('[PDF_GENERATE] No logo found in company data')
+          }
+        } else {
+          console.warn('[PDF_GENERATE] Company document not found for ID:', companyId)
+        }
+      } catch (error) {
+        console.error('[PDF_GENERATE] Error fetching company data and logo:', error)
+        // Continue with provided data if fetch fails
+      }
+    }
+
+    // Ensure we have company data
+    if (!finalCompanyData) {
+      console.log('[PDF_GENERATE] Using default company data')
+      finalCompanyData = {
+        name: "Company Name",
+        address: undefined,
+        phone: undefined,
+        email: undefined,
+        website: undefined,
+      }
+    }
+
+    console.log('[PDF_GENERATE] Final company data:', finalCompanyData.name)
+    console.log('[PDF_GENERATE] Logo data URL available:', !!logoDataUrl)
+
+    // Generate the PDF blob using the API (same approach as generateCostEstimatePDF)
+    console.log('[PDF_GENERATE] Calling PDF generation API...')
     const response = await fetch('/api/generate-cost-estimate-pdf', {
       method: 'POST',
       headers: {
@@ -1041,37 +1136,89 @@ export async function generateAndUploadCostEstimatePDF(
       },
       body: JSON.stringify({
         costEstimate,
-        companyData: null,
-        logoDataUrl: null,
+        companyData: finalCompanyData,
+        logoDataUrl,
         format: 'pdf',
         userData
       }),
     })
 
+    console.log('[PDF_GENERATE] API response status:', response.status)
+
     if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[PDF_GENERATE] API call failed:', response.status, errorText)
       throw new Error(`Failed to generate PDF: ${response.statusText}`)
     }
 
-    const buffer = await response.arrayBuffer()
-    const blob = new Blob([buffer], { type: 'application/pdf' })
+    const blob = await response.blob()
+    console.log('[PDF_GENERATE] API response blob size:', blob.size, 'type:', blob.type)
+
+    // Validate blob
+    if (blob.size === 0) {
+      console.error('[PDF_GENERATE] Generated PDF blob is empty')
+      throw new Error('Generated PDF blob is empty')
+    }
+
+    // Check first few bytes of blob to ensure it's a valid PDF
+    const blobArray = new Uint8Array(await blob.slice(0, 8).arrayBuffer())
+    const headerString = String.fromCharCode(...blobArray)
+    console.log('[PDF_GENERATE] PDF blob header bytes:', headerString)
+
+    if (!headerString.startsWith('%PDF-')) {
+      console.error('[PDF_GENERATE] Generated blob does not start with valid PDF header')
+      throw new Error('Generated file is not a valid PDF')
+    }
 
     // Generate password
     const password = generateCostEstimatePassword()
+    console.log('[PDF_GENERATE] Generated password for PDF protection')
 
     // Create a unique filename
     const timestamp = Date.now()
     const filename = `cost-estimate_${costEstimate.id}_${timestamp}.pdf`
+    console.log('[PDF_GENERATE] Created filename:', filename)
 
-    // Convert blob to File object for upload
-    const pdfFile = new File([blob], filename, { type: 'application/pdf' })
-
-    // Upload to Firebase storage
+    // Upload blob directly to Firebase storage (instead of converting to File)
     const uploadPath = `cost-estimates/pdfs/${filename}`
-    const pdfUrl = await uploadFileToFirebaseStorage(pdfFile, uploadPath)
+    console.log('[PDF_GENERATE] Uploading blob directly to Firebase Storage path:', uploadPath)
+
+    // Upload directly using Firebase Storage API
+    const storageRef = ref(storage, `${uploadPath}${filename}`)
+    const snapshot = await uploadBytes(storageRef, blob)
+    const pdfUrl = await getDownloadURL(snapshot.ref)
+    console.log('[PDF_GENERATE] Successfully uploaded PDF blob to:', pdfUrl)
+    console.log('[PDF_GENERATE] Successfully uploaded PDF to:', pdfUrl)
+
+    // Verify the uploaded file by downloading it back
+    console.log('[PDF_GENERATE] Verifying uploaded PDF by downloading it back...')
+    try {
+      const verifyResponse = await fetch(pdfUrl)
+      if (verifyResponse.ok) {
+        const verifyBlob = await verifyResponse.blob()
+        console.log('[PDF_GENERATE] Verification download - blob size:', verifyBlob.size, 'type:', verifyBlob.type)
+
+        const verifyArray = new Uint8Array(await verifyBlob.slice(0, 8).arrayBuffer())
+        const verifyHeader = String.fromCharCode(...verifyArray)
+        console.log('[PDF_GENERATE] Verification download - header bytes:', verifyHeader)
+
+        if (!verifyHeader.startsWith('%PDF-')) {
+          console.error('[PDF_GENERATE] Uploaded PDF is corrupted - does not start with valid PDF header')
+          throw new Error('Uploaded PDF is corrupted')
+        } else {
+          console.log('[PDF_GENERATE] Uploaded PDF verification successful')
+        }
+      } else {
+        console.error('[PDF_GENERATE] Failed to verify uploaded PDF, status:', verifyResponse.status)
+      }
+    } catch (verifyError) {
+      console.error('[PDF_GENERATE] Error verifying uploaded PDF:', verifyError)
+      // Don't throw here, continue with the process
+    }
 
     return { pdfUrl, password }
   } catch (error) {
-    console.error("Error generating and uploading cost estimate PDF:", error)
+    console.error("[PDF_GENERATE] Error generating and uploading cost estimate PDF:", error)
     throw error
   }
 }

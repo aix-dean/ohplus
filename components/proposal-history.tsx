@@ -21,9 +21,10 @@ interface ProposalHistoryProps {
   onCopySites?: (sites: Product[], client?: any) => void
   useProposalViewer?: boolean
   excludeProposalId?: string
+  showHeader?: boolean
 }
 
-export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer = false, excludeProposalId }: ProposalHistoryProps) {
+export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer = false, excludeProposalId, showHeader = true }: ProposalHistoryProps) {
   const [proposals, setProposals] = useState<Proposal[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
@@ -71,16 +72,18 @@ export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer
 
   return (
     <>
-      <Card className="w-full min-h-[85vh] max-h-[120vh] flex flex-col">
-        <CardHeader>
-          <CardTitle>
-            Proposal History
-            {selectedClient && (
-              <span className="text-sm font-normal text-gray-500 block">for {selectedClient.company}</span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-hidden">
+      <div className="w-full min-h-[10vh] max-h-[30vh] flex flex-col">
+        {showHeader && (
+          <div className="p-6">
+            <h3 className="text-lg font-semibold">
+              Proposal History
+              {selectedClient && (
+                <span className="text-sm font-normal text-gray-500 block">for {selectedClient.company}</span>
+              )}
+            </h3>
+          </div>
+        )}
+        <div className={`flex-1 ${showHeader ? 'p-6 pt-0' : 'p-6'}`}>
           <ScrollArea className="h-full pr-4">
             {loading ? (
               <div className="space-y-3">
@@ -118,8 +121,8 @@ export function ProposalHistory({ selectedClient, onCopySites, useProposalViewer
               </div>
             )}
           </ScrollArea>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <ProposalSitesModal
         proposal={selectedProposal}

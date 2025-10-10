@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { ArrowLeft, Paperclip, Edit, Trash2, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { getCostEstimate, getCostEstimatesByPageId } from "@/lib/cost-estimate-service"
+import { getCostEstimate, getCostEstimatesByPageId, updateCostEstimateStatus, generateAndUploadCostEstimatePDF } from "@/lib/cost-estimate-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
@@ -86,9 +86,9 @@ export default function ComposeEmailPage() {
 
         // Load company logo if available
         let logoDataUrl: string | null = null
-        if (companyDataParam?.photo_url) {
+        if (companyDataParam?.logo) {
           try {
-            const response = await fetch(companyDataParam.photo_url)
+            const response = await fetch(companyDataParam.logo)
             const blob = await response.blob()
             logoDataUrl = await new Promise<string>((resolve) => {
               const reader = new FileReader()
@@ -100,31 +100,14 @@ export default function ComposeEmailPage() {
           }
         }
 
-        const allPDFs: Array<{ filename: string; content: string }> = []
-
-        // Generate PDF for main cost estimate using the same API as download button
-        try {
-          const response = await fetch('/api/generate-cost-estimate-pdf', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              costEstimate: mainCostEstimate,
-              companyData: companyDataParam,
-              logoDataUrl,
-              userData,
-            }),
-          })
-
+        // Helper function to fetch PDF from URL and convert to base64
+        const fetchPDFAsBase64 = async (url: string): Promise<string> => {
+          const response = await fetch(url)
           if (!response.ok) {
-            const errorText = await response.text()
-            console.error('API Error:', response.status, errorText)
-            throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+            throw new Error(`Failed to fetch PDF: ${response.status}`)
           }
-
           const blob = await response.blob()
-          const mainPdfBase64 = await new Promise<string>((resolve) => {
+          return new Promise<string>((resolve) => {
             const reader = new FileReader()
             reader.onload = () => {
               const result = reader.result as string
@@ -132,43 +115,60 @@ export default function ComposeEmailPage() {
             }
             reader.readAsDataURL(blob)
           })
-
-          const mainFilename = `CE-${mainCostEstimate.costEstimateNumber}_${mainCostEstimate.client?.company || "Client"}_Cost_Estimate.pdf`
-          allPDFs.push({
-            filename: mainFilename,
-            content: mainPdfBase64,
-          })
-          setPreGeneratedPDF(mainPdfBase64)
-          console.log("[v0] Main PDF pre-generated successfully")
-        } catch (error) {
-          console.error("[v0] Error generating main PDF:", error)
         }
 
-        const uniqueRelatedCostEstimates = relatedCostEstimates.filter((costEstimate) => costEstimate.id !== mainCostEstimate.id)
+        const allPDFs: Array<{ filename: string; content: string }> = []
 
-        // Generate PDFs for unique related cost estimates only
-        for (let i = 0; i < uniqueRelatedCostEstimates.length; i++) {
-          const costEstimate = uniqueRelatedCostEstimates[i]
-          try {
-            console.log(`[v0] Generating PDF ${i + 1}/${uniqueRelatedCostEstimates.length} for cost estimate:`, costEstimate.id)
+        // Handle PDF for main cost estimate
+        try {
+          let mainPdfBase64: string
 
-            // Create unique cost estimate number with suffix
-            const baseCostEstimateNumber = costEstimate.costEstimateNumber || costEstimate.id?.slice(-8) || "CE-000"
-            const uniqueCostEstimateNumber = `${baseCostEstimateNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+          if (mainCostEstimate.pdf) {
+            try {
+              mainPdfBase64 = await fetchPDFAsBase64(mainCostEstimate.pdf)
+              console.log("[v0] Main PDF fetched from existing URL")
+            } catch (fetchError) {
+              console.error("[v0] Error fetching main PDF from URL:", fetchError)
+              // Fall back to generating PDF
+              const response = await fetch('/api/generate-cost-estimate-pdf', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  costEstimate: mainCostEstimate,
+                  companyData: companyDataParam,
+                  logoDataUrl,
+                  userData,
+                }),
+              })
 
-            // Create modified cost estimate with unique number
-            const modifiedCostEstimate = {
-              ...costEstimate,
-              costEstimateNumber: uniqueCostEstimateNumber,
+              if (!response.ok) {
+                const errorText = await response.text()
+                console.error('API Error:', response.status, errorText)
+                throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+              }
+
+              const blob = await response.blob()
+              mainPdfBase64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => {
+                  const result = reader.result as string
+                  resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
+                }
+                reader.readAsDataURL(blob)
+              })
+              console.log("[v0] Main PDF generated as fallback")
             }
-
+          } else {
+            // Generate PDF as before
             const response = await fetch('/api/generate-cost-estimate-pdf', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                costEstimate: modifiedCostEstimate,
+                costEstimate: mainCostEstimate,
                 companyData: companyDataParam,
                 logoDataUrl,
                 userData,
@@ -182,7 +182,7 @@ export default function ComposeEmailPage() {
             }
 
             const blob = await response.blob()
-            const pdfBase64 = await new Promise<string>((resolve) => {
+            mainPdfBase64 = await new Promise<string>((resolve) => {
               const reader = new FileReader()
               reader.onload = () => {
                 const result = reader.result as string
@@ -190,15 +190,120 @@ export default function ComposeEmailPage() {
               }
               reader.readAsDataURL(blob)
             })
+            console.log("[v0] Main PDF generated successfully")
+          }
+
+          const mainFilename = `CE-${mainCostEstimate.costEstimateNumber}_${mainCostEstimate.client?.company || "Client"}_Cost_Estimate.pdf`
+          allPDFs.push({
+            filename: mainFilename,
+            content: mainPdfBase64,
+          })
+          setPreGeneratedPDF(mainPdfBase64)
+        } catch (error) {
+          console.error("[v0] Error handling main PDF:", error)
+        }
+
+        const uniqueRelatedCostEstimates = relatedCostEstimates.filter((costEstimate) => costEstimate.id !== mainCostEstimate.id)
+
+        // Handle PDFs for unique related cost estimates only
+        for (let i = 0; i < uniqueRelatedCostEstimates.length; i++) {
+          const costEstimate = uniqueRelatedCostEstimates[i]
+          try {
+            console.log(`[v0] Handling PDF ${i + 1}/${uniqueRelatedCostEstimates.length} for cost estimate:`, costEstimate.id)
+
+            // Create unique cost estimate number with suffix
+            const baseCostEstimateNumber = costEstimate.costEstimateNumber || costEstimate.id?.slice(-8) || "CE-000"
+            const uniqueCostEstimateNumber = `${baseCostEstimateNumber}-${String.fromCharCode(65 + i)}` // Appends -A, -B, -C, etc.
+
+            let pdfBase64: string
+
+            if (costEstimate.pdf) {
+              try {
+                pdfBase64 = await fetchPDFAsBase64(costEstimate.pdf)
+                console.log(`[v0] PDF ${i + 1} fetched from existing URL`)
+              } catch (fetchError) {
+                console.error(`[v0] Error fetching PDF from URL for cost estimate ${costEstimate.id}:`, fetchError)
+                // Fall back to generating PDF
+                const modifiedCostEstimate = {
+                  ...costEstimate,
+                  costEstimateNumber: uniqueCostEstimateNumber,
+                }
+
+                const response = await fetch('/api/generate-cost-estimate-pdf', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    costEstimate: modifiedCostEstimate,
+                    companyData: companyDataParam,
+                    logoDataUrl,
+                    userData,
+                  }),
+                })
+
+                if (!response.ok) {
+                  const errorText = await response.text()
+                  console.error('API Error:', response.status, errorText)
+                  throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+                }
+
+                const blob = await response.blob()
+                pdfBase64 = await new Promise<string>((resolve) => {
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    const result = reader.result as string
+                    resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
+                  }
+                  reader.readAsDataURL(blob)
+                })
+                console.log(`[v0] PDF ${i + 1} generated as fallback`)
+              }
+            } else {
+              // Generate PDF as before
+              const modifiedCostEstimate = {
+                ...costEstimate,
+                costEstimateNumber: uniqueCostEstimateNumber,
+              }
+
+              const response = await fetch('/api/generate-cost-estimate-pdf', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  costEstimate: modifiedCostEstimate,
+                  companyData: companyDataParam,
+                  logoDataUrl,
+                  userData,
+                }),
+              })
+
+              if (!response.ok) {
+                const errorText = await response.text()
+                console.error('API Error:', response.status, errorText)
+                throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+              }
+
+              const blob = await response.blob()
+              pdfBase64 = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => {
+                  const result = reader.result as string
+                  resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
+                }
+                reader.readAsDataURL(blob)
+              })
+              console.log(`[v0] PDF ${i + 1} generated successfully`)
+            }
 
             const filename = `CE-${uniqueCostEstimateNumber}_${costEstimate.client?.company || "Client"}_Cost_Estimate.pdf`
             allPDFs.push({
               filename,
               content: pdfBase64,
             })
-            console.log(`[v0] PDF ${i + 1} generated successfully:`, filename)
           } catch (error) {
-            console.error(`[v0] Error generating PDF for cost estimate ${costEstimate.id}:`, error)
+            console.error(`[v0] Error handling PDF for cost estimate ${costEstimate.id}:`, error)
           }
         }
 
@@ -610,6 +715,18 @@ export default function ComposeEmailPage() {
       }
 
       console.log("[v0] Email sent successfully!")
+
+      // Update status for all related cost estimates to "sent"
+      const allCostEstimatesToUpdate = [costEstimate, ...relatedCostEstimates.filter(ce => ce.id !== costEstimate.id)]
+      for (const estimate of allCostEstimatesToUpdate) {
+        try {
+          await updateCostEstimateStatus(estimate.id, "sent")
+          console.log(`[v0] Updated status to 'sent' for cost estimate: ${estimate.id}`)
+        } catch (statusError) {
+          console.error(`[v0] Failed to update status for cost estimate ${estimate.id}:`, statusError)
+        }
+      }
+
       setShowSuccessDialog(true)
     } catch (error) {
       console.error("[v0] Error sending email:", error)
@@ -787,16 +904,6 @@ export default function ComposeEmailPage() {
                           disabled={downloadingPDF === index}
                         >
                           {downloadingPDF === index ? "Opening..." : <Eye className="h-4 w-4" />}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setPreGeneratedPDFs((prev) => prev.filter((_, i) => i !== index))
-                            setPdfAttachments((prev) => prev.filter((_, i) => i !== index))
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>

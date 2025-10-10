@@ -33,12 +33,6 @@ const categoryLabels = {
 
 async function fetchCompanyData(companyId: string) {
   // Provide immediate fallback data to prevent hanging
-  const fallbackData = {
-    company_name: "Golden Touch Imaging Specialist",
-    company_location: "No. 727 General Solano St., San Miguel, Manila 1005",
-    phone: "Telephone: (02) 5310 1750 to 53",
-    photo_url: null,
-  }
 
   try {
     // Attempt to fetch company data with a very short timeout
@@ -47,19 +41,22 @@ async function fetchCompanyData(companyId: string) {
     if (companyDoc.exists()) {
       const data = companyDoc.data()
       // Return fetched data merged with fallback for missing fields
+      // Use field names that match the API expectations
       return {
-        company_name: data.company_name || data.name || fallbackData.company_name,
-        company_location: data.company_location || data.address || fallbackData.company_location,
-        phone: data.phone || data.telephone || data.contact_number || fallbackData.phone,
-        photo_url: data.photo_url || data.logo_url || null,
+        name: data.name || "",
+        address: data.address || [],
+        phone: data.phone || data.telephone || data.contact_number || "",
+        email: data.email || "",
+        website: data.website || data.company_website || "",
+        logo: data.logo || data.logo_url || null,
       }
     }
 
-    return fallbackData
+    return null
   } catch (error) {
     console.error("Error fetching company data:", error)
     // Always return fallback data instead of throwing
-    return fallbackData
+    return null
   }
 }
 
@@ -262,7 +259,7 @@ export async function generateCostEstimatePDF(
   returnBase64 = false,
   returnPDF = false,
   userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
-): Promise<string | jsPDF | void> {
+): Promise<string | jsPDF | Blob | void> {
   try {
     // For now, we'll handle multiple sites by generating separate PDFs
     if (selectedPages && selectedPages.length > 0) {
@@ -308,9 +305,9 @@ export async function generateCostEstimatePDF(
         companyData = await fetchCompanyData(companyId)
 
         // Fetch company logo if available
-        if (companyData?.photo_url) {
+        if (companyData?.logo) {
           try {
-            const logoResponse = await fetch(companyData.photo_url)
+            const logoResponse = await fetch(companyData.logo)
             if (logoResponse.ok) {
               const logoBlob = await logoResponse.blob()
               const logoArrayBuffer = await logoBlob.arrayBuffer()
@@ -344,20 +341,22 @@ export async function generateCostEstimatePDF(
       throw new Error(`Failed to generate PDF: ${response.statusText}`)
     }
 
-    
+    if (returnBase64) {
+      // Return the blob for custom handling
+      return await response.blob()
+    }
 
-
-      // Create blob URL and trigger download
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      const filename = `${costEstimate.costEstimateNumber || costEstimate.id || 'cost-estimate'}.pdf`
-      link.download = filename
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
+    // Create blob URL and trigger download
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    const filename = `${costEstimate.costEstimateNumber || costEstimate.id || 'cost-estimate'}.pdf`
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
 
   } catch (error) {
     console.error("Error generating PDF:", error)
@@ -397,9 +396,9 @@ export async function generateDetailedCostEstimatePDF(
         companyData = await fetchCompanyData(companyId)
 
         // Fetch company logo if available
-        if (companyData?.photo_url) {
+        if (companyData?.logo) {
           try {
-            const logoResponse = await fetch(companyData.photo_url)
+            const logoResponse = await fetch(companyData.logo)
             if (logoResponse.ok) {
               const logoBlob = await logoResponse.blob()
               const logoArrayBuffer = await logoBlob.arrayBuffer()
@@ -420,7 +419,7 @@ export async function generateDetailedCostEstimatePDF(
     pdf.setFontSize(16)
     pdf.setFont("helvetica", "bold")
     pdf.setTextColor(0, 0, 0)
-    const companyName = companyData?.company_name || "Golden Touch Imaging Specialist"
+    const companyName = companyData?.name || "Golden Touch Imaging Specialist"
     const companyNameWidth = pdf.getTextWidth(companyName)
     const companyNameX = pageWidth / 2 - companyNameWidth / 2
     pdf.text(companyName, companyNameX, yPosition)
@@ -661,9 +660,9 @@ export async function generateCostEstimatePDFBlob(
       companyData = await fetchCompanyData(companyId)
 
       // Fetch company logo if available
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const logoResponse = await fetch(companyData.photo_url)
+          const logoResponse = await fetch(companyData.logo)
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             const logoArrayBuffer = await logoBlob.arrayBuffer()
@@ -684,7 +683,7 @@ export async function generateCostEstimatePDFBlob(
   pdf.setFontSize(16)
   pdf.setFont("helvetica", "bold")
   pdf.setTextColor(0, 0, 0)
-  const companyName = companyData?.company_name || "Golden Touch Imaging Specialist"
+  const companyName = companyData?.name || "Golden Touch Imaging Specialist"
   const companyNameWidth = pdf.getTextWidth(companyName)
   const companyNameX = pageWidth / 2 - companyNameWidth / 2
   pdf.text(companyName, companyNameX, yPosition)
@@ -877,9 +876,9 @@ export async function printCostEstimatePDF(
         companyData = await fetchCompanyData(companyId)
 
         // Fetch company logo if available
-        if (companyData?.photo_url) {
+        if (companyData?.logo) {
           try {
-            const logoResponse = await fetch(companyData.photo_url)
+            const logoResponse = await fetch(companyData.logo)
             if (logoResponse.ok) {
               const logoBlob = await logoResponse.blob()
               const logoArrayBuffer = await logoBlob.arrayBuffer()

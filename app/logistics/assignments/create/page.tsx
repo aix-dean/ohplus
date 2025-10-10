@@ -26,7 +26,6 @@ import {
   getDoc,
   updateDoc,
 } from "firebase/firestore"
-import { generatePersonalizedJONumber } from "@/lib/job-order-service"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -395,6 +394,51 @@ export default function CreateServiceAssignmentPage() {
   const handleSubmit = async () => {
     if (!user) return
 
+    // Validate that a site is selected
+    if (!formData.projectSite || formData.projectSite.trim() === "") {
+      toast({
+        title: "Site Selection Required",
+        description: "Please select a site before creating the service assignment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate required fields based on service type
+    if (formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair") {
+      // Campaign Name is required for non-maintenance/repair services
+      if (!formData.campaignName || formData.campaignName.trim() === "") {
+        toast({
+          title: "Campaign Name Required",
+          description: "Please enter a campaign name.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType)) {
+      // Material Specs is required for services that are not monitoring, change material, maintenance, or repair
+      if (!formData.materialSpecs || formData.materialSpecs.trim() === "") {
+        toast({
+          title: "Material Specs Required",
+          description: "Please select material specifications.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // Crew is always required
+    if (!formData.crew || formData.crew.trim() === "") {
+      toast({
+        title: "Crew Selection Required",
+        description: "Please select a crew for the assignment.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setLoading(true)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
@@ -493,55 +537,6 @@ export default function CreateServiceAssignmentPage() {
         // Don't throw here - we don't want notification failure to break assignment creation
       }
 
-      // Create or update job order with campaign name
-      try {
-        if (formData.campaignName) {
-          if (jobOrderData?.id) {
-            // Update existing job order with campaign name
-            const jobOrderRef = doc(db, "job_orders", jobOrderData.id)
-            await updateDoc(jobOrderRef, {
-              campaignName: formData.campaignName,
-              updatedAt: serverTimestamp(),
-            })
-            console.log("Updated job order with campaign name:", jobOrderData.id)
-          } else {
-            // Create new job order with campaign name
-            const newJobOrderData = {
-              joNumber: await generatePersonalizedJONumber(userData),
-              siteName: selectedProduct?.name || "",
-              siteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
-              joType: formData.serviceType,
-              requestedBy: userData?.first_name || "Auto-Generated",
-              assignTo: formData.assignedTo || formData.crew,
-              dateRequested: formData.startDate?.toISOString() || new Date().toISOString(),
-              deadline: formData.endDate?.toISOString() || new Date().toISOString(),
-              jobDescription: formData.remarks,
-              campaignName: formData.campaignName,
-              message: formData.campaignName, // Keep for backward compatibility
-              company_id: userData?.company_id || "",
-              created_by: user.uid,
-              status: "pending" as const,
-              quotation_id: "",
-            }
-
-            const newJobOrderRef = await addDoc(collection(db, "job_orders"), {
-              ...newJobOrderData,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            })
-
-            // Update the service assignment with the new job order ID
-            await updateDoc(assignmentDocRef, {
-              jobOrderId: newJobOrderRef.id,
-            })
-
-            console.log("Created new job order with campaign name:", newJobOrderRef.id)
-          }
-        }
-      } catch (jobOrderError) {
-        console.error("Error creating/updating job order:", jobOrderError)
-        // Don't throw here - we don't want job order operations to break assignment creation
-      }
 
       // Set session storage and navigate to assignments
       sessionStorage.setItem('lastCreatedServiceAssignmentId', assignmentDocRef.id)
@@ -557,6 +552,51 @@ export default function CreateServiceAssignmentPage() {
   // Add this new function after the handleSubmit function
   const handleSaveDraft = async () => {
     if (!user) return
+
+    // Validate that a site is selected
+    if (!formData.projectSite || formData.projectSite.trim() === "") {
+      toast({
+        title: "Site Selection Required",
+        description: "Please select a site before saving the draft.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate required fields based on service type for drafts too
+    if (formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair") {
+      // Campaign Name is required for non-maintenance/repair services
+      if (!formData.campaignName || formData.campaignName.trim() === "") {
+        toast({
+          title: "Campaign Name Required",
+          description: "Please enter a campaign name before saving the draft.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType)) {
+      // Material Specs is required for services that are not monitoring, change material, maintenance, or repair
+      if (!formData.materialSpecs || formData.materialSpecs.trim() === "") {
+        toast({
+          title: "Material Specs Required",
+          description: "Please select material specifications before saving the draft.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    // Crew is always required
+    if (!formData.crew || formData.crew.trim() === "") {
+      toast({
+        title: "Crew Selection Required",
+        description: "Please select a crew before saving the draft.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       setLoading(true)
@@ -786,6 +826,14 @@ export default function CreateServiceAssignmentPage() {
   // Handle product selection
   const handleProductSelect = (product: Product) => {
     handleInputChange("projectSite", product.id || "")
+    // Add the product to the products array if it's not already there
+    setProducts(prev => {
+      const exists = prev.find(p => p.id === product.id)
+      if (!exists) {
+        return [...prev, product]
+      }
+      return prev
+    })
   }
 
   // Handle identify JO

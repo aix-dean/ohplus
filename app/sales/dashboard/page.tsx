@@ -284,6 +284,60 @@ function SalesDashboardContent() {
     const mode = searchParams.get('mode')
     const clientId = searchParams.get('clientId')
     const tab = searchParams.get('tab')
+    const action = searchParams.get('action')
+
+    if (action === 'create-cost-estimate') {
+      // Reset all modes first
+      setProposalCreationMode(false)
+      setCeQuoteMode(false)
+      setCeMode(false)
+      setQuoteMode(false)
+      setSelectedClientForProposal(null)
+      setDashboardClientSearchTerm("")
+      setSelectedProducts([])
+      setSelectedSites([])
+
+      // Activate CE mode
+      setTimeout(() => {
+        setCeMode(true)
+        setQuoteMode(false)
+        setCeQuoteMode(true)
+        setProposalCreationMode(false)
+      }, 100)
+
+      // Clean up URL parameter
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('action')
+      window.history.replaceState({}, '', newUrl.toString())
+      return
+    }
+
+    // Handle action parameter for direct mode activation (from proposals page)
+    if (action && userData?.company_id) {
+      // Reset all modes first
+      setProposalCreationMode(false)
+      setCeQuoteMode(false)
+      setCeMode(false)
+      setQuoteMode(false)
+      setSelectedClientForProposal(null)
+      setDashboardClientSearchTerm("")
+      setSelectedProducts([])
+      setSelectedSites([])
+
+      // Activate the appropriate mode based on action parameter
+      setTimeout(() => {
+        if (action === 'create-proposal') {
+          setProposalCreationMode(true)
+          setCeQuoteMode(false)
+        }
+      }, 100)
+
+      // Clean up URL parameters
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete('action')
+      window.history.replaceState({}, '', newUrl.toString())
+      return
+    }
 
     // Handle tab parameter for direct mode activation (from product page buttons)
     if (tab && userData?.company_id) {
@@ -362,7 +416,7 @@ function SalesDashboardContent() {
       // Fetch and select the client
       const fetchClient = async () => {
         try {
-          const clientsRef = collection(db, "client_company")
+          const clientsRef = collection(db, "client_db")
           const clientDoc = await getDoc(doc(clientsRef, clientId))
 
           if (clientDoc.exists()) {
@@ -370,13 +424,13 @@ function SalesDashboardContent() {
             const client: Client = {
               id: clientDoc.id,
               name: clientData.contactPersons?.[0]?.name || clientData.name || "",
-              company: clientData.name || "",
-              email: clientData.contactPersons?.[0]?.email || "",
-              phone: clientData.contactPersons?.[0]?.phone || "",
+              company: clientData.company || "",
+              email: clientData.email || "",
+              phone: clientData.phone || "",
               address: clientData.address || "",
               industry: clientData.industry || "",
-              designation: clientData.contactPersons?.[0]?.position || "",
-              company_id: clientData.user_company_id || "",
+              designation: clientData.designation || "",
+              company_id: clientData.company_id || "",
               status: "lead",
               created: new Date(),
               updated: new Date(),
@@ -838,21 +892,31 @@ function SalesDashboardContent() {
       // Generate a simple title for the proposal
       const proposalTitle = `Proposal for ${selectedClientForProposal.company} - ${new Date().toLocaleDateString()}`
 
-      const proposalProducts = selectedProducts.map(product => ({
-        id: product.id || "",
-        name: product.name,
-        type: product.type || "rental",
-        price: product.price || 0,
-        location: product.specs_rental?.location || (product as any).light?.location || "N/A", // Ensure location is present
-        site_code: product.site_code || product.specs_rental?.site_code || (product as any).light?.siteCode || undefined, // Ensure site_code is present
-        media: product.media || [],
-        specs_rental: product.specs_rental || null,
-        light: (product as any).light || null,
-        description: product.description || "",
-        health_percentage: 0, // Default value
-        categories: product.categories || [], // Include categories from product
-        category_names: product.category_names || [], // Include category names from product
-      }));
+      const proposalProducts = selectedProducts.map(product => {
+        const proposalProduct: any = {
+          id: product.id || "",
+          ID: product.id || "", // Document ID of the selected site
+          name: product.name,
+          type: product.type || "rental",
+          price: product.price || 0,
+          location: product.specs_rental?.location || (product as any).light?.location || "N/A", // Ensure location is present
+          media: product.media || [],
+          specs_rental: product.specs_rental || null,
+          light: (product as any).light || null,
+          description: product.description || "",
+          health_percentage: 0, // Default value
+          categories: product.categories || [], // Include categories from product
+          category_names: product.category_names || [], // Include category names from product
+        }
+
+        // Only add site_code if it has a value
+        const siteCode = product.site_code || product.specs_rental?.site_code || (product as any).light?.siteCode
+        if (siteCode) {
+          proposalProduct.site_code = siteCode
+        }
+
+        return proposalProduct as ProposalProduct
+      });
 
       const proposalId = await createProposal(proposalTitle, selectedClientForProposal, proposalProducts as ProposalProduct[], user.uid, {
         // You can add notes or custom messages here if needed
@@ -930,8 +994,8 @@ function SalesDashboardContent() {
     })
   }
 
-  // New functions to open the date range dialog
-  const openCreateCostEstimateDateDialog = () => {
+  // New functions to navigate to cost estimate date selection
+  const navigateToCostEstimateDateSelection = () => {
     if (selectedSites.length === 0) {
       toast({
         title: "No sites selected",
@@ -950,11 +1014,14 @@ function SalesDashboardContent() {
       })
       return
     }
-    setActionAfterDateSelection("cost_estimate")
-    setIsDateRangeDialogOpen(true)
+
+    // Navigate to the date selection page with product IDs and client ID
+    const siteIdsParam = encodeURIComponent(JSON.stringify(selectedSites.map(site => site.id)))
+    const clientIdParam = encodeURIComponent(selectedClientForProposal.id)
+    router.push(`/sales/cost-estimates/select-dates?sites=${siteIdsParam}&clientId=${clientIdParam}`)
   }
 
-  const openCreateQuotationDateDialog = () => {
+  const navigateToQuotationDateSelection = () => {
     if (selectedSites.length === 0) {
       toast({
         title: "No sites selected",
@@ -973,8 +1040,11 @@ function SalesDashboardContent() {
       })
       return
     }
-    setActionAfterDateSelection("quotation")
-    setIsDateRangeDialogOpen(true)
+
+    // Navigate to the date selection page with product IDs and client ID
+    const siteIdsParam = encodeURIComponent(JSON.stringify(selectedSites.map(site => site.id)))
+    const clientIdParam = encodeURIComponent(selectedClientForProposal.id)
+    router.push(`/sales/quotations/select-dates?sites=${siteIdsParam}&clientId=${clientIdParam}`)
   }
 
   // Callback from DateRangeCalendarDialog - NOW CREATES THE DOCUMENT
@@ -1291,7 +1361,7 @@ function SalesDashboardContent() {
       // Assume digital products have content_type containing "digital" or "led"
       // Static products are everything else
       const contentType = product.content_type?.toLowerCase() || ""
-      const isDigital = contentType.includes("digital") || contentType.includes("led") || contentType.includes("screen")
+      const isDigital = contentType.includes("digital") || contentType.includes("led") || contentType.includes("screen") || contentType.includes("dynamic")  
 
       if (selectedDisplayType === "digital") {
         if (!isDigital) return false
@@ -2030,11 +2100,30 @@ function SalesDashboardContent() {
 
 {/* Right Column: Proposal History - Always show when in proposal mode or when copying sites */}
 {proposalCreationMode && (
-  <div className="flex flex-col gap-4 mt-24 h-[calc(100vh-120px)]">
-    <ProposalHistory
-      selectedClient={selectedClientForProposal}
-      onCopySites={handleCopySitesFromProposal}
-    />
+  <div className="w-full md:w-80 h-[60vh] bg-white rounded-[20px] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] print:hidden flex flex-col mt-[100px]">
+    <div className="p-6 pb-0">
+      <h3 className="text-lg font-semibold">
+        Proposal History
+        {selectedClientForProposal && (
+          <span className="text-sm font-normal text-gray-500 block">for {selectedClientForProposal.company}</span>
+        )}
+      </h3>
+    </div>
+    <div className="flex-1 overflow-y-auto">
+      <ProposalHistory
+        selectedClient={
+          selectedClientForProposal
+            ? {
+                id: selectedClientForProposal.id || "",
+                company: selectedClientForProposal.company,
+                contactPerson: selectedClientForProposal.contactPerson,
+              }
+            : null
+        }
+        onCopySites={handleCopySitesFromProposal}
+        showHeader={false}
+      />
+    </div>
   </div>
 )}
 
@@ -2084,7 +2173,7 @@ function SalesDashboardContent() {
                   {selectedSites.length} site{selectedSites.length !== 1 ? 's' : ''} selected
                 </div>
                 <Button
-                  onClick={ceMode ? openCreateCostEstimateDateDialog : openCreateQuotationDateDialog}
+                  onClick={ceMode ? navigateToCostEstimateDateSelection : navigateToQuotationDateSelection}
                   disabled={!selectedClientForProposal || selectedSites.length === 0 || isCreatingDocument}
                   className={`flex-1 h-12 rounded-lg text-lg font-semibold transition-all duration-200 ${
                     selectedClientForProposal && selectedSites.length > 0

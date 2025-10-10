@@ -7,9 +7,10 @@ interface ReportPostSuccessDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   reportId: string
+  message?: string
 }
 
-export function ReportPostSuccessDialog({ open, onOpenChange, reportId }: ReportPostSuccessDialogProps) {
+export function ReportPostSuccessDialog({ open, onOpenChange, reportId, message = "You have successfully posted a report!" }: ReportPostSuccessDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm text-center p-6">
@@ -20,7 +21,7 @@ export function ReportPostSuccessDialog({ open, onOpenChange, reportId }: Report
           <DialogTitle className="text-2xl font-bold text-gray-900 text-center">Congratulations!</DialogTitle>
         </DialogHeader>
         <div className="py-4">
-          <p className="text-gray-600 text-lg">You have successfully posted a report!</p>
+          <p className="text-gray-600 text-lg">{message}</p>
         </div>
       </DialogContent>
     </Dialog>

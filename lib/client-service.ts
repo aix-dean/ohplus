@@ -23,6 +23,8 @@ export interface Client {
   name: string
   email: string
   phone: string
+  email_sub?: string // Optional secondary email
+  phone_sub?: string // Optional secondary phone
   company: string
   company_id?: string // Make sure this field is included
   designation?: string
@@ -99,6 +101,8 @@ export async function createClient(clientData: Omit<Client, "id" | "created" | "
       name: clientData.name,
       email: clientData.email,
       phone: clientData.phone,
+      email_sub: clientData.email_sub || "",
+      phone_sub: clientData.phone_sub || "",
       company: clientData.company,
       company_id: clientData.company_id || "",
       designation: clientData.designation || "",
@@ -227,8 +231,10 @@ export async function getPaginatedClients(
         if (
           client.name?.toLowerCase().includes(searchLower) ||
           client.email?.toLowerCase().includes(searchLower) ||
+          client.email_sub?.toLowerCase().includes(searchLower) ||
           client.company?.toLowerCase().includes(searchLower) ||
-          client.phone?.includes(searchTerm)
+          client.phone?.includes(searchTerm) ||
+          client.phone_sub?.includes(searchTerm)
         ) {
           clients.push(client)
         }
@@ -294,8 +300,10 @@ export async function getClientsCount(
         if (
           client.name?.toLowerCase().includes(searchLower) ||
           client.email?.toLowerCase().includes(searchLower) ||
+          client.email_sub?.toLowerCase().includes(searchLower) ||
           client.company?.toLowerCase().includes(searchLower) ||
-          client.phone?.includes(searchTerm)
+          client.phone?.includes(searchTerm) ||
+          client.phone_sub?.includes(searchTerm)
         ) {
           count++
         }

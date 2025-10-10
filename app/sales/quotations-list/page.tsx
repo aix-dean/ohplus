@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
+import { useDebounce } from "@/hooks/use-debounce"
 import {
   collection,
   query,
@@ -17,6 +18,7 @@ import {
   Timestamp,
   limit,
   startAfter,
+  onSnapshot,
 } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { db, storage } from "@/lib/firebase"
@@ -85,6 +87,9 @@ export default function QuotationsListPage() {
   const [showComplianceDialog, setShowComplianceDialog] = useState(false)
   const [selectedQuotationForCompliance, setSelectedQuotationForCompliance] = useState<any>(null)
   const [companyData, setCompanyData] = useState<any>(null)
+  const [unsubscribe, setUnsubscribe] = useState<(() => void) | null>(null)
+
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   const handleProjectNameDialogClose = (open: boolean) => {
     if (!open) {
@@ -110,13 +115,13 @@ export default function QuotationsListPage() {
 
     try {
       // If there's a search term, use Algolia search
-      if (searchTerm.trim()) {
-        const searchResults = await searchQuotations(searchTerm.trim(), userData?.company_id || undefined, page - 1, pageSize)
+      if (debouncedSearchTerm.trim()) {
+        const searchResults = await searchQuotations(debouncedSearchTerm.trim(), userData?.company_id || undefined, page - 1, pageSize)
 
         if (searchResults.error) {
           console.error("Search error:", searchResults.error)
-          // Fallback to Firebase if search fails
-          await fetchFromFirebase(page, reset)
+          // Fallback to real-time listener if search fails
+          setupRealtimeListener(page, reset)
           return
         }
 
@@ -125,12 +130,15 @@ export default function QuotationsListPage() {
           id: hit.objectID,
           quotation_number: hit.quotation_number,
           client_name: hit.client_name,
+          client_company_name: hit.client_company_name,
           items: hit.items,
           seller_id: hit.seller_id,
           status: hit.status,
-          created: hit.created,
+          created: hit.created ? new Date(hit.created) : null,
+          projectCompliance: hit.projectCompliance || {},
           // Add other fields as needed
         }))
+        console.log(`transformedQuotations:`, transformedQuotations)
 
         // Apply status filter if not "all"
         if (statusFilter !== "all") {
@@ -142,39 +150,43 @@ export default function QuotationsListPage() {
         setHasMorePages(searchResults.page < searchResults.nbPages - 1)
         setTotalCount(searchResults.nbHits)
       } else {
-        // No search term, fetch from Firebase
-        await fetchFromFirebase(page, reset)
+        // No search term, set up real-time listener
+        setupRealtimeListener(page, reset)
       }
     } catch (error) {
       console.error("Error fetching quotations:", error)
-      // Fallback to Firebase on error
-      await fetchFromFirebase(page, reset)
+      // Fallback to real-time listener on error
+      setupRealtimeListener(page, reset)
     } finally {
       setLoading(false)
     }
   }
 
-  const fetchFromFirebase = async (page: number = 1, reset: boolean = false) => {
-    if (!user?.uid) return
+  const setupRealtimeListener = (page: number = 1, reset: boolean = false) => {
+    if (!user?.uid || !userData?.company_id) return
 
-    try {
-      const quotationsRef = collection(db, "quotations")
-      let q = query(
-        quotationsRef,
-        where("company_id", "==", userData?.company_id),
-        orderBy("created", "desc"),
-        limit(pageSize + 1) // Fetch one extra to check if there are more pages
-      )
+    // Clean up existing listener
+    if (unsubscribe) {
+      unsubscribe()
+    }
 
-      // If not the first page, start after the last document of the previous page
-      if (page > 1 && !reset) {
-        const prevPageLastDoc = pageLastDocs[page - 1]
-        if (prevPageLastDoc) {
-          q = query(q, startAfter(prevPageLastDoc))
-        }
+    const quotationsRef = collection(db, "quotations")
+    let q = query(
+      quotationsRef,
+      where("company_id", "==", userData.company_id),
+      orderBy("created", "desc"),
+      limit(pageSize + 1) // Fetch one extra to check if there are more pages
+    )
+
+    // If not the first page, start after the last document of the previous page
+    if (page > 1 && !reset) {
+      const prevPageLastDoc = pageLastDocs[page - 1]
+      if (prevPageLastDoc) {
+        q = query(q, startAfter(prevPageLastDoc))
       }
+    }
 
-      const querySnapshot = await getDocs(q)
+    const unsubscribeListener = onSnapshot(q, (querySnapshot) => {
       const fetchedQuotations: any[] = []
 
       querySnapshot.forEach((doc) => {
@@ -207,21 +219,44 @@ export default function QuotationsListPage() {
         filteredData = currentPageData.filter(q => q.status === statusFilter)
       }
 
-      setAllQuotations(filteredData)
+      // Apply search filter if there's a search term
+      if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase()
+        filteredData = filteredData.filter(q =>
+          q.quotation_number?.toLowerCase().includes(searchLower) ||
+          q.client_name?.toLowerCase().includes(searchLower) ||
+          q.client_company_name?.toLowerCase().includes(searchLower) ||
+          q.items?.name?.toLowerCase().includes(searchLower)
+        )
+      }
+
+      setAllQuotations(currentPageData)
       setLastDoc(pageLastDoc)
       setHasMorePages(hasMore)
       setQuotations(filteredData)
       setTotalCount(fetchedQuotations.length) // Approximate count
-    } catch (error) {
-      console.error("Error fetching from Firebase:", error)
-    }
+      setLoading(false)
+    }, (error) => {
+      console.error("Error in real-time listener:", error)
+      setLoading(false)
+    })
+
+    setUnsubscribe(() => unsubscribeListener)
   }
 
   useEffect(() => {
-    if (user?.uid) {
-      fetchQuotations(1, true)
+    if (user?.uid && userData?.company_id) {
+      setupRealtimeListener(1, true)
     }
-  }, [user?.uid])
+
+    // Cleanup function
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+        setUnsubscribe(null)
+      }
+    }
+  }, [user?.uid, userData?.company_id])
 
   useEffect(() => {
     if (user && userData) {
@@ -230,32 +265,40 @@ export default function QuotationsListPage() {
   }, [user, userData])
 
   useEffect(() => {
-    const resetPagination = async () => {
+    if (user?.uid) {
       setCurrentPage(1)
       setLastDoc(null)
       setPageLastDocs({})
       setHasMorePages(true)
-      await fetchQuotations(1, true)
-    }
 
-    if (user?.uid) {
-      resetPagination()
+      // If search term is cleared, immediately clear quotations to show reset
+      if (!debouncedSearchTerm.trim()) {
+        setQuotations([])
+        setLoading(true)
+      }
+
+      fetchQuotations(1, true)
     }
-  }, [searchTerm, statusFilter, user?.uid])
+  }, [debouncedSearchTerm, statusFilter, user?.uid])
 
   const handlePageChange = async (page: number) => {
     setCurrentPage(page)
-    await fetchQuotations(page, false)
+    // If there's a search term, use Algolia search for pagination
+    if (debouncedSearchTerm.trim()) {
+      fetchQuotations(page, false)
+    } else {
+      setupRealtimeListener(page, false)
+    }
   }
 
-  const clearFilters = async () => {
+  const clearFilters = () => {
     setSearchTerm("")
     setStatusFilter("all")
     setCurrentPage(1)
     setLastDoc(null)
     setPageLastDocs({})
     setHasMorePages(true)
-    await fetchQuotations(1, true)
+    setupRealtimeListener(1, true)
   }
 
   const formatDate = (date: any) => {
@@ -492,8 +535,7 @@ export default function QuotationsListPage() {
         // Don't fail the entire operation if booking update fails
       }
 
-      // Refresh quotations list
-      await fetchQuotations(1, true)
+      // Real-time listener will automatically update the list
 
       // Update the selected quotation for compliance dialog
       if (selectedQuotationForCompliance && selectedQuotationForCompliance.id === quotationId) {
@@ -507,7 +549,6 @@ export default function QuotationsListPage() {
               status: "uploaded",
               fileUrl: downloadURL,
               fileName: file.name,
-              uploadedAt: serverTimestamp(),
               uploadedBy: user?.uid,
             }
           }
@@ -629,10 +670,7 @@ export default function QuotationsListPage() {
 
       await new Promise((resolve) => setTimeout(resolve, 1000))
 
-      console.log("[v0] Refreshing quotations list...")
-      // Refresh the quotations list to show the new copied quotation
-      await fetchQuotations(1, true)
-      console.log("[v0] Quotations list refreshed, total quotations:", allQuotations.length)
+      console.log("[v0] Real-time listener will automatically update the quotations list")
     } catch (error: any) {
       console.error("Error copying quotation:", error)
       toast({
@@ -1116,7 +1154,6 @@ export default function QuotationsListPage() {
           status: "completed",
           fileUrl: downloadURL,
           fileName: selectedQuotationForProject.tempFile?.name || "",
-          uploadedAt: serverTimestamp(),
           uploadedBy: user?.uid,
         },
         status: "reserved", // Update the main status of the quotation
@@ -1151,8 +1188,7 @@ export default function QuotationsListPage() {
       setSelectedQuotationForProject(null)
       setProjectName("")
 
-      // Refresh quotations list
-      await fetchQuotations(1, true)
+      // Real-time listener will automatically update the quotations list
     } catch (bookingError) {
       console.error("[DEBUG] Error creating booking:", bookingError)
       toast({
@@ -1186,8 +1222,7 @@ export default function QuotationsListPage() {
         description: `${complianceType.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())} accepted successfully`,
       })
 
-      // Refresh quotations list
-      await fetchQuotations(1, true)
+      // Real-time listener will automatically update the quotations list
 
       // Update the selected quotation for compliance dialog
       if (selectedQuotationForCompliance && selectedQuotationForCompliance.id === quotationId) {
@@ -1229,8 +1264,7 @@ export default function QuotationsListPage() {
         description: `${complianceType.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase())} declined successfully`,
       })
 
-      // Refresh quotations list
-      await fetchQuotations(1, true)
+      // Real-time listener will automatically update the quotations list
 
       // Update the selected quotation for compliance dialog
       if (selectedQuotationForCompliance && selectedQuotationForCompliance.id === quotationId) {
@@ -1280,12 +1314,22 @@ export default function QuotationsListPage() {
                   placeholder="Search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-96 border-gray-300 rounded-full"
+                  className="pl-10 pr-10 w-96 border-gray-300 rounded-full"
                 />
+                {searchTerm && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full p-0"
+                    onClick={() => setSearchTerm("")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
             <Button
-              onClick={() => router.push("/sales/quotations/compose/new")}
+              onClick={() => router.push("/sales/dashboard?tab=quotations")}
               className="bg-white border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-medium rounded-lg px-6 py-2"
             >
               Create Quotation
@@ -1370,7 +1414,7 @@ export default function QuotationsListPage() {
                           {(() => {
                             const date = quotation.created instanceof Date ? quotation.created : (quotation.created && typeof quotation.created.toDate === 'function' ? quotation.created.toDate() : null);
                             if (!date || isNaN(date.getTime())) {
-                              return "N/A";
+                              return "—";
                             }
                             return format(date, "MMM d, yyyy");
                           })()}
@@ -1389,15 +1433,12 @@ export default function QuotationsListPage() {
                         <div className="text-sm text-gray-600">{quotation.items?.name || quotation.product_name || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
-                        {quotation.status?.toLowerCase() === "reserved" ? (
-                          <span className="text-[#30C71D] font-bold font-medium leading-[50%]">
-                            Reserved
-                          </span>
-                        ) : (
-                          <span className="text-[#C4C4C4] font-bold leading-[50%]">
-                            Pending
-                          </span>
-                        )}
+                        <Badge
+                          variant="secondary"
+                          className={`${getStatusColor(quotation.status)} border`}
+                        >
+                          {quotation.status ? quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1).toLowerCase() : "Draft"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="py-3">
                         <span

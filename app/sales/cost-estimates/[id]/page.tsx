@@ -41,8 +41,6 @@ import {
   Building,
   History,
 } from "lucide-react"
-import { getProposal } from "@/lib/proposal-service"
-import type { Proposal } from "@/lib/types/proposal"
 import { ProposalActivityTimeline } from "@/components/proposal-activity-timeline"
 import { getProposalActivities } from "@/lib/proposal-activity-service"
 import type { ProposalActivity } from "@/lib/types/proposal-activity"
@@ -69,7 +67,7 @@ interface CompanyData {
   address?: any
   company_website?: string
   website?: string
-  photo_url?: string
+  logo?: string
   contact_person?: string
   email?: string
   phone?: string
@@ -81,11 +79,6 @@ interface CompanyData {
 
 const formatCompanyAddress = (companyData: CompanyData | null): string => {
   if (!companyData) return ""
-
-  // Model 1: company_location as string (e.g., "727 Gen Solano St Manila")
-  if (companyData.company_location && typeof companyData.company_location === "string") {
-    return companyData.company_location
-  }
 
   // Model 2: address as object with city, province, street
   if (companyData.address && typeof companyData.address === "object") {
@@ -113,6 +106,43 @@ const generateQRCodeUrl = (costEstimateId: string) => {
 const formatDurationDisplay = (durationDays: number | null | undefined): string => {
   if (!durationDays || durationDays <= 0) return "—"
   return durationDays === 1 ? "1 day" : `${durationDays} days`
+}
+
+// Calculate prorated price based on actual calendar months and days
+const calculateProratedPrice = (price: number, startDate: Date, endDate: Date): number => {
+  let total = 0;
+  let currentDate = new Date(startDate);
+
+  while (currentDate <= endDate) {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    // Get days in this month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Daily price for this month
+    const dailyRate = price / daysInMonth;
+
+    // Determine start and end days for this month
+    let startDay = (currentDate.getMonth() === startDate.getMonth() && currentDate.getFullYear() === startDate.getFullYear())
+      ? startDate.getDate()
+      : 1;
+
+    let endDay = (currentDate.getMonth() === endDate.getMonth() && currentDate.getFullYear() === endDate.getFullYear())
+      ? endDate.getDate()
+      : daysInMonth;
+
+    // Days counted in this month
+    const daysCounted = (endDay - startDay + 1);
+
+    // Add to total
+    total += dailyRate * daysCounted;
+
+    // Move to next month
+    currentDate = new Date(year, month + 1, 1);
+  }
+
+  return total;
 }
 
 const getDateObject = (date: any): Date | undefined => {
@@ -175,7 +205,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true)
   const [sendingEmail, setSendingEmail] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [proposal, setProposal] = useState<Proposal | null>(null)
   const [activities, setActivities] = useState<ProposalActivity[]>([])
   const [timelineOpen, setTimelineOpen] = useState(false)
   const [isSendEmailDialogOpen, setIsSendEmailDialogOpen] = useState(false)
@@ -194,13 +223,17 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [companyData, setCompanyData] = useState<CompanyData | null>(null)
   const [clientHistory, setClientHistory] = useState<CostEstimate[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
+  const [pdfPreviewDialogOpen, setPdfPreviewDialogOpen] = useState(false)
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<CostEstimate | null>(null)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  const [loadingPdfPreview, setLoadingPdfPreview] = useState(false)
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<{ [key: string]: any }>({})
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [generatingPDFsForSend, setGeneratingPDFsForSend] = useState(false)
 
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
-    console.log("[v0] All line items:", lineItems)
 
     const siteGroups: { [siteName: string]: CostEstimateLineItem[] } = {}
 
@@ -224,7 +257,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     })
 
     if (Object.keys(siteGroups).length === 0) {
-      console.log("[v0] No billboard rental items found, treating as single site with all items")
       siteGroups["Single Site"] = lineItems
     } else {
       // Check for orphaned items (items not associated with any site)
@@ -235,7 +267,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
       const orphanedItems = lineItems.filter((item) => !groupedItemIds.has(item.id))
       if (orphanedItems.length > 0) {
-        console.log("[v0] Found orphaned items:", orphanedItems)
         const siteNames = Object.keys(siteGroups)
         siteNames.forEach((siteName) => {
           // Create copies of orphaned items for each site to avoid reference issues
@@ -245,7 +276,6 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       }
     }
 
-    console.log("[v0] Final site groups:", siteGroups)
     return siteGroups
   }
 
@@ -300,7 +330,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
       if (startDate && endDate) {
         const diffTime = Math.abs(endDate.getTime() - startDate.getTime())
-        const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        const newDurationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1
         updatedTempValues.durationDays = newDurationDays
       }
     }
@@ -310,196 +340,264 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   }
 
   const handleSaveAllChanges = async () => {
-    console.log("[v0] handleSaveAllChanges called")
-    console.log("[v0] Current state:", {
-      isEditing,
-      editableCostEstimate: !!costEstimate,
-      tempValuesCount: Object.keys(tempValues).length,
-      tempValues,
-      currentProductIndex,
-    })
-
-    if (!costEstimate) {
-      toast({
-        title: "Error",
-        description: "No cost estimate data available",
-        variant: "destructive",
+    setIsSaving(true)
+    try {
+      console.log("[v0] handleSaveAllChanges called")
+      console.log("[v0] Current state:", {
+        isEditing,
+        editableCostEstimate: !!costEstimate,
+        tempValuesCount: Object.keys(tempValues).length,
+        tempValues,
+        currentProductIndex,
       })
-      return
-    }
 
-    if (!isEditing) {
-      console.log("[v0] Not in edit mode, cannot save changes")
-      toast({
-        title: "Error",
-        description: "Please enter edit mode to save changes",
-        variant: "destructive",
-      })
-      return
-    }
+      if (!costEstimate) {
+        toast({
+          title: "Error",
+          description: "No cost estimate data available",
+          variant: "destructive",
+        })
+        return
+      }
 
-    if (Object.keys(tempValues).length === 0) {
-      console.log("[v0] No temp values to save, returning")
-      toast({
-        title: "No Changes",
-        description: "No changes to save",
-        variant: "destructive",
-      })
-      return
-    }
+      if (!isEditing) {
+        console.log("[v0] Not in edit mode, cannot save changes")
+        toast({
+          title: "Error",
+          description: "Please enter edit mode to save changes",
+          variant: "destructive",
+        })
+        return
+      }
 
-    // Create a deep copy of the cost estimate to ensure React detects changes
-    const updatedCostEstimate = JSON.parse(JSON.stringify(costEstimate))
+      if (Object.keys(tempValues).length === 0) {
+        console.log("[v0] No temp values to save, returning")
+        toast({
+          title: "No Changes",
+          description: "No changes to save",
+          variant: "destructive",
+        })
+        return
+      }
 
-    const siteGroups = groupLineItemsBySite(updatedCostEstimate.lineItems || [])
-    const siteNames = Object.keys(siteGroups)
-    const currentSiteName = siteNames[currentProductIndex]
-    const currentSiteItems = siteGroups[currentSiteName] || []
+      // Create a deep copy of the cost estimate to ensure React detects changes
+      const updatedCostEstimate = JSON.parse(JSON.stringify(costEstimate))
 
-    console.log("[v0] Editing site:", currentSiteName, "with items:", currentSiteItems.length)
+      const siteGroups = groupLineItemsBySite(updatedCostEstimate.lineItems || [])
+      const siteNames = Object.keys(siteGroups)
+      const currentSiteName = siteNames[currentProductIndex]
+      const currentSiteItems = siteGroups[currentSiteName] || []
 
-    const currentSiteRentalItem = currentSiteItems.find((item) => item.category.includes("Billboard Rental"))
-    const currentSiteId = currentSiteRentalItem?.id
+      console.log("[v0] Editing site:", currentSiteName, "with items:", currentSiteItems.length)
 
-    // Apply all temp values to the cost estimate - but only for current site
-    Object.entries(tempValues).forEach(([fieldName, newValue]) => {
-      switch (fieldName) {
-        case "terms_and_conditions":
-          updatedCostEstimate.template = {
-            ...updatedCostEstimate.template,
-            terms_and_conditions: newValue,
-          }
-          break
-        case "salutation":
-          updatedCostEstimate.template = {
-            ...updatedCostEstimate.template,
-            salutation: newValue,
-          }
-          break
-        case "signature_position":
-          updatedCostEstimate.signature_position = newValue
-          break
-        case "closing_message":
-          updatedCostEstimate.template = {
-            ...updatedCostEstimate.template,
-            closing_message: newValue,
-          }
-          break
-        case "site_notes":
-          updatedCostEstimate.items = {
-            ...updatedCostEstimate.items,
-            site_notes: newValue,
-          }
-          break
-        case "price_notes":
-          updatedCostEstimate.items = {
-            ...updatedCostEstimate.items,
-            price_notes: newValue,
-          }
-          break
-        case "unitPrice":
-          const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
-            const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-            if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
-              const newTotal = newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
-              console.log("[v0] Updating price for item:", item.id, "from", item.unitPrice, "to", newValue)
-              return { ...item, unitPrice: newValue, total: newTotal }
+      const currentSiteRentalItem = currentSiteItems.find((item) => item.category.includes("Billboard Rental"))
+      const currentSiteId = currentSiteRentalItem?.id
+
+      // Apply all temp values to the cost estimate - but only for current site
+      Object.entries(tempValues).forEach(([fieldName, newValue]) => {
+        switch (fieldName) {
+          case "terms_and_conditions":
+            updatedCostEstimate.template = {
+              ...(updatedCostEstimate.template || {}),
+              terms_and_conditions: newValue,
             }
-            return item
-          })
-          updatedCostEstimate.lineItems = updatedLineItems
-          updatedCostEstimate.totalAmount = updatedLineItems.reduce((sum, item) => sum + item.total, 0)
-          break
-
-        case "durationDays":
-          updatedCostEstimate.durationDays = newValue
-          const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
-            const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
-            if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
-              const newTotal = item.unitPrice * (newValue / 30)
-              console.log("[v0] Updating duration for item:", item.id, "new total:", newTotal)
-              return { ...item, total: newTotal }
+            break
+          case "salutation":
+            updatedCostEstimate.template = {
+              ...(updatedCostEstimate.template || {}),
+              salutation: newValue,
             }
-            return item
-          })
-          updatedCostEstimate.lineItems = recalculatedItems
-          updatedCostEstimate.totalAmount = recalculatedItems.reduce((sum, item) => sum + item.total, 0)
-
-          if (updatedCostEstimate.startDate) {
-            const newEndDate = new Date(updatedCostEstimate.startDate)
-            newEndDate.setDate(newEndDate.getDate() + newValue)
-            updatedCostEstimate.endDate = newEndDate
-          }
-          break
-
-
-        case "startDate":
-        case "endDate":
-          updatedCostEstimate[fieldName] = newValue
-          if (updatedCostEstimate.startDate && updatedCostEstimate.endDate) {
-            const diffTime = Math.abs(new Date(updatedCostEstimate.endDate).getTime() - new Date(updatedCostEstimate.startDate).getTime())
-            const newDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-            updatedCostEstimate.durationDays = newDurationDays
-
-            const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
+            break
+          case "greeting":
+            updatedCostEstimate.template = {
+              ...(updatedCostEstimate.template || {}),
+              greeting: newValue,
+            }
+            break
+          case "signature_position":
+            updatedCostEstimate.signature_position = newValue
+            break
+          case "closing_message":
+            updatedCostEstimate.template = {
+              ...updatedCostEstimate.template,
+              closing_message: newValue,
+            }
+            break
+          case "site_notes":
+            updatedCostEstimate.items = {
+              ...updatedCostEstimate.items,
+              site_notes: newValue,
+            }
+            break
+          case "price_notes":
+            updatedCostEstimate.items = {
+              ...updatedCostEstimate.items,
+              price_notes: newValue,
+            }
+            break
+          case "unitPrice":
+            const updatedLineItems = updatedCostEstimate.lineItems.map((item) => {
               const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
               if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
-                const newTotal = item.unitPrice * (newDurationDays / 30)
-                console.log("[v0] Updating date-based duration for item:", item.id, "new total:", newTotal)
+                const newTotal = updatedCostEstimate.startDate && updatedCostEstimate.endDate
+                  ? calculateProratedPrice(newValue, updatedCostEstimate.startDate, updatedCostEstimate.endDate)
+                  : newValue * (updatedCostEstimate.durationDays ? updatedCostEstimate.durationDays / 30 : 1)
+                console.log("[v0] Updating price for item:", item.id, "from", item.unitPrice, "to", newValue)
+                return { ...item, unitPrice: newValue, total: newTotal }
+              }
+              return item
+            })
+            updatedCostEstimate.lineItems = updatedLineItems
+            updatedCostEstimate.totalAmount = updatedLineItems.reduce((sum, item) => sum + item.total, 0)
+            break
+
+          case "durationDays":
+            updatedCostEstimate.durationDays = newValue
+            const recalculatedItems = updatedCostEstimate.lineItems.map((item) => {
+              const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+              if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
+                const newTotal = updatedCostEstimate.startDate && updatedCostEstimate.endDate
+                  ? calculateProratedPrice(item.unitPrice, updatedCostEstimate.startDate, updatedCostEstimate.endDate)
+                  : item.unitPrice * (newValue / 30)
+                console.log("[v0] Updating duration for item:", item.id, "new total:", newTotal)
                 return { ...item, total: newTotal }
               }
               return item
             })
-            updatedCostEstimate.lineItems = durationUpdatedItems
-            updatedCostEstimate.totalAmount = durationUpdatedItems.reduce((sum, item) => sum + item.total, 0)
-          }
-          break
+            updatedCostEstimate.lineItems = recalculatedItems
+            updatedCostEstimate.totalAmount = recalculatedItems.reduce((sum, item) => sum + item.total, 0)
 
-        case "closing_message":
-          updatedCostEstimate.template = {
-            ...updatedCostEstimate.template,
-            closing_message: newValue,
-          }
-          break
-
-        case "height":
-        case "width":
-          // Update the specs of the billboard rental item for the current site only
-          // Find the billboard rental item that belongs to the current site
-          const billboardItemToUpdate = updatedCostEstimate.lineItems.find((item) => {
-            if (!item.category.includes("Billboard Rental")) return false
-
-            // Check if this item belongs to the current site by checking if it exists in currentSiteItems
-            return currentSiteItems.some((siteItem) => siteItem.id === item.id)
-          })
-
-          if (billboardItemToUpdate) {
-            if (!billboardItemToUpdate.specs) {
-              billboardItemToUpdate.specs = {}
+            if (updatedCostEstimate.startDate) {
+              const newEndDate = new Date(updatedCostEstimate.startDate)
+              newEndDate.setDate(newEndDate.getDate() + newValue - 1) // -1 because duration is inclusive
+              updatedCostEstimate.endDate = newEndDate
             }
-            if (fieldName === "height") {
-              billboardItemToUpdate.specs.height = newValue
-              console.log(`[v0] Updated height to ${newValue} for item:`, billboardItemToUpdate.id)
-            } else if (fieldName === "width") {
-              billboardItemToUpdate.specs.width = newValue
-              console.log(`[v0] Updated width to ${newValue} for item:`, billboardItemToUpdate.id)
-            }
-          } else {
-            console.log(`[v0] Could not find billboard item to update for field: ${fieldName}`)
-          }
-          break
-      }
-    })
+            break
 
-    try {
+
+          case "startDate":
+          case "endDate":
+            updatedCostEstimate[fieldName] = newValue
+            if (updatedCostEstimate.startDate && updatedCostEstimate.endDate) {
+              const diffTime = Math.abs(new Date(updatedCostEstimate.endDate).getTime() - new Date(updatedCostEstimate.startDate).getTime())
+              const newDurationDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1
+              updatedCostEstimate.durationDays = newDurationDays
+
+              const durationUpdatedItems = updatedCostEstimate.lineItems.map((item) => {
+                const belongsToCurrentSite = currentSiteItems.some((siteItem) => siteItem.id === item.id)
+                if (belongsToCurrentSite && item.category.includes("Billboard Rental")) {
+                  const newTotal = calculateProratedPrice(item.unitPrice, updatedCostEstimate.startDate, updatedCostEstimate.endDate)
+                  console.log("[v0] Updating date-based duration for item:", item.id, "new total:", newTotal)
+                  return { ...item, total: newTotal }
+                }
+                return item
+              })
+              updatedCostEstimate.lineItems = durationUpdatedItems
+              updatedCostEstimate.totalAmount = durationUpdatedItems.reduce((sum, item) => sum + item.total, 0)
+            }
+            break
+
+          case "closing_message":
+            updatedCostEstimate.template = {
+              ...(updatedCostEstimate.template || {}),
+              closing_message: newValue,
+            }
+            break
+
+          case "height":
+          case "width":
+            // Update the specs of the billboard rental item for the current site only
+            // Find the billboard rental item that belongs to the current site
+            const billboardItemToUpdate = updatedCostEstimate.lineItems.find((item) => {
+              if (!item.category.includes("Billboard Rental")) return false
+
+              // Check if this item belongs to the current site by checking if it exists in currentSiteItems
+              return currentSiteItems.some((siteItem) => siteItem.id === item.id)
+            })
+
+            if (billboardItemToUpdate) {
+              if (!billboardItemToUpdate.specs) {
+                billboardItemToUpdate.specs = {}
+              }
+              if (fieldName === "height") {
+                billboardItemToUpdate.specs.height = newValue
+                console.log(`[v0] Updated height to ${newValue} for item:`, billboardItemToUpdate.id)
+              } else if (fieldName === "width") {
+                billboardItemToUpdate.specs.width = newValue
+                console.log(`[v0] Updated width to ${newValue} for item:`, billboardItemToUpdate.id)
+              }
+            } else {
+              console.log(`[v0] Could not find billboard item to update for field: ${fieldName}`)
+            }
+            break
+        }
+      })
+
       // Remove the id field from update data as it's not needed for Firestore update
       const { id, ...updateDataWithoutId } = updatedCostEstimate
 
-      await updateCostEstimate(updatedCostEstimate.id, updateDataWithoutId)
+      // Clean the data to remove undefined values before sending to Firestore
+      const cleanData = (obj: any): any => {
+        if (obj === null || obj === undefined) return obj
+        if (typeof obj !== 'object') return obj
+        if (obj instanceof Date) return obj // Preserve Date objects
+        if (Array.isArray(obj)) return obj.map(cleanData)
 
-      // Update state with the new data
-      setEditableCostEstimate(updatedCostEstimate)
-      setCostEstimate(updatedCostEstimate)
+        const cleaned: any = {}
+        for (const [key, value] of Object.entries(obj)) {
+          if (value !== undefined) {
+            cleaned[key] = cleanData(value)
+          }
+        }
+        return cleaned
+      }
+
+      const cleanedUpdateData = cleanData(updateDataWithoutId)
+
+      await updateCostEstimate(updatedCostEstimate.id, cleanedUpdateData)
+
+      // Generate new PDF after saving the cost estimate data
+      console.log("[v0] Generating new PDF after saving changes")
+
+      // Prepare logo data URL if company logo exists
+      let logoDataUrl: string | null = null
+      if (companyData?.logo) {
+        try {
+          const logoResponse = await fetch(companyData.logo)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(logoBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
+      }
+
+      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, userData ? {
+        first_name: userData.first_name || undefined,
+        last_name: userData.last_name || undefined,
+        email: userData.email || undefined,
+        company_id: userData.company_id || undefined,
+      } : undefined, companyData ? {
+        name: companyData.name || "Company Name",
+        address: companyData.address,
+        phone: companyData.phone,
+        email: companyData.email,
+        website: companyData.website || companyData.company_website,
+      } : undefined)
+
+      // Update cost estimate with new PDF URL and password
+      await updateCostEstimate(updatedCostEstimate.id, { pdf: pdfUrl, password: password })
+
+      // Update state with the new data including PDF
+      const finalCostEstimate = { ...updatedCostEstimate, pdf: pdfUrl, password: password }
+      setEditableCostEstimate(finalCostEstimate)
+      setCostEstimate(finalCostEstimate)
 
       // Force a re-render by updating the key or triggering a state change
       setEditingField(null)
@@ -511,8 +609,23 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         title: "Success",
         description: `Changes saved successfully for ${currentSiteName}`,
       })
+
+      // Refresh data from server
+      const refreshedCostEstimate = await getCostEstimate(costEstimateId)
+      if (refreshedCostEstimate) {
+        setCostEstimate(refreshedCostEstimate)
+        setEditableCostEstimate(refreshedCostEstimate)
+        // Refresh related cost estimates if needed
+        if (refreshedCostEstimate.page_id) {
+          const relatedCEs = await getCostEstimatesByPageId(refreshedCostEstimate.page_id)
+          setRelatedCostEstimates(relatedCEs)
+          const currentIndex = relatedCEs.findIndex((rce) => rce.id === refreshedCostEstimate.id)
+          setCurrentPageIndex(currentIndex >= 0 ? currentIndex : 0)
+        }
+      }
+
       console.log("[v0] Save completed successfully for site:", currentSiteName)
-      console.log("[v0] Updated cost estimate:", updatedCostEstimate)
+      console.log("[v0] Updated cost estimate:", finalCostEstimate)
     } catch (error) {
       console.error("[v0] Save failed:", error)
       toast({
@@ -520,6 +633,8 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         description: "Failed to save changes",
         variant: "destructive",
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -586,7 +701,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           company_location: companyDataResult.company_location || companyDataResult.address,
           address: companyDataResult.address,
           company_website: companyDataResult.company_website || companyDataResult.website,
-          photo_url: companyDataResult.photo_url,
+          logo: companyDataResult.logo,
           contact_person: companyDataResult.contact_person,
           email: companyDataResult.email,
           phone: companyDataResult.phone,
@@ -650,32 +765,9 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             console.log("[v0] No page_id found for this cost estimate")
           }
 
-          if (ce.proposalId) {
-            const linkedProposal = await getProposal(ce.proposalId)
-            setProposal(linkedProposal)
-          }
           const ceActivities = await getProposalActivities(costEstimateId)
           setActivities(ceActivities)
 
-          // Check if PDF needs to be generated
-          if (!ce.pdf || ce.pdf.trim() === "") {
-            setTimeout(async () => {
-              try {
-                const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(ce, userData ? {
-                  first_name: userData.first_name || undefined,
-                  last_name: userData.last_name || undefined,
-                  email: userData.email || undefined,
-                  company_id: userData.company_id || undefined,
-                } : undefined)
-                await updateCostEstimate(ce.id, { pdf: pdfUrl, password: password })
-                setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
-                console.log("Cost estimate PDF generated and uploaded successfully:", pdfUrl)
-              } catch (error) {
-                console.error("Error generating cost estimate PDF:", error)
-                toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" })
-              }
-            }, 2000)
-          }
         } else {
           toast({
             title: "Cost Estimate Not Found",
@@ -711,6 +803,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }, [fetchClientHistory])
 
+
   // Handle automatic share when page loads with action parameter
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -742,7 +835,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     if (isSendEmailDialogOpen && costEstimate) {
-      setEmailSubject(`Cost Estimate: ${costEstimate.title || "Custom Cost Estimate"} - OH Plus`)
+      setEmailSubject(`Cost Estimate: ${costEstimate.lineItems[0].description || "Custom Cost Estimate"}`)
       setEmailBody(
         `Dear ${costEstimate.client?.contactPerson || costEstimate.client?.company || "Valued Client"},\n\nWe are pleased to provide you with a detailed cost estimate for your advertising campaign. Please find the full cost estimate attached and accessible via the link below.\n\nThank you for considering OH Plus for your advertising needs. We look forward to working with you to bring your campaign to life!\n\nBest regards,\nThe OH Plus Team`,
       )
@@ -751,8 +844,88 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }, [isSendEmailDialogOpen, costEstimate])
 
-  const handleSendEmail = () => {
-    router.push(`/sales/cost-estimates/${costEstimateId}/compose-email`)
+  const handleSendEmail = async () => {
+    if (!costEstimate) return
+
+    // Ensure PDF is generated and saved before sending
+    try {
+      await generatePDFIfNeeded(costEstimate)
+      router.push(`/sales/cost-estimates/${costEstimateId}/compose-email`)
+    } catch (error) {
+      // Error is already handled in generatePDFIfNeeded
+    }
+  }
+
+  const handleSendWithPDFGeneration = async () => {
+    if (!costEstimate) return
+
+    console.log("=== DEBUG SEND BUTTON ===")
+    console.log("Current costEstimate.pdf:", costEstimate?.pdf, "Type:", typeof costEstimate?.pdf)
+
+    // Check if current cost estimate has PDF - if so, assume all related ones do too
+    if (costEstimate.pdf) {
+      console.log("✅ Skipping PDF generation - current estimate has PDF")
+      // Current estimate has PDF, assume all related estimates have PDFs too
+      setIsSendOptionsDialogOpen(true)
+      return
+    }
+
+    console.log("⚠️ Generating PDFs...")
+
+    setGeneratingPDFsForSend(true)
+    try {
+      let generatedCount = 0
+      // Generate PDFs for all related cost estimates
+      if (relatedCostEstimates.length > 1) {
+        // Generate and update PDFs for all related cost estimates
+        const updatedRelatedEstimates = [...relatedCostEstimates]
+        for (let i = 0; i < relatedCostEstimates.length; i++) {
+          const estimate = relatedCostEstimates[i]
+
+          // Check if PDF already exists
+          if (!estimate.pdf) {
+            // Generate PDF and get URL/password
+            const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(estimate, userData ? {
+              first_name: userData.first_name || undefined,
+              last_name: userData.last_name || undefined,
+              email: userData.email || undefined,
+              company_id: userData.company_id || undefined,
+            } : undefined, companyData ? {
+              name: companyData.name || "Company Name",
+              address: companyData.address,
+              phone: companyData.phone,
+              email: companyData.email,
+              website: companyData.website || companyData.company_website,
+            } : undefined)
+
+            // Update the cost estimate with PDF URL and password
+            await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password })
+            // Update the local state
+            updatedRelatedEstimates[i] = { ...estimate, pdf: pdfUrl, password: password }
+            generatedCount++
+          }
+        }
+        setRelatedCostEstimates(updatedRelatedEstimates)
+      } else {
+        // Single cost estimate - check if PDF exists before generating
+        if (!costEstimate.pdf) {
+          await generatePDFIfNeeded(costEstimate)
+          generatedCount++
+        }
+      }
+
+      // After PDFs are generated, open the send options dialog
+      setIsSendOptionsDialogOpen(true)
+    } catch (error) {
+      console.error("Error generating PDFs for send:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDFs. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setGeneratingPDFsForSend(false)
+    }
   }
 
   const handleSendEmailConfirm = async () => {
@@ -877,78 +1050,117 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }
 
+  const generatePDFIfNeeded = async (costEstimate: CostEstimate) => {
+    if (costEstimate.pdf) {
+      return { pdfUrl: costEstimate.pdf, password: costEstimate.password }
+    }
+
+    try {
+      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, userData ? {
+        first_name: userData.first_name || undefined,
+        last_name: userData.last_name || undefined,
+        email: userData.email || undefined,
+        company_id: userData.company_id || undefined,
+      } : undefined, companyData ? {
+        name: companyData.name || "Company Name",
+        address: companyData.address,
+        phone: companyData.phone,
+        email: companyData.email,
+        website: companyData.website || companyData.company_website,
+      } : undefined)
+      await updateCostEstimate(costEstimate.id, { pdf: pdfUrl, password: password })
+      setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+      // Also update the relatedCostEstimates if this estimate is in there
+      setRelatedCostEstimates(prev => prev.map(est =>
+        est.id === costEstimate.id ? { ...est, pdf: pdfUrl, password: password } : est
+      ))
+      console.log("Cost estimate PDF generated and uploaded successfully:", pdfUrl)
+      return { pdfUrl, password }
+    } catch (error) {
+      console.error("Error generating cost estimate PDF:", error)
+      toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" })
+      throw error
+    }
+  }
+
   const handleDownloadPDF = async (userData: any) => {
     if (!costEstimate) return
-    console.log(`users all data: ${userData}`)
-    // Check if there are multiple related cost estimates (same page_id)
-    if (relatedCostEstimates.length > 1) {
-      setDownloadingPDF(true)
-      try {
-        // Download all related cost estimates as separate PDFs
-        for (let i = 0; i < relatedCostEstimates.length; i++) {
-          const estimate = relatedCostEstimates[i]
-          await generateCostEstimatePDF(estimate, undefined, false, undefined, userData )
-        }
-        toast({
-          title: "PDFs Generated",
-          description: `${relatedCostEstimates.length} PDF files have been downloaded for all pages.`,
-        })
-      } catch (error) {
-        console.error("Error downloading multiple PDFs:", error)
-        toast({
-          title: "Error",
-          description: "Failed to generate PDFs. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setDownloadingPDF(false)
-      }
-      return
-    }
 
-    // Check if current cost estimate has multiple sites
-    const siteGroups = groupLineItemsBySite(costEstimate.lineItems || [])
-    const sites = Object.keys(siteGroups)
-
-    if (sites.length > 1) {
-      setDownloadingPDF(true)
-      try {
-        await generateSeparateCostEstimatePDFs(costEstimate, undefined, userData ? {
-          first_name: userData.first_name || undefined,
-          last_name: userData.last_name || undefined,
-          email: userData.email || undefined,
-          company_id: userData.company_id || undefined,
-        } : undefined)
-        toast({
-          title: "PDFs Generated",
-          description: `${sites.length} separate PDF files have been downloaded for each product.`,
-        })
-      } catch (error) {
-        console.error("Error downloading separate PDFs:", error)
-        toast({
-          title: "Error",
-          description: "Failed to generate separate PDFs. Please try again.",
-          variant: "destructive",
-        })
-      } finally {
-        setDownloadingPDF(false)
-      }
-      return
-    }
-
-    // Single site - download directly
+    console.log('[PDF_DOWNLOAD] Starting PDF download process for cost estimate:', costEstimate.id)
     setDownloadingPDF(true)
     try {
-      await generateCostEstimatePDF(costEstimate, undefined, false, undefined, userData )
+      // Check if there are multiple related cost estimates
+      const estimatesToDownload = relatedCostEstimates.length > 1 ? relatedCostEstimates : [costEstimate]
+
+      console.log('[PDF_DOWNLOAD] Downloading PDFs for', estimatesToDownload.length, 'cost estimate(s)')
+
+      for (let i = 0; i < estimatesToDownload.length; i++) {
+        const estimate = estimatesToDownload[i]
+
+        // Fetch fresh cost estimate data from database to check current PDF field
+        console.log(`[PDF_DOWNLOAD] Fetching fresh cost estimate data for ${estimate.id}...`)
+        const freshCostEstimate = await getCostEstimate(estimate.id)
+        if (!freshCostEstimate) {
+          throw new Error(`Cost estimate ${estimate.id} not found`)
+        }
+
+        // Check if PDF field has value
+        let pdfUrl = freshCostEstimate.pdf
+        let wasExisting = !!pdfUrl
+        if (!pdfUrl) {
+          // Generate PDF if field is null or doesn't exist
+          const result = await generatePDFIfNeeded(freshCostEstimate)
+          pdfUrl = result.pdfUrl
+          wasExisting = false
+        } else {
+          console.log('[PDF_DOWNLOAD] Using existing PDF URL from database:', pdfUrl)
+        }
+
+        if (!pdfUrl) {
+          console.error('[PDF_DOWNLOAD] No PDF URL available after generation')
+          throw new Error("Failed to generate PDF")
+        }
+
+        console.log('[PDF_DOWNLOAD] PDF URL available:', pdfUrl, 'existing:', wasExisting)
+
+        // Download the PDF
+        const response = await fetch(pdfUrl)
+        if (!response.ok) {
+          throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`)
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${freshCostEstimate.costEstimateNumber || freshCostEstimate.id || 'cost-estimate'}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.open(url, '_blank')
+
+        // Revoke blob URL after a short delay (to keep tab valid)
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url)
+        }, 2000)
+
+        // Add a small delay between downloads to ensure proper file naming
+        if (i < estimatesToDownload.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+      }
+
+      console.log('[PDF_DOWNLOAD] PDF download initiated successfully')
+
       toast({
-        title: "PDF Generated",
-        description: "Cost estimate PDF has been downloaded.",
+        title: "Success",
+        description: `PDF${estimatesToDownload.length > 1 ? 's' : ''} downloaded successfully`,
       })
     } catch (error) {
-      console.error("Error downloading PDF:", error)
+      console.error("[PDF_DOWNLOAD] Error in PDF download process:", error)
       toast({
         title: "Error",
-        description: "Failed to generate PDF. Please try again.",
+        description: `Failed to download PDF: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       })
     } finally {
@@ -1015,8 +1227,18 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           "Site availability: First-come-first-served basis. Official documents required.",
           "Payment terms: One month advance and two months security deposit.",
           "Payment deadline: 7 days before rental start.",
-        ]
-      }) // Set default terms
+        ],
+        greeting: costEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`,
+        unitPrice: costEstimate.lineItems.find(item => item.category.includes("Billboard Rental"))?.unitPrice,
+        durationDays: costEstimate.durationDays,
+        startDate: costEstimate.startDate,
+        endDate: costEstimate.endDate,
+        salutation: costEstimate.template?.salutation,
+        site_notes: costEstimate.items?.site_notes,
+        price_notes: costEstimate.items?.price_notes,
+        signature_position: costEstimate.signature_position,
+        closing_message: costEstimate.template?.closing_message,
+      }) // Set all current values to preserve edits
       setIsEditing(true)
     }
   }
@@ -1174,6 +1396,112 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     router.push(`/sales/cost-estimates/${selectedCostEstimate.id}`)
   }
 
+  const handleHistoryItemClick = async (historyItem: CostEstimate) => {
+    setSelectedHistoryItem(historyItem)
+    setLoadingPdfPreview(true)
+    setPdfPreviewDialogOpen(true)
+
+    try {
+      // Check if cost estimate already has a PDF
+      if (historyItem.pdf && historyItem.pdf.trim() !== "") {
+        setPdfPreviewUrl(historyItem.pdf)
+      } else {
+        // If no PDF exists, generate one
+        // Prepare logo data URL if company logo exists
+        let logoDataUrl: string | null = null
+        if (companyData?.logo) {
+          try {
+            const logoResponse = await fetch(companyData.logo)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              logoDataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.readAsDataURL(logoBlob)
+              })
+            }
+          } catch (error) {
+            console.error('Error fetching company logo:', error)
+          }
+        }
+
+        // Prepare cost estimate data for API (convert dates to serializable format)
+        const serializableCostEstimate = {
+          ...historyItem,
+          createdAt: historyItem.createdAt?.toISOString ? historyItem.createdAt.toISOString() : historyItem.createdAt,
+          updatedAt: historyItem.updatedAt?.toISOString ? historyItem.updatedAt.toISOString() : historyItem.updatedAt,
+          startDate: historyItem.startDate?.toISOString ? historyItem.startDate.toISOString() : historyItem.startDate,
+          endDate: historyItem.endDate?.toISOString ? historyItem.endDate.toISOString() : historyItem.endDate,
+        }
+
+        // Call the generate-cost-estimate-pdf API
+        const response = await fetch('/api/generate-cost-estimate-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            costEstimate: serializableCostEstimate,
+            companyData,
+            logoDataUrl,
+            userData,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('API Error:', response.status, errorText)
+          throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+
+        // Save the generated PDF URL to the cost estimate
+        try {
+          const { pdfUrl } = await generateAndUploadCostEstimatePDF(historyItem, userData ? {
+            first_name: userData.first_name || undefined,
+            last_name: userData.last_name || undefined,
+            email: userData.email || undefined,
+            company_id: userData.company_id || undefined,
+          } : undefined, companyData ? {
+            name: companyData.name || "Company Name",
+            address: companyData.address,
+            phone: companyData.phone,
+            email: companyData.email,
+            website: companyData.website || companyData.company_website,
+          } : undefined)
+          await updateCostEstimate(historyItem.id, { pdf: pdfUrl })
+          console.log("PDF saved to cost estimate:", pdfUrl)
+        } catch (saveError) {
+          console.error("Error saving PDF to cost estimate:", saveError)
+          // Continue with preview even if save fails
+        }
+
+        setPdfPreviewUrl(url)
+      }
+    } catch (error) {
+      console.error("Error loading PDF preview:", error)
+      toast({
+        title: "Error",
+        description: "Failed to load PDF preview",
+        variant: "destructive",
+      })
+      setPdfPreviewDialogOpen(false)
+    } finally {
+      setLoadingPdfPreview(false)
+    }
+  }
+
+  const handleClosePdfPreview = () => {
+    setPdfPreviewDialogOpen(false)
+    setSelectedHistoryItem(null)
+    if (pdfPreviewUrl) {
+      window.URL.revokeObjectURL(pdfPreviewUrl)
+      setPdfPreviewUrl(null)
+    }
+  }
+
   const handleAddTerm = () => {
     const currentTerms = tempValues.terms_and_conditions || editableCostEstimate?.template?.terms_and_conditions || [
       "Cost Estimate validity: 5 working days.",
@@ -1275,28 +1603,55 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const renderCostEstimationBlock = (siteName: string, siteLineItems: CostEstimateLineItem[], pageNumber: number) => {
     const currentCostEstimate = editableCostEstimate || costEstimate
     if (!currentCostEstimate) return null
-    console.log(`Data of Cost Estimate: ${JSON.stringify(currentCostEstimate)}`)
 
     // Calculate preview total using tempValues if available
     const previewSiteTotal = siteLineItems.reduce((sum, item) => {
       let itemTotal = item.total
 
-      // Apply unitPrice changes
-      if (tempValues.unitPrice !== undefined && item.category.includes("Billboard Rental")) {
-        const duration = tempValues.durationDays !== undefined ? tempValues.durationDays : (costEstimate?.durationDays || 30)
-        itemTotal = tempValues.unitPrice * (duration / 30)
-      }
+      // Determine effective dates and duration for calculation
+      const effectiveStartDate = tempValues.startDate || costEstimate?.startDate
+      const effectiveEndDate = tempValues.endDate || costEstimate?.endDate
+      const effectiveDuration = tempValues.durationDays !== undefined ? tempValues.durationDays : costEstimate?.durationDays
 
-      // Apply duration changes
-      if (tempValues.durationDays !== undefined && item.category.includes("Billboard Rental") && tempValues.unitPrice === undefined) {
-        itemTotal = item.unitPrice * (tempValues.durationDays / 30)
+      if (item.category.includes("Billboard Rental")) {
+        // Apply unitPrice changes
+        if (tempValues.unitPrice !== undefined) {
+          if (effectiveStartDate && effectiveEndDate) {
+            itemTotal = calculateProratedPrice(tempValues.unitPrice, effectiveStartDate, effectiveEndDate)
+          } else {
+            const duration = effectiveDuration || 30
+            itemTotal = tempValues.unitPrice * (duration / 30)
+          }
+        }
+        // Apply duration changes (only if unitPrice not changed)
+        else if (tempValues.durationDays !== undefined) {
+          if (effectiveStartDate && effectiveEndDate) {
+            itemTotal = calculateProratedPrice(item.unitPrice, effectiveStartDate, effectiveEndDate)
+          } else {
+            itemTotal = item.unitPrice * (tempValues.durationDays / 30)
+          }
+        }
+        // If no changes, use existing total or calculate from unitPrice
+        else {
+          if (effectiveStartDate && effectiveEndDate) {
+            itemTotal = calculateProratedPrice(item.unitPrice, effectiveStartDate, effectiveEndDate)
+          } else {
+            const duration = effectiveDuration || 30
+            itemTotal = item.unitPrice * (duration / 30)
+          }
+        }
+      } else {
+        // For non-billboard items, ensure total is calculated if not set
+        if (item.total === 0 && item.unitPrice && item.quantity) {
+          itemTotal = item.unitPrice * item.quantity
+        }
       }
 
       return sum + itemTotal
     }, 0)
 
-    const siteTotal = Object.keys(tempValues).length > 0 ? previewSiteTotal : siteLineItems.reduce((sum, item) => sum + item.total, 0)
-    const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.title
+    const siteTotal = previewSiteTotal
+    const adjustedTitle = hasMultipleSites ? `${siteName}` : costEstimate?.lineItems[0]?.description
 
     const baseCENumber = costEstimate?.costEstimateNumber || costEstimate?.id
     const uniqueCENumber = hasMultipleSites
@@ -1319,422 +1674,427 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             <p className="text-base">{format(new Date(), "MMMM dd, yyyy")}</p>
           </div>
 
-        {/* Client and RFQ Info */}
-        <div className="flex justify-between items-start mb-8">
-          <div className="text-left">
-            <p className="text-base ">{currentCostEstimate.client?.name || "Client Name"}</p>
-            <p className="text-base ">{currentCostEstimate.client?.designation || "Position"}</p>
-            <p className="text-base font-bold">{currentCostEstimate.client?.company || "COMPANY NAME"}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-base">RFQ. No. {uniqueCENumber}</p>
-          </div>
-        </div>
-
-        <div className="text-center mb-8">
-          <h1 className="text-xl font-bold text-gray-900 mb-4">{adjustedTitle} - Cost Estimate</h1>
-        </div>
-
-        {/* Salutation */}
-        <div className="text-left mb-4">
-          <p className="text-base">
-            Dear {isEditing && editingField === "salutation" ? (
-              <select
-                value={tempValues.salutation || currentCostEstimate.template?.salutation}
-                onChange={(e) => updateTempValues("salutation", e.target.value)}
-                className="border border-gray-300 rounded px-1 py-0 text-sm"
-                onBlur={() => setEditingField(null)}
-              >
-                <option value="Mr.">Mr.</option>
-                <option value="Ms.">Ms.</option>
-                <option value="Mrs.">Mrs.</option>
-                <option value="Miss">Miss</option>
-              </select>
-            ) : (
-              <span
-                className={isEditing ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
-                onClick={() => isEditing && handleFieldEdit("salutation", currentCostEstimate.template?.salutation || "Mr.")}
-                title={isEditing ? "Click to edit salutation" : ""}
-              >
-                {currentCostEstimate.template?.salutation || "Mr."}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </span>
-            )} {currentCostEstimate?.client?.name?.split(' ').pop() || 'Client'},
-          </p>
-        </div>
-
-        {/* Greeting */}
-        <div className="text-left mb-8">
-          <p className="text-base">
-            Good Day! Thank you for considering {companyData?.name || "our company"} for your business needs.
-          </p>
-        </div>
-
-        {/* Details Header */}
-        <div className="text-left mb-1">
-          <p className="text-base font-semibold">Site details:</p>
-        </div>
-
-        {/* Details Section with editable fields */}
-        <div className="space-y-2 mb-4">
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Type:</span>
-            <span className="text-gray-700">{siteLineItems[0]?.content_type || "Rental"}</span>
+          {/* Client and RFQ Info */}
+          <div className="flex justify-between items-start mb-8">
+            <div className="text-left">
+              <p className="text-base ">{currentCostEstimate.client?.name || "Client Name"}</p>
+              <p className="text-base ">{currentCostEstimate.client?.designation || "Position"}</p>
+              <p className="text-base font-bold">{currentCostEstimate.client?.company || "COMPANY NAME"}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-base">RFQ. No. {uniqueCENumber}</p>
+            </div>
           </div>
 
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Size:</span>
-            <span className="text-gray-700">
-              {siteLineItems[0]?.specs?.height ? `${siteLineItems[0].specs.height}ft (H)` : "N/A"} x {siteLineItems[0]?.specs?.width ? `${siteLineItems[0].specs.width}ft (W)` : "N/A"}
-            </span>
+          <div className="text-center mb-8">
+            <h1 className="text-xl font-bold text-gray-900 mb-4">{adjustedTitle} Cost Estimate</h1>
           </div>
 
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Contract Duration:</span>
-            {isEditing && editingField === "durationDays" ? (
-              <div className="flex items-center gap-2 ml-1">
-                <Input
-                  type="number"
-                  value={tempValues.durationDays || ""}
-                  onChange={(e) => updateTempValues("durationDays", Number.parseInt(e.target.value) || 0)}
-                  className="w-24 h-6 text-sm"
-                  placeholder={currentCostEstimate?.durationDays?.toString() || "0"}
+          {/* Salutation */}
+          <div className="text-left mb-4">
+            <p className="text-base">
+              Dear {isEditing && editingField === "salutation" ? (
+                <select
+                  value={tempValues.salutation || currentCostEstimate.template?.salutation}
+                  onChange={(e) => updateTempValues("salutation", e.target.value)}
+                  className="border border-gray-300 rounded px-1 py-0 text-sm"
                   onBlur={() => setEditingField(null)}
-                />
-                <span className="text-sm text-gray-600">days</span>
-              </div>
-            ) : (
-              <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
-                onClick={() => isEditing && handleFieldEdit("durationDays", tempValues.durationDays || currentCostEstimate?.durationDays || 0)}
-                title={isEditing ? "Click to edit contract duration" : ""}
-              >
-                {formatDurationDisplay(tempValues.durationDays || currentCostEstimate?.durationDays || 0)}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Contract Period:</span>
-            {isEditing && editingField === "contractPeriod" ? (
-              <div className="flex items-center gap-2 ml-1">
-                <Input
-                  type="date"
-                  value={formatDateForInput(tempValues.startDate)}
-                  onChange={(e) => updateTempValues("startDate", new Date(e.target.value))}
-                  className="w-36 h-8 text-sm border-gray-300 rounded-md"
-                  onBlur={() => setEditingField(null)}
-                />
-                <span className="text-gray-500">-</span>
-                <Input
-                  type="date"
-                  value={formatDateForInput(tempValues.endDate)}
-                  onChange={(e) => updateTempValues("endDate", new Date(e.target.value))}
-                  className="w-36 h-8 text-sm border-gray-300 rounded-md"
-                  onBlur={() => setEditingField(null)}
-                />
-              </div>
-            ) : (
-              <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
-                onClick={() =>
-                  isEditing &&
-                  handleFieldEdit("contractPeriod", {
-                    startDate: tempValues.startDate || currentCostEstimate?.startDate,
-                    endDate: tempValues.endDate || currentCostEstimate?.endDate,
-                  })
-                }
-                title={isEditing ? "Click to edit contract period" : ""}
-              >
-                {(tempValues.startDate || currentCostEstimate?.startDate) && (tempValues.endDate || currentCostEstimate?.endDate)
-                  ? `${formatDate(tempValues.startDate || currentCostEstimate?.startDate)} - ${formatDate(tempValues.endDate || currentCostEstimate?.endDate)}`
-                  : "—"}
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </span>
-            )}
-          </div>
-
-          <div className="flex">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Proposal to:</span>
-            <span className="text-gray-700">{currentCostEstimate?.client?.company || "CLIENT COMPANY NAME"}</span>
-          </div>
-
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Lease rate per month:</span>
-
-            {isEditing && editingField === "unitPrice" ? (
-              <div className="flex items-center gap-2 ml-1">
-                <Input
-                  type="number"
-                  value={tempValues.unitPrice || ""}
-                  onChange={(e) => updateTempValues("unitPrice", Number.parseFloat(e.target.value) || 0)}
-                  className="w-32 h-6 text-sm"
-                  placeholder={monthlyRate?.toString() || "0.00"}
-                  onBlur={() => setEditingField(null)}
-                />
-                <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
-              </div>
-            ) : (
-              <span
-                className={`text-gray-700 ${
-                  isEditing
-                    ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
-                    : ""
-                }`}
-                onClick={() => isEditing && handleFieldEdit("unitPrice", tempValues.unitPrice || monthlyRate)}
-                title={isEditing ? "Click to edit lease rate" : ""}
-              >
-                PHP {(tempValues.unitPrice || monthlyRate).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
-                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-              </span>
-            )}
-          </div>
-
-          <div className="flex">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Total Lease:</span>
-            <span className="text-gray-700">
-              PHP{" "}
-              {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}{" "}
-              (Exclusive of VAT)
-            </span>
-          </div>
-        </div>
-
-        {/* Site Notes */}
-        {isEditing && editingField === "site_notes" ? (
-          <div className="mt-4">
-            <textarea
-              value={tempValues.site_notes || currentCostEstimate?.items?.site_notes || ""}
-              onChange={(e) => updateTempValues("site_notes", e.target.value)}
-              className="w-full text-base border border-gray-300 rounded p-2"
-              rows={3}
-              placeholder="Enter site notes"
-              onBlur={() => setEditingField(null)}
-            />
-          </div>
-        ) : (tempValues.site_notes || currentCostEstimate?.items?.site_notes) ? (
-          <div
-            className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
-            onClick={() => isEditing && handleFieldEdit("site_notes", tempValues.site_notes || currentCostEstimate.items?.site_notes || "")}
-            title={isEditing ? "Click to edit site notes" : ""}
-          >
-            <p className="text-sm italic"><strong>Note:</strong> {tempValues.site_notes || currentCostEstimate.items?.site_notes}</p>
-            {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-          </div>
-        ) : isEditing ? (
-          <div
-            className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
-            onClick={() => handleFieldEdit("site_notes", tempValues.site_notes || "")}
-            title="Click to add site notes"
-          >
-            <p className="text-base">+ Add site notes</p>
-          </div>
-        ) : null}
-
-        <p className="font-bold mt-2">Price breakdown:</p>
-        {/* Pricing Table */}
-        <div className="px-4 pt-2">
-          <div className="space-y-1">
-            <div className="flex justify-between">
-              <span className="text-gray-700">Lease rate per month</span>
-              <span className="text-gray-900">PHP {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-700">Contract duration</span>
-              <span className="text-gray-900">x {currentCostEstimate.durationDays ? `${formatDurationDisplay(currentCostEstimate.durationDays)}` :  "1 month"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-700">Total lease</span>
-              <span className="text-gray-900">PHP {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-700">Add: VAT</span>
-              <span className="text-gray-900">PHP {(siteTotal * 0.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="border-t pt-1 mt-1">
-              <div className="flex justify-between font-bold text-lg">
-                <span className="text-gray-900">Total</span>
-                <span className="text-gray-900">PHP {(siteTotal * 1.12).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Price Notes */}
-        {isEditing && editingField === "price_notes" ? (
-          <div className="mt-4">
-            <textarea
-              value={tempValues.price_notes || currentCostEstimate?.items?.price_notes || ""}
-              onChange={(e) => updateTempValues("price_notes", e.target.value)}
-              className="w-full text-base border border-gray-300 rounded p-2"
-              rows={3}
-              placeholder="Enter price notes"
-              onBlur={() => setEditingField(null)}
-            />
-          </div>
-        ) : (tempValues.price_notes || currentCostEstimate?.items?.price_notes) ? (
-          <div
-            className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
-            onClick={() => isEditing && handleFieldEdit("price_notes", tempValues.price_notes || currentCostEstimate.items?.price_notes || "")}
-            title={isEditing ? "Click to edit price notes" : ""}
-          >
-            <p className="text-sm italic mb-[15px]"><strong>Note:</strong> {tempValues.price_notes || currentCostEstimate.items?.price_notes}</p>
-            {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-          </div>
-        ) : isEditing ? (
-          <div
-            className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
-            onClick={() => handleFieldEdit("price_notes", tempValues.price_notes || "")}
-            title="Click to add price notes"
-          >
-            <p className="text-base">+ Add price notes</p>
-          </div>
-        ) : null}
-
-        {/* Terms and Conditions */}
-        <div className="mb-8 mt-2">
-          <p className="font-semibold mb-4">Terms and Conditions:</p>
-          <div className="space-y-2 text-sm">
-            {(isEditing
-              ? tempValues.terms_and_conditions || currentCostEstimate?.template?.terms_and_conditions || [
-                  "Cost Estimate validity: 5 working days.",
-                  "Site availability: First-come-first-served basis. Official documents required.",
-                  "Payment terms: One month advance and two months security deposit.",
-                  "Payment deadline: 7 days before rental start.",
-                ]
-              : currentCostEstimate?.template?.terms_and_conditions || [
-                  "Cost Estimate validity: 5 working days.",
-                  "Site availability: First-come-first-served basis. Official documents required.",
-                  "Payment terms: One month advance and two months security deposit.",
-                  "Payment deadline: 7 days before rental start.",
-                ]
-            ).map((term: string, index: number) => (
-              <div key={index} className="flex items-start gap-2">
-                <span className="flex-shrink-0">{index + 1}.</span>
-                {isEditing ? (
-                  <div className="flex-1 flex items-center gap-2">
-                    <textarea
-                      value={term}
-                      onChange={(e) => handleUpdateTerm(index, e.target.value)}
-                      className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px]"
-                      placeholder="Enter term and condition"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveTerm(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <span className="flex-1">{term}</span>
-                )}
-              </div>
-            ))}
-            {isEditing && (
-              <div className="mt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddTerm}
-                  className="text-blue-600 hover:text-blue-800"
                 >
-                  + Add Term
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Closing Message */}
-        {isEditing && editingField === "closing_message" ? (
-          <div className="mb-8">
-            <textarea
-              value={tempValues.closing_message || currentCostEstimate?.template?.closing_message || ""}
-              onChange={(e) => updateTempValues("closing_message", e.target.value)}
-              className="w-full text-base border border-gray-300 rounded p-2"
-              rows={3}
-              placeholder="Enter closing message (optional)"
-              onBlur={() => setEditingField(null)}
-            />
-          </div>
-        ) : (tempValues.closing_message || currentCostEstimate?.template?.closing_message) ? (
-          <div
-            className={isEditing ? "mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mb-8"}
-            onClick={() => isEditing && handleFieldEdit("closing_message", tempValues.closing_message || currentCostEstimate?.template?.closing_message || "")}
-            title={isEditing ? "Click to edit closing message" : ""}
-          >
-            <p className="text-base">{tempValues.closing_message || currentCostEstimate?.template?.closing_message}</p>
-            {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
-          </div>
-        ) : isEditing ? (
-          <div
-            className="mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
-            onClick={() => handleFieldEdit("closing_message", tempValues.closing_message || "")}
-            title="Click to add closing message"
-          >
-            <p className="text-base">+ Add closing message</p>
-          </div>
-        ) : null}
-
-        <div className="space-y-8 mb-8">
-          <div className="text-left">
-            <p className="mb-16">Very truly yours,</p>
-            <div>
-              <div className="border-b border-gray-400 w-48 mb-2"></div>
-              <p className="font-medium">
-                {userData?.first_name && userData?.last_name
-                  ? `${userData.first_name} ${userData.last_name}`
-                  : "Golden Touch Imaging Specialist"}
-              </p>
-              {isEditing && editingField === "signature_position" ? (
-                <Input
-                  type="text"
-                  value={tempValues.signature_position || ""}
-                  onChange={(e) => updateTempValues("signature_position", e.target.value)}
-                  className="w-32 h-6 text-sm"
-                  placeholder={currentCostEstimate?.signature_position ?? "Position"}
-                  onBlur={() => setEditingField(null)}
-                />
+                  <option value="Mr.">Mr.</option>
+                  <option value="Ms.">Ms.</option>
+                  <option value="Mrs.">Mrs.</option>
+                  <option value="Miss">Miss</option>
+                </select>
               ) : (
-                <p
-                  className={`text-sm ${isEditing ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}`}
-                  onClick={() => isEditing && handleFieldEdit("signature_position", tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "")}
-                  title={isEditing ? "Click to edit position" : ""}
+                <span
+                  className={isEditing ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
+                  onClick={() => isEditing && handleFieldEdit("salutation", tempValues.salutation || currentCostEstimate.template?.salutation || "Mr.")}
+                  title={isEditing ? "Click to edit salutation" : ""}
                 >
-                  {tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "Account Manager"}
+                  {tempValues.salutation || currentCostEstimate.template?.salutation || "Mr."}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </span>
+              )} {currentCostEstimate?.client?.name?.split(' ').pop() || 'Client'},
+            </p>
+          </div>
+
+          {/* Greeting */}
+          <div className="text-left mb-8">
+            {isEditing && editingField === "greeting" ? (
+              <textarea
+                value={tempValues.greeting || currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
+                onChange={(e) => updateTempValues("greeting", e.target.value)}
+                className="w-full text-left text-base border border-gray-300 rounded p-2"
+                rows={2}
+                placeholder="Enter greeting text"
+              />
+            ) : (
+              <div
+                className={isEditing ? "cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}
+                onClick={() => isEditing && handleFieldEdit("greeting", tempValues.greeting || currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`)}
+                title={isEditing ? "Click to edit greeting" : ""}
+              >
+                <p className="text-base">
+                  {tempValues.greeting || currentCostEstimate?.template?.greeting || `Good Day! Thank you for considering ${companyData?.name || "our company"} for your business needs.`}
                 </p>
+                {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Details Header */}
+          <div className="text-left mb-1">
+            <p className="text-base font-semibold">Site details:</p>
+          </div>
+
+          {/* Details Section with editable fields */}
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Type:</span>
+              <span className="text-gray-700">{siteLineItems[0]?.content_type || "Rental"}</span>
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Size:</span>
+              <span className="text-gray-700">
+                {siteLineItems[0]?.specs?.height ? `${siteLineItems[0].specs.height}ft (H)` : "N/A"} x {siteLineItems[0]?.specs?.width ? `${siteLineItems[0].specs.width}ft (W)` : "N/A"}
+              </span>
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Contract Duration:</span>
+              {isEditing && editingField === "durationDays" ? (
+                <div className="flex items-center gap-2 ml-1">
+                  <Input
+                    type="number"
+                    value={tempValues.durationDays || ""}
+                    onChange={(e) => updateTempValues("durationDays", Number.parseInt(e.target.value) || 0)}
+                    className="w-24 h-6 text-sm"
+                    placeholder={currentCostEstimate?.durationDays?.toString() || "0"}
+                    onBlur={() => setEditingField(null)}
+                  />
+                  <span className="text-sm text-gray-600">days</span>
+                </div>
+              ) : (
+                <span
+                  className={`text-gray-700 ${isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                    }`}
+                  onClick={() => isEditing && handleFieldEdit("durationDays", tempValues.durationDays || currentCostEstimate?.durationDays || 0)}
+                  title={isEditing ? "Click to edit contract duration" : ""}
+                >
+                  {formatDurationDisplay(tempValues.durationDays || currentCostEstimate?.durationDays || 0)}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Contract Period:</span>
+              {isEditing && editingField === "contractPeriod" ? (
+                <div className="flex items-center gap-2 ml-1">
+                  <Input
+                    type="date"
+                    value={formatDateForInput(tempValues.startDate)}
+                    onChange={(e) => updateTempValues("startDate", new Date(e.target.value))}
+                    className="w-36 h-8 text-sm border-gray-300 rounded-md"
+                    onBlur={() => setEditingField(null)}
+                  />
+                  <span className="text-gray-500">-</span>
+                  <Input
+                    type="date"
+                    value={formatDateForInput(tempValues.endDate)}
+                    onChange={(e) => updateTempValues("endDate", new Date(e.target.value))}
+                    className="w-36 h-8 text-sm border-gray-300 rounded-md"
+                    onBlur={() => setEditingField(null)}
+                  />
+                </div>
+              ) : (
+                <span
+                  className={`text-gray-700 ${isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                    }`}
+                  onClick={() =>
+                    isEditing &&
+                    handleFieldEdit("contractPeriod", {
+                      startDate: tempValues.startDate || currentCostEstimate?.startDate,
+                      endDate: tempValues.endDate || currentCostEstimate?.endDate,
+                    })
+                  }
+                  title={isEditing ? "Click to edit contract period" : ""}
+                >
+                  {(tempValues.startDate || currentCostEstimate?.startDate) && (tempValues.endDate || currentCostEstimate?.endDate)
+                    ? `${formatDate(tempValues.startDate || currentCostEstimate?.startDate)} - ${formatDate(tempValues.endDate || currentCostEstimate?.endDate)}`
+                    : "—"}
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </span>
+              )}
+            </div>
+
+            <div className="flex">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Proposal to:</span>
+              <span className="text-gray-700">{currentCostEstimate?.client?.company || "CLIENT COMPANY NAME"}</span>
+            </div>
+
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/4">Lease rate per month:</span>
+
+              {isEditing && editingField === "unitPrice" ? (
+                <div className="flex items-center gap-2 ml-1">
+                  <Input
+                    type="number"
+                    value={tempValues.unitPrice || ""}
+                    onChange={(e) => updateTempValues("unitPrice", Number.parseFloat(e.target.value) || 0)}
+                    className="w-32 h-6 text-sm"
+                    placeholder={monthlyRate?.toString() || "0.00"}
+                    onBlur={() => setEditingField(null)}
+                  />
+                  <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
+                </div>
+              ) : (
+                <span
+                  className={`text-gray-700 ${isEditing
+                      ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200"
+                      : ""
+                    }`}
+                  onClick={() => isEditing && handleFieldEdit("unitPrice", tempValues.unitPrice || monthlyRate)}
+                  title={isEditing ? "Click to edit lease rate" : ""}
+                >
+                  PHP {(tempValues.unitPrice || monthlyRate).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+                  {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                </span>
+              )}
+            </div>
+
+          </div>
+
+          {/* Site Notes */}
+          {isEditing && editingField === "site_notes" ? (
+            <div className="mt-4">
+              <textarea
+                value={tempValues.site_notes || currentCostEstimate?.items?.site_notes || ""}
+                onChange={(e) => updateTempValues("site_notes", e.target.value)}
+                className="w-full text-base border border-gray-300 rounded p-2"
+                rows={3}
+                placeholder="Enter site notes"
+                onBlur={() => setEditingField(null)}
+              />
+            </div>
+          ) : (tempValues.site_notes || currentCostEstimate?.items?.site_notes) ? (
+            <div
+              className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
+              onClick={() => isEditing && handleFieldEdit("site_notes", tempValues.site_notes || currentCostEstimate.items?.site_notes || "")}
+              title={isEditing ? "Click to edit site notes" : ""}
+            >
+              <p className="text-sm italic"><strong>Note:</strong> {tempValues.site_notes || currentCostEstimate.items?.site_notes}</p>
+              {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+            </div>
+          ) : isEditing ? (
+            <div
+              className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
+              onClick={() => handleFieldEdit("site_notes", tempValues.site_notes || "")}
+              title="Click to add site notes"
+            >
+              <p className="text-base">+ Add site notes</p>
+            </div>
+          ) : null}
+
+          <p className="font-bold mt-2">Price breakdown:</p>
+          {/* Pricing Table */}
+          <div className="px-4 pt-2">
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-700">Lease rate per month</span>
+                <span className="text-gray-900">PHP {monthlyRate.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Contract duration</span>
+                <span className="text-gray-900">x {formatDurationDisplay(tempValues.durationDays || currentCostEstimate?.durationDays || 30)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Total lease</span>
+                <span className="text-gray-900">PHP {siteTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Add: VAT</span>
+                <span className="text-gray-900">PHP {(siteTotal * 0.12).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              <div className="border-t pt-1 mt-1">
+                <div className="flex justify-between font-bold text-lg">
+                  <span className="text-gray-900">Total</span>
+                  <span className="text-gray-900">PHP {(siteTotal * 1.12).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Price Notes */}
+          {isEditing && editingField === "price_notes" ? (
+            <div className="mt-4">
+              <textarea
+                value={tempValues.price_notes || currentCostEstimate?.items?.price_notes || ""}
+                onChange={(e) => updateTempValues("price_notes", e.target.value)}
+                className="w-full text-base border border-gray-300 rounded p-2"
+                rows={3}
+                placeholder="Enter price notes"
+                onBlur={() => setEditingField(null)}
+              />
+            </div>
+          ) : (tempValues.price_notes || currentCostEstimate?.items?.price_notes) ? (
+            <div
+              className={isEditing ? "mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mt-4"}
+              onClick={() => isEditing && handleFieldEdit("price_notes", tempValues.price_notes || currentCostEstimate.items?.price_notes || "")}
+              title={isEditing ? "Click to edit price notes" : ""}
+            >
+              <p className="text-sm italic mb-[15px]"><strong>Note:</strong> {tempValues.price_notes || currentCostEstimate.items?.price_notes}</p>
+              {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+            </div>
+          ) : isEditing ? (
+            <div
+              className="mt-4 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
+              onClick={() => handleFieldEdit("price_notes", tempValues.price_notes || "")}
+              title="Click to add price notes"
+            >
+              <p className="text-base">+ Add price notes</p>
+            </div>
+          ) : null}
+
+          {/* Terms and Conditions */}
+          <div className="mb-8 mt-2">
+            <p className="font-semibold mb-4">Terms and Conditions:</p>
+            <div className="space-y-2 text-sm">
+              {(isEditing
+                ? tempValues.terms_and_conditions || currentCostEstimate?.template?.terms_and_conditions || [
+                  "Cost Estimate validity: 5 working days.",
+                  "Site availability: First-come-first-served basis. Official documents required.",
+                  "Payment terms: One month advance and two months security deposit.",
+                  "Payment deadline: 7 days before rental start.",
+                ]
+                : currentCostEstimate?.template?.terms_and_conditions || [
+                  "Cost Estimate validity: 5 working days.",
+                  "Site availability: First-come-first-served basis. Official documents required.",
+                  "Payment terms: One month advance and two months security deposit.",
+                  "Payment deadline: 7 days before rental start.",
+                ]
+              ).map((term: string, index: number) => (
+                <div key={index} className="flex items-start gap-2">
+                  <span className="flex-shrink-0">{index + 1}.</span>
+                  {isEditing ? (
+                    <div className="flex-1 flex items-center gap-2">
+                      <textarea
+                        value={term}
+                        onChange={(e) => handleUpdateTerm(index, e.target.value)}
+                        className="flex-1 text-sm border border-gray-300 rounded p-1 min-h-[40px]"
+                        placeholder="Enter term and condition"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemoveTerm(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="flex-1">{term}</span>
+                  )}
+                </div>
+              ))}
+              {isEditing && (
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAddTerm}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    + Add Term
+                  </Button>
+                </div>
               )}
             </div>
           </div>
-        </div>
 
-        <div className="text-center text-xs text-gray-600 mt-8 border-t pt-4">
-          <p className="font-semibold">{companyData?.name || "Company Name"}</p>
-          <p>{formatCompanyAddress(companyData)}</p>
-          <span className="text-center gap-1 flex-1">{companyData?.phone && `Tel no: ${companyData.phone}`}|{companyData?.email && `Email: ${companyData.email}`}</span>
-        </div>
+          {/* Closing Message */}
+          {isEditing && editingField === "closing_message" ? (
+            <div className="mb-8">
+              <textarea
+                value={tempValues.closing_message || currentCostEstimate?.template?.closing_message || ""}
+                onChange={(e) => updateTempValues("closing_message", e.target.value)}
+                className="w-full text-base border border-gray-300 rounded p-2"
+                rows={3}
+                placeholder="Enter closing message (optional)"
+                onBlur={() => setEditingField(null)}
+              />
+            </div>
+          ) : (tempValues.closing_message || currentCostEstimate?.template?.closing_message) ? (
+            <div
+              className={isEditing ? "mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : "mb-8"}
+              onClick={() => isEditing && handleFieldEdit("closing_message", tempValues.closing_message || currentCostEstimate?.template?.closing_message || "")}
+              title={isEditing ? "Click to edit closing message" : ""}
+            >
+              <p className="text-base">{tempValues.closing_message || currentCostEstimate?.template?.closing_message}</p>
+              {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+            </div>
+          ) : isEditing ? (
+            <div
+              className="mb-8 cursor-pointer hover:bg-blue-50 p-2 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200 text-gray-500"
+              onClick={() => handleFieldEdit("closing_message", tempValues.closing_message || "")}
+              title="Click to add closing message"
+            >
+              <p className="text-base">+ Add closing message</p>
+            </div>
+          ) : null}
+
+          <div className="space-y-8 mb-8">
+            <div className="text-left">
+              <p className="mb-16">Very truly yours,</p>
+              <div>
+                <div className="border-b border-gray-400 w-48 mb-2"></div>
+                <p className="font-medium">
+                  {userData?.first_name && userData?.last_name
+                    ? `${userData.first_name} ${userData.last_name}`
+                    : "Golden Touch Imaging Specialist"}
+                </p>
+                {isEditing && editingField === "signature_position" ? (
+                  <Input
+                    type="text"
+                    value={tempValues.signature_position || ""}
+                    onChange={(e) => updateTempValues("signature_position", e.target.value)}
+                    className="w-32 h-6 text-sm"
+                    placeholder={currentCostEstimate?.signature_position ?? "Position"}
+                    onBlur={() => setEditingField(null)}
+                  />
+                ) : (
+                  <p
+                    className={`text-sm ${isEditing ? "cursor-pointer hover:bg-blue-50 px-2 py-1 rounded border-2 border-dashed border-blue-300 hover:border-blue-500 transition-all duration-200" : ""}`}
+                    onClick={() => isEditing && handleFieldEdit("signature_position", tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "")}
+                    title={isEditing ? "Click to edit position" : ""}
+                  >
+                    {tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "Account Manager"}
+                    {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center text-xs text-gray-600 mt-8 border-t pt-4">
+            <p className="font-semibold">{companyData?.name || "Company Name"}</p>
+            <p>{formatCompanyAddress(companyData)}</p>
+            <span className="text-center gap-1 flex-1">{companyData?.phone && `Tel no: ${companyData.phone}`}|{companyData?.email && `Email: ${companyData.email}`}</span>
+          </div>
         </div>
       </div>
     )
@@ -1785,98 +2145,86 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       {/* New Wrapper for Sidebar + Document */}
       <div className="flex justify-center items-start gap-6 mt-6">
         {/* Left Panel (now part of flow) */}
-        <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
-          <Button
-            variant="ghost"
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Templates</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={handleEditClick}
-            disabled={isEditing}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            <Pencil className="h-8 w-8 text-gray-500 mb-1" />
-            <span className="text-[10px] text-gray-700">Edit</span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => handleDownloadPDF(userData)}
-            disabled={downloadingPDF}
-            className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
-          >
-            {downloadingPDF ? (
-              <>
-                <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
-                <span className="text-[10px] text-gray-700">Generating...</span>
-              </>
-            ) : (
-              <>
-                <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
-                <span className="text-[10px] text-gray-700">Download</span>
-              </>
-            )}
-          </Button>
-        </div>
+        {costEstimate.status !== "sent" && (
+          <div className="flex flex-col space-y-4 z-20 hidden lg:flex">
+            <Button
+              variant="ghost"
+              className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            >
+              <LayoutGrid className="h-8 w-8 text-gray-500 mb-1" />
+              <span className="text-[10px] text-gray-700">Templates</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={handleEditClick}
+              disabled={isEditing}
+              className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            >
+              <Pencil className="h-8 w-8 text-gray-500 mb-1" />
+              <span className="text-[10px] text-gray-700">Edit</span>
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => handleDownloadPDF(userData)}
+              disabled={downloadingPDF}
+              className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
+            >
+              {downloadingPDF ? (
+                <>
+                  <Loader2 className="h-8 w-8 text-gray-500 mb-1 animate-spin" />
+                  <span className="text-[10px] text-gray-700">Generating...</span>
+                </>
+              ) : (
+                <>
+                  <DownloadIcon className="h-8 w-8 text-gray-500 mb-1" />
+                  <span className="text-[10px] text-gray-700">Download</span>
+                </>
+              )}
+            </Button>
+          </div>
+        )}
 
         <div className="flex gap-6 items-start">
-          <div id="cost-estimate-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
-            <div className="text-center mb-8">
-              <div className="flex items-center justify-center mb-4 pt-6">
-                {companyData?.photo_url ? (
-                  <img
-                    src={companyData.photo_url || "/placeholder.svg"}
-                    alt="Company Logo"
-                    className="h-16 w-auto object-contain"
-                  />
-                ) : (
-                  <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <Building className="h-8 w-8 text-gray-400" />
-                  </div>
-                )}
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">{companyData?.name}</h1>
+          {costEstimate.status === "sent" && costEstimate.pdf ? (
+            <div className="w-[210mm] min-h-[297mm] bg-white shadow-md rounded-sm overflow-hidden">
+              <iframe
+                src={`${costEstimate.pdf}#view=FitH`}
+                className="w-full h-full min-h-[297mm]"
+                title="Cost Estimate PDF"
+              />
             </div>
-
-            {hasMultipleSites ? (
-              <>
-                {renderCostEstimationBlock(
-                  siteNames[currentProductIndex],
-                  siteGroups[siteNames[currentProductIndex]],
-                  currentProductIndex + 1,
-                )}
-              </>
-            ) : (
-              // Render single page for single site (original behavior)
-              renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
-            )}
-
-            {proposal && (
-              <div className="p-6 sm:p-8 border-t border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4 pb-1 border-b border-gray-200 font-[Calibri]">
-                  Linked Proposal
-                </h2>
-                <Card>
-                  <CardContent className="p-4">
-                    <p className="text-lg font-semibold">{proposal.title}</p>
-                    <p className="text-gray-600">
-                      Created on {format(proposal.createdAt, "PPP")} by {proposal.createdBy}
-                    </p>
-                    <Button
-                      variant="link"
-                      className="p-0 mt-2"
-                      onClick={() => router.push(`/sales/proposals/${proposal.id}`)}
-                    >
-                      View Proposal
-                    </Button>
-                  </CardContent>
-                </Card>
+          ) : (
+            <div id="cost-estimate-document" className="w-[210mm] min-h-[297mm] bg-white shadow-md py-8 rounded-sm overflow-auto">
+              <div className="text-left mb-8 ml-8">
+                <div className="flex items-center justify-start mb-6 pt-6">
+                  {companyData?.logo ? (
+                    <img
+                      src={companyData.logo || "/placeholder.svg"}
+                      alt="Company Logo"
+                      className="h-24 w-auto object-contain"
+                    />
+                  ) : (
+                    <div className="h-24 w-24 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <Building className="h-12 w-12 text-gray-400" />
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
+
+              {hasMultipleSites ? (
+                <>
+                  {renderCostEstimationBlock(
+                    siteNames[currentProductIndex],
+                    siteGroups[siteNames[currentProductIndex]],
+                    currentProductIndex + 1,
+                  )}
+                </>
+              ) : (
+                // Render single page for single site (original behavior)
+                renderCostEstimationBlock("Single Site", costEstimate?.lineItems || [], 1)
+              )}
+            </div>
+          )}
 
           <Button
             onClick={() => setShowHistory(!showHistory)}
@@ -1910,7 +2258,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                 </Button>
               </div>
               <div className="bg-blue-500 text-white px-3 py-1 rounded-md text-sm font-medium inline-block mb-4">
-                {costEstimate?.client?.company || "Client"}
+                {costEstimate?.lineItems[0].description || "Client"}
               </div>
             </div>
 
@@ -1923,7 +2271,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                 {clientHistory.map((historyItem) => (
                   <div
                     key={historyItem.id}
-                    onClick={() => router.push(`/sales/cost-estimates/${historyItem.id}`)}
+                    onClick={() => handleHistoryItemClick(historyItem)}
                     className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <div className="text-sm font-medium text-gray-900 mb-1">
@@ -1989,7 +2337,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       ) : null}
 
       {!isEditing && relatedCostEstimates.length > 1 ? (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
               variant="outline"
@@ -2007,11 +2355,18 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
             {currentPageIndex === relatedCostEstimates.length - 1 ? (
               <Button
-                onClick={() => setIsSendOptionsDialogOpen(true)}
-                disabled={costEstimate?.status !== "draft"}
+                onClick={handleSendWithPDFGeneration}
+                disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
               >
-                Send
+                {generatingPDFsForSend ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Preparing...
+                  </>
+                ) : (
+                  "Send"
+                )}
               </Button>
             ) : (
               <Button
@@ -2030,11 +2385,18 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
-              onClick={() => setIsSendOptionsDialogOpen(true)}
-              disabled={costEstimate?.status !== "draft"}
-              className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
+              onClick={handleSendWithPDFGeneration}
+              disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
+              className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
             >
-              Send
+              {generatingPDFsForSend ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Preparing...
+                </>
+              ) : (
+                "Send"
+              )}
             </Button>
           </div>
         </div>
@@ -2042,31 +2404,47 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
       {!isEditing && hasMultipleSites && relatedCostEstimates.length <= 1 && (
         <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="flex items-center gap-4 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg opacity-90">
+          <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
               variant="outline"
               size="sm"
               onClick={handlePreviousProduct}
-              disabled={Object.keys(siteGroups).length <= 1}
-              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
+              disabled={currentProductIndex === 0}
+              className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
             >
               Previous
             </Button>
-            <div className="relative">
-              <span className="text-sm font-medium text-gray-700 px-4">
-                {currentProductIndex + 1} of {Object.keys(siteGroups).length}
-              </span>
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"></div>
+
+            <div className="px-4 py-2 bg-gray-100 text-gray-800 rounded-full font-medium text-sm">
+              {currentProductIndex + 1}/{Object.keys(siteGroups).length}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextProduct}
-              disabled={Object.keys(siteGroups).length <= 1}
-              className="flex items-center gap-2 bg-transparent hover:bg-gray-50"
-            >
-              Next
-            </Button>
+
+            {currentProductIndex === Object.keys(siteGroups).length - 1 ? (
+              <Button
+                onClick={handleSendWithPDFGeneration}
+                disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
+                className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
+              >
+                {generatingPDFsForSend ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Preparing...
+                  </>
+                ) : (
+                  "Send"
+                )}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleNextProduct}
+                disabled={currentProductIndex === Object.keys(siteGroups).length - 1}
+                className="px-6 py-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full font-medium"
+              >
+                Next
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -2246,9 +2624,8 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                   return (
                     <div
                       key={siteName}
-                      className={`relative border rounded-lg p-4 cursor-pointer transition-all ${
-                        isSelected ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
-                      }`}
+                      className={`relative border rounded-lg p-4 cursor-pointer transition-all ${isSelected ? "border-green-500 bg-green-50" : "border-gray-200 hover:border-gray-300"
+                        }`}
                       onClick={() => handlePageToggle(index)}
                     >
                       {/* Checkbox */}
@@ -2314,6 +2691,45 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF Preview Dialog */}
+      <Dialog open={pdfPreviewDialogOpen} onOpenChange={handleClosePdfPreview}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedHistoryItem ? `Cost Estimate ${selectedHistoryItem.costEstimateNumber || selectedHistoryItem.id?.slice(-8) || "N/A"}` : "PDF Preview"}
+            </DialogTitle>
+            <DialogDescription>
+              Preview of the cost estimate PDF
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 min-h-[600px]">
+            {loadingPdfPreview ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                  <p className="text-gray-600">Generating PDF preview...</p>
+                </div>
+              </div>
+            ) : pdfPreviewUrl ? (
+              <iframe
+                src={`${pdfPreviewUrl}#view=FitH&toolbar=0&navpanes=0`}
+                className="w-full h-full min-h-[600px] border-0"
+                title="PDF Preview"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-600">Failed to load PDF preview</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClosePdfPreview}>
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

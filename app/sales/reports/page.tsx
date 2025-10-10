@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Search, MoreVertical, Plus, Printer, Eye, Edit, Trash2 } from "lucide-react"
+import { Search, MoreVertical, Plus, Printer, Eye, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -11,6 +11,7 @@ import { getReportsByCompany, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
+import { SentHistoryDialog } from "@/components/sent-history-dialog"
 
 export default function SalesReportsPage() {
   const [filteredReports, setFilteredReports] = useState<ReportData[]>([])
@@ -23,6 +24,8 @@ export default function SalesReportsPage() {
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [postedReportId, setPostedReportId] = useState<string>("")
+  const [showSentHistoryDialog, setShowSentHistoryDialog] = useState(false)
+  const [selectedReportId, setSelectedReportId] = useState<string>("")
 
   const router = useRouter()
   const { user, userData } = useAuth()
@@ -43,6 +46,15 @@ export default function SalesReportsPage() {
       setShowSuccessDialog(true)
       // Clear the session storage
       sessionStorage.removeItem("lastPostedReportId")
+    }
+
+    // Check if we just sent an email
+    const lastSentEmailReportId = sessionStorage.getItem("lastSentEmailReportId")
+    if (lastSentEmailReportId) {
+      setSentEmailReportId(lastSentEmailReportId)
+      setShowEmailSuccessDialog(true)
+      // Clear the session storage
+      sessionStorage.removeItem("lastSentEmailReportId")
     }
   }, [])
 
@@ -147,9 +159,6 @@ export default function SalesReportsPage() {
     router.push(`/sales/reports/${reportId}`)
   }
 
-  const handleEditReport = (reportId: string) => {
-    router.push(`/sales/reports/${reportId}/edit`)
-  }
 
   const handleDeleteReport = (reportId: string) => {
     // Implement delete functionality
@@ -163,6 +172,11 @@ export default function SalesReportsPage() {
     // Navigate to detail page and trigger print there
     // This ensures the report is rendered and can be printed
     router.push(`/sales/reports/${report.id}?action=print`)
+  }
+
+  const handleViewSentHistory = (reportId: string) => {
+    setSelectedReportId(reportId)
+    setShowSentHistoryDialog(true)
   }
 
   return (
@@ -279,13 +293,13 @@ export default function SalesReportsPage() {
                             <Eye className="mr-2 h-4 w-4" />
                             View Report
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditReport(report.id!)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit Report
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handlePrintReport(report)}>
                             <Printer className="mr-2 h-4 w-4" />
                             Print Report
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewSentHistory(report.id!)}>
+                            <History className="mr-2 h-4 w-4" />
+                            View Sent History
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDeleteReport(report.id!)} className="text-red-600">
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -335,6 +349,14 @@ export default function SalesReportsPage() {
 
       {/* Report Post Success Dialog */}
       <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />
+
+      {/* Sent History Dialog */}
+      <SentHistoryDialog
+        open={showSentHistoryDialog}
+        onOpenChange={setShowSentHistoryDialog}
+        reportId={selectedReportId}
+        emailType="report"
+      />
     </div>
   )
 }

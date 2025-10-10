@@ -333,13 +333,18 @@ export function ServiceAssignmentCard({
     <Card className="w-[90%]">
       <CardHeader>
         <CardTitle>
-          <div className="flex justify-between items-center bg-gray-100 p-2 rounded-md">
-            <div className="flex flex-col">
-              <span className="text-xl font-bold">
-                {products.find(p => p.id === productId)?.site_code || "Site Code"}
-              </span>
+           <div className="flex justify-between items-center bg-gray-100 p-2 rounded-md">
+             <div className="flex flex-col">
+               <span className="text-xl font-bold">
+                 {products.find(p => p.id === productId)?.site_code || products.find(p => p.id === productId)?.id?.substring(0, 8) || "-"}
+               </span>
               <span className="text-base text-gray-500">
-                {products.find(p => p.id === productId)?.name || "Select Project Site"}
+                {products.find(p => p.id === productId)?.name || (
+                  <>
+                    Select Project Site
+                    <span className="text-red-500">*</span>
+                  </>
+                )}
               </span>
             </div>
             <Button
@@ -359,7 +364,7 @@ export function ServiceAssignmentCard({
             <div className="flex flex-col text-sm">
               <p>SA#: {saNumber}</p>
               <p className="text-xs text-gray-500">
-                {products.find(p => p.id === productId)?.site_code || "Site Code"}
+                {products.find(p => p.id === productId)?.site_code || products.find(p => p.id === productId)?.id?.substring(0, 8) || "-"}
               </p>
             </div>
             <p className="text-sm">{currentTime}</p>
@@ -386,13 +391,16 @@ export function ServiceAssignmentCard({
             {/* Campaign Name - Row Layout */}
             {formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair" && (
               <div className="flex items-center space-x-4">
-                <Label htmlFor="campaignName" className="w-32 flex-shrink-0">Campaign Name:</Label>
+                <Label htmlFor="campaignName" className="w-32 flex-shrink-0">
+                  Campaign Name: <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="campaignName"
                   placeholder="Enter campaign name"
                   value={formData.campaignName || ""}
                   onChange={(e) => handleInputChange("campaignName", e.target.value)}
                   className="flex-1"
+                  required
                 />
               </div>
             )}
@@ -485,7 +493,9 @@ export function ServiceAssignmentCard({
 
             {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
               <div className="flex items-center space-x-4">
-                <Label htmlFor="materialSpecs" className="w-32 flex-shrink-0">Material Specs:</Label>
+                <Label htmlFor="materialSpecs" className="w-32 flex-shrink-0">
+                  Material Specs: <span className="text-red-500">*</span>
+                </Label>
                 <Select value={formData.materialSpecs} onValueChange={(value) => handleInputChange("materialSpecs", value)}>
                   <SelectTrigger id="materialSpecs" className="flex-1">
                     <SelectValue placeholder="Select material" />
@@ -563,7 +573,9 @@ export function ServiceAssignmentCard({
             </div>
 
             <div className="flex items-center space-x-4">
-              <Label htmlFor="crew" className="w-32 flex-shrink-0">Crew:</Label>
+              <Label htmlFor="crew" className="w-32 flex-shrink-0">
+                Crew: <span className="text-red-500">*</span>
+              </Label>
               <Select value={formData.crew} onValueChange={(value) => {
                 if (value === "add-new-team") {
                   // This will be handled by the parent component

@@ -571,3 +571,40 @@ export async function postReport(reportData: ReportData): Promise<string> {
     throw error
   }
 }
+
+// Get sent emails for a report
+export async function getSentEmailsForReport(reportId: string): Promise<any[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const emailsRef = collection(db, "emails")
+    const q = query(
+      emailsRef,
+      where("reportId", "==", reportId),
+      where("email_type", "==", "report"),
+      where("status", "==", "sent"),
+      orderBy("sentAt", "desc")
+    )
+
+    const querySnapshot = await getDocs(q)
+    const emails: any[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      emails.push({
+        id: doc.id,
+        ...data,
+        sentAt: data.sentAt instanceof Timestamp ? data.sentAt.toDate() : new Date(data.sentAt),
+        created: data.created instanceof Timestamp ? data.created.toDate() : new Date(data.created),
+        updated: data.updated instanceof Timestamp ? data.updated.toDate() : new Date(data.updated),
+      })
+    })
+
+    return emails
+  } catch (error) {
+    console.error("Error fetching sent emails for report:", error)
+    return []
+  }
+}

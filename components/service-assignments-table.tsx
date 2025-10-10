@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Pagination } from "@/components/ui/pagination"
 import { MoreVertical, Printer, X, Bell, FileText } from "lucide-react"
+import { CreateReportDialog } from "@/components/create-report-dialog"
 
 interface ServiceAssignment {
   id: string
@@ -80,6 +81,11 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
   const [teams, setTeams] = useState<Record<string, Team>>({})
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [createReportDialog, setCreateReportDialog] = useState<{
+    open: boolean
+    assignmentId?: string
+    projectSiteId?: string
+  }>({ open: false })
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -539,7 +545,15 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
                         <Bell className="mr-2 h-4 w-4" />
                         Set an Alarm
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/logistics/reports/create?assignment=${assignment.id}`); }}>
+                      <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation();
+                        // Show create report dialog directly
+                        setCreateReportDialog({
+                          open: true,
+                          assignmentId: assignment.id,
+                          projectSiteId: assignment.projectSiteId
+                        });
+                      }}>
                         <FileText className="mr-2 h-4 w-4" />
                         Create a Report
                       </DropdownMenuItem>
@@ -561,6 +575,17 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
           onNextPage={handleNextPage}
           onPreviousPage={handlePreviousPage}
           hasMore={hasMore}
+        />
+      )}
+
+      {/* Create Report Dialog */}
+      {createReportDialog.open && createReportDialog.projectSiteId && (
+        <CreateReportDialog
+          open={createReportDialog.open}
+          onOpenChange={(open) => setCreateReportDialog({ open })}
+          siteId={createReportDialog.projectSiteId}
+          module="logistics"
+          hideJobOrderSelection={false}
         />
       )}
     </div>

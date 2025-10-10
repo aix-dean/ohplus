@@ -21,6 +21,8 @@ interface DeleteConfirmationDialogProps {
   title?: string
   description?: string
   itemName?: string
+  confirmButtonText?: string
+  confirmButtonLoadingText?: string
 }
 
 export function DeleteConfirmationDialog({
@@ -30,6 +32,8 @@ export function DeleteConfirmationDialog({
   title = "Delete Item",
   description = "This action cannot be undone. This will permanently delete this item from our servers.",
   itemName,
+  confirmButtonText = "Delete",
+  confirmButtonLoadingText = "Deleting...",
 }: DeleteConfirmationDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -69,7 +73,7 @@ export function DeleteConfirmationDialog({
           <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
           <AlertDialogAction asChild>
             <Button variant="destructive" onClick={handleConfirm} disabled={isDeleting}>
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleting ? confirmButtonLoadingText : confirmButtonText}
             </Button>
           </AlertDialogAction>
         </AlertDialogFooter>

@@ -18,7 +18,7 @@ interface CompanyData {
   address?: any
   company_website?: string
   website?: string
-  photo_url?: string
+  logo?: string
   contact_person?: string
   email?: string
   phone?: string
@@ -407,9 +407,9 @@ export default function PublicQuotationPage({ params }: { params: { id: string }
         <div className="max-w-[850px] bg-white shadow-md rounded-sm overflow-hidden">
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              {companyData?.photo_url ? (
+              {companyData?.logo ? (
                 <img
-                  src={companyData.photo_url || "/placeholder.svg"}
+                  src={companyData.logo || "/placeholder.svg"}
                   alt="Company Logo"
                   className="h-16 w-auto object-contain"
                 />

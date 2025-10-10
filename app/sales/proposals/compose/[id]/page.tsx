@@ -3,6 +3,7 @@
 import React from "react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, doc, updateDoc } from "firebase/firestore"
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
@@ -278,6 +279,8 @@ ${contactDetails}`,
 
         setProposal(proposalData)
 
+        console.log('Company Logo from query:', proposalData.companyLogo)
+
         // Read URL parameters
         const urlParams = new URLSearchParams(window.location.search)
         const pdfKey = urlParams.get('pdfKey')
@@ -362,6 +365,13 @@ ${contactDetails}`,
             } else {
               console.log('Company found but no name for ID:', companyIdToUse, 'companyData:', companyData)
             }
+
+            // Log company address
+            if (companyData?.address) {
+              console.log('Found company address from proposal:', companyData.address)
+            } else {
+              console.log('No company address found for ID:', companyIdToUse)
+            }
           } catch (companyError) {
             console.error("Error fetching company data for ID:", companyIdToUse, companyError)
           }
@@ -389,7 +399,8 @@ ${contactDetails}`,
           finalCompanyName,
           `📞 ${userData?.phone_number || '+639XXXXXXXXX'}`,
           `📧 ${replyToEmail}`,
-          ...(projectData?.company_website && projectData.company_website !== 'www.ohplus.ph' ? [`🌐 ${projectData.company_website}`] : [])
+          ...(projectData?.company_website && projectData.company_website !== 'www.ohplus.ph' ? [`🌐 ${projectData.company_website}`] : []),
+          ...(proposalData?.companyLogo ? [`Logo: ${proposalData.companyLogo}`] : [])
         ].join('\n')
 
         console.log('Contact details construction:', {
@@ -465,6 +476,20 @@ ${contactDetails}`,
     setSending(true)
 
     try {
+      // Upload attachments to Firebase storage if they don't have URLs
+      for (const attachment of attachments) {
+        if (attachment.file && !attachment.url) {
+          try {
+            const uploadPath = `proposals/attachments/${resolvedParams.id}/`
+            const downloadURL = await uploadFileToFirebaseStorage(attachment.file, uploadPath)
+            attachment.url = downloadURL
+          } catch (uploadError) {
+            console.error(`Error uploading attachment ${attachment.name}:`, uploadError)
+            // Continue without URL, but log error
+          }
+        }
+      }
+
       const formData = new FormData()
 
       const toEmails = emailData.to
@@ -501,9 +526,9 @@ ${contactDetails}`,
       if (projectData?.company_website) {
         formData.append("companyWebsite", projectData.company_website)
       }
-      if (userData?.displayName) {
-        formData.append("userDisplayName", userData.displayName)
-      }
+      // Always send userDisplayName with fallback
+      const displayName = userData?.displayName || user?.displayName || user?.email?.split('@')[0] || "Sales Executive"
+      formData.append("userDisplayName", displayName)
 
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
@@ -522,6 +547,24 @@ ${contactDetails}`,
           console.error(`Error processing attachment ${attachment.name}:`, error)
         }
       }
+
+      if (proposal?.companyLogo) {
+        formData.append('companyLogo', proposal.companyLogo)
+      }
+
+      // Pass the proposal ID for the email template
+      formData.append('proposalId', resolvedParams.id)
+
+      // Pass the proposal password if it exists
+      if (proposal?.password) {
+        formData.append('proposalPassword', proposal.password)
+      }
+
+      console.log('Sending email with company data:', {
+        companyId: userData?.company_id,
+        companyName: projectData?.company_name,
+        proposalCompanyLogo: proposal?.companyLogo
+      })
 
       console.log("Sending email request to /api/send-email", {
         to: toEmails,
@@ -983,9 +1026,6 @@ ${contactDetails}`,
                                title="View attachment"
                              >
                                <Eye className="h-4 w-4" />
-                             </Button>
-                             <Button variant="ghost" size="sm" onClick={() => handleRemoveAttachment(index)}>
-                               <X className="h-4 w-4" />
                              </Button>
                            </div>
                          </div>

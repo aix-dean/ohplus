@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,23 +22,35 @@ import {
   Check,
   Minus,
   Send,
+  CheckCircle2,
 } from "lucide-react"
 import { getProposalById, updateProposal, downloadProposalPDF, generateProposalPDFBlob, generateAndUploadProposalPDF } from "@/lib/proposal-service"
 import {
+  getPaginatedUserProducts,
+  getUserProductsCount,
+  softDeleteProduct,
+  type Product,
+  type Booking,
   getProposalTemplatesByCompanyId,
   createProposalTemplate,
   uploadFileToFirebaseStorage,
 } from "@/lib/firebase-service"
-import type { Proposal } from "@/lib/types/proposal"
+import type { Proposal, ProposalClient, ProposalProduct } from "@/lib/types/proposal"
 import type { ProposalTemplate } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
+import { generateStaticMapUrl } from "@/lib/static-maps"
 import { SendProposalShareDialog } from "@/components/send-proposal-share-dialog"
 import { ProposalHistory } from "@/components/proposal-history"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { getPaginatedClients, type Client } from "@/lib/client-service"
+import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { Vibrant } from 'node-vibrant/browser'
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -143,7 +156,7 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
   )
 }
 
-const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null }> = ({ className, proposal }) => {
+const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; onColorExtracted?: (color: string) => void; hasShadow?: boolean; onLogoChange?: (logoUrl: string) => void }> = ({ className, proposal, onColorExtracted, hasShadow = true, onLogoChange }) => {
   const { userData } = useAuth()
   const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("")
@@ -153,15 +166,19 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null }> 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   useEffect(() => {
-    // If proposal data is available, use it directly
-    if (proposal?.companyLogo || proposal?.companyName) {
-      setCompanyLogo(proposal.companyLogo || "")
-      setCompanyName(proposal.companyName || "")
+    // Use proposal name if available
+    if (proposal?.companyName) {
+      setCompanyName(proposal.companyName)
+    }
+
+    // Check if proposal has its own logo first
+    if (proposal?.companyLogo && proposal.companyLogo.trim() !== "") {
+      setCompanyLogo(proposal.companyLogo)
       setLoading(false)
       return
     }
 
-    // Fallback to fetching from company data if no proposal data
+    // Otherwise, fetch latest logo from company data
     const fetchCompanyData = async () => {
       if (!userData?.company_id) {
         setLoading(false)
@@ -174,10 +191,11 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null }> 
 
         if (companyDocSnap.exists()) {
           const companyData = companyDocSnap.data()
-          if (companyData.photo_url && companyData.photo_url.trim() !== "") {
-            setCompanyLogo(companyData.photo_url)
+          if (companyData.logo && companyData.logo.trim() !== "") {
+            setCompanyLogo(companyData.logo)
           }
-          if (companyData.name && companyData.name.trim() !== "") {
+          // Use company name if no proposal name
+          if (!proposal?.companyName && companyData.name && companyData.name.trim() !== "") {
             setCompanyName(companyData.name)
           }
         }
@@ -189,7 +207,22 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null }> 
     }
 
     fetchCompanyData()
-  }, [userData?.company_id, proposal?.companyLogo, proposal?.companyName])
+  }, [userData?.company_id, proposal?.companyName, proposal?.companyLogo])
+
+  useEffect(() => {
+    if (companyLogo && onColorExtracted) {
+      Vibrant.from(companyLogo).getPalette().then(palette => {
+        const vibrant = palette.Vibrant
+        if (vibrant) {
+          const hex = vibrant.hex
+          onColorExtracted(hex)
+        }
+      }).catch(error => {
+        console.error('Error extracting color:', error)
+        onColorExtracted('#f8c102')
+      })
+    }
+  }, [companyLogo, onColorExtracted])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -227,17 +260,15 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null }> 
       const uploadPath = `companies/logos/${Date.now()}_${file.name}`
       const logoUrl = await uploadFileToFirebaseStorage(file, uploadPath)
 
-      const companyDocRef = doc(db, "companies", userData.company_id)
-      await updateDoc(companyDocRef, {
-        photo_url: logoUrl,
-      })
-
-      setCompanyLogo(logoUrl)
+      // Just update local state, don't save to database yet
+      if (onLogoChange) {
+        onLogoChange(logoUrl)
+      }
       setSelectedFile(null)
 
       toast({
-        title: "Success",
-        description: "Company logo uploaded successfully",
+        title: "Image Updated",
+        description: "Click 'Save' to confirm changes",
       })
     } catch (error) {
       console.error("Error uploading company logo:", error)
@@ -261,10 +292,15 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null }> 
 
   if (companyLogo) {
     return (
-      <img
-        src={companyLogo || "/placeholder.svg"}
-        alt="Company logo"
-        className={`object-cover rounded-lg border border-gray-200 shadow-sm bg-white ${className}`}
+      <div
+        style={{
+          backgroundImage: `url(${companyLogo || "/placeholder.svg"})`,
+          backgroundSize: 'contain',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center',
+          backgroundColor: hasShadow ? 'white' : 'transparent',
+        }}
+        className={`rounded-lg ${hasShadow ? 'shadow-sm' : ''} ${className}`}
         onError={(e) => {
           // If image fails to load, clear it so upload button shows
           setCompanyLogo("")
@@ -326,7 +362,7 @@ export default function ProposalDetailsPage() {
   const [uploading, setUploading] = useState(false)
   const [selectedTemplateBackground, setSelectedTemplateBackground] = useState<string>("")
   const [selectedSize, setSelectedSize] = useState<string>("A4")
-  const [selectedOrientation, setSelectedOrientation] = useState<string>("Portrait")
+  const [selectedOrientation, setSelectedOrientation] = useState<string>("Landscape")
   const [selectedLayout, setSelectedLayout] = useState<string>("1")
   const [previewSize, setPreviewSize] = useState<string>("A4")
   const [previewOrientation, setPreviewOrientation] = useState<string>("Portrait")
@@ -335,9 +371,140 @@ export default function ProposalDetailsPage() {
   const [showBackgroundTemplates, setShowBackgroundTemplates] = useState(false)
   const [currentEditingPage, setCurrentEditingPage] = useState<number | null>(null)
   const [isApplying, setIsApplying] = useState(false)
-  const [zoomLevel, setZoomLevel] = useState<number>(1)
+  const [zoomLevel, setZoomLevel] = useState<number>(0.85)
   const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
   const [printLoading, setPrintLoading] = useState(false)
+  const [dominantColor, setDominantColor] = useState<string | null>(null)
+  const [originalDominantColor, setOriginalDominantColor] = useState<string | null>(null)
+  const [clients, setClients] = useState<Client[]>([])
+  const [selectedClientId, setSelectedClientId] = useState<string>("")
+  const [isAddSiteDialogOpen, setIsAddSiteDialogOpen] = useState(false)
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([])
+  const [selectedProductsForAddition, setSelectedProductsForAddition] = useState<Product[]>([])
+  const [loadingProducts, setLoadingProducts] = useState(false)
+  const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false)
+  const [siteToDelete, setSiteToDelete] = useState<{ id: string; name: string } | null>(null)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [editableTitle, setEditableTitle] = useState("Site Proposals")
+  const [editableProposalTitle, setEditableProposalTitle] = useState("Site Proposals")
+  const [editableCompanyName, setEditableCompanyName] = useState("")
+  const [editableClientContact, setEditableClientContact] = useState("")
+  const [editableClientCompany, setEditableClientCompany] = useState("")
+  const [editablePreparedByName, setEditablePreparedByName] = useState("")
+  const [editablePreparedByCompany, setEditablePreparedByCompany] = useState("")
+  const [editableProducts, setEditableProducts] = useState<{ [key: string]: any }>({})
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editableLogo, setEditableLogo] = useState<string>("")
+  const [pendingSiteImages, setPendingSiteImages] = useState<{[productId: string]: string}>({})
+  const [logoDimensions, setLogoDimensions] = useState({ width: 183, height: 110 })
+  const [logoPosition, setLogoPosition] = useState({ left: 114, top: 175 })
+  const [originalLogoDimensions, setOriginalLogoDimensions] = useState({ width: 183, height: 110 })
+  const [originalLogoPosition, setOriginalLogoPosition] = useState({ left: 114, top: 175 })
+  const [isResizingLogo, setIsResizingLogo] = useState(false)
+  const [isDraggingLogo, setIsDraggingLogo] = useState(false)
+  const [logoStartPos, setLogoStartPos] = useState({ x: 0, y: 0 })
+  const [logoStartDimensions, setLogoStartDimensions] = useState({ width: 183, height: 110 })
+  const [logoStartPosition, setLogoStartPosition] = useState({ left: 114, top: 175 })
+  const [logoResizeDirection, setLogoResizeDirection] = useState<string>('')
+  const [selectedProductForMedia, setSelectedProductForMedia] = useState<ProposalProduct | null>(null)
+  const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false)
+
+  const fetchClients = async () => {
+    if (!userData?.company_id) return
+
+    try {
+      // Use the existing getPaginatedClients function
+      const result = await getPaginatedClients(
+        100, // itemsPerPage - fetch more for dropdown
+        null, // lastDoc
+        "", // searchTerm - empty for all
+        null, // statusFilter
+        null, // uploadedByFilter
+        userData.company_id, // companyIdFilter
+        false // deletedFilter - false to exclude deleted
+      )
+
+      // Ensure the current proposal client is included if not in the list
+      let allClients = result.items
+      if (proposal?.client && !allClients.find(c => c.id === proposal.client.id)) {
+        // Convert ProposalClient to Client format
+        const currentClient: Client = {
+          id: proposal.client.id,
+          name: proposal.client.contactPerson || '',
+          company: proposal.client.company || '',
+          email: proposal.client.email || '',
+          phone: proposal.client.phone || '',
+          address: proposal.client.address || '',
+          industry: proposal.client.industry || '',
+          designation: proposal.client.designation || '',
+          status: 'active' as const,
+          created: new Date(),
+          updated: new Date(),
+          user_company_id: proposal.client.company_id || userData.company_id,
+        }
+        allClients = [currentClient, ...allClients]
+      }
+
+      setClients(allClients)
+    } catch (error) {
+      console.error('Error fetching clients:', error)
+      // Add dummy clients for testing
+      const dummyClients: Client[] = [
+        {
+          id: '1',
+          name: 'John Doe',
+          company: 'ABC Company',
+          email: 'john@example.com',
+          phone: '',
+          address: '',
+          industry: '',
+          designation: '',
+          status: 'active' as const,
+          created: new Date(),
+          updated: new Date(),
+          user_company_id: userData.company_id
+        },
+        {
+          id: '2',
+          name: 'Jane Smith',
+          company: 'XYZ Corp',
+          email: 'jane@example.com',
+          phone: '',
+          address: '',
+          industry: '',
+          designation: '',
+          status: 'active' as const,
+          created: new Date(),
+          updated: new Date(),
+          user_company_id: userData.company_id
+        }
+      ]
+      // Include current client if not in dummy
+      if (proposal?.client && !dummyClients.find(c => c.id === proposal.client.id)) {
+        const currentClient: Client = {
+          id: proposal.client.id,
+          name: proposal.client.contactPerson || '',
+          company: proposal.client.company || '',
+          email: proposal.client.email || '',
+          phone: proposal.client.phone || '',
+          address: proposal.client.address || '',
+          industry: proposal.client.industry || '',
+          designation: proposal.client.designation || '',
+          status: 'active' as const,
+          created: new Date(),
+          updated: new Date(),
+          user_company_id: userData.company_id
+        }
+        dummyClients.unshift(currentClient)
+      }
+      setClients(dummyClients)
+    }
+  }
+
+  useEffect(() => {
+    fetchClients()
+  }, [userData?.company_id])
 
   useEffect(() => {
     async function fetchProposal() {
@@ -348,6 +515,7 @@ export default function ProposalDetailsPage() {
         const proposalData = await getProposalById(params.id as string)
         if (proposalData) {
           setProposal(proposalData)
+          setSelectedClientId(proposalData.client.id || "")
           const currentPageContent = getPageContent(1, proposalData.templateLayout || "1")
           const currentPagePrice = getPagePrice(currentPageContent)
           setEditablePrice(currentPagePrice.toString())
@@ -369,41 +537,43 @@ export default function ProposalDetailsPage() {
             setPreviewTemplateBackground(proposalData.templateBackground)
           }
 
-          // Check if PDF needs to be generated
-          if (!proposalData.pdf || proposalData.pdf.trim() === "") {
-            // Generate PDF and upload to Firebase storage
-            setTimeout(async () => {
-              try {
-                const { pdfUrl, password } = await generateAndUploadProposalPDF(
-                  proposalData,
-                  proposalData.templateSize || "A4",
-                  proposalData.templateOrientation || "Portrait"
-                )
+          // Set editable states
+          setEditableTitle(proposalData.title || "Site Proposals")
+          setEditableProposalTitle(proposalData.proposalTitle || "Site Proposals")
+          setEditableCompanyName(proposalData.companyName || "")
+          setEditableClientContact(proposalData.client.contactPerson || "")
+          setEditableClientCompany(proposalData.client.company || "")
+          setEditablePreparedByName(proposalData.preparedByName || `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim())
+          setEditablePreparedByCompany(proposalData.preparedByCompany || proposalData.companyName || "")
+          setLogoDimensions({
+            width: proposalData.logoWidth || 183,
+            height: proposalData.logoHeight || 110
+          })
+          setLogoPosition({
+            left: proposalData.logoLeft || 114,
+            top: proposalData.logoTop || 175
+          })
+          setOriginalLogoDimensions({
+            width: proposalData.logoWidth || 183,
+            height: proposalData.logoHeight || 110
+          })
+          setOriginalLogoPosition({
+            left: proposalData.logoLeft || 114,
+            top: proposalData.logoTop || 175
+          })
+          const products: { [key: string]: any } = {}
+          proposalData.products.forEach(product => {
+            products[product.id] = {
+              name: product.name,
+              location: product.location || 'N/A',
+              dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
+              type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
+              traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
+              srp: product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'
+            }
+          })
+          setEditableProducts(products)
 
-                // Update proposal with PDF URL and password
-                console.log("Updating proposal with PDF URL:", pdfUrl, "and password:", password)
-                await updateProposal(
-                  proposalData.id,
-                  { pdf: pdfUrl, password: password },
-                  userData?.uid || "system",
-                  userData?.displayName || "System"
-                )
-
-                // Update local state
-                setProposal(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
-
-                console.log("PDF generated and uploaded successfully:", pdfUrl)
-                console.log("Proposal document updated with PDF URL and password")
-              } catch (error) {
-                console.error("Error generating PDF:", error)
-                toast({
-                  title: "Error",
-                  description: "Failed to generate PDF",
-                  variant: "destructive",
-                })
-              }
-            }, 2000) // Small delay to ensure the page is fully rendered
-          }
         }
       } catch (error) {
         console.error("Error fetching proposal:", error)
@@ -495,6 +665,22 @@ export default function ProposalDetailsPage() {
       }, 1000)
     }
   }, [proposal, loading])
+
+  // Extract color from editable logo when it changes
+  useEffect(() => {
+    if (editableLogo) {
+      Vibrant.from(editableLogo).getPalette().then(palette => {
+        const vibrant = palette.Vibrant
+        if (vibrant) {
+          const hex = vibrant.hex
+          setDominantColor(hex)
+        }
+      }).catch(error => {
+        console.error('Error extracting color from editable logo:', error)
+        setDominantColor('#f8c102')
+      })
+    }
+  }, [editableLogo])
 
   const fetchTemplates = async () => {
     if (!userData?.company_id) {
@@ -862,9 +1048,210 @@ export default function ProposalDetailsPage() {
     setEditablePrice(currentPagePrice.toString())
   }
 
+  const handleSaveEdit = async () => {
+    if (!proposal || !userData) return
+
+    setSavingEdit(true)
+    try {
+      const updatedClient = {
+        ...proposal.client,
+        contactPerson: editableClientContact,
+        company: editableClientCompany
+      }
+      const updatedProducts = proposal.products.map(product => {
+        const editable = editableProducts[product.id]
+        if (editable) {
+          const updatedProduct = { ...product }
+          if (editable.name) updatedProduct.name = editable.name
+          if (editable.location) updatedProduct.location = editable.location
+          if (editable.srp) {
+            const priceStr = editable.srp.replace(/[^\d.]/g, '')
+            const price = parseFloat(priceStr)
+            if (!isNaN(price)) {
+              updatedProduct.price = price
+            }
+          }
+          if (editable.traffic) {
+            const trafficStr = editable.traffic.replace(/[^\d]/g, '')
+            const traffic = parseInt(trafficStr)
+            if (!isNaN(traffic) && updatedProduct.specs_rental) {
+              updatedProduct.specs_rental = { ...updatedProduct.specs_rental, traffic_count: traffic }
+            }
+          }
+          if (editable.dimension) {
+            // Parse dimension string like "10ft (H) x 20ft (W)"
+            const dimensionRegex = /(\d+(?:\.\d+)?)ft\s*\(H\)\s*x\s*(\d+(?:\.\d+)?)ft\s*\(W\)/i
+            const match = editable.dimension.match(dimensionRegex)
+            if (match) {
+              const height = parseFloat(match[1])
+              const width = parseFloat(match[2])
+              if (!isNaN(height) && !isNaN(width) && updatedProduct.specs_rental) {
+                updatedProduct.specs_rental = { ...updatedProduct.specs_rental, height, width }
+              }
+            }
+          }
+          if (editable.type) {
+            if (!updatedProduct.categories) {
+              updatedProduct.categories = []
+            }
+            updatedProduct.categories[0] = editable.type
+          }
+          return updatedProduct
+        }
+        return product
+      })
+
+      console.log("Saving edit with data:", {
+        title: editableTitle,
+        proposalTitle: editableProposalTitle,
+        companyName: editableCompanyName,
+        logoWidth: logoDimensions.width,
+        logoHeight: logoDimensions.height,
+        logoLeft: logoPosition.left,
+        logoTop: logoPosition.top,
+        client: updatedClient,
+        products: updatedProducts,
+        preparedByName: editablePreparedByName,
+        preparedByCompany: editablePreparedByCompany
+      })
+
+      const updateData: any = {
+        title: editableTitle,
+        proposalTitle: editableProposalTitle,
+        companyName: editableCompanyName,
+        logoWidth: logoDimensions.width,
+        logoHeight: logoDimensions.height,
+        logoLeft: logoPosition.left,
+        logoTop: logoPosition.top,
+        client: updatedClient,
+        products: updatedProducts,
+        preparedByName: editablePreparedByName,
+        preparedByCompany: editablePreparedByCompany
+      }
+
+      // Save company logo if changed
+      if (editableLogo) {
+        updateData.companyLogo = editableLogo
+      }
+
+      // Save site images if changed
+      if (Object.keys(pendingSiteImages).length > 0) {
+        const finalProducts = updatedProducts.map(product => {
+          const pendingImageUrl = pendingSiteImages[product.id]
+          if (pendingImageUrl) {
+            return {
+              ...product,
+              media: [{ url: pendingImageUrl, isVideo: false }]
+            }
+          }
+          return product
+        })
+        updateData.products = finalProducts
+      }
+      await updateProposal(
+        proposal.id,
+        updateData,
+        userData.uid,
+        userData.displayName || "User"
+      )
+
+      console.log("Update successful")
+
+      setProposal(prev => prev ? { ...prev, title: editableTitle, proposalTitle: editableProposalTitle, companyName: editableCompanyName, logoWidth: logoDimensions.width, logoHeight: logoDimensions.height, logoLeft: logoPosition.left, logoTop: logoPosition.top, client: updatedClient, products: updateData.products || updatedProducts, companyLogo: editableLogo || prev.companyLogo, preparedByName: editablePreparedByName, preparedByCompany: editablePreparedByCompany } : null)
+
+      // Clear pending changes after successful save
+      setEditableLogo("")
+      setPendingSiteImages({})
+
+      // Reset cursor when exiting edit mode
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      setIsEditMode(false)
+      toast({
+        title: "Success",
+        description: "Proposal updated successfully",
+      })
+    } catch (error) {
+      console.error("Error updating proposal:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update proposal",
+        variant: "destructive",
+      })
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   const handleEdit = () => {
     setIsEditingPrice(true)
     // Don't set currentEditingPage here - let individual pages handle their own editing
+  }
+
+  const handleToggleEditMode = () => {
+    if (!isEditMode) {
+      // Entering edit mode - store original values
+      setOriginalLogoDimensions({ ...logoDimensions })
+      setOriginalLogoPosition({ ...logoPosition })
+      setOriginalDominantColor(dominantColor)
+    } else {
+      // Exiting edit mode - reset cursor
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    setIsEditMode(!isEditMode)
+  }
+
+  const handleCancelEdit = () => {
+    // Restore original logo dimensions and position
+    setLogoDimensions({ ...originalLogoDimensions })
+    setLogoPosition({ ...originalLogoPosition })
+    setDominantColor(originalDominantColor)
+    // Clear pending changes
+    setEditableLogo("")
+    setPendingSiteImages({})
+    // Reset cursor when exiting edit mode
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    setIsEditMode(false)
+  }
+
+  const generatePDFIfNeeded = async (proposal: Proposal) => {
+    if (proposal.pdf && proposal.pdf.trim() !== "") {
+      return { pdfUrl: proposal.pdf, password: proposal.password }
+    }
+
+    try {
+      const { pdfUrl, password } = await generateAndUploadProposalPDF(
+        proposal,
+        proposal.templateSize || "A4",
+        proposal.templateOrientation || "Landscape"
+      )
+
+      // Update proposal with PDF URL and password
+      console.log("Updating proposal with PDF URL:", pdfUrl, "and password:", password)
+      await updateProposal(
+        proposal.id,
+        { pdf: pdfUrl, password: password },
+        userData?.uid || "system",
+        userData?.displayName || "System"
+      )
+
+      // Update local state
+      setProposal(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+
+      console.log("PDF generated and uploaded successfully:", pdfUrl)
+      console.log("Proposal document updated with PDF URL and password")
+      return { pdfUrl, password }
+    } catch (error) {
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate PDF",
+        variant: "destructive",
+      })
+      throw error
+    }
   }
 
   const handleDownload = async () => {
@@ -877,7 +1264,16 @@ export default function ProposalDetailsPage() {
       return
     }
 
-    await downloadProposalPDF(proposal, selectedSize, selectedOrientation, toast)
+    setDownloading(true)
+    try {
+      // Ensure PDF is generated and saved before downloading
+      await generatePDFIfNeeded(proposal)
+      await downloadProposalPDF(proposal, selectedSize, selectedOrientation, toast)
+    } catch (error) {
+      // Error is already handled in generatePDFIfNeeded
+    } finally {
+      setDownloading(false)
+    }
   }
 
   const handleTemplateSelect = (template: any) => {
@@ -1006,6 +1402,194 @@ export default function ProposalDetailsPage() {
   }
 
   // Added handler functions for Save as Draft and Send
+  const handleClientChange = async (clientId: string) => {
+    const selectedClient = clients.find(c => c.id === clientId)
+    if (!selectedClient || !proposal || !userData) return
+
+    // Convert Client to ProposalClient format
+    const proposalClient: ProposalClient = {
+      id: selectedClient.id,
+      company: selectedClient.company,
+      contactPerson: selectedClient.name,
+      name: selectedClient.name,
+      email: selectedClient.email || '',
+      phone: selectedClient.phone || '',
+      address: selectedClient.address || '',
+      industry: selectedClient.industry || '',
+      designation: selectedClient.designation || '',
+      targetAudience: '',
+      campaignObjective: '',
+      company_id: selectedClient.user_company_id || userData.company_id || '',
+    }
+
+    try {
+      await updateProposal(
+        proposal.id,
+        { client: proposalClient },
+        userData.uid,
+        userData.displayName || "User",
+      )
+
+      setProposal((prev) => (prev ? { ...prev, client: proposalClient } : null))
+      setSelectedClientId(clientId)
+
+      toast({
+        title: "Success",
+        description: "Client updated successfully",
+      })
+    } catch (error) {
+      console.error("Error updating client:", error)
+      toast({
+        title: "Error",
+        description: "Failed to update client",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleAddSiteClick = async () => {
+    if (!userData?.company_id) return
+
+    setLoadingProducts(true)
+    try {
+      // Fetch all available products
+      const result = await getPaginatedUserProducts(userData.company_id, 100, null, { active: true })
+
+      console.log("Available products:", result.items)
+      console.log("Current proposal products:", proposal?.products)
+
+      setAvailableProducts(result.items)
+      setSelectedProductsForAddition([])
+      setIsAddSiteDialogOpen(true)
+    } catch (error) {
+      console.error('Error fetching products:', error)
+      toast({
+        title: "Error",
+        description: "Failed to load available products",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingProducts(false)
+    }
+  }
+
+  const handleProductSelectForAddition = (product: Product) => {
+    setSelectedProductsForAddition((prev) => {
+      const isSelected = prev.some((p) => p.id === product.id)
+      if (isSelected) {
+        return prev.filter((p) => p.id !== product.id)
+      } else {
+        return [...prev, product]
+      }
+    })
+  }
+
+  const handleConfirmAddSites = async () => {
+    if (!proposal || !userData || selectedProductsForAddition.length === 0) return
+
+    try {
+      // Convert selected products to proposal products format
+      const newProposalProducts = selectedProductsForAddition.map(product => {
+        const proposalProduct: any = {
+          id: product.id || "",
+          ID: product.id || "", // Document ID of the selected site
+          name: product.name,
+          type: product.type || "rental",
+          price: product.price || 0,
+          location: product.specs_rental?.location || (product as any).light?.location || "N/A",
+          media: product.media || [],
+          specs_rental: product.specs_rental || null,
+          light: (product as any).light || null,
+          description: product.description || "",
+          health_percentage: 0,
+          categories: product.categories || [],
+          category_names: product.category_names || [],
+        }
+
+        // Only add site_code if it has a value
+        const siteCode = product.site_code || product.specs_rental?.site_code || (product as any).light?.siteCode
+        if (siteCode) {
+          proposalProduct.site_code = siteCode
+        }
+
+        return proposalProduct as ProposalProduct
+      })
+
+      // Add new products to existing ones
+      const updatedProducts = [...(proposal.products || []), ...newProposalProducts]
+
+      await updateProposal(
+        proposal.id,
+        { products: updatedProducts },
+        userData.uid,
+        userData.displayName || "User",
+      )
+
+      setProposal((prev) => (prev ? { ...prev, products: updatedProducts } : null))
+      setIsAddSiteDialogOpen(false)
+      setSelectedProductsForAddition([])
+
+      toast({
+        title: "Success",
+        description: `${selectedProductsForAddition.length} site${selectedProductsForAddition.length === 1 ? '' : 's'} added to proposal`,
+      })
+    } catch (error) {
+      console.error("Error adding sites:", error)
+      toast({
+        title: "Error",
+        description: "Failed to add sites to proposal",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRemoveSiteClick = (productId: string, productName: string) => {
+    setSiteToDelete({ id: productId, name: productName })
+    setIsDeleteConfirmationOpen(true)
+  }
+
+  const handleConfirmRemoveSite = async () => {
+    if (!siteToDelete || !proposal || !userData) return
+
+    try {
+      // Find the product to remove by matching document ID
+      const productToRemove = proposal.products?.find(p => p.ID === siteToDelete.id || p.id === siteToDelete.id)
+      if (!productToRemove) return
+
+      // Remove the product from the proposal
+      const updatedProducts = (proposal.products || []).filter(product =>
+        !(product.ID === siteToDelete.id || product.id === siteToDelete.id)
+      )
+
+      await updateProposal(
+        proposal.id,
+        { products: updatedProducts },
+        userData.uid,
+        userData.displayName || "User",
+      )
+
+      setProposal((prev) => (prev ? { ...prev, products: updatedProducts } : null))
+
+      // Close the add site dialog if it's open (when removing from within the dialog)
+      setIsAddSiteDialogOpen(false)
+
+      toast({
+        title: "Site Removed",
+        description: `${productToRemove.name} has been removed from the proposal`,
+      })
+    } catch (error) {
+      console.error("Error removing site:", error)
+      toast({
+        title: "Error",
+        description: "Failed to remove site from proposal",
+        variant: "destructive",
+      })
+    } finally {
+      setSiteToDelete(null)
+    }
+  }
+
+
   const handleUpdatePublicStatus = async (status: string) => {
     if (!proposal || !userData) return
 
@@ -1032,6 +1616,126 @@ export default function ProposalDetailsPage() {
       })
     }
   }
+
+  const handleLogoMouseDown = (e: React.MouseEvent, resizeDirection?: string) => {
+    if (!isEditMode) return
+
+    // Check if clicking on resize handle
+    const rect = e.currentTarget.getBoundingClientRect()
+    const isOnResizeHandle = resizeDirection || (
+      e.clientX >= rect.right - 20 && e.clientY >= rect.bottom - 20
+    )
+
+    if (isOnResizeHandle) {
+      // Resize mode
+      setIsResizingLogo(true)
+      setLogoResizeDirection(resizeDirection || 'se')
+      setLogoStartPos({ x: e.clientX, y: e.clientY })
+      setLogoStartDimensions({ ...logoDimensions })
+      setLogoStartPosition({ ...logoPosition })
+
+      // Set cursor based on resize direction
+      const cursorMap: { [key: string]: string } = {
+        'nw': 'nw-resize',
+        'ne': 'ne-resize',
+        'sw': 'sw-resize',
+        'se': 'se-resize',
+        'n': 'n-resize',
+        's': 's-resize',
+        'w': 'w-resize',
+        'e': 'e-resize'
+      }
+      document.body.style.cursor = cursorMap[resizeDirection || 'se'] || 'nw-resize'
+    } else {
+      // Drag mode
+      setIsDraggingLogo(true)
+      setLogoStartPos({ x: e.clientX, y: e.clientY })
+      setLogoStartPosition({ ...logoPosition })
+      document.body.style.cursor = 'move'
+    }
+    document.body.style.userSelect = 'none'
+    e.preventDefault()
+  }
+
+  const handleLogoMouseMove = (e: MouseEvent) => {
+    if (isResizingLogo) {
+      const deltaX = e.clientX - logoStartPos.x
+      const deltaY = e.clientY - logoStartPos.y
+
+      let newWidth = logoStartDimensions.width
+      let newHeight = logoStartDimensions.height
+      let newLeft = logoStartPosition.left
+      let newTop = logoStartPosition.top
+
+      switch (logoResizeDirection) {
+        case 'nw': // Top-left
+          newWidth = Math.max(50, logoStartDimensions.width - deltaX)
+          newHeight = Math.max(30, logoStartDimensions.height - deltaY)
+          newLeft = logoStartPosition.left + (logoStartDimensions.width - newWidth)
+          newTop = logoStartPosition.top + (logoStartDimensions.height - newHeight)
+          break
+        case 'ne': // Top-right
+          newWidth = Math.max(50, logoStartDimensions.width + deltaX)
+          newHeight = Math.max(30, logoStartDimensions.height - deltaY)
+          newTop = logoStartPosition.top + (logoStartDimensions.height - newHeight)
+          break
+        case 'sw': // Bottom-left
+          newWidth = Math.max(50, logoStartDimensions.width - deltaX)
+          newHeight = Math.max(30, logoStartDimensions.height + deltaY)
+          newLeft = logoStartPosition.left + (logoStartDimensions.width - newWidth)
+          break
+        case 'se': // Bottom-right
+          newWidth = Math.max(50, logoStartDimensions.width + deltaX)
+          newHeight = Math.max(30, logoStartDimensions.height + deltaY)
+          break
+        case 'n': // Top edge
+          newHeight = Math.max(30, logoStartDimensions.height - deltaY)
+          newTop = logoStartPosition.top + (logoStartDimensions.height - newHeight)
+          break
+        case 's': // Bottom edge
+          newHeight = Math.max(30, logoStartDimensions.height + deltaY)
+          break
+        case 'w': // Left edge
+          newWidth = Math.max(50, logoStartDimensions.width - deltaX)
+          newLeft = logoStartPosition.left + (logoStartDimensions.width - newWidth)
+          break
+        case 'e': // Right edge
+          newWidth = Math.max(50, logoStartDimensions.width + deltaX)
+          break
+      }
+
+      setLogoDimensions({ width: newWidth, height: newHeight })
+      setLogoPosition({ left: newLeft, top: newTop })
+    } else if (isDraggingLogo) {
+      const deltaX = e.clientX - logoStartPos.x
+      const deltaY = e.clientY - logoStartPos.y
+
+      const newLeft = logoStartPosition.left + deltaX
+      const newTop = logoStartPosition.top + deltaY
+
+      // Allow free movement anywhere on the page
+      setLogoPosition({ left: newLeft, top: newTop })
+    }
+  }
+
+  const handleLogoMouseUp = () => {
+    setIsResizingLogo(false)
+    setIsDraggingLogo(false)
+    setLogoResizeDirection('')
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+  }
+
+  useEffect(() => {
+    if (isResizingLogo || isDraggingLogo) {
+      document.addEventListener('mousemove', handleLogoMouseMove)
+      document.addEventListener('mouseup', handleLogoMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleLogoMouseMove)
+        document.removeEventListener('mouseup', handleLogoMouseUp)
+      }
+    }
+  }, [isResizingLogo, isDraggingLogo, logoStartPos, logoStartDimensions, logoStartPosition])
 
   if (loading) {
     return (
@@ -1065,32 +1769,32 @@ export default function ProposalDetailsPage() {
   const getPageContainerClass = (size: string, orientation: string) => {
     const baseStyles = "mx-auto bg-white shadow-lg print:shadow-none print:mx-0 print:my-0 relative overflow-hidden"
 
-    // Size-based dimensions with orientation support and responsiveness
+    // Size-based dimensions with orientation support and responsiveness - adjusted sizes
     let sizeStyles = ""
     switch (size) {
       case "A4":
         if (orientation === "Landscape") {
-          sizeStyles = "w-full md:w-[297mm] min-h-[400px] md:min-h-[210mm]" // A4 Landscape
+          sizeStyles = "w-full md:w-[280mm] min-h-[350px] md:min-h-[180mm]" // A4 Landscape - adjusted
         } else {
-          sizeStyles = "w-full md:w-[210mm] min-h-[600px] md:min-h-[297mm]" // A4 Portrait
+          sizeStyles = "w-full md:w-[200mm] min-h-[500px] md:min-h-[240mm]" // A4 Portrait - adjusted
         }
         break
       case "Letter size":
         if (orientation === "Landscape") {
-          sizeStyles = "w-full md:w-[11in] min-h-[400px] md:min-h-[8.5in]" // Letter Landscape
+          sizeStyles = "w-full md:w-[10in] min-h-[350px] md:min-h-[7in]" // Letter Landscape - adjusted
         } else {
-          sizeStyles = "w-full md:w-[8.5in] min-h-[600px] md:min-h-[11in]" // Letter Portrait
+          sizeStyles = "w-full md:w-[8in] min-h-[500px] md:min-h-[9in]" // Letter Portrait - adjusted
         }
         break
       case "Legal size":
         if (orientation === "Landscape") {
-          sizeStyles = "w-full md:w-[14in] min-h-[400px] md:min-h-[8.5in]" // Legal Landscape
+          sizeStyles = "w-full md:w-[12in] min-h-[350px] md:min-h-[7in]" // Legal Landscape - adjusted
         } else {
-          sizeStyles = "w-full md:w-[8.5in] min-h-[600px] md:min-h-[14in]" // Legal Portrait
+          sizeStyles = "w-full md:w-[8in] min-h-[500px] md:min-h-[10in]" // Legal Portrait - adjusted
         }
         break
       default:
-        sizeStyles = "w-full max-w-4xl min-h-[600px]"
+        sizeStyles = "w-full max-w-4xl min-h-[500px]" // Adjusted max-width and height
     }
 
 
@@ -1108,81 +1812,239 @@ export default function ProposalDetailsPage() {
     return (
       <div className="relative w-full h-full bg-white">
         {/* Header */}
-        <div className="absolute top-0 left-0 w-[800px] h-[80px] bg-[#f8c102] rounded-tr-[50px] rounded-br-[50px] z-10" />
+        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
         {/* Header Right */}
-        <div className="absolute top-0 left-0 w-[1500px] h-[80px] bg-[rgba(248,193,2,0.5)] rounded-tl-[50px] rounded-tr-[50px] rounded-br-[50px] z-10" />
-        {/* Background borders and accents */}
+        <div className="absolute top-0 left-0 w-[1310px] h-[70px] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+        {/* Background borders and accents - scaled */}
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-0 w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="bg-white h-[1001px] w-[774px]" />
+            <div className="bg-white h-[857px] w-[675px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[540px] top-[2px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-[473px] top-[2px] w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="h-[461px] w-[79px]" />
+            <div className="h-[393px] w-[69px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[695px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[594px] w-[0px]">
           <div className="flex-none rotate-[90deg]">
-            <div className="h-[461px] w-[79px]" />
+            <div className="h-[393px] w-[69px]" />
           </div>
         </div>
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-[2px] w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="h-[763px] rounded-bl-[50px] rounded-br-[50px] w-[79px]" />
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[238px] top-[695px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-[208px] top-[594px] w-[0px]">
           <div className="flex-none rotate-[90deg]">
-            <div className="h-[763px] rounded-bl-[50px] rounded-br-[50px] w-[79px]" />
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
           </div>
         </div>
 
         {/* Company Logo */}
-        <div className="absolute h-[110px] left-[114px] top-[175px] w-[183px]">
-          <CompanyLogo className="h-full w-full" proposal={proposal} />
+        <div
+          className={`absolute border-2 transition-colors ${isEditMode ? 'border-[#c4c4c4] border-dashed' : 'border-transparent'}`}
+          style={{
+            left: logoPosition.left * 0.875,
+            top: logoPosition.top * 0.857,
+            width: logoDimensions.width * 0.875,
+            height: logoDimensions.height * 0.857
+          }}
+          onMouseDown={handleLogoMouseDown}
+        >
+          <div className="relative h-full w-full">
+            {editableLogo ? (
+              <img src={editableLogo} alt="Proposal logo" className="h-full w-full object-contain" />
+            ) : (
+              <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} hasShadow={false} onLogoChange={setEditableLogo} />
+            )}
+            {isEditMode && (
+              <>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      const uploadFile = async () => {
+                        try {
+                          const uploadPath = `proposals/logos/${Date.now()}_${file.name}`
+                          const logoUrl = await uploadFileToFirebaseStorage(file, uploadPath)
+                          setEditableLogo(logoUrl)
+                        } catch (error) {
+                          console.error("Error uploading logo:", error)
+                          toast({
+                            title: "Error",
+                            description: "Failed to upload logo",
+                            variant: "destructive",
+                          })
+                        }
+                      }
+                      uploadFile()
+                    }
+                  }}
+                  className="hidden"
+                  id="proposal-logo"
+                />
+                <label htmlFor="proposal-logo" className="absolute top-1 right-1 w-6 h-6 bg-blue-500 hover:bg-blue-600 rounded-full flex items-center justify-center cursor-pointer transition-colors shadow-lg">
+                  <Upload className="h-3 w-3 text-white" />
+                </label>
+                {/* Resize Handles - Small dots */}
+                {/* Top-left corner */}
+                <div
+                  className="absolute top-0 left-0 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-nw-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'nw')}
+                  title="Drag to resize logo"
+                />
+                {/* Top-right corner */}
+                <div
+                  className="absolute top-0 right-0 w-3 h-3 translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-ne-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'ne')}
+                  title="Drag to resize logo"
+                />
+                {/* Bottom-left corner */}
+                <div
+                  className="absolute bottom-0 left-0 w-3 h-3 -translate-x-1/2 translate-y-1/2 bg-blue-500 cursor-sw-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'sw')}
+                  title="Drag to resize logo"
+                />
+                {/* Bottom-right corner */}
+                <div
+                  className="absolute bottom-0 right-0 w-3 h-3 translate-x-1/2 translate-y-1/2 bg-blue-500 cursor-se-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'se')}
+                  title="Drag to resize logo"
+                />
+                {/* Middle edges */}
+                {/* Top edge */}
+                <div
+                  className="absolute top-0 left-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-n-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'n')}
+                  title="Drag to resize logo"
+                />
+                {/* Bottom edge */}
+                <div
+                  className="absolute bottom-0 left-1/2 w-3 h-3 -translate-x-1/2 translate-y-1/2 bg-blue-500 cursor-s-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 's')}
+                  title="Drag to resize logo"
+                />
+                {/* Left edge */}
+                <div
+                  className="absolute left-0 top-1/2 w-3 h-3 -translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-w-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'w')}
+                  title="Drag to resize logo"
+                />
+                {/* Right edge */}
+                <div
+                  className="absolute right-0 top-1/2 w-3 h-3 translate-x-1/2 -translate-y-1/2 bg-blue-500 cursor-e-resize rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => handleLogoMouseDown(e, 'e')}
+                  title="Drag to resize logo"
+                />
+              </>
+            )}
+          </div>
         </div>
 
         {/* Title */}
-        <p className="absolute font-bold text-[#333333] text-[80px] leading-none left-[114px] top-[331px] w-[602px]">
-          Site Proposals
-        </p>
+        {isEditMode ? (
+          <input
+            value={editableProposalTitle}
+            onChange={(e) => setEditableProposalTitle(e.target.value)}
+            className="absolute font-bold text-[#333333] text-[70px] leading-none left-[100px] top-[284px] min-w-[262px] max-w-[700px] w-auto border-2 border-[#c4c4c4] border-dashed rounded px-2 outline-none whitespace-nowrap"
+            style={{ width: `${Math.max(262, (editableProposalTitle.length * 39) + 35)}px` }}
+          />
+        ) : (
+          <p className="absolute font-bold text-[#333333] text-[70px] leading-none left-[100px] top-[284px] whitespace-nowrap">
+            {proposal?.proposalTitle || 'Site Proposals'}
+          </p>
+        )}
 
         {/* Subtitle */}
-        <p className="absolute font-normal text-[#333333] text-[20px] leading-none left-[114px] top-[285px] w-[333px]">
-          {proposal?.companyName || 'Company Name'}
-        </p>
+        {isEditMode ? (
+          <input
+            value={editableCompanyName}
+            onChange={(e) => setEditableCompanyName(e.target.value)}
+            className="absolute font-semibold text-[#333333] text-[18px] leading-none left-[100px] top-[243px] w-[291px] border-2 border-[#c4c4c4] border-dashed rounded px-2 outline-none"
+          />
+        ) : (
+          <p className="absolute font-semibold text-[#333333] text-[18px] leading-none left-[100px] top-[243px] w-[291px]">
+            {proposal?.companyName || 'Company Name'}
+          </p>
+        )}
 
         {/* Date */}
-        <p className="absolute font-normal text-[#333333] text-[20px] text-right top-[104px] right-[32px] w-[219px]">
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[89px] right-[28px] w-[191px]">
           {formattedDate}
         </p>
 
         {/* Page Number */}
-        <p className="absolute font-normal text-[#333333] text-[20px] text-right top-[650px] right-[32px] w-[59px]">
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[558px] right-[28px] w-[51px]">
           {pageNumber}/{totalPages}
         </p>
 
         {/* Prepared For */}
-        <div className="absolute text-[#333333] text-[20px] left-[114px] top-[451px] w-[737px] leading-[1.2]">
-          <p className="font-bold mb-0">Prepared for:</p>
-          <p>{proposal?.client.contactPerson} - {proposal?.client.company}</p>
-        </div>
+        {isEditMode ? (
+          <div className="absolute text-[#333333] text-[18px] left-[100px] top-[386px] w-[645px] leading-[1.2]">
+            <p className="font-bold mb-0">Prepared for:</p>
+            <input
+              value={editableClientContact}
+              onChange={(e) => setEditableClientContact(e.target.value)}
+              className="border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none"
+            /> - <input
+              value={editableClientCompany}
+              onChange={(e) => setEditableClientCompany(e.target.value)}
+              className="border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none"
+            />
+          </div>
+        ) : (
+          <div className="absolute text-[#333333] text-[18px] left-[100px] top-[386px] w-[645px] leading-[1.2]">
+            <p className="font-bold mb-0">Prepared for:</p>
+            <p>{proposal?.client.contactPerson} - {proposal?.client.company}</p>
+          </div>
+        )}
 
         {/* Prepared By */}
-        <div className="absolute font-bold text-[#333333] text-[20px] left-[114px] top-[508px] w-[785px] leading-[1.2]">
-          <p className="mb-0">Prepared By:</p>
-          <p className="font-normal">{userData?.first_name} {userData?.last_name} - {proposal?.companyName}</p>
-        </div>
+        {isEditMode ? (
+          <div className="absolute font-bold text-[#333333] text-[18px] left-[100px] top-[434px] w-[688px] leading-[1.2]">
+            <p className="mb-0">Prepared By:</p>
+            <input
+              value={editablePreparedByName}
+              onChange={(e) => setEditablePreparedByName(e.target.value)}
+              className="font-normal border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none"
+            /> - <input
+              value={editablePreparedByCompany}
+              onChange={(e) => setEditablePreparedByCompany(e.target.value)}
+              className="font-normal border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none"
+            />
+          </div>
+        ) : (
+          <div className="absolute font-bold text-[#333333] text-[18px] left-[100px] top-[434px] w-[688px] leading-[1.2]">
+            <p className="mb-0">Prepared By:</p>
+            <p className="font-normal">{proposal?.preparedByName || `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim()} - {proposal?.preparedByCompany || proposal?.companyName}</p>
+          </div>
+        )}
 
         {/* Bottom Logo */}
-        <div className="absolute h-[46px] left-[32px] top-[730px] w-[77px] z-20">
-          <CompanyLogo className="h-full w-full" proposal={proposal} />
+        <div className="absolute h-[40px] left-[28px] top-[626px] w-[67px] z-20">
+          {editableLogo ? (
+            <div
+              style={{
+                backgroundImage: `url(${editableLogo})`,
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                width: '100%',
+                height: '100%',
+              }}
+            />
+          ) : (
+            <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
+          )}
         </div>
         {/* Footer */}
-        <div className="absolute top-[714px] right-0 w-[800px] h-[80px] bg-[#f8c102] rounded-tl-[50px] rounded-bl-[50px] z-10" />
+        <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
         {/* Footer Right */}
-        <div className="absolute top-[714px] right-0 w-[1500px] h-[80px] bg-[rgba(248,193,2,0.5)] rounded-tl-[50px] rounded-tl-[50px] rounded-br-[50px] z-10" />
+        <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
       </div>
     )
   }
@@ -1204,39 +2066,39 @@ export default function ProposalDetailsPage() {
 
     return (
       <div className="relative w-full h-full bg-white">
-        {/* Header - same as intro page */}
-        <div className="absolute top-0 left-0 w-[800px] h-[80px] bg-[#f8c102] rounded-tr-[50px] rounded-br-[50px] z-10" />
-        <div className="absolute top-0 left-0 w-[1500px] h-[80px] bg-[rgba(248,193,2,0.5)] rounded-tl-[50px] rounded-tr-[50px] rounded-br-[50px] z-10" />
+        {/* Header - scaled */}
+        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-0 left-0 w-[1310px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
 
-        {/* Background borders and accents - same as intro page */}
+        {/* Background borders and accents - scaled */}
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-0 w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="bg-white h-[1001px] w-[774px]" />
+            <div className="bg-white h-[857px] w-[675px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[540px] top-[2px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-[473px] top-[2px] w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="h-[461px] w-[79px]" />
+            <div className="h-[393px] w-[69px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[695px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[594px] w-[0px]">
           <div className="flex-none rotate-[90deg]">
-            <div className="h-[461px] w-[79px]" />
+            <div className="h-[393px] w-[69px]" />
           </div>
         </div>
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-[2px] w-[0px]">
           <div className="flex-none rotate-[270deg]">
-            <div className="h-[763px] rounded-bl-[50px] rounded-br-[50px] w-[79px]" />
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
           </div>
         </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[238px] top-[695px] w-[0px]">
+        <div className="absolute flex h-[0px] items-center justify-center left-[208px] top-[594px] w-[0px]">
           <div className="flex-none rotate-[90deg]">
-            <div className="h-[763px] rounded-bl-[50px] rounded-br-[50px] w-[79px]" />
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
           </div>
         </div>
 
-        {/* Date - same as intro page */}
-        <p className="absolute font-normal text-[#333333] text-[20px] text-right top-[104px] right-[32px] w-[219px]">
+        {/* Date - scaled */}
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[89px] right-[28px] w-[191px]">
           {proposal?.createdAt ? new Date(proposal.createdAt).toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
@@ -1245,147 +2107,294 @@ export default function ProposalDetailsPage() {
         </p>
 
         {/* Page Number */}
-        <p className="absolute font-normal text-[#333333] text-[20px] text-right top-[650px] right-[32px] w-[59px]">
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[558px] right-[28px] w-[51px]">
           {pageNumber}/{totalPages}
         </p>
 
-        {/* Main Image - Top Left */}
-        <div className="absolute left-0 top-[81px] w-[372px] h-[372px] overflow-hidden">
-          {product.media && product.media.length > 0 ? (
-            product.media[0].isVideo ? (
-              <video
-                src={product.media[0].url}
+        {/* Main Image - Top Left - scaled */}
+        <div className="absolute left-0 top-[70px] w-[324px] h-[324px] overflow-hidden">
+          {(() => {
+            const pendingImageUrl = pendingSiteImages[product.id]
+            const currentImageUrl = pendingImageUrl || (product.media && product.media.length > 0 ? product.media[0].url : null)
+
+            if (currentImageUrl) {
+              return product.media && product.media.length > 0 && product.media[0].isVideo && !pendingImageUrl ? (
+                <video
+                  src={currentImageUrl}
+                  className="w-full h-full"
+                  controls
+                />
+              ) : (
+                <img
+                  src={currentImageUrl}
+                  alt={product.name}
+                  className="w-full h-full"
+                />
+              )
+            } else {
+              return (
+                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                  <span className="text-gray-500">No image available</span>
+                </div>
+              )
+            }
+          })()}
+          {isEditMode && (
+            <div
+              className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black bg-opacity-0 hover:bg-opacity-30 transition-all rounded-lg group"
+              onClick={() => {
+                setSelectedProductForMedia(product)
+                setIsMediaDialogOpen(true)
+              }}
+            >
+              <div className="opacity-0 group-hover:opacity-100 text-white text-center transition-opacity">
+                <Upload className="h-8 w-8 mx-auto mb-2" />
+                <p className="text-sm">Change Image</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Static Map - Bottom Left - scaled */}
+        <div className="absolute left-0 top-[386px] w-[324px] h-[226px] overflow-hidden">
+          {(() => {
+            const mapUrl = generateStaticMapUrl(product.location)
+            return mapUrl ? (
+              <img
+                src={mapUrl}
+                alt={`Map of ${product.location}`}
                 className="w-full h-full object-cover"
-                controls
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                  const parent = target.parentElement
+                  if (parent) {
+                    parent.innerHTML = '<div class="w-full h-full bg-gray-200 flex items-center justify-center"><span class="text-gray-500">Map unavailable</span></div>'
+                  }
+                }}
               />
             ) : (
-              <img
-                src={product.media[0].url}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
+              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                <span className="text-gray-500">No location available</span>
+              </div>
             )
-          ) : (
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-              <span className="text-gray-500">No image available</span>
-            </div>
-          )}
+          })()}
         </div>
 
-        {/* Google Map - Bottom Left */}
-        <div className="absolute left-0 top-[453px] w-[372px] h-[260px] overflow-hidden">
-          {product.location ? (
-            <GoogleMap location={product.location} className="w-full h-full" />
-          ) : (
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-              <span className="text-gray-500">No location available</span>
-            </div>
-          )}
-        </div>
-
-        {/* Site Details - Right Side */}
-        <div className="absolute font-bold text-[#333333] text-[20px] left-[409px] top-[200px] w-[495.663px] leading-[1.2]">
+        {/* Site Details - Right Side - scaled */}
+        <div className="absolute font-bold text-[#333333] text-[18px] left-[358px] top-[171px] w-[434px] leading-[1.2]">
           {/* Site Name */}
-          <div className="mb-2 text-[40px]">
-            <p className="mb-0">{product.name}</p>
+          <div className="mb-2 text-[35px]">
+            {isEditMode ? (
+              <input
+                value={editableProducts[product.id]?.name || product.name}
+                onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], name: e.target.value } }))}
+                className="mb-0 border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+              />
+            ) : (
+              <p className="mb-0">{product.name}</p>
+            )}
           </div>
 
           <div className="ml-2">
             {/* Location */}
             <div className="mb-2">
               <p className="mb-0">Location:</p>
-              <p className="font-normal text-[20px]">{product.location || 'N/A'}</p>
+              {isEditMode ? (
+                <input
+                  value={editableProducts[product.id]?.location || product.location || 'N/A'}
+                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: e.target.value } }))}
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                />
+              ) : (
+                <p className="font-normal text-[18px]">{product.location || 'N/A'}</p>
+              )}
             </div>
 
             {/* Dimension */}
             <div className="mb-2">
               <p className="mb-0">Dimension:</p>
-              <p className="font-normal text-[20px] mb-0">
-                {product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}
-                {product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}
-                {product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}
-                {!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}
-              </p>
+              {isEditMode ? (
+                <input
+                  value={editableProducts[product.id]?.dimension || ''}
+                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], dimension: e.target.value } }))}
+                  className="font-normal text-[18px] mb-0 border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                />
+              ) : (
+                <p className="font-normal text-[18px] mb-0">
+                  {product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}
+                  {product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}
+                  {product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}
+                  {!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}
+                </p>
+              )}
             </div>
 
             {/* Type */}
             <div className="mb-2">
               <p className="mb-0">Type:</p>
-              <p className="font-normal text-[20px]">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
+              {isEditMode ? (
+                <input
+                  value={editableProducts[product.id]?.type || ''}
+                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], type: e.target.value } }))}
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                />
+              ) : (
+                <p className="font-normal text-[18px]">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
+              )}
             </div>
 
             {/* Average Daily Traffic Count */}
             <div className="mb-2">
-              <p className="mb-0">Average Daily Traffic Count:</p>
-              <p className="font-normal text-[20px]">
-                {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
-              </p>
+              <p className="mb-0">Average Monthly Traffic Count:</p>
+              {isEditMode ? (
+                <input
+                  value={editableProducts[product.id]?.traffic || ''}
+                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], traffic: e.target.value } }))}
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                />
+              ) : (
+                <p className="font-normal text-[18px]">
+                  {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
+                </p>
+              )}
             </div>
 
             {/* SRP */}
             <div className="mb-2">
               <p className="mb-0">SRP:</p>
-              <p className="font-normal text-[20px]">
-                {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
-              </p>
+              {isEditMode ? (
+                <input
+                  value={editableProducts[product.id]?.srp || ''}
+                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                />
+              ) : (
+                <p className="font-normal text-[18px]">
+                  {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
         {/* Bottom Logo */}
-        <div className="absolute h-[46px] left-[32px] top-[730px] w-[77px] z-20">
-          <CompanyLogo className="h-full w-full" proposal={proposal} />
+        <div className="absolute h-[40px] left-[28px] top-[626px] w-[67px] z-20">
+          {editableLogo ? (
+            <div
+              style={{
+                backgroundImage: `url(${editableLogo})`,
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                width: '100%',
+                height: '100%',
+              }}
+            />
+          ) : (
+            <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
+          )}
         </div>
 
-        {/* Footer - same as intro page */}
-        <div className="absolute top-[714px] right-0 w-[800px] h-[80px] bg-[#f8c102] rounded-tl-[50px] rounded-bl-[50px] z-10" />
-        <div className="absolute top-[714px] right-0 w-[1500px] h-[80px] bg-[rgba(248,193,2,0.5)] rounded-tl-[50px] rounded-tl-[50px] rounded-br-[50px] z-10" />
+        {/* Footer - scaled */}
+        <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
       </div>
     )
   }
 
   return (
     <div className="min-h-screen bg-gray-50/50 print:bg-white flex flex-col">
-      <div className="bg-white px-4 py-3 flex items-center gap-3 sticky top-0 z-50 border-b border-gray-200 shadow-sm print:hidden">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.push("/sales/proposals")}
-          className="text-black hover:bg-gray-100 p-1 h-8 w-8"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <span className="text-black font-medium">Finalize Proposal</span>
-        <span className="text-black italic ml-2">{proposal?.proposalNumber || params.id}</span>
 
-        <div className="ml-auto flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+      {/* Top Navigation Header */}
+      <div className="px-6 py-4 print:hidden">
+        <button
+          onClick={() => router.push('/sales/proposals')}
+          className="text-[#333333] font-bold text-[20px] leading-none hover:text-gray-600 transition-colors"
+        >
+          ← Finalize proposal
+        </button>
+      </div>
+
+      {/* Client Selector */}
+      <div className="px-4 py-2 print:hidden">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <span className="font-medium text-[16px] text-[#333333] w-[60px]">Client:</span>
+            <Select value={selectedClientId} onValueChange={handleClientChange}>
+              <SelectTrigger className="bg-white border-2 border-[#c4c4c4] rounded-[8px] h-[32px] w-[250px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map(client => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.company}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-3">
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomOut}
-              className="h-7 w-7 p-0 hover:bg-gray-200"
-              disabled={zoomLevel <= 0.3}
+              variant="outline"
+              onClick={handleTemplates}
+              className="w-[50px] h-[50px] bg-white border-[#c4c4c4] border-2 rounded-[12px] p-0 flex items-center justify-center hover:bg-gray-50"
             >
-              <Minus className="h-3 w-3" />
+              <Grid3X3 className="h-5 w-5 text-black opacity-50" />
             </Button>
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleResetZoom}
-              className="h-7 px-2 text-xs font-medium hover:bg-gray-200 min-w-[50px]"
+              variant="outline"
+              onClick={handleToggleEditMode}
+              className="w-[50px] h-[50px] bg-white border-[#c4c4c4] border-2 rounded-[12px] p-0 flex items-center justify-center hover:bg-gray-50"
             >
-              {Math.round(zoomLevel * 100)}%
+              <Edit className="h-5 w-5 text-black opacity-50" />
             </Button>
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleZoomIn}
-              className="h-7 w-7 p-0 hover:bg-gray-200"
-              disabled={zoomLevel >= 2}
+              variant="outline"
+              onClick={handleDownload}
+              disabled={downloading}
+              className="w-[50px] h-[50px] bg-white border-[#c4c4c4] border-2 rounded-[12px] p-0 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50"
             >
-              <Plus className="h-3 w-3" />
+              {downloading ? (
+                <Loader2 className="h-5 w-5 animate-spin text-black opacity-50" />
+              ) : (
+                <Download className="h-5 w-5 text-black opacity-50" />
+              )}
             </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Sites Selector */}
+      <div className="px-4 py-2 print:hidden">
+        <div className="flex items-center mb-3">
+          <span className="font-medium text-[16px] text-[#333333] w-[60px]">Site:</span>
+          <div className="flex gap-3">
+            {proposal?.products?.map((product, index) => (
+              <div
+                key={product.id}
+                className="bg-[#c4c4c4] bg-opacity-25 shadow h-[32px] rounded-[8px] flex items-center justify-between px-2 min-w-[100px]"
+              >
+                <span className="font-medium text-[12px] text-[#333] leading-none truncate">
+                  {product.site_code || product.name}
+                </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleRemoveSiteClick(product.ID || product.id || "", product.site_code || product.name)
+                  }}
+                  className="ml-2 text-[#333] hover:text-gray-600 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+            <div
+              className="bg-white shadow h-[32px] rounded-[8px] flex items-center px-2 min-w-[100px] cursor-pointer hover:bg-gray-50"
+              onClick={handleAddSiteClick}
+            >
+              <span className="font-medium text-[16px] text-[#333333]">+Add Site</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1393,38 +2402,80 @@ export default function ProposalDetailsPage() {
       {/* Main content area */}
       <div className="flex-1 flex flex-col md:flex-row">
         {/* Proposal Page Content */}
-        <div className="flex-1 p-2 md:p-4 space-y-4">
+        <div className="flex-1 p-2 md:p-4">
           {Array.from({ length: getTotalPages(selectedLayout) }, (_, index) => {
             const pageNumber = index + 1
             return (
-              <div key={pageNumber} className={getPageContainerClass(selectedSize, "Landscape")} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
+              <div key={pageNumber} className={`${getPageContainerClass(selectedSize, "Landscape")} ${index > 0 ? 'mt-[-65px]' : ''}`} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
                 {pageNumber === 1 ? renderIntroPage(pageNumber) : renderSitePage(pageNumber)}
               </div>
             )
           })}
         </div>
 
-        <div className="w-full md:w-80 border-l md:border-l border-gray-200 p-4 overflow-y-auto print:hidden">
-          <ProposalHistory
-            selectedClient={
-              proposal
-                ? {
-                    id: proposal.client.id || "",
-                    company: proposal.client.company,
-                    contactPerson: proposal.client.contactPerson,
-                  }
-                : null
-            }
-            useProposalViewer={true}
-            excludeProposalId={params.id as string}
-          />
+        <div className="w-full md:w-80 h-[60vh] bg-white rounded-[20px] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] print:hidden flex flex-col">
+          <div className="p-6 pb-0">
+            <h3 className="text-lg font-semibold">
+              Proposal History
+              {proposal && (
+                <span className="text-sm font-normal text-gray-500 block">for {proposal.client.company}</span>
+              )}
+            </h3>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <ProposalHistory
+              selectedClient={
+                proposal
+                  ? {
+                      id: proposal.client.id || "",
+                      company: proposal.client.company,
+                      contactPerson: proposal.client.contactPerson,
+                    }
+                  : null
+              }
+              useProposalViewer={true}
+              excludeProposalId={params.id as string}
+              showHeader={false}
+            />
+          </div>
         </div>
       </div>
 
       {/* Bottom Action Buttons */}
       {!loading && proposal && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex gap-4 z-50 print:hidden">
-          {isEditingPrice ? (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 print:hidden">
+          <div className="bg-white rounded-[20px] shadow-lg border border-gray-200 p-4 min-w-[350px] max-w-[450px]">
+            <div className="flex items-center justify-center gap-4">
+          {isEditMode ? (
+            <div className="flex gap-4">
+              <Button
+                onClick={handleCancelEdit}
+                variant="ghost"
+                className="text-gray-600 hover:text-gray-800 underline underline-offset-4 hover:underline-offset-2 font-medium px-0 py-2 h-auto transition-all duration-200"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSaveEdit}
+                disabled={savingEdit}
+                className={`bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75 ${
+                  savingEdit ? "opacity-50 cursor-not-allowed" : ""
+                }`}
+              >
+                {savingEdit ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 mr-2" />
+                    Save
+                  </>
+                )}
+              </Button>
+            </div>
+          ) : isEditingPrice ? (
             <>
               <Button
                 onClick={() => setIsEditingPrice(false)}
@@ -1443,26 +2494,105 @@ export default function ProposalDetailsPage() {
               </Button>
             </>
           ) : (
-            <>
+            <div className="flex gap-4">
               <Button
                 onClick={() => handleUpdatePublicStatus("draft")}
-                variant="outline"
-                className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75"
+                variant="ghost"
+                className="text-gray-600 hover:text-gray-800 underline underline-offset-4 hover:underline-offset-2 font-medium px-0 py-2 h-auto transition-all duration-200"
               >
-                <FileText className="h-5 w-5 mr-2" />
+                <FileText className="h-4 w-4 mr-2" />
                 Save as Draft
               </Button>
               <Button
-                onClick={() => setIsSendOptionsDialogOpen(true)}
+                onClick={async () => {
+                  if (!proposal) return
+                  try {
+                    await generatePDFIfNeeded(proposal)
+                    setIsSendOptionsDialogOpen(true)
+                  } catch (error) {
+                    // Error is already handled in generatePDFIfNeeded
+                  }
+                }}
                 className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-full shadow-lg transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-opacity-75"
               >
                 <Send className="h-5 w-5 mr-2" />
                 Send
               </Button>
-            </>
+            </div>
           )}
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Media Selection Dialog */}
+      <Dialog open={isMediaDialogOpen} onOpenChange={setIsMediaDialogOpen}>
+        <DialogContent className="max-w-4xl mx-auto border-0 shadow-lg">
+          <DialogTitle className="text-xl font-semibold mb-4">
+            Select Image for {selectedProductForMedia?.name}
+          </DialogTitle>
+
+          {selectedProductForMedia?.media && selectedProductForMedia.media.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-96 overflow-y-auto">
+              {selectedProductForMedia.media.map((mediaItem, index) => (
+                <div
+                  key={index}
+                  className="relative cursor-pointer border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 transition-colors"
+                  onClick={() => {
+                    setPendingSiteImages(prev => ({
+                      ...prev,
+                      [selectedProductForMedia.id]: mediaItem.url
+                    }))
+                    setIsMediaDialogOpen(false)
+                    setSelectedProductForMedia(null)
+                    toast({
+                      title: "Image Selected",
+                      description: "Click 'Save' to confirm changes",
+                    })
+                  }}
+                >
+                  {mediaItem.isVideo ? (
+                    <video
+                      src={mediaItem.url}
+                      className="w-full h-32 object-cover"
+                      controls={false}
+                    />
+                  ) : (
+                    <img
+                      src={mediaItem.url}
+                      alt={`Media ${index + 1}`}
+                      className="w-full h-32 object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement
+                        target.src = "/placeholder.svg"
+                      }}
+                    />
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1">
+                    {mediaItem.type || 'Image'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No media available for this site.</p>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsMediaDialogOpen(false)
+                setSelectedProductForMedia(null)
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Send Options Dialog */}
       <SendProposalShareDialog
@@ -1490,6 +2620,251 @@ export default function ProposalDetailsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Add Sites Dialog */}
+      <Dialog open={isAddSiteDialogOpen} onOpenChange={setIsAddSiteDialogOpen}>
+        <DialogContent className="max-w-6xl mx-auto border-0 shadow-lg">
+          <DialogTitle className="text-xl font-semibold mb-4">Add Sites to Proposal</DialogTitle>
+
+          {loadingProducts ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+              <span className="ml-2">Loading products...</span>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">
+                  Select sites to add to this proposal. Sites marked as "Already Added" are currently in this proposal. {selectedProductsForAddition.length} site{selectedProductsForAddition.length !== 1 ? 's' : ''} selected for addition.
+                </p>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto">
+                <ResponsiveCardGrid
+                  mobileColumns={1}
+                  tabletColumns={2}
+                  desktopColumns={4}
+                  gap="lg"
+                >
+                  {availableProducts.map((product) => {
+                    // Check if product is already in proposal by comparing document IDs
+                    const isAlreadyInProposal = proposal?.products?.some(p => {
+                      const matches = p.ID === product.id || p.id === product.id
+                      if (matches && product.id === "BjKgUoSrHaK5zLtqOKwL") {
+                        console.log("Found matching product in proposal:", p, "for product:", product)
+                      }
+                      return matches
+                    }) || false
+                    const isSelectedForAddition = selectedProductsForAddition.some((p) => p.id === product.id)
+
+                    return (
+                      <div
+                        key={product.id}
+                        className={`bg-white rounded-2xl shadow-lg overflow-hidden transition-all border ${
+                          isAlreadyInProposal
+                            ? "border-blue-500 bg-blue-50 cursor-pointer hover:shadow-xl"
+                            : isSelectedForAddition
+                            ? "border-green-500 cursor-pointer hover:shadow-xl"
+                            : "border-gray-200 cursor-pointer hover:shadow-xl"
+                        }`}
+                        onClick={() => isAlreadyInProposal ? handleRemoveSiteClick(product.id || "", product.site_code || product.name) : handleProductSelectForAddition(product)}
+                      >
+                        <div className="h-[180px] bg-gray-300 relative rounded-t-2xl">
+                          <Image
+                            src={product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"}
+                            alt={product.name || "Product image"}
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = "/abstract-geometric-sculpture.png"
+                              target.className = "opacity-50 object-contain"
+                            }}
+                          />
+
+                          {/* Selection indicator */}
+                          <div className="absolute top-3 left-3 z-10">
+                            {isAlreadyInProposal ? (
+                              <div className="w-6 h-6 rounded-full bg-blue-500 border-2 border-blue-500 flex items-center justify-center">
+                                <CheckCircle2 size={16} className="text-white" />
+                              </div>
+                            ) : (
+                              <div
+                                className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                                  isSelectedForAddition
+                                    ? "bg-green-500 border-green-500"
+                                    : "bg-white border-gray-300"
+                                }`}
+                              >
+                                {isSelectedForAddition && (
+                                  <CheckCircle2 size={16} className="text-white" />
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Already selected badge */}
+                          {isAlreadyInProposal && (
+                            <div className="absolute top-3 right-3 z-10">
+                              <div className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                Already Added
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="p-3">
+                          <div className="space-y-1">
+                            <div className="text-xs text-gray-500 font-medium">
+                              {product.site_code || "N/A"}
+                            </div>
+                            <div className="text-sm text-black font-medium line-clamp-1">
+                              {product.name}
+                            </div>
+                            <div className="text-xs text-black font-medium truncate">
+                              {product.specs_rental?.location || (product as any).light?.location || "Unknown location"}
+                            </div>
+                            <div className="text-xs text-black font-medium">
+                              ₱{product.price ? Number(product.price).toLocaleString() : "Not set"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </ResponsiveCardGrid>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsAddSiteDialogOpen(false)
+                    setSelectedProductsForAddition([])
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmAddSites}
+                  disabled={selectedProductsForAddition.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Add {selectedProductsForAddition.length} Site{selectedProductsForAddition.length !== 1 ? 's' : ''}
+                </Button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Templates Panel Dialog - Work in Progress */}
+      <Dialog open={showTemplatesPanel} onOpenChange={setShowTemplatesPanel}>
+        <DialogContent className="max-w-md mx-auto border-0 shadow-lg">
+          <DialogTitle className="text-xl font-semibold mb-4 text-center">Template Settings</DialogTitle>
+
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Grid3X3 className="h-8 w-8 text-blue-600" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Work in Progress</h3>
+            <p className="text-gray-600 mb-6">
+              Template customization features are currently under development. This functionality will be available in a future update.
+            </p>
+            <Button
+              onClick={() => setShowTemplatesPanel(false)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Template Form Dialog */}
+      <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+        <DialogContent className="max-w-md mx-auto border-0 shadow-lg">
+          <DialogTitle className="text-xl font-semibold mb-4">Create New Template</DialogTitle>
+
+          <form onSubmit={handleFormSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="template-name">Template Name</Label>
+              <Input
+                id="template-name"
+                value={formData.name}
+                onChange={(e) => handleInputChange("name", e.target.value)}
+                placeholder="Enter template name"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="background-url">Background URL (optional)</Label>
+              <Input
+                id="background-url"
+                value={formData.background_url}
+                onChange={(e) => handleInputChange("background_url", e.target.value)}
+                placeholder="https://example.com/image.jpg"
+              />
+            </div>
+
+            {/* File Upload */}
+            <div className="space-y-2">
+              <Label>Or Upload Background Image</Label>
+              <Input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="cursor-pointer"
+              />
+              {filePreview && (
+                <div className="mt-2">
+                  <img src={filePreview} alt="Preview" className="max-w-full h-32 object-cover rounded border" />
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBackToList}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={formLoading || uploading}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {formLoading || uploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Template"
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={isDeleteConfirmationOpen}
+        onClose={() => {
+          setIsDeleteConfirmationOpen(false)
+          setSiteToDelete(null)
+        }}
+        onConfirm={handleConfirmRemoveSite}
+        title="Remove Site from Proposal"
+        description="This action will remove the site from your proposal. You can add it back later if needed."
+        itemName={siteToDelete?.name}
+        confirmButtonText="Remove"
+        confirmButtonLoadingText="Removing..."
+      />
     </div>
   )
 }

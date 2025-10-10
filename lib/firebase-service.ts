@@ -141,6 +141,7 @@ export interface Product {
     audience_types?: string[]
     geopoint?: [number, number]
     location?: string
+    location_label?: string
     traffic_count?: number | null
     elevation?: number | null
     height?: number | null

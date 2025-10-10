@@ -88,6 +88,10 @@ export async function POST(request: Request) {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
       apiKey = process.env.ALGOLIA_ADMIN_API_KEY
       finalIndexName = 'reports'
+    } else if (indexName === 'proposals') {
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
+      apiKey = process.env.ALGOLIA_ADMIN_API_KEY
+      finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_INDEX_NAME
     } else {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
       apiKey = process.env.ALGOLIA_ADMIN_API_KEY
@@ -131,20 +135,23 @@ export async function POST(request: Request) {
       attributesToRetrieve = "saNumber,projectSiteId,projectSiteName,projectSiteLocation,serviceType,assignedTo,jobDescription,message,joNumber,requestedBy,status,coveredDateStart,coveredDateEnd,created,updated,company_id"
       attributesToHighlight = "saNumber,projectSiteName,serviceType"
     } else if (indexName === 'cost_estimates') {
-      attributesToRetrieve = "id,title,client,client_company,client_contact,client_email,client_phone,status,totalAmount,createdAt,company_id,lineItems,lineItemsCount"
-      attributesToHighlight = "title,client_company,client_contact"
+      attributesToRetrieve = "id,costEstimateNumber,title,client,client_company,client_contact,client_email,client_phone,status,totalAmount,createdAt,company_id,lineItems,lineItemsCount"
+      attributesToHighlight = "costEstimateNumber,title,client_company,client_contact"
     } else if (indexName === 'collectibles') {
       attributesToRetrieve = "id,invoice_number,invoice_id,contract_pdf_url,client,period,amount,due_date,booking,status,created,company_id"
       attributesToHighlight = "invoice_number,client.name,booking.reservation_id,booking.project_name"
     } else if (indexName === 'quotaions') {
-      attributesToRetrieve = "quotation_number,client_name,items,seller_id,status,created"
-      attributesToHighlight = "quotation_number,client_name"
+      attributesToRetrieve = "quotation_number,client_name,items,seller_id,status,created,client_company_name,client_email,client_phone,client_address,client_designation,total_amount,company_id,projectCompliance,projectName"
+      attributesToHighlight = "quotation_number,client_name,created"
     } else if (indexName === 'booking') {
       attributesToRetrieve = "reservation_id,product_name,client,project_name,start_date,end_date,status,created,quotation_id,product_id,company_id,client_name,client_company_name"
       attributesToHighlight = "reservation_id,product_name,client_name,client_company_name"
     } else if (indexName === 'reports') {
       attributesToRetrieve = "siteName,date,reportType,createdByName,category,companyId,status,created"
       attributesToHighlight = "siteName,reportType,createdByName"
+    } else if (indexName === 'proposals') {
+      attributesToRetrieve = "id,proposalNumber,title,client_company,client_contactPerson,client_name,client_email,status,createdAt,company_id,totalAmount,products"
+      attributesToHighlight = "proposalNumber,title,client_company,client_contactPerson"
     }
 
     const searchParams: any = {

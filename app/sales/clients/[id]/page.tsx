@@ -80,8 +80,8 @@ interface Quotation {
   status: string;
   created: Date;
   valid_until: Date;
-  start_date: string;
-  end_date: string;
+  start_date: Date;
+  end_date: Date;
   duration_days: number;
   items: { name: string; location: string }; // Single object, not array
   projectCompliance: {
@@ -90,8 +90,8 @@ interface Quotation {
     };
   };
 }
- 
- interface Booking {
+
+interface Booking {
   id: string;
   cancel_reason: string;
   category_id: string;
@@ -142,81 +142,86 @@ interface Quotation {
   updated: Date;
   user_id: string;
 }
- 
- export default function ClientInformationPage() {
-   const router = useRouter()
-   const params = useParams()
-   const { userData } = useAuth()
-   const clientId = params.id as string
- 
-   const [company, setCompany] = useState<Company | null>(null)
-   const [proposals, setProposals] = useState<Proposal[]>([])
-   const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([])
-   const [quotations, setQuotations] = useState<Quotation[]>([])
-   const [bookings, setBookings] = useState<Booking[]>([]) // Add bookings state
-   const [loading, setLoading] = useState(true)
-   const [activeTab, setActiveTab] = useState("proposals")
-   const [searchTerm, setSearchTerm] = useState("")
-   const [showComplianceDialog, setShowComplianceDialog] = useState(false)
-   const [showContactsDialog, setShowContactsDialog] = useState(false)
-   const [uploadingDocument, setUploadingDocument] = useState<string | null>(null) // To track which document is being uploaded
-   const [companyContacts, setCompanyContacts] = useState<any[]>([])
-   const [loadingContacts, setLoadingContacts] = useState(false)
-   const [editingContact, setEditingContact] = useState<any | null>(null)
-   const [showEditContactDialog, setShowEditContactDialog] = useState(false)
-   const [showDeleteContactDialog, setShowDeleteContactDialog] = useState(false)
-   const [contactToDelete, setContactToDelete] = useState<any | null>(null)
-   const [editFormData, setEditFormData] = useState({
-     name: "",
-     designation: "",
-     phone: "",
-     email: "",
-   })
-   const [showAddContactDialog, setShowAddContactDialog] = useState(false)
-   const [addContactFormData, setAddContactFormData] = useState({
-     name: "",
-     designation: "",
-     phone: "",
-     email: "",
-   })
 
-   // Validation states for contact forms
-   const [addContactValidationErrors, setAddContactValidationErrors] = useState({
-     name: false,
-     phone: false,
-     email: false,
-     phoneFormat: false,
-   })
+export default function ClientInformationPage() {
+  const router = useRouter()
+  const params = useParams()
+  const { userData } = useAuth()
+  const clientId = params.id as string
 
-   const [editContactValidationErrors, setEditContactValidationErrors] = useState({
-     name: false,
-     phone: false,
-     email: false,
-     phoneFormat: false,
-   })
+  const [company, setCompany] = useState<Company | null>(null)
+  const [proposals, setProposals] = useState<Proposal[]>([])
+  const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([])
+  const [quotations, setQuotations] = useState<Quotation[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([]) // Add bookings state
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("proposals")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [showComplianceDialog, setShowComplianceDialog] = useState(false)
+  const [showContactsDialog, setShowContactsDialog] = useState(false)
+  const [uploadingDocument, setUploadingDocument] = useState<string | null>(null) // To track which document is being uploaded
+  const [companyContacts, setCompanyContacts] = useState<any[]>([])
+  const [loadingContacts, setLoadingContacts] = useState(false)
+  const [editingContact, setEditingContact] = useState<any | null>(null)
+  const [showEditContactDialog, setShowEditContactDialog] = useState(false)
+  const [showDeleteContactDialog, setShowDeleteContactDialog] = useState(false)
+  const [contactToDelete, setContactToDelete] = useState<any | null>(null)
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    designation: "",
+    phone: "",
+    email: "",
+  })
+  const [showAddContactDialog, setShowAddContactDialog] = useState(false)
+  const [addContactFormData, setAddContactFormData] = useState({
+    name: "",
+    designation: "",
+    phone: "",
+    email: "",
+  })
 
-   // Pagination states
-   const [proposalsPage, setProposalsPage] = useState(1)
-   const [proposalsTotalPages, setProposalsTotalPages] = useState(1)
-   const [proposalsTotalItems, setProposalsTotalItems] = useState(0)
-   const [loadingProposals, setLoadingProposals] = useState(false)
+  // Contact selection for proposal/ce/quotation creation
+  const [showSelectContactDialog, setShowSelectContactDialog] = useState(false)
+  const [selectedContact, setSelectedContact] = useState<any | null>(null)
+  const [creationMode, setCreationMode] = useState<'proposal' | 'cost_estimate' | 'quotation'>('proposal')
 
-   const [costEstimatesPage, setCostEstimatesPage] = useState(1)
-   const [costEstimatesTotalPages, setCostEstimatesTotalPages] = useState(1)
-   const [costEstimatesTotalItems, setCostEstimatesTotalItems] = useState(0)
-   const [loadingCostEstimates, setLoadingCostEstimates] = useState(false)
+  // Validation states for contact forms
+  const [addContactValidationErrors, setAddContactValidationErrors] = useState({
+    name: false,
+    phone: false,
+    email: false,
+    phoneFormat: false,
+  })
 
-   const [quotationsPage, setQuotationsPage] = useState(1)
-   const [quotationsTotalPages, setQuotationsTotalPages] = useState(1)
-   const [quotationsTotalItems, setQuotationsTotalItems] = useState(0)
-   const [loadingQuotations, setLoadingQuotations] = useState(false)
+  const [editContactValidationErrors, setEditContactValidationErrors] = useState({
+    name: false,
+    phone: false,
+    email: false,
+    phoneFormat: false,
+  })
 
-   const [reservationsPage, setReservationsPage] = useState(1)
-   const [reservationsTotalPages, setReservationsTotalPages] = useState(1)
-   const [reservationsTotalItems, setReservationsTotalItems] = useState(0)
-   const [loadingReservations, setLoadingReservations] = useState(false)
+  // Pagination states
+  const [proposalsPage, setProposalsPage] = useState(1)
+  const [proposalsTotalPages, setProposalsTotalPages] = useState(1)
+  const [proposalsTotalItems, setProposalsTotalItems] = useState(0)
+  const [loadingProposals, setLoadingProposals] = useState(false)
 
-   const ITEMS_PER_PAGE = 10
+  const [costEstimatesPage, setCostEstimatesPage] = useState(1)
+  const [costEstimatesTotalPages, setCostEstimatesTotalPages] = useState(1)
+  const [costEstimatesTotalItems, setCostEstimatesTotalItems] = useState(0)
+  const [loadingCostEstimates, setLoadingCostEstimates] = useState(false)
+
+  const [quotationsPage, setQuotationsPage] = useState(1)
+  const [quotationsTotalPages, setQuotationsTotalPages] = useState(1)
+  const [quotationsTotalItems, setQuotationsTotalItems] = useState(0)
+  const [loadingQuotations, setLoadingQuotations] = useState(false)
+
+  const [reservationsPage, setReservationsPage] = useState(1)
+  const [reservationsTotalPages, setReservationsTotalPages] = useState(1)
+  const [reservationsTotalItems, setReservationsTotalItems] = useState(0)
+  const [loadingReservations, setLoadingReservations] = useState(false)
+
+  const ITEMS_PER_PAGE = 10
 
   // Refs for hidden file inputs
   const dtiBirFileInputRef = useRef<HTMLInputElement>(null)
@@ -255,7 +260,7 @@ interface Quotation {
         orderBy("createdAt", "desc"),
         limit(ITEMS_PER_PAGE)
       )
-  
+
       // If not first page, add offset
       if (page > 1) {
         const offsetQuery = query(
@@ -266,7 +271,7 @@ interface Quotation {
         )
         const offsetSnapshot = await getDocs(offsetQuery)
         const lastDoc = offsetSnapshot.docs[offsetSnapshot.docs.length - 1]
-  
+
         if (lastDoc) {
           paginatedQuery = query(
             costEstimatesCollectionRef,
@@ -288,17 +293,17 @@ interface Quotation {
           title: data.title || "",
           startDate: data.startDate
             ? new Date(data.startDate.toDate()).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
             : "",
           endDate: data.endDate
             ? new Date(data.endDate.toDate()).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
             : "",
           totalAmount: data.totalAmount || 0,
           status: data.status || "",
@@ -404,10 +409,10 @@ interface Quotation {
           title: data.title || "",
           date: data.createdAt
             ? new Date(data.createdAt.toDate()).toLocaleDateString("en-US", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
             : "",
           sites: data.products?.length || 0,
           sentTo: data.client?.email || "",
@@ -500,7 +505,7 @@ interface Quotation {
       setLoading(false)
     }
   }
- 
+
   const loadBookings = async (page: number = 1) => {
     setLoadingReservations(true)
     try {
@@ -571,16 +576,16 @@ interface Quotation {
           created: data.created ? data.created.toDate() : new Date(),
           end_date: data.end_date
             ? (data.end_date.toDate
-                ? new Date(data.end_date.toDate()).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                : new Date(data.end_date).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  }))
+              ? new Date(data.end_date.toDate()).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })
+              : new Date(data.end_date).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              }))
             : "",
           media_order: data.media_order || [],
           payment_method: data.payment_method || "",
@@ -593,16 +598,16 @@ interface Quotation {
           seller_id: data.seller_id || "",
           start_date: data.start_date
             ? (data.start_date.toDate
-                ? new Date(data.start_date.toDate()).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })
-                : new Date(data.start_date).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  }))
+              ? new Date(data.start_date.toDate()).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })
+              : new Date(data.start_date).toLocaleDateString("en-US", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              }))
             : "",
           status: data.status || "",
           total_cost: data.total_cost || 0,
@@ -654,6 +659,39 @@ interface Quotation {
     } catch (error) {
       console.error("Error loading company contacts:", error)
       toast.error("Failed to load company contacts")
+    } finally {
+      setLoadingContacts(false)
+    }
+  }
+
+  const loadContactsForProposal = async () => {
+    setLoadingContacts(true)
+    try {
+      const clientsCollectionRef = collection(db, "client_db")
+      const q = query(
+        clientsCollectionRef,
+        where("company_id", "==", clientId),
+        where("deleted", "==", false)
+      )
+      const querySnapshot = await getDocs(q)
+
+      const fetchedContacts: any[] = querySnapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          name: data.name || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          designation: data.designation || "",
+          status: data.status || "",
+          created: data.created ? data.created.toDate() : new Date(),
+        }
+      })
+
+      setCompanyContacts(fetchedContacts)
+    } catch (error) {
+      console.error("Error loading contacts for proposal:", error)
+      toast.error("Failed to load contacts")
     } finally {
       setLoadingContacts(false)
     }
@@ -973,1046 +1011,1149 @@ interface Quotation {
       toast.error("Failed to add contact")
     }
   }
- 
-   const getStatusBadge = (status: string) => {
-     const statusColors = {
-       "Open Inquiry": "bg-gray-100 text-gray-800",
-       "For Cost Estimate": "bg-green-100 text-green-800",
-       Approved: "bg-blue-100 text-blue-800",
-       Rejected: "bg-red-100 text-red-800",
-       COMPLETED: "bg-green-500 text-white", // Added for bookings
-       CANCELLED: "bg-red-500 text-white", // Added for bookings
-       PENDING: "bg-yellow-500 text-white", // Added for bookings
-       Ongoing: "bg-gray-500 text-white", // Added for bookings
-       Done: "bg-green-500 text-white", // Added for bookings
-     }
- 
-     return (
-       <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
-         {status}
-       </Badge>
-     )
-   }
- 
-   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, documentKey: 'dti' | 'gis' | 'id') => {
-     const file = e.target.files?.[0]
-     if (!file || !company || !userData?.uid) {
-       toast.error("No file selected or user not authenticated.")
-       return
-     }
- 
-     setUploadingDocument(documentKey)
-     try {
-       const uploadPath = `compliance_documents/${company.id}/${documentKey}/`
-       const downloadUrl = await uploadFileToFirebaseStorage(file, uploadPath)
- 
-       const companyRef = doc(db, "client_company", company.id)
-       await updateDoc(companyRef, {
-         [`compliance.${documentKey}`]: downloadUrl,
-         'compliance.uploadedAt': new Date(),
-         'compliance.uploadedBy': userData.uid,
-       })
- 
-       setCompany((prev) => {
-         if (!prev) return null
-         return {
-           ...prev,
-           compliance: {
-             ...prev.compliance,
-             [documentKey]: downloadUrl,
-             uploadedAt: new Date(),
-             uploadedBy: userData.uid,
-           },
-         }
-       })
-       toast.success(`${documentKey.toUpperCase()} uploaded successfully!`)
-     } catch (error) {
-       console.error(`Error uploading ${documentKey}:`, error)
-       toast.error(`Failed to upload ${documentKey.toUpperCase()}.`)
-     } finally {
-       setUploadingDocument(null)
-       // Clear the file input value to allow re-uploading the same file
-       e.target.value = ""
-     }
-   }
- 
-   const triggerFileInput = (ref: React.RefObject<HTMLInputElement | null>) => {
-     if (ref.current) {
-       ref.current.click()
-     }
-   }
 
-   const truncateFileName = (fileName: string, maxLength: number = 10) => {
-     return fileName.length > maxLength ? fileName.substring(0, maxLength) + '...' : fileName;
-   }
- 
-   const filteredProposals = proposals.filter(
-     (proposal) =>
-     (proposal.proposalNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       proposal.title?.toLowerCase().includes(searchTerm.toLowerCase())),
-   )
- 
-   const filteredBookings = bookings.filter( // Added for bookings
+  const getStatusBadge = (status: string) => {
+    const statusColors = {
+      "Open Inquiry": "bg-gray-100 text-gray-800",
+      "For Cost Estimate": "bg-green-100 text-green-800",
+      Approved: "bg-blue-100 text-blue-800",
+      Rejected: "bg-red-100 text-red-800",
+      COMPLETED: "bg-green-500 text-white", // Added for bookings
+      CANCELLED: "bg-red-500 text-white", // Added for bookings
+      PENDING: "bg-yellow-500 text-white", // Added for bookings
+      Ongoing: "bg-gray-500 text-white", // Added for bookings
+      Done: "bg-green-500 text-white", // Added for bookings
+    }
+
+    return (
+      <Badge className={statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"}>
+        {status}
+      </Badge>
+    )
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, documentKey: 'dti' | 'gis' | 'id') => {
+    const file = e.target.files?.[0]
+    if (!file || !company || !userData?.uid) {
+      toast.error("No file selected or user not authenticated.")
+      return
+    }
+
+    setUploadingDocument(documentKey)
+    try {
+      const uploadPath = `compliance_documents/${company.id}/${documentKey}/`
+      const downloadUrl = await uploadFileToFirebaseStorage(file, uploadPath)
+
+      const companyRef = doc(db, "client_company", company.id)
+      await updateDoc(companyRef, {
+        [`compliance.${documentKey}`]: downloadUrl,
+        'compliance.uploadedAt': new Date(),
+        'compliance.uploadedBy': userData.uid,
+      })
+
+      setCompany((prev) => {
+        if (!prev) return null
+        return {
+          ...prev,
+          compliance: {
+            ...prev.compliance,
+            [documentKey]: downloadUrl,
+            uploadedAt: new Date(),
+            uploadedBy: userData.uid,
+          },
+        }
+      })
+      toast.success(`${documentKey.toUpperCase()} uploaded successfully!`)
+    } catch (error) {
+      console.error(`Error uploading ${documentKey}:`, error)
+      toast.error(`Failed to upload ${documentKey.toUpperCase()}.`)
+    } finally {
+      setUploadingDocument(null)
+      // Clear the file input value to allow re-uploading the same file
+      e.target.value = ""
+    }
+  }
+
+  const triggerFileInput = (ref: React.RefObject<HTMLInputElement | null>) => {
+    if (ref.current) {
+      ref.current.click()
+    }
+  }
+
+  const truncateFileName = (fileName: string, maxLength: number = 10) => {
+    return fileName.length > maxLength ? fileName.substring(0, maxLength) + '...' : fileName;
+  }
+
+  const filteredProposals = proposals.filter(
+    (proposal) =>
+    (proposal.proposalNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      proposal.title?.toLowerCase().includes(searchTerm.toLowerCase())),
+  )
+
+  const filteredBookings = bookings.filter( // Added for bookings
     (booking) =>
       booking.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.product_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.status?.toLowerCase().includes(searchTerm.toLowerCase())
   );
- 
-   if (loading) {
-     return (
-       <div className="flex-1 overflow-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
-         <div className="space-y-6">
-           <Skeleton className="h-8 w-64" />
-           <Card className="p-6">
-             <div className="flex items-start space-x-4">
-               <Skeleton className="w-20 h-20 rounded-lg" />
-               <div className="space-y-2 flex-1">
-                 <Skeleton className="h-6 w-48" />
-                 <Skeleton className="h-4 w-32" />
-                 <Skeleton className="h-4 w-64" />
-                 <Skeleton className="h-4 w-56" />
-               </div>
-             </div>
-           </Card>
-         </div>
-       </div>
-     )
-   }
- 
-   if (!company) {
-     return (
-       <div className="flex-1 overflow-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
-         <div className="text-center py-12">
-           <p className="text-gray-500">Client not found</p>
-           <Button onClick={() => router.push("/sales/clients")} className="mt-4">
-             Back to Clients
-           </Button>
-         </div>
-       </div>
-     )
-   }
- 
-   const primaryContact = company.contactPersons?.[0]
- 
-   return (
-     <div className="flex-1 overflow-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
-       <Toaster />
- 
-       {/* Header */}
-       <div className="flex items-center justify-between mb-6">
-         <div className="flex items-center space-x-4">
-           <Button variant="ghost" size="icon" onClick={() => router.push("/sales/clients")} className="h-8 w-8">
-             <ArrowLeft className="h-4 w-4" />
-           </Button>
-           <h1 className="text-2xl font-bold text-gray-900">Client Information</h1>
-         </div>
-         <Button variant="ghost" size="icon" className="h-8 w-8 hidden">
-           <Edit className="h-4 w-4" />
-         </Button>
-       </div>
- 
-       {/* Client Information Card */}
-       <Card className="mb-6">
-         <CardContent className="p-6">
-           <div className="flex items-start justify-between">
-             <div className="flex items-start space-x-4">
-               <div className="w-20 h-20 rounded-lg overflow-hidden bg-red-500 flex items-center justify-center">
-                 {company.companyLogoUrl ? (
-                   <img
-                     src={company.companyLogoUrl || "/placeholder.svg"}
-                     alt={company.name}
-                     className="w-full h-full object-cover"
-                   />
-                 ) : (
-                   <div className="text-white font-bold text-lg">{company.name.charAt(0)}</div>
-                 )}
-               </div>
-               <div className="space-y-1">
-                 <div>
-                   <span className="font-semibold text-gray-900">Company Name: </span>
-                   <span className="text-gray-700">{company.name}</span>
-                 </div>
-                 <div>
-                   <span className="font-semibold text-gray-900">Category: </span>
-                   <span className="text-gray-700">
-                     {company.clientType === "partner" ? "Partners" : "Brand"} - {company.partnerType || "Operator"}
-                   </span>
-                 </div>
-                 <div>
-                   <span className="font-semibold text-gray-900">Industry: </span>
-                   <span className="text-gray-700">{formatIndustryText(company.industry)}</span>
-                 </div>
-                 {primaryContact && (
-                   <>
-                     <div>
-                       <span className="font-semibold text-gray-900">Contact Person: </span>
-                       <span className="text-gray-700">{primaryContact.name}</span>
-                     </div>
-                     <div>
-                       <span className="font-semibold text-gray-900">Contact Details: </span>
-                       <span className="text-gray-700">
-                         {primaryContact.phone} / {primaryContact.email}
-                       </span>
-                     </div>
-                   </>
-                 )}
-                 <div>
-                   <span className="font-semibold text-gray-900">Address: </span>
-                   <span className="text-gray-700">{company.address}</span>
-                 </div>
-               </div>
-             </div>
-             <div className="flex flex-col gap-2">
-               <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowComplianceDialog(true)}>Corporate Compliance Docs</Button>
-               <Button variant="outline" onClick={loadCompanyContacts} disabled={loadingContacts}>
-                 {loadingContacts ? "Loading..." : "View Contacts"}
-               </Button>
-             </div>
-           </div>
-         </CardContent>
-       </Card>
-       {/* Compliance Documents Dialog */}
-       <Dialog open={showComplianceDialog} onOpenChange={setShowComplianceDialog}>
-         <DialogContent className="sm:max-w-[600px]">
-           <DialogHeader>
-             <DialogTitle className="text-xl font-bold text-gray-900">Corporate Compliance Requirements</DialogTitle>
-             <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-               <X className="h-4 w-4" />
-               <span className="sr-only">Close</span>
-             </DialogClose>
-           </DialogHeader>
-           <div className="grid gap-1 p-4">
-             {/* DTI/ BIR 2303 */}
-             <div className="flex items-center justify-between space-x-2">
-               <div className="flex items-center space-x-2">
-                 {company.compliance?.dti ? (
-                   <div className="h-5 w-5 bg-green-500 rounded-sm flex items-center justify-center">
-                     <Check className="h-4 w-4 text-white" />
-                   </div>
-                 ) : (
-                   <div className="h-5 w-5 border border-gray-300 rounded-sm" />
-                 )}
-                 <label htmlFor="dti-bir" className="text-sm font-medium leading-none">
-                   DTI/ BIR 2303
-                 </label>
-               </div>
-               {company.compliance?.dti ? (
-                 <div className="flex items-center space-x-2">
-                   <a href={company.compliance.dti} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
-                     {truncateFileName(decodeURIComponent(company.compliance.dti).split('/').pop()?.split('?')[0] || 'DTI/BIR 2303.pdf')}
-                   </a>
-                   <Edit className="h-4 w-4 text-gray-500 cursor-pointer" onClick={() => triggerFileInput(dtiBirFileInputRef)} />
-                 </div>
-               ) : (
-                 <Button variant="outline" size="sm" className="h-8" onClick={() => triggerFileInput(dtiBirFileInputRef)} disabled={uploadingDocument === "dti"}>
-                   {uploadingDocument === "dti" ? "Uploading..." : <><Upload className="h-4 w-4 mr-2" /> Upload Document</>}
-                 </Button>
-               )}
-             </div>
- 
-             {/* GIS */}
-             <div className="flex items-center justify-between space-x-2">
-               <div className="flex items-center space-x-2">
-                 {company.compliance?.gis ? (
-                   <div className="h-5 w-5 bg-green-500 rounded-sm flex items-center justify-center">
-                     <Check className="h-4 w-4 text-white" />
-                   </div>
-                 ) : (
-                   <div className="h-5 w-5 border border-gray-300 rounded-sm" />
-                 )}
-                 <label htmlFor="gis" className="text-sm font-medium leading-none">
-                   GIS
-                 </label>
-               </div>
-               {company.compliance?.gis ? (
-                 <div className="flex items-center space-x-2">
-                   <a href={company.compliance.gis} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
-                     {truncateFileName(decodeURIComponent(company.compliance.gis).split('/').pop()?.split('?')[0] || 'GIS.pdf')}
-                   </a>
-                   <Edit className="h-4 w-4 text-gray-500 cursor-pointer" onClick={() => triggerFileInput(gisFileInputRef)} />
-                 </div>
-               ) : (
-                 <Button variant="outline" size="sm" className="h-8" onClick={() => triggerFileInput(gisFileInputRef)} disabled={uploadingDocument === "gis"}>
-                   {uploadingDocument === "gis" ? "Uploading..." : <><Upload className="h-4 w-4 mr-2" /> Upload Document</>}
-                 </Button>
-               )}
-             </div>
- 
-             {/* ID with signature */}
-             <div className="flex items-center justify-between space-x-2">
-               <div className="flex items-center space-x-2">
-                 {company.compliance?.id ? (
-                   <div className="h-5 w-5 bg-green-500 rounded-sm flex items-center justify-center">
-                     <Check className="h-4 w-4 text-white" />
-                   </div>
-                 ) : (
-                   <div className="h-5 w-5 border border-gray-300 rounded-sm" />
-                 )}
-                 <label htmlFor="id-signature" className="text-sm font-medium leading-none">
-                   ID with signature
-                 </label>
-               </div>
-               {company.compliance?.id ? (
-                 <div className="flex items-center space-x-2">
-                   <a href={company.compliance.id} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
-                     {truncateFileName(decodeURIComponent(company.compliance.id).split('/').pop()?.split('?')[0] || 'ID_with_signature.pdf')}
-                   </a>
-                   <Edit className="h-4 w-4 text-gray-500 cursor-pointer" onClick={() => triggerFileInput(idSignatureFileInputRef)} />
-                 </div>
-               ) : (
-                 <Button variant="outline" size="sm" className="h-8" onClick={() => triggerFileInput(idSignatureFileInputRef)} disabled={uploadingDocument === "id"}>
-                   {uploadingDocument === "id" ? "Uploading..." : <><Upload className="h-4 w-4 mr-2" /> Upload Document</>}
-                 </Button>
-               )}
-             </div>
-           </div>
- 
-           {/* Hidden file inputs */}
-           <input
-             type="file"
-             ref={dtiBirFileInputRef}
-             onChange={(e) => handleFileUpload(e, "dti")}
-             className="hidden"
-             accept="application/pdf,image/*"
-           />
-           <input
-             type="file"
-             ref={gisFileInputRef}
-             onChange={(e) => handleFileUpload(e, "gis")}
-             className="hidden"
-             accept="application/pdf,image/*"
-           />
-           <input
-             type="file"
-             ref={idSignatureFileInputRef}
-             onChange={(e) => handleFileUpload(e, "id")}
-             className="hidden"
-             accept="application/pdf,image/*"
-           />
-         </DialogContent>
-       </Dialog>
 
-       {/* View Contacts Dialog */}
-       <Dialog open={showContactsDialog} onOpenChange={setShowContactsDialog}>
-         <DialogContent className="sm:max-w-[800px]">
-           <DialogHeader>
-             <DialogTitle className="text-xl font-bold text-gray-900">Company Contacts</DialogTitle>
-             <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-               <X className="h-4 w-4" />
-               <span className="sr-only">Close</span>
-             </DialogClose>
-           </DialogHeader>
+  if (loading) {
+    return (
+      <div className="flex-1 overflow-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+        <div className="space-y-6">
+          <Skeleton className="h-8 w-64" />
+          <Card className="p-6">
+            <div className="flex items-start space-x-4">
+              <Skeleton className="w-20 h-20 rounded-lg" />
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-6 w-48" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-64" />
+                <Skeleton className="h-4 w-56" />
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
-           <div className="py-4">
-             <div className="flex items-center justify-between mb-4">
-               <h3 className="text-lg font-medium text-gray-900">{company?.name} - Contacts</h3>
-               <div className="flex items-center gap-3">
-                 <Badge variant="outline" className="text-sm">
-                   Total: {companyContacts.length}
-                 </Badge>
-                 <Button onClick={handleAddContact} size="sm" className="bg-blue-600 hover:bg-blue-700">
-                   <Plus className="h-4 w-4 mr-2" />
-                   Add Contact
-                 </Button>
-               </div>
-             </div>
+  if (!company) {
+    return (
+      <div className="flex-1 overflow-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+        <div className="text-center py-12">
+          <p className="text-gray-500">Client not found</p>
+          <Button onClick={() => router.push("/sales/clients")} className="mt-4">
+            Back to Clients
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
-             {companyContacts.length > 0 ? (
-               <div className="border rounded-lg overflow-hidden">
-                 <Table>
-                   <TableHeader>
-                     <TableRow className="bg-gray-50">
-                       <TableHead className="font-medium text-gray-700">Name</TableHead>
-                       <TableHead className="font-medium text-gray-700">Designation</TableHead>
-                       <TableHead className="font-medium text-gray-700">Contact Details</TableHead>
-                       <TableHead className="font-medium text-gray-700">Status</TableHead>
-                       <TableHead className="font-medium text-gray-700">Created</TableHead>
-                       <TableHead className="font-medium text-gray-700">Actions</TableHead>
-                     </TableRow>
-                   </TableHeader>
-                   <TableBody>
-                     {companyContacts.map((contact) => (
-                       <TableRow key={contact.id}>
-                         <TableCell className="font-medium text-gray-900">{contact.name}</TableCell>
-                         <TableCell className="text-gray-700">{contact.designation || "N/A"}</TableCell>
-                         <TableCell className="text-gray-700">
-                           <div className="space-y-1">
-                             <div className="text-sm">{contact.email}</div>
-                             <div className="text-sm text-gray-500">{contact.phone}</div>
-                           </div>
-                         </TableCell>
-                         <TableCell>
-                           <Badge
-                             variant="outline"
-                             className={`${
-                               contact.status === "active"
-                                 ? "bg-green-100 text-green-800"
-                                 : contact.status === "inactive"
-                                 ? "bg-red-100 text-red-800"
-                                 : "bg-gray-100 text-gray-800"
-                             }`}
-                           >
-                             {contact.status || "lead"}
-                           </Badge>
-                         </TableCell>
-                         <TableCell className="text-sm text-gray-500">
-                           {new Date(contact.created).toLocaleDateString("en-US", {
-                             year: "numeric",
-                             month: "short",
-                             day: "numeric",
-                           })}
-                         </TableCell>
-                         <TableCell>
-                           <div className="flex items-center space-x-2">
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => handleEditContact(contact)}
-                               className="h-8 w-8 p-0"
-                             >
-                               <Edit className="h-4 w-4" />
-                             </Button>
-                             <Button
-                               variant="ghost"
-                               size="sm"
-                               onClick={() => handleDeleteContact(contact)}
-                               className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                             >
-                               <Trash2 className="h-4 w-4" />
-                             </Button>
-                           </div>
-                         </TableCell>
-                       </TableRow>
-                     ))}
-                   </TableBody>
-                 </Table>
-               </div>
-             ) : (
-               <div className="text-center py-8 text-gray-500">
-                 <p>No contacts found for this company.</p>
-               </div>
-             )}
-           </div>
+  const primaryContact = company.contactPersons?.[0]
 
-           <DialogFooter>
-             <Button variant="outline" onClick={() => setShowContactsDialog(false)}>
-               Close
-             </Button>
-           </DialogFooter>
-         </DialogContent>
-       </Dialog>
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <Toaster />
 
-       {/* Edit Contact Dialog */}
-       <Dialog open={showEditContactDialog} onOpenChange={setShowEditContactDialog}>
-         <DialogContent className="sm:max-w-[500px]">
-           <DialogHeader>
-             <DialogTitle className="text-xl font-bold text-gray-900">Edit Contact</DialogTitle>
-             <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-               <X className="h-4 w-4" />
-               <span className="sr-only">Close</span>
-             </DialogClose>
-           </DialogHeader>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-4">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/sales/clients")} className="h-8 w-8">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-2xl font-bold text-gray-900">Client Information</h1>
+        </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8 hidden">
+          <Edit className="h-4 w-4" />
+        </Button>
+      </div>
 
-           <div className="py-4">
-             <div className="grid grid-cols-1 gap-4">
-               <div className="space-y-2">
-                 <Label htmlFor="edit-name">Name *</Label>
-                 <Input
-                   id="edit-name"
-                   value={editFormData.name}
-                   onChange={(e) => {
-                     setEditFormData({ ...editFormData, name: e.target.value })
-                     if (editContactValidationErrors.name) {
-                       setEditContactValidationErrors({ ...editContactValidationErrors, name: false })
-                     }
-                   }}
-                   placeholder="Contact name"
-                   className={editContactValidationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
-                 />
-                 {editContactValidationErrors.name && (
-                   <p className="text-sm text-red-500">Name is required</p>
-                 )}
-               </div>
+      {/* Client Information Card */}
+      <Card className="mb-6">
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start space-x-4">
+              <div className="w-20 h-20 rounded-lg overflow-hidden bg-red-500 flex items-center justify-center">
+                {company.companyLogoUrl ? (
+                  <img
+                    src={company.companyLogoUrl || "/placeholder.svg"}
+                    alt={company.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="text-white font-bold text-lg">{company.name.charAt(0)}</div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <div>
+                  <span className="font-semibold text-gray-900">Company Name: </span>
+                  <span className="text-gray-700">{company.name}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-900">Category: </span>
+                  <span className="text-gray-700">
+                    {company.clientType === "partner" ? "Partners" : "Brand"} - {company.partnerType || "Operator"}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-900">Industry: </span>
+                  <span className="text-gray-700">{formatIndustryText(company.industry)}</span>
+                </div>
+                {primaryContact && (
+                  <>
+                    <div>
+                      <span className="font-semibold text-gray-900">Contact Person: </span>
+                      <span className="text-gray-700">{primaryContact.name}</span>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-gray-900">Contact Details: </span>
+                      <span className="text-gray-700">
+                        {primaryContact.phone} / {primaryContact.email}
+                      </span>
+                    </div>
+                  </>
+                )}
+                <div>
+                  <span className="font-semibold text-gray-900">Address: </span>
+                  <span className="text-gray-700">{company.address}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setShowComplianceDialog(true)}>Corporate Compliance Docs</Button>
+              <Button variant="outline" onClick={loadCompanyContacts} disabled={loadingContacts}>
+                {loadingContacts ? "Loading..." : "View Contacts"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      {/* Compliance Documents Dialog */}
+      <Dialog open={showComplianceDialog} onOpenChange={setShowComplianceDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">Corporate Compliance Requirements</DialogTitle>
+            <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </DialogHeader>
+          <div className="grid gap-1 p-4">
+            {/* DTI/ BIR 2303 */}
+            <div className="flex items-center justify-between space-x-2">
+              <div className="flex items-center space-x-2">
+                {company.compliance?.dti ? (
+                  <div className="h-5 w-5 bg-green-500 rounded-sm flex items-center justify-center">
+                    <Check className="h-4 w-4 text-white" />
+                  </div>
+                ) : (
+                  <div className="h-5 w-5 border border-gray-300 rounded-sm" />
+                )}
+                <label htmlFor="dti-bir" className="text-sm font-medium leading-none">
+                  DTI/ BIR 2303
+                </label>
+              </div>
+              {company.compliance?.dti ? (
+                <div className="flex items-center space-x-2">
+                  <a href={company.compliance.dti} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                    {truncateFileName(decodeURIComponent(company.compliance.dti).split('/').pop()?.split('?')[0] || 'DTI/BIR 2303.pdf')}
+                  </a>
+                  <Edit className="h-4 w-4 text-gray-500 cursor-pointer" onClick={() => triggerFileInput(dtiBirFileInputRef)} />
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" className="h-8" onClick={() => triggerFileInput(dtiBirFileInputRef)} disabled={uploadingDocument === "dti"}>
+                  {uploadingDocument === "dti" ? "Uploading..." : <><Upload className="h-4 w-4 mr-2" /> Upload Document</>}
+                </Button>
+              )}
+            </div>
 
-               <div className="space-y-2">
-                 <Label htmlFor="edit-designation">Designation</Label>
-                 <Input
-                   id="edit-designation"
-                   value={editFormData.designation}
-                   onChange={(e) => setEditFormData({ ...editFormData, designation: e.target.value })}
-                   placeholder="Job title/designation"
-                 />
-               </div>
+            {/* GIS */}
+            <div className="flex items-center justify-between space-x-2">
+              <div className="flex items-center space-x-2">
+                {company.compliance?.gis ? (
+                  <div className="h-5 w-5 bg-green-500 rounded-sm flex items-center justify-center">
+                    <Check className="h-4 w-4 text-white" />
+                  </div>
+                ) : (
+                  <div className="h-5 w-5 border border-gray-300 rounded-sm" />
+                )}
+                <label htmlFor="gis" className="text-sm font-medium leading-none">
+                  GIS
+                </label>
+              </div>
+              {company.compliance?.gis ? (
+                <div className="flex items-center space-x-2">
+                  <a href={company.compliance.gis} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                    {truncateFileName(decodeURIComponent(company.compliance.gis).split('/').pop()?.split('?')[0] || 'GIS.pdf')}
+                  </a>
+                  <Edit className="h-4 w-4 text-gray-500 cursor-pointer" onClick={() => triggerFileInput(gisFileInputRef)} />
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" className="h-8" onClick={() => triggerFileInput(gisFileInputRef)} disabled={uploadingDocument === "gis"}>
+                  {uploadingDocument === "gis" ? "Uploading..." : <><Upload className="h-4 w-4 mr-2" /> Upload Document</>}
+                </Button>
+              )}
+            </div>
 
-               <div className="space-y-2">
-                 <Label htmlFor="edit-phone">Phone *</Label>
-                 <Input
-                   id="edit-phone"
-                   value={editFormData.phone}
-                   onChange={handleEditContactPhoneInput}
-                   placeholder="Enter 10 digits"
-                   className={(editContactValidationErrors.phone || editContactValidationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
-                 />
-                 {editContactValidationErrors.phone && (
-                   <p className="text-sm text-red-500">Phone number is required</p>
-                 )}
-                 {editContactValidationErrors.phoneFormat && !editContactValidationErrors.phone && (
-                   <p className="text-sm text-red-500">Please enter exactly 10 digits</p>
-                 )}
-               </div>
+            {/* ID with signature */}
+            <div className="flex items-center justify-between space-x-2">
+              <div className="flex items-center space-x-2">
+                {company.compliance?.id ? (
+                  <div className="h-5 w-5 bg-green-500 rounded-sm flex items-center justify-center">
+                    <Check className="h-4 w-4 text-white" />
+                  </div>
+                ) : (
+                  <div className="h-5 w-5 border border-gray-300 rounded-sm" />
+                )}
+                <label htmlFor="id-signature" className="text-sm font-medium leading-none">
+                  ID with signature
+                </label>
+              </div>
+              {company.compliance?.id ? (
+                <div className="flex items-center space-x-2">
+                  <a href={company.compliance.id} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                    {truncateFileName(decodeURIComponent(company.compliance.id).split('/').pop()?.split('?')[0] || 'ID_with_signature.pdf')}
+                  </a>
+                  <Edit className="h-4 w-4 text-gray-500 cursor-pointer" onClick={() => triggerFileInput(idSignatureFileInputRef)} />
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" className="h-8" onClick={() => triggerFileInput(idSignatureFileInputRef)} disabled={uploadingDocument === "id"}>
+                  {uploadingDocument === "id" ? "Uploading..." : <><Upload className="h-4 w-4 mr-2" /> Upload Document</>}
+                </Button>
+              )}
+            </div>
+          </div>
 
-               <div className="space-y-2">
-                 <Label htmlFor="edit-email">Email *</Label>
-                 <Input
-                   id="edit-email"
-                   type="email"
-                   value={editFormData.email}
-                   onChange={(e) => {
-                     setEditFormData({ ...editFormData, email: e.target.value })
-                     if (editContactValidationErrors.email) {
-                       setEditContactValidationErrors({ ...editContactValidationErrors, email: false })
-                     }
-                   }}
-                   placeholder="Email address"
-                   className={editContactValidationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
-                 />
-                 {editContactValidationErrors.email && (
-                   <p className="text-sm text-red-500">Email address is required</p>
-                 )}
-               </div>
-             </div>
-           </div>
+          {/* Hidden file inputs */}
+          <input
+            type="file"
+            ref={dtiBirFileInputRef}
+            onChange={(e) => handleFileUpload(e, "dti")}
+            className="hidden"
+            accept="application/pdf,image/*"
+          />
+          <input
+            type="file"
+            ref={gisFileInputRef}
+            onChange={(e) => handleFileUpload(e, "gis")}
+            className="hidden"
+            accept="application/pdf,image/*"
+          />
+          <input
+            type="file"
+            ref={idSignatureFileInputRef}
+            onChange={(e) => handleFileUpload(e, "id")}
+            className="hidden"
+            accept="application/pdf,image/*"
+          />
+        </DialogContent>
+      </Dialog>
 
-           <DialogFooter>
-             <Button variant="outline" onClick={() => setShowEditContactDialog(false)}>
-               Cancel
-             </Button>
-             <Button onClick={handleSaveContactEdit} className="bg-blue-600 hover:bg-blue-700">
-               Save Changes
-             </Button>
-           </DialogFooter>
-         </DialogContent>
-       </Dialog>
+      {/* View Contacts Dialog */}
+      <Dialog open={showContactsDialog} onOpenChange={setShowContactsDialog}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">Company Contacts</DialogTitle>
+            <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </DialogHeader>
 
-       {/* Delete Contact Confirmation Dialog */}
-       <Dialog open={showDeleteContactDialog} onOpenChange={setShowDeleteContactDialog}>
-         <DialogContent className="sm:max-w-[400px]">
-           <DialogHeader>
-             <DialogTitle className="text-xl font-bold text-gray-900">Delete Contact</DialogTitle>
-           </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-900">{company?.name} - Contacts</h3>
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="text-sm">
+                  Total: {companyContacts.length}
+                </Badge>
+                <Button onClick={handleAddContact} size="sm" className="bg-blue-600 hover:bg-blue-700">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Contact
+                </Button>
+              </div>
+            </div>
 
-           <div className="py-4">
-             <p className="text-gray-700">
-               Are you sure you want to delete the contact{" "}
-               <span className="font-semibold text-gray-900">
-                 {contactToDelete?.name}
-               </span>
-               ? This action cannot be undone.
-             </p>
-           </div>
+            {companyContacts.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-medium text-gray-700">Name</TableHead>
+                      <TableHead className="font-medium text-gray-700">Designation</TableHead>
+                      <TableHead className="font-medium text-gray-700">Contact Details</TableHead>
+                      <TableHead className="font-medium text-gray-700">Status</TableHead>
+                      <TableHead className="font-medium text-gray-700">Created</TableHead>
+                      <TableHead className="font-medium text-gray-700">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companyContacts.map((contact) => (
+                      <TableRow key={contact.id}>
+                        <TableCell className="font-medium text-gray-900">{contact.name}</TableCell>
+                        <TableCell className="text-gray-700">{contact.designation || "N/A"}</TableCell>
+                        <TableCell className="text-gray-700">
+                          <div className="space-y-1">
+                            <div className="text-sm">{contact.email}</div>
+                            <div className="text-sm text-gray-500">{contact.phone}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={`${contact.status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : contact.status === "inactive"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                          >
+                            {contact.status || "lead"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-gray-500">
+                          {new Date(contact.created).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditContact(contact)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteContact(contact)}
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No contacts found for this company.</p>
+              </div>
+            )}
+          </div>
 
-           <DialogFooter>
-             <Button variant="outline" onClick={() => setShowDeleteContactDialog(false)}>
-               Cancel
-             </Button>
-             <Button
-               onClick={handleConfirmDeleteContact}
-               className="bg-red-600 hover:bg-red-700 text-white"
-             >
-               Delete Contact
-             </Button>
-           </DialogFooter>
-         </DialogContent>
-       </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowContactsDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-       {/* Add Contact Dialog */}
-       <Dialog open={showAddContactDialog} onOpenChange={setShowAddContactDialog}>
-         <DialogContent className="sm:max-w-[500px]">
-           <DialogHeader>
-             <DialogTitle className="text-xl font-bold text-gray-900">Add New Contact</DialogTitle>
-             <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-               <X className="h-4 w-4" />
-               <span className="sr-only">Close</span>
-             </DialogClose>
-           </DialogHeader>
+      {/* Edit Contact Dialog */}
+      <Dialog open={showEditContactDialog} onOpenChange={setShowEditContactDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">Edit Contact</DialogTitle>
+            <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </DialogHeader>
 
-           <div className="py-4">
-             <div className="grid grid-cols-1 gap-4">
-               <div className="space-y-2">
-                 <Label htmlFor="add-name">Name *</Label>
-                 <Input
-                   id="add-name"
-                   value={addContactFormData.name}
-                   onChange={(e) => {
-                     setAddContactFormData({ ...addContactFormData, name: e.target.value })
-                     if (addContactValidationErrors.name) {
-                       setAddContactValidationErrors({ ...addContactValidationErrors, name: false })
-                     }
-                   }}
-                   placeholder="Contact name"
-                   className={addContactValidationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
-                   required
-                 />
-                 {addContactValidationErrors.name && (
-                   <p className="text-sm text-red-500">Name is required</p>
-                 )}
-               </div>
+          <div className="py-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Name *</Label>
+                <Input
+                  id="edit-name"
+                  value={editFormData.name}
+                  onChange={(e) => {
+                    setEditFormData({ ...editFormData, name: e.target.value })
+                    if (editContactValidationErrors.name) {
+                      setEditContactValidationErrors({ ...editContactValidationErrors, name: false })
+                    }
+                  }}
+                  placeholder="Contact name"
+                  className={editContactValidationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
+                />
+                {editContactValidationErrors.name && (
+                  <p className="text-sm text-red-500">Name is required</p>
+                )}
+              </div>
 
-               <div className="space-y-2">
-                 <Label htmlFor="add-designation">Designation</Label>
-                 <Input
-                   id="add-designation"
-                   value={addContactFormData.designation}
-                   onChange={(e) => setAddContactFormData({ ...addContactFormData, designation: e.target.value })}
-                   placeholder="Job title/designation"
-                 />
-               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-designation">Designation</Label>
+                <Input
+                  id="edit-designation"
+                  value={editFormData.designation}
+                  onChange={(e) => setEditFormData({ ...editFormData, designation: e.target.value })}
+                  placeholder="Job title/designation"
+                />
+              </div>
 
-               <div className="space-y-2">
-                 <Label htmlFor="add-phone">Phone *</Label>
-                 <Input
-                   id="add-phone"
-                   value={addContactFormData.phone}
-                   onChange={handleAddContactPhoneInput}
-                   placeholder="Enter 10 digits"
-                   className={(addContactValidationErrors.phone || addContactValidationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
-                 />
-                 {addContactValidationErrors.phone && (
-                   <p className="text-sm text-red-500">Phone number is required</p>
-                 )}
-                 {addContactValidationErrors.phoneFormat && !addContactValidationErrors.phone && (
-                   <p className="text-sm text-red-500">Please enter exactly 10 digits</p>
-                 )}
-               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">Phone *</Label>
+                <Input
+                  id="edit-phone"
+                  value={editFormData.phone}
+                  onChange={handleEditContactPhoneInput}
+                  placeholder="Enter 10 digits"
+                  className={(editContactValidationErrors.phone || editContactValidationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
+                />
+                {editContactValidationErrors.phone && (
+                  <p className="text-sm text-red-500">Phone number is required</p>
+                )}
+                {editContactValidationErrors.phoneFormat && !editContactValidationErrors.phone && (
+                  <p className="text-sm text-red-500">Please enter exactly 10 digits</p>
+                )}
+              </div>
 
-               <div className="space-y-2">
-                 <Label htmlFor="add-email">Email *</Label>
-                 <Input
-                   id="add-email"
-                   type="email"
-                   value={addContactFormData.email}
-                   onChange={(e) => {
-                     setAddContactFormData({ ...addContactFormData, email: e.target.value })
-                     if (addContactValidationErrors.email) {
-                       setAddContactValidationErrors({ ...addContactValidationErrors, email: false })
-                     }
-                   }}
-                   placeholder="Email address"
-                   className={addContactValidationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
-                   required
-                 />
-                 {addContactValidationErrors.email && (
-                   <p className="text-sm text-red-500">Email address is required</p>
-                 )}
-               </div>
-             </div>
-           </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email *</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editFormData.email}
+                  onChange={(e) => {
+                    setEditFormData({ ...editFormData, email: e.target.value })
+                    if (editContactValidationErrors.email) {
+                      setEditContactValidationErrors({ ...editContactValidationErrors, email: false })
+                    }
+                  }}
+                  placeholder="Email address"
+                  className={editContactValidationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
+                />
+                {editContactValidationErrors.email && (
+                  <p className="text-sm text-red-500">Email address is required</p>
+                )}
+              </div>
+            </div>
+          </div>
 
-           <DialogFooter>
-             <Button variant="outline" onClick={() => setShowAddContactDialog(false)}>
-               Cancel
-             </Button>
-             <Button onClick={handleSaveNewContact} className="bg-blue-600 hover:bg-blue-700">
-               Add Contact
-             </Button>
-           </DialogFooter>
-         </DialogContent>
-       </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditContactDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveContactEdit} className="bg-blue-600 hover:bg-blue-700">
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-       {/* Tabs */}
-       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-         <TabsList className="grid w-full grid-cols-4">
-           <TabsTrigger value="proposals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
-             Proposals
-           </TabsTrigger>
-           <TabsTrigger value="cost-estimates">Cost Estimates</TabsTrigger>
-           <TabsTrigger value="quotations">Quotations</TabsTrigger>
-           <TabsTrigger value="reservations">Reservations</TabsTrigger>
-         </TabsList>
- 
-         <TabsContent value="proposals" className="space-y-4">
-           <Card>
-             <CardContent className="p-6">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="flex items-center space-x-4">
-                   <div className="relative">
-                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                     <Input
-                       placeholder="Search proposals..."
-                       value={searchTerm}
-                       onChange={(e) => setSearchTerm(e.target.value)}
-                       className="pl-10 w-64"
-                     />
-                   </div>
-                   <Button
-                     onClick={() => router.push(`/sales/dashboard?mode=proposal&clientId=${clientId}`)}
-                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
-                   >
-                     <Plus className="h-4 w-4" />
-                     <span>Create New Proposal</span>
-                   </Button>
-                 </div>
-                 <div className="flex items-center space-x-2">
-                   <span className="text-sm text-gray-500">Total: {proposalsTotalItems}</span>
-                   <span className="text-sm text-gray-500">All Time</span>
-                 </div>
-               </div>
- 
-               <Table>
-                 <TableHeader>
-                   <TableRow>
-                     <TableHead>Proposal ID</TableHead>
-                     <TableHead>Date</TableHead>
-                     <TableHead>Site Name</TableHead>
-                     <TableHead>Sent To</TableHead>
-                     <TableHead>Status</TableHead>
-                   </TableRow>
-                 </TableHeader>
-                 <TableBody>
-                   {filteredProposals.map((proposal) => (
-                     <TableRow key={proposal.id}>
-                       <TableCell>{proposal.proposalNumber}</TableCell>
-                       <TableCell>{proposal.date}</TableCell>
-                       <TableCell>({proposal.sites}) Sites</TableCell>
-                       <TableCell>{proposal.sentTo}</TableCell>
-                       <TableCell>{getStatusBadge(proposal.status)}</TableCell>
-                     </TableRow>
-                   ))}
-                 </TableBody>
-               </Table>
+      {/* Delete Contact Confirmation Dialog */}
+      <Dialog open={showDeleteContactDialog} onOpenChange={setShowDeleteContactDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">Delete Contact</DialogTitle>
+          </DialogHeader>
 
-               {/* Pagination */}
-               {proposalsTotalPages > 1 && (
-                 <div className="flex items-center justify-center mt-6">
-                   <div className="flex items-center space-x-2">
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setProposalsPage(prev => Math.max(1, prev - 1))}
-                       disabled={proposalsPage === 1 || loadingProposals}
-                     >
-                       Previous
-                     </Button>
-                     <span className="text-sm text-gray-600">
-                       Page {proposalsPage} of {proposalsTotalPages}
-                     </span>
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setProposalsPage(prev => Math.min(proposalsTotalPages, prev + 1))}
-                       disabled={proposalsPage === proposalsTotalPages || loadingProposals}
-                     >
-                       Next
-                     </Button>
-                   </div>
-                 </div>
-               )}
-             </CardContent>
-           </Card>
-         </TabsContent>
- 
-         <TabsContent value="cost-estimates" className="space-y-4">
-           <Card>
-             <CardContent className="p-6">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="flex items-center space-x-4">
-                   <div className="relative">
-                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                     <Input
-                       placeholder="Search cost estimates..."
-                       value={searchTerm}
-                       onChange={(e) => setSearchTerm(e.target.value)}
-                       className="pl-10 w-64"
-                     />
-                   </div>
-                   <Button
-                     onClick={() => router.push(`/sales/dashboard?mode=cost_estimate&clientId=${clientId}`)}
-                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
-                   >
-                     <Plus className="h-4 w-4" />
-                     <span>Create New Cost Estimate</span>
-                   </Button>
-                 </div>
-                 <div className="flex items-center space-x-2">
-                   <span className="text-sm text-gray-500">Total: {costEstimatesTotalItems}</span>
-                   <span className="text-sm text-gray-500">All Time</span>
-                 </div>
-               </div>
- 
-               <Table>
-                 <TableHeader>
-                   <TableRow>
-                     <TableHead>Cost Estimate ID</TableHead>
-                     <TableHead>Site Name</TableHead>
-                     <TableHead>Start Date</TableHead>
-                     <TableHead>End Date</TableHead>
-                     <TableHead>Total Amount</TableHead>
-                     <TableHead>Status</TableHead>
-                   </TableRow>
-                 </TableHeader>
-                 <TableBody>
-                   {costEstimates.filter(
-                     (ce) =>
-                       ce.costEstimateNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       ce.title?.toLowerCase().includes(searchTerm.toLowerCase())
-                   ).map((costEstimate) => (
-                     <TableRow key={costEstimate.id}>
-                       <TableCell className="text-blue-600 font-medium">{costEstimate.costEstimateNumber}</TableCell>
-                       <TableCell>{costEstimate.title}</TableCell>
-                       <TableCell>{costEstimate.startDate}</TableCell>
-                       <TableCell>{costEstimate.endDate}</TableCell>
-                       <TableCell>{costEstimate.totalAmount.toLocaleString('en-US', { style: 'currency', currency: 'PHP' })}</TableCell>
-                       <TableCell>{getStatusBadge(costEstimate.status)}</TableCell>
-                     </TableRow>
-                   ))}
-                 </TableBody>
-               </Table>
+          <div className="py-4">
+            <p className="text-gray-700">
+              Are you sure you want to delete the contact{" "}
+              <span className="font-semibold text-gray-900">
+                {contactToDelete?.name}
+              </span>
+              ? This action cannot be undone.
+            </p>
+          </div>
 
-               {/* Pagination */}
-               {costEstimatesTotalPages > 1 && (
-                 <div className="flex items-center justify-center mt-6">
-                   <div className="flex items-center space-x-2">
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setCostEstimatesPage(prev => Math.max(1, prev - 1))}
-                       disabled={costEstimatesPage === 1 || loadingCostEstimates}
-                     >
-                       Previous
-                     </Button>
-                     <span className="text-sm text-gray-600">
-                       Page {costEstimatesPage} of {costEstimatesTotalPages}
-                     </span>
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setCostEstimatesPage(prev => Math.min(costEstimatesTotalPages, prev + 1))}
-                       disabled={costEstimatesPage === costEstimatesTotalPages || loadingCostEstimates}
-                     >
-                       Next
-                     </Button>
-                   </div>
-                 </div>
-               )}
-             </CardContent>
-           </Card>
-         </TabsContent>
-         {/* Quotations Tab */}
-         <TabsContent value="quotations" className="space-y-4">
-           <Card>
-             <CardContent className="p-6">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="flex items-center space-x-4">
-                   <div className="relative">
-                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                     <Input
-                       placeholder="Search quotations..."
-                       value={searchTerm}
-                       onChange={(e) => setSearchTerm(e.target.value)}
-                       className="pl-10 w-64"
-                     />
-                   </div>
-                   <Button
-                     onClick={() => router.push(`/sales/dashboard?mode=quotation&clientId=${clientId}`)}
-                     className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
-                   >
-                     <Plus className="h-4 w-4" />
-                     <span>Create New Quotation</span>
-                   </Button>
-                 </div>
-                 <div className="flex items-center space-x-2">
-                   <span className="text-sm text-gray-500">Total: {quotationsTotalItems}</span>
-                   <span className="text-sm text-gray-500">All Time</span>
-                 </div>
-               </div>
- 
-               <Table>
-                 <TableHeader>
-                   <TableRow>
-                     <TableHead>Quotation ID</TableHead>
-                     <TableHead>Date</TableHead>
-                     <TableHead>Site Name</TableHead>
-                     <TableHead>Duration</TableHead>
-                     <TableHead>Amount</TableHead>
-                     <TableHead>Status</TableHead>
-                   </TableRow>
-                 </TableHeader>
-                 <TableBody>
-                   {quotations.filter(
-                     (quotation) =>
-                       quotation.quotation_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       quotation.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
-                   ).map((quotation) => (
-                     <TableRow key={quotation.id}>
-                       <TableCell>{quotation.quotation_number}</TableCell>
-                       <TableCell>
-                         {new Date(quotation.created).toLocaleDateString("en-US", {
-                           month: "short",
-                           day: "numeric",
-                           year: "numeric",
-                         })}
-                       </TableCell>
-                       <TableCell>{quotation.items?.name || "N/A"}</TableCell>
-                       <TableCell>
-                         {new Date(quotation.start_date).toLocaleDateString("en-US", {
-                           month: "short",
-                           day: "numeric",
-                           year: "numeric",
-                         })} to{" "}
-                         {new Date(quotation.end_date).toLocaleDateString("en-US", {
-                           month: "short",
-                           day: "numeric",
-                           year: "numeric",
-                         })}
-                         <br />
-                         ({Math.floor(quotation.duration_days / 30)}{" "}
-                         months and {quotation.duration_days % 30} days)
-                       </TableCell>
-                       <TableCell>{quotation.total_amount.toLocaleString('en-US', { style: 'currency', currency: 'PHP' })}</TableCell>
-                       <TableCell>
-                         <Badge
-                           className={`${
-                             quotation.status === "Expired"
-                               ? "bg-gray-200 text-gray-800"
-                               : "bg-green-100 text-green-800"
-                           } rounded-md px-2 py-1 text-xs font-medium`}
-                         >
-                           {quotation.status}
-                         </Badge>
-                       </TableCell>
-                     </TableRow>
-                   ))}
-                 </TableBody>
-               </Table>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteContactDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDeleteContact}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Delete Contact
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-               {/* Pagination */}
-               {quotationsTotalPages > 1 && (
-                 <div className="flex items-center justify-center mt-6">
-                   <div className="flex items-center space-x-2">
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setQuotationsPage(prev => Math.max(1, prev - 1))}
-                       disabled={quotationsPage === 1 || loadingQuotations}
-                     >
-                       Previous
-                     </Button>
-                     <span className="text-sm text-gray-600">
-                       Page {quotationsPage} of {quotationsTotalPages}
-                     </span>
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setQuotationsPage(prev => Math.min(quotationsTotalPages, prev + 1))}
-                       disabled={quotationsPage === quotationsTotalPages || loadingQuotations}
-                     >
-                       Next
-                     </Button>
-                   </div>
-                 </div>
-               )}
-             </CardContent>
-           </Card>
-         </TabsContent>
- 
-         <TabsContent value="reservations">
-           <Card>
-             <CardContent className="p-6">
-               <div className="flex items-center justify-between mb-4">
-                 <div className="relative">
-                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                   <Input
-                     placeholder="Search reservations..."
-                     value={searchTerm}
-                     onChange={(e) => setSearchTerm(e.target.value)}
-                     className="pl-10 w-64"
-                   />
-                 </div>
-                 <div className="flex items-center space-x-2">
-                   <span className="text-sm text-gray-500">Total: {reservationsTotalItems}</span>
-                   <span className="text-sm text-gray-500">All Time</span>
-                 </div>
-               </div>
- 
-               <Table>
-                 <TableHeader>
-                   <TableRow>
-                     <TableHead>Reservation ID</TableHead>
-                     <TableHead>Date</TableHead>
-                     <TableHead>Site Name</TableHead>
-                     <TableHead>Duration</TableHead>
-                     <TableHead>Amount</TableHead>
-                     <TableHead>Status</TableHead>
-                   </TableRow>
-                 </TableHeader>
-                 <TableBody>
-                   {filteredBookings.map((booking) => {
-                     const startDate = new Date(booking.start_date);
-                     const endDate = new Date(booking.end_date);
-                     const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                     const diffMonths = Math.floor(diffDays / 30);
-                     const remainingDays = diffDays % 30;
+      {/* Add Contact Dialog */}
+      <Dialog open={showAddContactDialog} onOpenChange={setShowAddContactDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">Add New Contact</DialogTitle>
+            <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
+          </DialogHeader>
 
-                     return (
-                       <TableRow key={booking.id}>
-                         <TableCell className="text-blue-600 font-medium">{booking.reservation_id}</TableCell>
-                         <TableCell>
-                           {booking.start_date}
-                         </TableCell>
-                         <TableCell>{booking.product_name}</TableCell>
-                         <TableCell>
-                           {startDate.toLocaleDateString("en-US", {
-                             month: "short",
-                             day: "numeric",
-                             year: "numeric",
-                           })} to{" "}
-                           {endDate.toLocaleDateString("en-US", {
-                             month: "short",
-                             day: "numeric",
-                             year: "numeric",
-                           })}
-                           <br />
-                           ({diffMonths} months and {remainingDays} days)
-                         </TableCell>
-                         <TableCell>{booking.costDetails.total.toLocaleString('en-US', { style: 'currency', currency: 'PHP' })}</TableCell>
-                         <TableCell>{getStatusBadge(booking.status)}</TableCell>
-                       </TableRow>
-                     );
-                   })}
-                 </TableBody>
-               </Table>
+          <div className="py-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="add-name">Name *</Label>
+                <Input
+                  id="add-name"
+                  value={addContactFormData.name}
+                  onChange={(e) => {
+                    setAddContactFormData({ ...addContactFormData, name: e.target.value })
+                    if (addContactValidationErrors.name) {
+                      setAddContactValidationErrors({ ...addContactValidationErrors, name: false })
+                    }
+                  }}
+                  placeholder="Contact name"
+                  className={addContactValidationErrors.name ? 'border-red-500 focus:border-red-500' : ''}
+                  required
+                />
+                {addContactValidationErrors.name && (
+                  <p className="text-sm text-red-500">Name is required</p>
+                )}
+              </div>
 
-               {/* Pagination */}
-               {reservationsTotalPages > 1 && (
-                 <div className="flex items-center justify-center mt-6">
-                   <div className="flex items-center space-x-2">
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setReservationsPage(prev => Math.max(1, prev - 1))}
-                       disabled={reservationsPage === 1 || loadingReservations}
-                     >
-                       Previous
-                     </Button>
-                     <span className="text-sm text-gray-600">
-                       Page {reservationsPage} of {reservationsTotalPages}
-                     </span>
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => setReservationsPage(prev => Math.min(reservationsTotalPages, prev + 1))}
-                       disabled={reservationsPage === reservationsTotalPages || loadingReservations}
-                     >
-                       Next
-                     </Button>
-                   </div>
-                 </div>
-               )}
-             </CardContent>
-           </Card>
-         </TabsContent>
-       </Tabs>
-     </div>
-   )}
+              <div className="space-y-2">
+                <Label htmlFor="add-designation">Designation</Label>
+                <Input
+                  id="add-designation"
+                  value={addContactFormData.designation}
+                  onChange={(e) => setAddContactFormData({ ...addContactFormData, designation: e.target.value })}
+                  placeholder="Job title/designation"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="add-phone">Phone *</Label>
+                <Input
+                  id="add-phone"
+                  value={addContactFormData.phone}
+                  onChange={handleAddContactPhoneInput}
+                  placeholder="Enter 10 digits"
+                  className={(addContactValidationErrors.phone || addContactValidationErrors.phoneFormat) ? 'border-red-500 focus:border-red-500' : ''}
+                />
+                {addContactValidationErrors.phone && (
+                  <p className="text-sm text-red-500">Phone number is required</p>
+                )}
+                {addContactValidationErrors.phoneFormat && !addContactValidationErrors.phone && (
+                  <p className="text-sm text-red-500">Please enter exactly 10 digits</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="add-email">Email *</Label>
+                <Input
+                  id="add-email"
+                  type="email"
+                  value={addContactFormData.email}
+                  onChange={(e) => {
+                    setAddContactFormData({ ...addContactFormData, email: e.target.value })
+                    if (addContactValidationErrors.email) {
+                      setAddContactValidationErrors({ ...addContactValidationErrors, email: false })
+                    }
+                  }}
+                  placeholder="Email address"
+                  className={addContactValidationErrors.email ? 'border-red-500 focus:border-red-500' : ''}
+                  required
+                />
+                {addContactValidationErrors.email && (
+                  <p className="text-sm text-red-500">Email address is required</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddContactDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveNewContact} className="bg-blue-600 hover:bg-blue-700">
+              Add Contact
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Select Contact Dialog */}
+      <Dialog open={showSelectContactDialog} onOpenChange={setShowSelectContactDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-gray-900">
+              Select Contact for {creationMode === 'proposal' ? 'Proposal' : creationMode === 'cost_estimate' ? 'Cost Estimate' : 'Quotation'}
+            </DialogTitle>
+            <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <X className="h-4 w-4" />
+            </DialogClose>
+          </DialogHeader>
+
+          <div className="py-4">
+            <p className="text-sm text-gray-600 mb-4">
+              Please select a contact person for this {creationMode === 'proposal' ? 'proposal' : creationMode === 'cost_estimate' ? 'cost estimate' : 'quotation'}. The document will be associated with the selected contact.
+            </p>
+
+            {loadingContacts ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-sm text-gray-500 mt-2">Loading contacts...</p>
+              </div>
+            ) : companyContacts.length > 0 ? (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-medium text-gray-700">Name</TableHead>
+                      <TableHead className="font-medium text-gray-700">Designation</TableHead>
+                      <TableHead className="font-medium text-gray-700">Email</TableHead>
+                      <TableHead className="font-medium text-gray-700">Select</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companyContacts.map((contact) => (
+                      <TableRow key={contact.id}>
+                        <TableCell className="font-medium text-gray-900">{contact.name}</TableCell>
+                        <TableCell className="text-gray-700">{contact.designation || "N/A"}</TableCell>
+                        <TableCell className="text-gray-700">{contact.email}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant={selectedContact?.id === contact.id ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setSelectedContact(contact)}
+                            className={selectedContact?.id === contact.id ? "bg-blue-600 hover:bg-blue-700" : ""}
+                          >
+                            {selectedContact?.id === contact.id ? "Selected" : "Select"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <p>No contacts found for this company.</p>
+                <p className="text-sm">Please add contacts first.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSelectContactDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedContact) {
+                  router.push(`/sales/dashboard?mode=${creationMode}&clientId=${selectedContact.id}`)
+                  setShowSelectContactDialog(false)
+                  setSelectedContact(null)
+                }
+              }}
+              disabled={!selectedContact}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Create {creationMode === 'proposal' ? 'Proposal' : creationMode === 'cost_estimate' ? 'Cost Estimate' : 'Quotation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="proposals" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+            Proposals
+          </TabsTrigger>
+          <TabsTrigger value="cost-estimates">Cost Estimates</TabsTrigger>
+          <TabsTrigger value="quotations">Quotations</TabsTrigger>
+          <TabsTrigger value="reservations">Reservations</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="proposals" className="space-y-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search proposals..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-64"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => {
+                      loadContactsForProposal()
+                      setCreationMode('proposal')
+                      setShowSelectContactDialog(true)
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Create New Proposal</span>
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">Total: {proposalsTotalItems}</span>
+                  <span className="text-sm text-gray-500">All Time</span>
+                </div>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Proposal ID</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Site Name</TableHead>
+                    <TableHead>Sent To</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProposals.map((proposal) => (
+                    <TableRow key={proposal.id}>
+                      <TableCell>{proposal.proposalNumber}</TableCell>
+                      <TableCell>{proposal.date}</TableCell>
+                      <TableCell>({proposal.sites}) Sites</TableCell>
+                      <TableCell>{proposal.sentTo}</TableCell>
+                      <TableCell>{getStatusBadge(proposal.status)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {proposalsTotalPages > 1 && (
+                <div className="flex items-center justify-center mt-6">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setProposalsPage(prev => Math.max(1, prev - 1))}
+                      disabled={proposalsPage === 1 || loadingProposals}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {proposalsPage} of {proposalsTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setProposalsPage(prev => Math.min(proposalsTotalPages, prev + 1))}
+                      disabled={proposalsPage === proposalsTotalPages || loadingProposals}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cost-estimates" className="space-y-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search cost estimates..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-64"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => {
+                      loadContactsForProposal()
+                      setCreationMode('cost_estimate')
+                      setShowSelectContactDialog(true)
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Create New Cost Estimate</span>
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">Total: {costEstimatesTotalItems}</span>
+                  <span className="text-sm text-gray-500">All Time</span>
+                </div>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Cost Estimate ID</TableHead>
+                    <TableHead>Site Name</TableHead>
+                    <TableHead>Start Date</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead>Total Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {costEstimates.filter(
+                    (ce) =>
+                      ce.costEstimateNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      ce.title?.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).map((costEstimate) => (
+                    <TableRow key={costEstimate.id}>
+                      <TableCell className="text-blue-600 font-medium">{costEstimate.costEstimateNumber}</TableCell>
+                      <TableCell>{costEstimate.title}</TableCell>
+                      <TableCell>{costEstimate.startDate}</TableCell>
+                      <TableCell>{costEstimate.endDate}</TableCell>
+                      <TableCell>{costEstimate.totalAmount.toLocaleString('en-US', { style: 'currency', currency: 'PHP' })}</TableCell>
+                      <TableCell>{getStatusBadge(costEstimate.status)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {costEstimatesTotalPages > 1 && (
+                <div className="flex items-center justify-center mt-6">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCostEstimatesPage(prev => Math.max(1, prev - 1))}
+                      disabled={costEstimatesPage === 1 || loadingCostEstimates}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {costEstimatesPage} of {costEstimatesTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCostEstimatesPage(prev => Math.min(costEstimatesTotalPages, prev + 1))}
+                      disabled={costEstimatesPage === costEstimatesTotalPages || loadingCostEstimates}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* Quotations Tab */}
+        <TabsContent value="quotations" className="space-y-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search quotations..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-64"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => {
+                      loadContactsForProposal()
+                      setCreationMode('quotation')
+                      setShowSelectContactDialog(true)
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Create New Quotation</span>
+                  </Button>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">Total: {quotationsTotalItems}</span>
+                  <span className="text-sm text-gray-500">All Time</span>
+                </div>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Quotation ID</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Site Name</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {quotations.filter(
+                    (quotation) =>
+                      quotation.quotation_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      quotation.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).map((quotation) => (
+                    <TableRow key={quotation.id}>
+                      <TableCell>{quotation.quotation_number}</TableCell>
+                      <TableCell>
+                        {new Date(quotation.created).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </TableCell>
+                      <TableCell>{quotation.items?.name || "N/A"}</TableCell>
+                      <TableCell>
+                        {new Date(
+                          quotation.start_date.toDate
+                            ? quotation.start_date.toDate()
+                            : quotation.start_date.seconds * 1000
+                        ).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}{" "}
+                        to{" "}
+                        {new Date(
+                          quotation.end_date.toDate
+                            ? quotation.end_date.toDate()
+                            : quotation.end_date.seconds * 1000
+                        ).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                        <br />
+                        ({Math.floor(quotation.duration_days / 30)}{" "}
+                        months and {quotation.duration_days % 30} days)
+                      </TableCell>
+                      <TableCell>{quotation.total_amount.toLocaleString('en-US', { style: 'currency', currency: 'PHP' })}</TableCell>
+                      <TableCell>
+                        <Badge
+                          className={`${quotation.status === "Expired"
+                              ? "bg-gray-200 text-gray-800"
+                              : "bg-green-100 text-green-800"
+                            } rounded-md px-2 py-1 text-xs font-medium`}
+                        >
+                          {quotation.status}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {quotationsTotalPages > 1 && (
+                <div className="flex items-center justify-center mt-6">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setQuotationsPage(prev => Math.max(1, prev - 1))}
+                      disabled={quotationsPage === 1 || loadingQuotations}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {quotationsPage} of {quotationsTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setQuotationsPage(prev => Math.min(quotationsTotalPages, prev + 1))}
+                      disabled={quotationsPage === quotationsTotalPages || loadingQuotations}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reservations">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search reservations..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 w-64"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-500">Total: {reservationsTotalItems}</span>
+                  <span className="text-sm text-gray-500">All Time</span>
+                </div>
+              </div>
+
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Reservation ID</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Site Name</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredBookings.map((booking) => {
+                    const startDate = new Date(booking.start_date);
+                    const endDate = new Date(booking.end_date);
+                    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const diffMonths = Math.floor(diffDays / 30);
+                    const remainingDays = diffDays % 30;
+
+                    return (
+                      <TableRow key={booking.id}>
+                        <TableCell className="text-blue-600 font-medium">{booking.reservation_id}</TableCell>
+                        <TableCell>
+                          {booking.start_date}
+                        </TableCell>
+                        <TableCell>{booking.product_name}</TableCell>
+                        <TableCell>
+                          {startDate.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })} to{" "}
+                          {endDate.toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                          <br />
+                          ({diffMonths} months and {remainingDays} days)
+                        </TableCell>
+                        <TableCell>{booking.costDetails.total.toLocaleString('en-US', { style: 'currency', currency: 'PHP' })}</TableCell>
+                        <TableCell>{getStatusBadge(booking.status)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {reservationsTotalPages > 1 && (
+                <div className="flex items-center justify-center mt-6">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReservationsPage(prev => Math.max(1, prev - 1))}
+                      disabled={reservationsPage === 1 || loadingReservations}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      Page {reservationsPage} of {reservationsTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReservationsPage(prev => Math.min(reservationsTotalPages, prev + 1))}
+                      disabled={reservationsPage === reservationsTotalPages || loadingReservations}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}

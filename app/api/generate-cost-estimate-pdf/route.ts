@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import puppeteer from 'puppeteer'
 import type { CostEstimate } from '@/lib/types/cost-estimate'
 
+
 // Helper functions from quotation PDF
 const formatDate = (date: any) => {
   const dateObj = getDateObject(date)
@@ -63,13 +64,20 @@ const formatDuration = (days: number, startDate?: any, endDate?: any): string =>
 }
 
 const formatCompanyAddress = (companyData: any): string => {
-  if (!companyData) return ""
-  const parts = []
-  if (companyData.company_location?.street) parts.push(companyData.company_location.street)
-  if (companyData.company_location?.city) parts.push(companyData.company_location.city)
-  if (companyData.company_location?.province) parts.push(companyData.company_location.province)
-  if (companyData.zip) parts.push(companyData.zip)
-  return parts.join(", ")
+const parts: string[] = [];
+
+const location = companyData.company_location && (
+  companyData.company_location.street ||
+  companyData.company_location.city ||
+  companyData.company_location.province
+) ? companyData.company_location : companyData.address;
+
+if (location?.street) parts.push(location.street);
+if (location?.city) parts.push(location.city);
+if (location?.province) parts.push(location.province);
+
+const fullAddress = parts.join(", ");
+  return fullAddress
 }
 
 const calculateProratedPrice = (price: number, startDate: Date | undefined, endDate: Date | undefined): number => {
@@ -131,34 +139,43 @@ const getDateObject = (date: any): Date | undefined => {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[API_PDF] Received PDF generation request')
   const { costEstimate, companyData, logoDataUrl, format = 'pdf', userData }: { costEstimate: CostEstimate; companyData: any; logoDataUrl: string | null; format?: 'pdf' | 'image'; userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string } } = await request.json()
-  console.log('Received cost estimate:', costEstimate)
-  console.log('Received companyData:', companyData)
-  console.log('Received logoDataUrl:', !!logoDataUrl)
-  console.log('Received userData:', userData)
-  console.log('Format:', format)
+  console.log('[API_PDF] Cost estimate ID:', costEstimate?.id)
+  console.log('[API_PDF] Company data:', companyData?.name)
+  console.log('[API_PDF] Logo data URL provided:', !!logoDataUrl)
+  console.log('[API_PDF] User data:', userData?.first_name)
+  console.log('[API_PDF] Format:', format)
 
   try {
     // Generate HTML content
+    console.log('[API_PDF] Generating HTML content...')
     const htmlContent = generateCostEstimateHTML(costEstimate, companyData, userData)
+    console.log('[API_PDF] HTML content generated, length:', htmlContent.length)
 
     // Launch puppeteer
+    console.log('[API_PDF] Launching Puppeteer browser...')
     const browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
     })
+    console.log('[API_PDF] Browser launched successfully')
 
     const page = await browser.newPage()
+    console.log('[API_PDF] New page created')
+
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
+    console.log('[API_PDF] HTML content set on page')
 
     // Generate PDF
+    console.log('[API_PDF] Generating PDF...')
     const buffer = await page.pdf({
       format: 'A4',
       printBackground: true,
       displayHeaderFooter: true,
       headerTemplate: `
-        <div class="header" style="text-align: center; width: 100%; padding: 5px;">
-          ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 50px; margin-right: 10px;">` : ''}
+        <div class="header" style="text-align: left; width: 100%; padding: 5px; margin-left: 15mm;">
+          ${logoDataUrl ? `<img src="${logoDataUrl}" style="height: 55px;">` : ''}
         </div>
       `,
       footerTemplate: `<div> </div>
@@ -170,10 +187,30 @@ export async function POST(request: NextRequest) {
         left: '10mm'
       }
     })
+    console.log('[API_PDF] PDF buffer generated, size:', buffer.length, 'bytes')
+
     const contentType = 'application/pdf'
     const filename = `${costEstimate.costEstimateNumber || costEstimate.id || 'cost-estimate'}.pdf`
+    console.log('[API_PDF] Generated filename:', filename)
 
     await browser.close()
+    console.log('[API_PDF] Browser closed')
+
+    // Validate PDF buffer before upload
+    if (!buffer || buffer.length === 0) {
+      console.error('[API_PDF] PDF buffer is empty or invalid')
+      throw new Error('Generated PDF buffer is empty')
+    }
+
+    // Check if buffer starts with PDF header
+    const pdfHeader = buffer.slice(0, 8).toString()
+    console.log('[API_PDF] PDF header bytes:', pdfHeader)
+    if (!pdfHeader.startsWith('%PDF-')) {
+      console.error('[API_PDF] PDF buffer does not start with valid PDF header')
+      throw new Error('Generated PDF does not have valid PDF header')
+    }
+
+    console.log('[API_PDF] PDF validation successful, returning response')
 
     return new NextResponse(Buffer.from(buffer), {
       headers: {
@@ -183,7 +220,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error(`Error generating ${format}:`, error)
+    console.error(`[API_PDF] Error generating ${format}:`, error)
     return NextResponse.json({ error: `Failed to generate ${format}` }, { status: 500 })
   }
 }
@@ -431,10 +468,10 @@ function generateCostEstimateHTML(
       </div>
     </div>
 
-    <div class="title">${isMultipleSites ? `Cost Estimate for ${primarySite}` : costEstimate.title || "Cost Estimate"}</div>
+    <div class="title">${isMultipleSites ? `${primarySite}` : `${costEstimate.lineItems[0].description} Cost Estimate` || "Cost Estimate"}</div>
 
     <div class="salutation">
-      Dear ${costEstimate.client?.name?.split(" ").pop() || "Client"},
+      Dear ${costEstimate?.template?.salutation ||  "Mr."} ${costEstimate.client?.name?.split(" ").pop() || "Client"},
     </div>
 
     <div class="greeting">
@@ -477,13 +514,7 @@ function generateCostEstimateHTML(
         <li>
           <div class="details-row">
             <div class="details-label">Lease rate per month:</div>
-            <div class="details-value">PHP ${monthlyRate.toLocaleString()} (Exclusive of VAT)</div>
-          </div>
-        </li>
-        <li>
-          <div class="details-row">
-            <div class="details-label">Total Lease:</div>
-            <div class="details-value">PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)).toLocaleString()} (Exclusive of VAT)</div>
+            <div class="details-value">PHP ${monthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Exclusive of VAT)</div>
           </div>
         </li>
       </ul>
@@ -491,14 +522,14 @@ function generateCostEstimateHTML(
 
     ${costEstimate.items?.site_notes ? `
     <div class="price-notes">
-      <p><strong>Site Notes:</strong> ${costEstimate.items.site_notes}</p>
+      <p><strong>Notes:</strong> ${costEstimate.items.site_notes}</p>
     </div>
     ` : ''}
     <div class="price-breakdown-title">Price breakdown:</div>
     <div class="price-breakdown">
       <div class="price-row">
         <span>Lease rate per month</span>
-        <span>PHP ${(costEstimate.lineItems[0].total).toLocaleString()}</span>
+        <span>PHP ${(costEstimate.lineItems[0].unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row">
         <span>Contract duration</span>
@@ -506,23 +537,23 @@ function generateCostEstimateHTML(
       </div>
       <div class="price-row">
         <span>Total lease</span>
-        <span>PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)).toLocaleString()}</span>
+        <span>PHP ${calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row">
         <span>Add: VAT</span>
-        <span>PHP ${(calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)) * 0.12).toLocaleString()}</span>
+        <span>PHP ${(calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)) * 0.12).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row price-total">
         <span>Total</span>
         <span>PHP ${(
           calculateProratedPrice(monthlyRate, getDateObject(startDate), getDateObject(endDate)) * 1.12
-        ).toLocaleString()}</span>
+        ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
     </div>
 
     ${costEstimate.items?.price_notes ? `
     <div class="price-notes">
-      <p><strong>Price Notes:</strong> ${costEstimate.items.price_notes}</p>
+      <p><strong>Notes:</strong> ${costEstimate.items.price_notes}</p>
     </div>
     ` : ''}
 
@@ -552,7 +583,7 @@ function generateCostEstimateHTML(
       </div>
     </div>
         <div class="page-footer" style="font-size:8px; width:100%; text-align:center; padding:2px 0; color: #444;">
-          <div>${companyData?.name || 'Company Name'}</div>
+          <div>${companyData?.company_name || companyData?.name}</div>
           <div>${formatCompanyAddress(companyData)}</div>
           <div>Tel: ${companyData?.phone || 'N/A'} | Email: ${companyData?.email || 'N/A'}</div>
         </div>
