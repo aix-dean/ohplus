@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Type,
   Image as ImageIcon,
@@ -38,28 +37,12 @@ export const BlankPageEditor: React.FC<BlankPageEditorProps> = ({
 }) => {
   const [elements, setElements] = useState<PageElement[]>(page.elements || [])
   const [selectedElement, setSelectedElement] = useState<string | null>(null)
-  const [editingTextId, setEditingTextId] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isResizing, setIsResizing] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [resizeDirection, setResizeDirection] = useState<string>('')
-  const [scale, setScale] = useState(1)
   const canvasRef = useRef<HTMLDivElement>(null)
-  const textRefs = useRef<{ [key: string]: HTMLDivElement }>({})
   const { toast } = useToast()
-
-  useEffect(() => {
-    const updateScale = () => {
-      const containerWidth = window.innerWidth - 32; // account for padding
-      const containerHeight = window.innerHeight - 200; // estimate for tabs and padding
-      const scaleX = containerWidth / pageWidth;
-      const scaleY = containerHeight / pageHeight;
-      setScale(Math.min(1, Math.min(scaleX, scaleY)));
-    };
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, [pageWidth, pageHeight]);
 
   const handleAddText = () => {
     const newElement: PageElement = {
@@ -158,8 +141,8 @@ export const BlankPageEditor: React.FC<BlankPageEditorProps> = ({
     } else {
       setIsDragging(true)
       setDragOffset({
-        x: e.clientX - element.position.x * scale,
-        y: e.clientY - element.position.y * scale
+        x: e.clientX - element.position.x,
+        y: e.clientY - element.position.y
       })
     }
   }
@@ -171,8 +154,8 @@ export const BlankPageEditor: React.FC<BlankPageEditorProps> = ({
     if (!element) return
 
     if (isDragging) {
-      const newX = Math.max(0, Math.min(pageWidth - element.size.width, (e.clientX - dragOffset.x) / scale))
-      const newY = Math.max(0, Math.min(pageHeight - element.size.height, (e.clientY - dragOffset.y) / scale))
+      const newX = Math.max(0, Math.min(pageWidth - element.size.width, e.clientX - dragOffset.x))
+      const newY = Math.max(0, Math.min(pageHeight - element.size.height, e.clientY - dragOffset.y))
 
       setElements(prev => prev.map(el =>
         el.id === selectedElement
@@ -180,8 +163,8 @@ export const BlankPageEditor: React.FC<BlankPageEditorProps> = ({
           : el
       ))
     } else if (isResizing) {
-      const deltaX = (e.clientX - dragOffset.x) / scale
-      const deltaY = (e.clientY - dragOffset.y) / scale
+      const deltaX = e.clientX - dragOffset.x
+      const deltaY = e.clientY - dragOffset.y
 
       let newWidth = element.size.width
       let newHeight = element.size.height
@@ -208,20 +191,6 @@ export const BlankPageEditor: React.FC<BlankPageEditorProps> = ({
         case 'se':
           newWidth = Math.max(50, element.size.width + deltaX)
           newHeight = Math.max(30, element.size.height + deltaY)
-          break
-        case 'n':
-          newHeight = Math.max(30, element.size.height - deltaY)
-          newY = element.position.y + (element.size.height - newHeight)
-          break
-        case 's':
-          newHeight = Math.max(30, element.size.height + deltaY)
-          break
-        case 'w':
-          newWidth = Math.max(50, element.size.width - deltaX)
-          newX = element.position.x + (element.size.width - newWidth)
-          break
-        case 'e':
-          newWidth = Math.max(50, element.size.width + deltaX)
           break
       }
 
@@ -277,116 +246,207 @@ export const BlankPageEditor: React.FC<BlankPageEditorProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      <Tabs defaultValue="insert" className="w-full">
-        <TabsList className="flex w-full">
-          <TabsTrigger value="insert" className="flex-1">Insert</TabsTrigger>
-          {selectedElementData && <TabsTrigger value="properties" className="flex-1">Properties</TabsTrigger>}
-        </TabsList>
-
-        <TabsContent value="insert" className="p-2 sm:p-4 border-b bg-white">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button onClick={handleAddText} size="sm" variant="outline">
-                <Type className="h-4 w-4 mr-2" />
-                Add Text
-              </Button>
-              <div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAddImage}
-                  className="hidden"
-                  id="image-upload"
-                />
-                <Button asChild size="sm" variant="outline">
-                  <label htmlFor="image-upload" className="cursor-pointer">
-                    <ImageIcon className="h-4 w-4 mr-2" />
-                    Add Image
-                  </label>
-                </Button>
-              </div>
-              <div>
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={handleAddVideo}
-                  className="hidden"
-                  id="video-upload"
-                />
-                <Button asChild size="sm" variant="outline">
-                  <label htmlFor="video-upload" className="cursor-pointer">
-                    <Video className="h-4 w-4 mr-2" />
-                    Add Video
-                  </label>
-                </Button>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={handleSave} size="sm">
-                <Save className="h-4 w-4 mr-2" />
-                Save Page
-              </Button>
-              <Button onClick={onCancel} size="sm" variant="outline">
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-            </div>
+      {/* Toolbar */}
+      <div className="flex items-center justify-between p-4 border-b bg-white">
+        <div className="flex items-center gap-2">
+          <Button onClick={handleAddText} size="sm" variant="outline">
+            <Type className="h-4 w-4 mr-2" />
+            Add Text
+          </Button>
+          <div>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleAddImage}
+              className="hidden"
+              id="image-upload"
+            />
+            <Button asChild size="sm" variant="outline">
+              <label htmlFor="image-upload" className="cursor-pointer">
+                <ImageIcon className="h-4 w-4 mr-2" />
+                Add Image
+              </label>
+            </Button>
           </div>
-        </TabsContent>
+          <div>
+            <input
+              type="file"
+              accept="video/*"
+              onChange={handleAddVideo}
+              className="hidden"
+              id="video-upload"
+            />
+            <Button asChild size="sm" variant="outline">
+              <label htmlFor="video-upload" className="cursor-pointer">
+                <Video className="h-4 w-4 mr-2" />
+                Add Video
+              </label>
+            </Button>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleSave} size="sm">
+            <Save className="h-4 w-4 mr-2" />
+            Save Page
+          </Button>
+          <Button onClick={onCancel} size="sm" variant="outline">
+            <X className="h-4 w-4 mr-2" />
+            Cancel
+          </Button>
+        </div>
+      </div>
 
-        <TabsContent value="properties" className="p-2 sm:p-4 border-b bg-gray-50">
-          {selectedElementData && (
-            <div className="flex flex-row flex-wrap gap-4 items-end">
+      <div className="flex flex-1">
+        {/* Canvas */}
+        <div className="flex-1 p-4">
+          <div
+            ref={canvasRef}
+            className="relative bg-white border-2 border-gray-200 mx-auto shadow-lg"
+            style={{ width: pageWidth, height: pageHeight }}
+          >
+            {elements.map((element) => (
+              <div
+                key={element.id}
+                className={`absolute cursor-move border-2 ${
+                  selectedElement === element.id ? 'border-blue-500' : 'border-transparent'
+                }`}
+                style={{
+                  left: element.position.x,
+                  top: element.position.y,
+                  width: element.size.width,
+                  height: element.size.height,
+                  zIndex: selectedElement === element.id ? 10 : 1
+                }}
+                onMouseDown={(e) => handleMouseDown(e, element.id)}
+                onClick={() => setSelectedElement(element.id)}
+              >
+                {element.type === 'text' && (
+                  <div
+                    className="w-full h-full p-2 overflow-hidden"
+                    style={{
+                      fontSize: element.style?.fontSize || 16,
+                      fontFamily: element.style?.fontFamily || 'Arial',
+                      color: element.style?.color || '#000000',
+                      fontWeight: element.style?.fontWeight || 'normal',
+                      textAlign: element.style?.textAlign as any || 'left'
+                    }}
+                  >
+                    {element.content}
+                  </div>
+                )}
+                {element.type === 'image' && (
+                  <img
+                    src={element.content}
+                    alt="Custom content"
+                    className="w-full h-full object-cover"
+                  />
+                )}
+                {element.type === 'video' && (
+                  <video
+                    src={element.content}
+                    className="w-full h-full object-cover"
+                    controls
+                  />
+                )}
+
+                {/* Resize handles */}
+                {selectedElement === element.id && (
+                  <>
+                    <div
+                      className="absolute top-0 left-0 w-3 h-3 bg-blue-500 cursor-nw-resize -translate-x-1/2 -translate-y-1/2"
+                      onMouseDown={(e) => handleMouseDown(e, element.id, 'nw')}
+                    />
+                    <div
+                      className="absolute top-0 right-0 w-3 h-3 bg-blue-500 cursor-ne-resize translate-x-1/2 -translate-y-1/2"
+                      onMouseDown={(e) => handleMouseDown(e, element.id, 'ne')}
+                    />
+                    <div
+                      className="absolute bottom-0 left-0 w-3 h-3 bg-blue-500 cursor-sw-resize -translate-x-1/2 translate-y-1/2"
+                      onMouseDown={(e) => handleMouseDown(e, element.id, 'sw')}
+                    />
+                    <div
+                      className="absolute bottom-0 right-0 w-3 h-3 bg-blue-500 cursor-se-resize translate-x-1/2 translate-y-1/2"
+                      onMouseDown={(e) => handleMouseDown(e, element.id, 'se')}
+                    />
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Properties Panel */}
+        <div className="w-80 bg-gray-50 p-4 border-l">
+          <h3 className="text-lg font-semibold mb-4">Properties</h3>
+
+          {selectedElementData ? (
+            <div className="space-y-4">
               <div>
-                <Label className="text-sm font-medium">Type: {selectedElementData.type}</Label>
+                <Label className="text-sm font-medium">Element Type</Label>
+                <p className="text-sm text-gray-600 capitalize">{selectedElementData.type}</p>
               </div>
 
               {selectedElementData.type === 'text' && (
                 <>
                   <div>
-                    <Label htmlFor="font-size">Font Size</Label>
-                    <Input
-                      id="font-size"
-                      type="number"
-                      value={selectedElementData.style?.fontSize || 16}
+                    <Label htmlFor="text-content">Content</Label>
+                    <Textarea
+                      id="text-content"
+                      value={selectedElementData.content}
                       onChange={(e) => setElements(prev => prev.map(el =>
                         el.id === selectedElement
-                          ? {
-                              ...el,
-                              style: {
-                                ...el.style,
-                                fontSize: parseInt(e.target.value)
-                              }
-                            }
+                          ? { ...el, content: e.target.value }
                           : el
                       ))}
-                      className="mt-1 w-20"
+                      className="mt-1"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="font-weight">Weight</Label>
-                    <select
-                      id="font-weight"
-                      value={selectedElementData.style?.fontWeight || 'normal'}
-                      onChange={(e) => setElements(prev => prev.map(el =>
-                        el.id === selectedElement
-                          ? {
-                              ...el,
-                              style: {
-                                ...el.style,
-                                fontWeight: e.target.value
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="font-size">Font Size</Label>
+                      <Input
+                        id="font-size"
+                        type="number"
+                        value={selectedElementData.style?.fontSize || 16}
+                        onChange={(e) => setElements(prev => prev.map(el =>
+                          el.id === selectedElement
+                            ? {
+                                ...el,
+                                style: {
+                                  ...el.style,
+                                  fontSize: parseInt(e.target.value)
+                                }
                               }
-                            }
-                          : el
-                      ))}
-                      className="mt-1 p-2 border rounded w-24"
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="bold">Bold</option>
-                    </select>
+                            : el
+                        ))}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="font-weight">Font Weight</Label>
+                      <select
+                        id="font-weight"
+                        value={selectedElementData.style?.fontWeight || 'normal'}
+                        onChange={(e) => setElements(prev => prev.map(el =>
+                          el.id === selectedElement
+                            ? {
+                                ...el,
+                                style: {
+                                  ...el.style,
+                                  fontWeight: e.target.value
+                                }
+                              }
+                            : el
+                        ))}
+                        className="w-full mt-1 p-2 border rounded"
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="bold">Bold</option>
+                      </select>
+                    </div>
                   </div>
                   <div>
-                    <Label htmlFor="text-color">Color</Label>
+                    <Label htmlFor="text-color">Text Color</Label>
                     <Input
                       id="text-color"
                       type="color"
@@ -402,223 +462,103 @@ export const BlankPageEditor: React.FC<BlankPageEditorProps> = ({
                             }
                           : el
                       ))}
-                      className="mt-1 h-10 w-12"
+                      className="mt-1 h-10"
                     />
                   </div>
                 </>
               )}
 
-              <div>
-                <Label>Pos X</Label>
-                <Input
-                  type="number"
-                  value={Math.round(selectedElementData.position.x)}
-                  onChange={(e) => setElements(prev => prev.map(el =>
-                    el.id === selectedElement
-                      ? {
-                          ...el,
-                          position: {
-                            ...el.position,
-                            x: parseInt(e.target.value) || 0
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Position X</Label>
+                  <Input
+                    type="number"
+                    value={Math.round(selectedElementData.position.x)}
+                    onChange={(e) => setElements(prev => prev.map(el =>
+                      el.id === selectedElement
+                        ? {
+                            ...el,
+                            position: {
+                              ...el.position,
+                              x: parseInt(e.target.value) || 0
+                            }
                           }
-                        }
-                      : el
-                  ))}
-                  className="w-16"
-                />
+                        : el
+                    ))}
+                  />
+                </div>
+                <div>
+                  <Label>Position Y</Label>
+                  <Input
+                    type="number"
+                    value={Math.round(selectedElementData.position.y)}
+                    onChange={(e) => setElements(prev => prev.map(el =>
+                      el.id === selectedElement
+                        ? {
+                            ...el,
+                            position: {
+                              ...el.position,
+                              y: parseInt(e.target.value) || 0
+                            }
+                          }
+                        : el
+                    ))}
+                  />
+                </div>
               </div>
-              <div>
-                <Label>Pos Y</Label>
-                <Input
-                  type="number"
-                  value={Math.round(selectedElementData.position.y)}
-                  onChange={(e) => setElements(prev => prev.map(el =>
-                    el.id === selectedElement
-                      ? {
-                          ...el,
-                          position: {
-                            ...el.position,
-                            y: parseInt(e.target.value) || 0
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Width</Label>
+                  <Input
+                    type="number"
+                    value={Math.round(selectedElementData.size.width)}
+                    onChange={(e) => setElements(prev => prev.map(el =>
+                      el.id === selectedElement
+                        ? {
+                            ...el,
+                            size: {
+                              ...el.size,
+                              width: parseInt(e.target.value) || 50
+                            }
                           }
-                        }
-                      : el
-                  ))}
-                  className="w-16"
-                />
-              </div>
-              <div>
-                <Label>Width</Label>
-                <Input
-                  type="number"
-                  value={Math.round(selectedElementData.size.width)}
-                  onChange={(e) => setElements(prev => prev.map(el =>
-                    el.id === selectedElement
-                      ? {
-                          ...el,
-                          size: {
-                            ...el.size,
-                            width: parseInt(e.target.value) || 50
+                        : el
+                    ))}
+                  />
+                </div>
+                <div>
+                  <Label>Height</Label>
+                  <Input
+                    type="number"
+                    value={Math.round(selectedElementData.size.height)}
+                    onChange={(e) => setElements(prev => prev.map(el =>
+                      el.id === selectedElement
+                        ? {
+                            ...el,
+                            size: {
+                              ...el.size,
+                              height: parseInt(e.target.value) || 30
+                            }
                           }
-                        }
-                      : el
-                  ))}
-                  className="w-16"
-                />
-              </div>
-              <div>
-                <Label>Height</Label>
-                <Input
-                  type="number"
-                  value={Math.round(selectedElementData.size.height)}
-                  onChange={(e) => setElements(prev => prev.map(el =>
-                    el.id === selectedElement
-                      ? {
-                          ...el,
-                          size: {
-                            ...el.size,
-                            height: parseInt(e.target.value) || 30
-                          }
-                        }
-                      : el
-                  ))}
-                  className="w-16"
-                />
+                        : el
+                    ))}
+                  />
+                </div>
               </div>
 
               <Button
                 onClick={() => selectedElement && handleDeleteElement(selectedElement)}
                 variant="destructive"
                 size="sm"
+                className="w-full"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Delete
+                Delete Element
               </Button>
             </div>
+          ) : (
+            <p className="text-gray-500 text-sm">Select an element to edit its properties</p>
           )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Canvas */}
-      <div className="flex-1 p-2 sm:p-4">
-        <div
-          ref={canvasRef}
-          data-testid="canvas"
-          className="relative bg-white border-2 border-gray-200 mx-auto shadow-lg overflow-auto"
-          style={{ width: pageWidth * scale, height: pageHeight * scale, maxWidth: '100%', maxHeight: '100%' }}
-          onClick={(e) => { if (e.target === e.currentTarget) { setSelectedElement(null); setEditingTextId(null); } }}
-        >
-          {elements.map((element) => (
-            <div
-              key={element.id}
-              className={`absolute border-2 ${
-                selectedElement === element.id ? 'border-blue-500' : 'border-transparent'
-              } ${editingTextId === element.id ? 'cursor-text' : 'cursor-move'}`}
-              style={{
-                left: element.position.x * scale,
-                top: element.position.y * scale,
-                width: element.size.width * scale,
-                height: element.size.height * scale,
-                zIndex: selectedElement === element.id ? 10 : 1
-              }}
-              onMouseDown={(e) => handleMouseDown(e, element.id)}
-              {...(element.type !== 'text' && {
-                onClick: (e: React.MouseEvent) => { e.stopPropagation(); setSelectedElement(element.id); }
-              })}
-            >
-              {element.type === 'text' && (
-                <div
-                  ref={(el) => { if (el) textRefs.current[element.id] = el; }}
-                  contentEditable={editingTextId === element.id}
-                  suppressContentEditableWarning
-                  onClick={(e) => { e.stopPropagation(); setSelectedElement(element.id); }}
-                  onMouseDown={(e) => { if (editingTextId === element.id) e.stopPropagation(); }}
-                  onDoubleClick={() => {
-                    setEditingTextId(element.id);
-                    setTimeout(() => textRefs.current[element.id]?.focus(), 0);
-                  }}
-                  onBlur={(e) => {
-                    const newContent = e.currentTarget.textContent || '';
-                    setElements(prev => prev.map(el =>
-                      el.id === element.id ? { ...el, content: newContent } : el
-                    ));
-                    setEditingTextId(null);
-                  }}
-                  className="w-full h-full p-2 overflow-hidden outline-none"
-                  style={{
-                    fontSize: element.style?.fontSize || 16,
-                    fontFamily: element.style?.fontFamily || 'Arial',
-                    color: element.style?.color || '#000000',
-                    fontWeight: element.style?.fontWeight || 'normal',
-                    textAlign: element.style?.textAlign as any || 'left'
-                  }}
-                >
-                  {element.content}
-                </div>
-              )}
-              {element.type === 'image' && (
-                <img
-                  src={element.content}
-                  alt="Custom content"
-                  className="w-full h-full object-cover"
-                />
-              )}
-              {element.type === 'video' && (
-                <video
-                  src={element.content}
-                  className="w-full h-full object-cover"
-                  controls
-                />
-              )}
-
-              {/* Resize handles */}
-              {selectedElement === element.id && (
-                <>
-                  {/* Corners */}
-                  <div
-                    className="absolute top-0 left-0 w-4 h-4 bg-blue-500 cursor-nw-resize -translate-x-1/2 -translate-y-1/2"
-                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, element.id, 'nw'); }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                  />
-                  <div
-                    className="absolute top-0 right-0 w-4 h-4 bg-blue-500 cursor-ne-resize translate-x-1/2 -translate-y-1/2"
-                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, element.id, 'ne'); }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                  />
-                  <div
-                    className="absolute bottom-0 left-0 w-4 h-4 bg-blue-500 cursor-sw-resize -translate-x-1/2 translate-y-1/2"
-                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, element.id, 'sw'); }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                  />
-                  <div
-                    className="absolute bottom-0 right-0 w-4 h-4 bg-blue-500 cursor-se-resize translate-x-1/2 translate-y-1/2"
-                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, element.id, 'se'); }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                  />
-                  {/* Sides */}
-                  <div
-                    className="absolute top-0 left-1/2 w-4 h-4 bg-blue-500 cursor-n-resize -translate-x-1/2 -translate-y-1/2"
-                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, element.id, 'n'); }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                  />
-                  <div
-                    className="absolute bottom-0 left-1/2 w-4 h-4 bg-blue-500 cursor-s-resize -translate-x-1/2 translate-y-1/2"
-                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, element.id, 's'); }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                  />
-                  <div
-                    className="absolute top-1/2 left-0 w-4 h-4 bg-blue-500 cursor-w-resize -translate-x-1/2 -translate-y-1/2"
-                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, element.id, 'w'); }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                  />
-                  <div
-                    className="absolute top-1/2 right-0 w-4 h-4 bg-blue-500 cursor-e-resize translate-x-1/2 -translate-y-1/2"
-                    onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, element.id, 'e'); }}
-                    onDoubleClick={(e) => e.stopPropagation()}
-                  />
-                </>
-              )}
-            </div>
-          ))}
         </div>
       </div>
     </div>
