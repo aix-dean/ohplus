@@ -2,6 +2,21 @@ import React from 'react'
 import { render, screen } from '@testing-library/react'
 import QuotationsListPage from './page'
 
+// Suppress act() warnings during tests
+const originalError = console.error
+beforeAll(() => {
+  console.error = (...args: any[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('was not wrapped in act(...)')) {
+      return
+    }
+    originalError.call(console, ...args)
+  }
+})
+
+afterAll(() => {
+  console.error = originalError
+})
+
 // Mock all external dependencies with simple implementations
 jest.mock('@/contexts/auth-context', () => ({
   useAuth: () => ({
@@ -52,11 +67,47 @@ jest.mock('firebase/firestore', () => ({
   query: jest.fn(),
   where: jest.fn(),
   orderBy: jest.fn(),
-  getDocs: jest.fn(),
+  getDocs: jest.fn(() => Promise.resolve({
+    empty: false,
+    docs: [{
+      id: 'test-company-id',
+      data: () => ({
+        name: 'Test Company',
+        company_location: 'Test Location',
+        address: 'Test Address',
+        company_website: 'https://test.com',
+        photo_url: 'https://test.com/logo.png',
+        contact_person: 'Test Person',
+        email: 'test@test.com',
+        phone: '123-456-7890',
+        social_media: {},
+        created_by: 'test-user-id',
+        created: { toDate: () => new Date() },
+        updated: { toDate: () => new Date() }
+      })
+    }]
+  })),
   addDoc: jest.fn(),
   serverTimestamp: jest.fn(),
   doc: jest.fn(),
-  getDoc: jest.fn(),
+  getDoc: jest.fn(() => Promise.resolve({
+    exists: () => true,
+    id: 'test-company-id',
+    data: () => ({
+      name: 'Test Company',
+      company_location: 'Test Location',
+      address: 'Test Address',
+      company_website: 'https://test.com',
+      photo_url: 'https://test.com/logo.png',
+      contact_person: 'Test Person',
+      email: 'test@test.com',
+      phone: '123-456-7890',
+      social_media: {},
+      created_by: 'test-user-id',
+      created: { toDate: () => new Date() },
+      updated: { toDate: () => new Date() }
+    })
+  })),
   updateDoc: jest.fn(),
   Timestamp: {
     fromDate: jest.fn(),
