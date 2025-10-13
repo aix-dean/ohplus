@@ -51,7 +51,9 @@ import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { BlankPageEditor } from "@/components/blank-page-editor"
+import { BlankPageEditor } from "@/components/blank-page-editor"
 import { Vibrant } from 'node-vibrant/browser'
+import type { CustomPage } from "@/lib/types/proposal"
 import type { CustomPage } from "@/lib/types/proposal"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
@@ -421,13 +423,6 @@ export default function ProposalDetailsPage() {
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false)
   const [editingCustomPage, setEditingCustomPage] = useState<CustomPage | null>(null)
   const [isBlankPageEditorOpen, setIsBlankPageEditorOpen] = useState(false)
-  const [fieldVisibility, setFieldVisibility] = useState<{[productId: string]: {
-    location: boolean
-    dimension: boolean
-    type: boolean
-    traffic: boolean
-    srp: boolean
-  }}>({})
 
   const fetchClients = async () => {
     if (!userData?.company_id) return
@@ -611,6 +606,8 @@ export default function ProposalDetailsPage() {
               dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
+              srp: product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A',
+              additionalMessage: (product as any).additionalMessage || ''
               srp: product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A',
               additionalMessage: (product as any).additionalMessage || ''
             }
@@ -1199,6 +1196,21 @@ export default function ProposalDetailsPage() {
         updateData.products = productsWithMessages
       }
 
+      // Save additional messages for products
+      if (Object.keys(editableProducts).length > 0) {
+        const productsWithMessages = updatedProducts.map(product => {
+          const editable = editableProducts[product.id]
+          if (editable?.additionalMessage) {
+            return {
+              ...product,
+              additionalMessage: editable.additionalMessage
+            }
+          }
+          return product
+        })
+        updateData.products = productsWithMessages
+      }
+
       // Save company logo if changed
       if (editableLogo) {
         updateData.companyLogo = editableLogo
@@ -1406,8 +1418,8 @@ export default function ProposalDetailsPage() {
     const numberOfSites = proposal?.products?.length || 1
     const sitesPerPage = getSitesPerPage(layout)
     const customPages = proposal?.customPages?.length || 0
-    // Always include 1 page for intro + pages for sites + custom pages + 1 page for outro
-    return 1 + Math.ceil(numberOfSites / sitesPerPage) + customPages + 1
+    // Always include 1 page for intro + pages for sites + custom pages
+    return 1 + Math.ceil(numberOfSites / sitesPerPage) + customPages
   }
 
   const getPageContent = (pageNumber: number, layout: string) => {
@@ -1417,8 +1429,35 @@ export default function ProposalDetailsPage() {
     if (pageNumber === 1) return []
 
     const numberOfSitePages = Math.ceil((proposal.products?.length || 0) / getSitesPerPage(layout))
+    // Page 1 is always intro
+    if (pageNumber === 1) return []
+
+    const numberOfSitePages = Math.ceil((proposal.products?.length || 0) / getSitesPerPage(layout))
     const sitePageNumber = pageNumber - 1
 
+    // Check if this is a site page
+    if (sitePageNumber <= numberOfSitePages) {
+      const sitesPerPage = getSitesPerPage(layout)
+      const startIndex = (sitePageNumber - 1) * sitesPerPage
+      const endIndex = startIndex + sitesPerPage
+      return proposal.products.slice(startIndex, endIndex)
+    }
+
+    // This is a custom page
+    return []
+  }
+
+  const getCustomPageForPageNumber = (pageNumber: number) => {
+    if (!proposal?.customPages) return null
+
+    const numberOfSitePages = Math.ceil((proposal.products?.length || 0) / getSitesPerPage(selectedLayout))
+    const customPageIndex = pageNumber - 2 - numberOfSitePages // -2 because page 1 is intro, page 2+ are site pages
+
+    if (customPageIndex >= 0 && customPageIndex < proposal.customPages.length) {
+      return proposal.customPages[customPageIndex]
+    }
+
+    return null
     // Check if this is a site page
     if (sitePageNumber <= numberOfSitePages) {
       const sitesPerPage = getSitesPerPage(layout)
@@ -1942,6 +1981,86 @@ export default function ProposalDetailsPage() {
     }
   }
 
+  const handleAddBlankPage = (position: number) => {
+    const newPage: CustomPage = {
+      id: `blank-${Date.now()}`,
+      type: 'blank',
+      elements: [],
+      position
+    }
+
+    // Save the blank page immediately
+    handleSaveBlankPage(newPage)
+  }
+
+  const handleEditBlankPage = (page: CustomPage) => {
+    setEditingCustomPage(page)
+    setIsBlankPageEditorOpen(true)
+  }
+
+  const handleSaveBlankPage = async (page: CustomPage) => {
+    if (!proposal || !userData) return
+
+    try {
+      const existingPages = proposal.customPages || []
+      const updatedPages = editingCustomPage?.id
+        ? existingPages.map(p => p.id === page.id ? page : p)
+        : [...existingPages, page]
+
+      await updateProposal(
+        proposal.id,
+        { customPages: updatedPages },
+        userData.uid,
+        userData.displayName || "User"
+      )
+
+      setProposal(prev => prev ? { ...prev, customPages: updatedPages } : null)
+      setIsBlankPageEditorOpen(false)
+      setEditingCustomPage(null)
+
+      toast({
+        title: "Success",
+        description: "Blank page saved successfully"
+      })
+    } catch (error) {
+      console.error("Error saving blank page:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save blank page",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDeleteBlankPage = async (pageId: string) => {
+    if (!proposal || !userData) return
+
+    try {
+      const updatedPages = (proposal.customPages || []).filter(p => p.id !== pageId)
+
+      await updateProposal(
+        proposal.id,
+        { customPages: updatedPages },
+        userData.uid,
+        userData.displayName || "User"
+      )
+
+      setProposal(prev => prev ? { ...prev, customPages: updatedPages } : null)
+
+      toast({
+        title: "Success",
+        description: "Blank page deleted successfully"
+      })
+    } catch (error) {
+      console.error("Error deleting blank page:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete blank page",
+        variant: "destructive"
+      })
+    }
+  }
+
   useEffect(() => {
     if (isResizingLogo || isDraggingLogo) {
       document.addEventListener('mousemove', handleLogoMouseMove)
@@ -2274,6 +2393,12 @@ export default function ProposalDetailsPage() {
     if (customPage) {
       return renderBlankPage(customPage, pageNumber, totalPages)
     }
+    const customPage = getCustomPageForPageNumber(pageNumber)
+
+    // Check if this is a custom blank page
+    if (customPage) {
+      return renderBlankPage(customPage, pageNumber, totalPages)
+    }
 
     // For now, we'll take the first product on this page (assuming 1 site per page for this layout)
     const product = pageContent[0]
@@ -2548,53 +2673,32 @@ export default function ProposalDetailsPage() {
             ) : null}
 
             {/* SRP */}
-            {isEditMode || fieldVisibility[product.id]?.srp !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">SRP:</p>
-                {isEditMode ? (
-                  <input
-                    value={editableProducts[product.id]?.srp || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
-                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
-                  />
-                ) : (
-                  <p className="font-normal text-[18px]">
-                    {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
-                  </p>
-                )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        srp: !prev[product.id]?.srp
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.srp !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.srp !== false ? "Hide SRP field" : "Show SRP field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ) : null}
+            <div className="mb-2">
+              <p className="mb-0">SRP:</p>
+              {isEditMode ? (
+                <input
+                  value={editableProducts[product.id]?.srp || ''}
+                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                />
+              ) : (
+                <p className="font-normal text-[18px]">
+                  {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
+                </p>
+              )}
+            </div>
 
             {/* Additional Message */}
-            {((product as any).additionalMessage || isEditMode) && (
-              <div className="mb-2 flex items-start">
-                <div className="flex-shrink-0 w-[180px]"></div>
-                {isEditMode ? (
-                  <textarea
-                    value={editableProducts[product.id]?.additionalMessage || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
-                    placeholder="Add Message"
-                    className="font-normal text-[16px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none flex-1 min-h-[60px] resize-none ml-[-180px]"
-                    rows={2}
-                  />
-                ) : (
-                  <p className="font-normal text-[16px] ml-[-178px]">{(product as any).additionalMessage}</p>
-                )}
+            {isEditMode && (
+              <div className="mb-2">
+                <p className="mb-0">Additional Message:</p>
+                <textarea
+                  value={editableProducts[product.id]?.additionalMessage || ''}
+                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
+                  placeholder="Add Message"
+                  className="font-normal text-[16px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full min-h-[60px] resize-none"
+                  rows={2}
+                />
               </div>
             )}
           </div>
@@ -2681,260 +2785,6 @@ export default function ProposalDetailsPage() {
         {/* Footer */}
         <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
         <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
-
-        {/* Edit Mode Overlay for Blank Pages */}
-        {isEditMode && customPage.elements.length === 0 && (
-          <div className="absolute top-[350px] left-0 right-0 bottom-[70px] flex items-center justify-center bg-gray-50 bg-opacity-80 z-10">
-            <div className="text-center">
-              <div className="mb-4">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Edit className="h-8 w-8 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Blank Page</h3>
-                <p className="text-gray-600 mb-4">Click the edit button to add content</p>
-              </div>
-              <Button
-                onClick={() => {
-                  setEditingCustomPage(customPage)
-                  setIsBlankPageEditorOpen(true)
-                }}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Page
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  const renderOutroPage = (pageNumber: number) => {
-    const totalPages = getTotalPages(selectedLayout)
-    const formattedDate = proposal?.createdAt ? new Date(proposal.createdAt).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    }) : 'N/A'
-
-    return (
-      <div className="relative w-full h-full bg-white">
-        {/* Header */}
-        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-0 left-0 w-[1310px] h-[70px] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
-
-        {/* Background borders and accents - scaled */}
-        <div className="absolute flex h-[0px] items-center justify-center left-0 top-0 w-[0px]">
-          <div className="flex-none rotate-[270deg]">
-            <div className="bg-white h-[857px] w-[675px]" />
-          </div>
-        </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[473px] top-[2px] w-[0px]">
-          <div className="flex-none rotate-[270deg]">
-            <div className="h-[393px] w-[69px]" />
-          </div>
-        </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[594px] w-[0px]">
-          <div className="flex-none rotate-[90deg]">
-            <div className="h-[393px] w-[69px]" />
-          </div>
-        </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[2px] w-[0px]">
-          <div className="flex-none rotate-[270deg]">
-            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
-          </div>
-        </div>
-        <div className="absolute flex h-[0px] items-center justify-center left-[208px] top-[594px] w-[0px]">
-          <div className="flex-none rotate-[90deg]">
-            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
-          </div>
-        </div>
-
-
-        {/* Thank You Message - Group 534 content */}
-        {isEditMode ? (
-          <input
-            value={editableProposalMessage}
-            onChange={(e) => setEditableProposalMessage(e.target.value)}
-            className="absolute font-bold text-[#333333] text-[71px] left-[73px] top-[307px] min-w-[200px] max-w-[500px] w-auto border-2 border-[#c4c4c4] border-dashed rounded px-2 outline-none whitespace-nowrap"
-            style={{ width: `${Math.max(200, (editableProposalMessage.length * 45) + 35)}px` }}
-          />
-        ) : (
-          <div className="absolute font-bold text-[#333333] text-[71px] left-[73px] top-[307px] whitespace-nowrap">
-            {proposal?.proposalMessage || 'Thank You'}
-          </div>
-        )}
-
-        {/* Contact Information */}
-        <div className="absolute font-normal text-[#333333] text-[20px] left-[93px] top-[429px] w-[316px] leading-[1.2]">
-          {isEditMode ? (
-            <input
-              value={editableContactInfo.heading}
-              onChange={(e) => setEditableContactInfo(prev => ({ ...prev, heading: e.target.value }))}
-              className="font-bold mb-0 text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-              placeholder="Contact Heading"
-            />
-          ) : (
-            <p className="font-bold mb-0 text-[20px]">{proposal?.contactInfo?.heading || 'contact us!'}</p>
-          )}
-          {isEditMode ? (
-            <>
-              <input
-                value={editableContactInfo.name}
-                onChange={(e) => setEditableContactInfo(prev => ({ ...prev, name: e.target.value }))}
-                className="mb-0 text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                placeholder="Contact Name"
-              />
-              <input
-                value={editableContactInfo.role}
-                onChange={(e) => setEditableContactInfo(prev => ({ ...prev, role: e.target.value }))}
-                className="mb-0 text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                placeholder="Role"
-              />
-              <input
-                value={editableContactInfo.phone}
-                onChange={(e) => setEditableContactInfo(prev => ({ ...prev, phone: e.target.value }))}
-                className="mb-0 text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                placeholder="Phone Number"
-              />
-              <input
-                value={editableContactInfo.email}
-                onChange={(e) => setEditableContactInfo(prev => ({ ...prev, email: e.target.value }))}
-                className="text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                placeholder="Email Address"
-              />
-            </>
-          ) : (
-            <>
-              <p className="mb-0 text-[20px]">{proposal?.contactInfo?.name || 'N/A'}</p>
-              <p className="mb-0 text-[20px]">{proposal?.contactInfo?.role || 'Sales'}</p>
-              <p className="mb-0 text-[20px]">{proposal?.contactInfo?.phone || 'N/A'}</p>
-              <p className="text-[20px]">{proposal?.contactInfo?.email || 'N/A'}</p>
-            </>
-          )}
-        </div>
-
-        {/* Date */}
-        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[89px] right-[28px] w-[191px]">
-          {formattedDate}
-        </p>
-
-        {/* Page Number */}
-        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[558px] right-[28px] w-[51px]">
-          {pageNumber}/{totalPages}
-        </p>
-
-        {/* Bottom Logo */}
-        <div className="absolute h-[40px] left-[28px] top-[626px] w-[67px] z-20">
-          {editableLogo ? (
-            <div
-              style={{
-                backgroundImage: `url(${editableLogo})`,
-                backgroundSize: 'contain',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'center',
-                width: '100%',
-                height: '100%',
-              }}
-            />
-          ) : (
-            <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
-      </div>
-    )
-  }
-
-  const renderBlankPage = (customPage: CustomPage, pageNumber: number, totalPages: number) => {
-    return (
-      <div className="relative w-full h-full bg-white">
-        {/* Header */}
-        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-0 left-0 w-[1310px] h-[70px] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
-
-        {/* Page Number */}
-        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[89px] right-[28px] w-[51px]">
-          {pageNumber}/{totalPages}
-        </p>
-
-        {/* Custom Elements */}
-        {customPage.elements.map((element) => (
-          <div
-            key={element.id}
-            className="absolute"
-            style={{
-              left: element.position.x,
-              top: element.position.y + 70, // Account for header
-              width: element.size.width,
-              height: element.size.height,
-              zIndex: 5
-            }}
-          >
-            {element.type === 'text' && (
-              <div
-                className="w-full h-full overflow-hidden"
-                style={{
-                  fontSize: element.style?.fontSize || 16,
-                  fontFamily: element.style?.fontFamily || 'Arial',
-                  color: element.style?.color || '#000000',
-                  fontWeight: element.style?.fontWeight || 'normal',
-                  textAlign: element.style?.textAlign as any || 'left',
-                  lineHeight: '1.2'
-                }}
-              >
-                {element.content}
-              </div>
-            )}
-            {element.type === 'image' && (
-              <img
-                src={element.content}
-                alt="Custom content"
-                className="w-full h-full object-cover"
-              />
-            )}
-            {element.type === 'video' && (
-              <video
-                src={element.content}
-                className="w-full h-full object-cover"
-                controls
-              />
-            )}
-          </div>
-        ))}
-
-        {/* Footer */}
-        <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
-
-        {/* Edit Mode Overlay for Blank Pages */}
-        {isEditMode && customPage.elements.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-80 z-10">
-            <div className="text-center">
-              <div className="mb-4">
-                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Edit className="h-8 w-8 text-blue-600" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Blank Page</h3>
-                <p className="text-gray-600 mb-4">Click the edit button to add content</p>
-              </div>
-              <Button
-                onClick={() => {
-                  setEditingCustomPage(customPage)
-                  setIsBlankPageEditorOpen(true)
-                }}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Page
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
     )
   }
@@ -3128,6 +2978,14 @@ export default function ProposalDetailsPage() {
                 <span className="font-medium text-[14px] text-blue-700">+Add Blank Page</span>
               </div>
             )}
+            {isEditMode && (
+              <div
+                className="bg-blue-50 shadow h-[32px] rounded-[8px] flex items-center px-2 min-w-[120px] cursor-pointer hover:bg-blue-100 border border-blue-200"
+                onClick={() => handleAddBlankPage(getTotalPages(selectedLayout))}
+              >
+                <span className="font-medium text-[14px] text-blue-700">+Add Blank Page</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -3140,7 +2998,7 @@ export default function ProposalDetailsPage() {
             const pageNumber = index + 1
             return (
               <div key={pageNumber} className={`${getPageContainerClass(selectedSize, "Landscape")} ${index > 0 ? 'mt-[-65px]' : ''}`} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
-                {pageNumber === 1 ? renderIntroPage(pageNumber) : pageNumber === getTotalPages(selectedLayout) ? renderOutroPage(pageNumber) : renderSitePage(pageNumber)}
+                {pageNumber === 1 ? renderIntroPage(pageNumber) : renderSitePage(pageNumber)}
                 {/* Add blank page button between pages */}
                 {isEditMode && pageNumber < getTotalPages(selectedLayout) && (
                   <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 z-20">
@@ -3626,7 +3484,7 @@ export default function ProposalDetailsPage() {
 
       {/* Blank Page Editor Dialog */}
       <Dialog open={isBlankPageEditorOpen} onOpenChange={setIsBlankPageEditorOpen}>
-        <DialogContent className="w-full max-w-7xl mx-auto border-0 shadow-lg h-[90vh] sm:h-[95vh]">
+        <DialogContent className="max-w-7xl mx-auto border-0 shadow-lg h-[90vh]">
           <DialogTitle className="sr-only">Blank Page Editor</DialogTitle>
           {editingCustomPage && (
             <BlankPageEditor
@@ -3636,8 +3494,8 @@ export default function ProposalDetailsPage() {
                 setIsBlankPageEditorOpen(false)
                 setEditingCustomPage(null)
               }}
-              pageWidth={getPageDimensions(selectedSize, selectedOrientation).width}
-              pageHeight={getPageDimensions(selectedSize, selectedOrientation).height}
+              pageWidth={800}
+              pageHeight={600}
             />
           )}
         </DialogContent>
