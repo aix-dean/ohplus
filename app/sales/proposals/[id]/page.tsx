@@ -419,6 +419,8 @@ export default function ProposalDetailsPage() {
   const [logoResizeDirection, setLogoResizeDirection] = useState<string>('')
   const [selectedProductForMedia, setSelectedProductForMedia] = useState<ProposalProduct | null>(null)
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false)
+  const [editingCustomPage, setEditingCustomPage] = useState<CustomPage | null>(null)
+  const [isBlankPageEditorOpen, setIsBlankPageEditorOpen] = useState(false)
 
   const fetchClients = async () => {
     if (!userData?.company_id) return
@@ -1396,8 +1398,9 @@ export default function ProposalDetailsPage() {
   const getTotalPages = (layout: string) => {
     const numberOfSites = proposal?.products?.length || 1
     const sitesPerPage = getSitesPerPage(layout)
-    // Always include 1 page for intro + pages for sites
-    return 1 + Math.ceil(numberOfSites / sitesPerPage)
+    const customPages = proposal?.customPages?.length || 0
+    // Always include 1 page for intro + pages for sites + custom pages
+    return 1 + Math.ceil(numberOfSites / sitesPerPage) + customPages
   }
 
   const getPageContent = (pageNumber: number, layout: string) => {
@@ -2552,6 +2555,20 @@ export default function ProposalDetailsPage() {
                 </p>
               )}
             </div>
+
+            {/* Additional Message */}
+            {isEditMode && (
+              <div className="mb-2">
+                <p className="mb-0">Additional Message:</p>
+                <textarea
+                  value={editableProducts[product.id]?.additionalMessage || ''}
+                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
+                  placeholder="Add Message"
+                  className="font-normal text-[16px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full min-h-[60px] resize-none"
+                  rows={2}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -2894,6 +2911,95 @@ export default function ProposalDetailsPage() {
     )
   }
 
+  const renderBlankPage = (customPage: CustomPage, pageNumber: number, totalPages: number) => {
+    return (
+      <div className="relative w-full h-full bg-white">
+        {/* Header */}
+        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-0 left-0 w-[1310px] h-[70px] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+
+        {/* Page Number */}
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[89px] right-[28px] w-[51px]">
+          {pageNumber}/{totalPages}
+        </p>
+
+        {/* Custom Elements */}
+        {customPage.elements.map((element) => (
+          <div
+            key={element.id}
+            className="absolute"
+            style={{
+              left: element.position.x,
+              top: element.position.y + 70, // Account for header
+              width: element.size.width,
+              height: element.size.height,
+              zIndex: 5
+            }}
+          >
+            {element.type === 'text' && (
+              <div
+                className="w-full h-full overflow-hidden"
+                style={{
+                  fontSize: element.style?.fontSize || 16,
+                  fontFamily: element.style?.fontFamily || 'Arial',
+                  color: element.style?.color || '#000000',
+                  fontWeight: element.style?.fontWeight || 'normal',
+                  textAlign: element.style?.textAlign as any || 'left',
+                  lineHeight: '1.2'
+                }}
+              >
+                {element.content}
+              </div>
+            )}
+            {element.type === 'image' && (
+              <img
+                src={element.content}
+                alt="Custom content"
+                className="w-full h-full object-cover"
+              />
+            )}
+            {element.type === 'video' && (
+              <video
+                src={element.content}
+                className="w-full h-full object-cover"
+                controls
+              />
+            )}
+          </div>
+        ))}
+
+        {/* Footer */}
+        <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+
+        {/* Edit Mode Overlay for Blank Pages */}
+        {isEditMode && customPage.elements.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-80 z-10">
+            <div className="text-center">
+              <div className="mb-4">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Edit className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Blank Page</h3>
+                <p className="text-gray-600 mb-4">Click the edit button to add content</p>
+              </div>
+              <Button
+                onClick={() => {
+                  setEditingCustomPage(customPage)
+                  setIsBlankPageEditorOpen(true)
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Page
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50/50 print:bg-white flex flex-col">
 
@@ -3007,6 +3113,46 @@ export default function ProposalDetailsPage() {
             return (
               <div key={pageNumber} className={`${getPageContainerClass(selectedSize, "Landscape")} ${index > 0 ? 'mt-[-65px]' : ''}`} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
                 {pageNumber === 1 ? renderIntroPage(pageNumber) : renderSitePage(pageNumber)}
+                {/* Add blank page button between pages */}
+                {isEditMode && pageNumber < getTotalPages(selectedLayout) && (
+                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 z-20">
+                    <Button
+                      onClick={() => handleAddBlankPage(pageNumber)}
+                      size="sm"
+                      className="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-8 h-8 p-0"
+                      title="Add blank page"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                {/* Edit/Delete blank page buttons */}
+                {isEditMode && getCustomPageForPageNumber(pageNumber) && (
+                  <div className="absolute top-2 right-2 z-30 flex gap-1">
+                    <Button
+                      onClick={() => {
+                        const page = getCustomPageForPageNumber(pageNumber)!
+                        setEditingCustomPage(page)
+                        setIsBlankPageEditorOpen(true)
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="bg-white hover:bg-gray-50 w-8 h-8 p-0"
+                      title="Edit blank page"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      onClick={() => handleDeleteBlankPage(getCustomPageForPageNumber(pageNumber)!.id)}
+                      size="sm"
+                      variant="outline"
+                      className="bg-white hover:bg-red-50 border-red-200 w-8 h-8 p-0"
+                      title="Delete blank page"
+                    >
+                      <X className="h-3 w-3 text-red-500" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -3447,6 +3593,25 @@ export default function ProposalDetailsPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Blank Page Editor Dialog */}
+      <Dialog open={isBlankPageEditorOpen} onOpenChange={setIsBlankPageEditorOpen}>
+        <DialogContent className="max-w-7xl mx-auto border-0 shadow-lg h-[90vh]">
+          <DialogTitle className="sr-only">Blank Page Editor</DialogTitle>
+          {editingCustomPage && (
+            <BlankPageEditor
+              page={editingCustomPage}
+              onSave={handleSaveBlankPage}
+              onCancel={() => {
+                setIsBlankPageEditorOpen(false)
+                setEditingCustomPage(null)
+              }}
+              pageWidth={800}
+              pageHeight={600}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
