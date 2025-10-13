@@ -26,6 +26,8 @@ export default function SalesReportsPage() {
   const [postedReportId, setPostedReportId] = useState<string>("")
   const [showSentHistoryDialog, setShowSentHistoryDialog] = useState(false)
   const [selectedReportId, setSelectedReportId] = useState<string>("")
+  const [showReportDialog, setShowReportDialog] = useState(false)
+  const [selectedReport, setSelectedReport] = useState<ReportData | null>(null)
 
   const router = useRouter()
   const { user, userData } = useAuth()
@@ -48,14 +50,6 @@ export default function SalesReportsPage() {
       sessionStorage.removeItem("lastPostedReportId")
     }
 
-    // Check if we just sent an email
-    const lastSentEmailReportId = sessionStorage.getItem("lastSentEmailReportId")
-    if (lastSentEmailReportId) {
-      setSentEmailReportId(lastSentEmailReportId)
-      setShowEmailSuccessDialog(true)
-      // Clear the session storage
-      sessionStorage.removeItem("lastSentEmailReportId")
-    }
   }, [])
 
   // Reset page when filter or search changes
@@ -155,8 +149,9 @@ export default function SalesReportsPage() {
   }
 
 
-  const handleViewReport = (reportId: string) => {
-    router.push(`/sales/reports/${reportId}`)
+  const handleViewReport = (report: ReportData) => {
+    setSelectedReport(report)
+    setShowReportDialog(true)
   }
 
 
@@ -189,131 +184,121 @@ export default function SalesReportsPage() {
       </div>
 
 
-      {/* Search and Filters */}
-      <div className="bg-white px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search reports..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                <SelectItem value="completion-report">Completion</SelectItem>
-                <SelectItem value="monitoring-report">Monitoring</SelectItem>
-                <SelectItem value="installation-report">Installation</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+      {/* Content Title */}
+      <div className="bg-white px-6 py-4">
+        <h2 className="text-lg font-semibold text-gray-900">Report</h2>
       </div>
 
-      {/* Reports Table */}
-      <div className="bg-white mx-6 mt-6 rounded-lg border border-gray-200 overflow-hidden">
-        <div>
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Report ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Site</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date of Report
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Report Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Reported By
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                      <span className="ml-2">Loading reports...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredReports.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
-                    No reports found
-                  </td>
-                </tr>
-              ) : (
-                filteredReports.map((report) => (
-                  <tr key={report.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(report.created)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {report.report_id || "N/A"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {report.siteName || "Unknown Site"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
-                      {formatDate(report.date || report.created)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {getReportTypeDisplay(report.reportType)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {report.createdByName || "Unknown User"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="p-1">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewReport(report.id!)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Report
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handlePrintReport(report)}>
-                            <Printer className="mr-2 h-4 w-4" />
-                            Print Report
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleViewSentHistory(report.id!)}>
-                            <History className="mr-2 h-4 w-4" />
-                            View Sent History
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteReport(report.id!)} className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Report
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+      {/* Search and Filters */}
+      <div className="bg-white px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Search className="absolute left-[13px] top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 opacity-30" />
+            <Input
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-[257px] h-[22px] rounded-[15px] border border-gray-400"
+            />
+          </div>
         </div>
+        <Button
+          variant="outline"
+          className="border-gray-400 rounded-[5px] w-[103px] h-[24px] text-xs"
+          onClick={() => setShowSentHistoryDialog(true)}
+        >
+          Sent History
+        </Button>
+      </div>
+
+      {/* Reports List */}
+      <div className="bg-white mx-6 mt-6 rounded-tl-[10px] rounded-tr-[10px] overflow-hidden">
+        {/* Table Headers */}
+        <div className="bg-white px-6 py-4 border-b border-gray-200">
+          <div className="grid grid-cols-8 gap-4 text-xs font-semibold text-gray-900">
+            <div>Date Issued</div>
+            <div>Report ID</div>
+            <div>Report Type</div>
+            <div>Site</div>
+            <div>Campaign</div>
+            <div>Sender</div>
+            <div>Status</div>
+            <div>Actions</div>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="px-6 py-8 text-center text-gray-500">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="ml-2">Loading reports...</span>
+            </div>
+          </div>
+        ) : filteredReports.length === 0 ? (
+          <div className="px-6 py-8 text-center text-gray-500">
+            No reports found
+          </div>
+        ) : (
+          <div className="p-4 space-y-3">
+            {filteredReports.map((report) => (
+              <div key={report.id} className="bg-[#f6f9ff] border-2 border-[#b8d9ff] rounded-[10px] p-4 cursor-pointer hover:bg-[#e8f0ff]" onClick={() => handleViewReport(report)}>
+                <div className="grid grid-cols-8 gap-4 items-center text-sm">
+                  <div className="text-gray-900">
+                    {formatDate(report.date || report.created)}
+                  </div>
+                  <div className="text-gray-900">
+                    {report.report_id || "N/A"}
+                  </div>
+                  <div className="text-gray-900">
+                    {getReportTypeDisplay(report.reportType)}
+                  </div>
+                  <div className="text-gray-900 font-bold">
+                    {report.siteName || "Unknown Site"}
+                  </div>
+                  <div className="text-gray-900">
+                    {report.product?.name || "N/A"}
+                  </div>
+                  <div className="text-gray-900">
+                    {report.createdByName || "Unknown User"}
+                  </div>
+                  <div
+                    className="text-[#2d3fff] underline cursor-pointer"
+                    onClick={() => report.status === 'posted' && handleViewSentHistory(report.id!)}
+                  >
+                    {report.status === 'posted' ? 'PDF' : 'Draft'}
+                  </div>
+                  <div className="text-gray-500">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="p-1">
+                          <MoreVertical className="h-4 w-4 opacity-50" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleViewReport(report)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Report
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handlePrintReport(report)}>
+                          <Printer className="mr-2 h-4 w-4" />
+                          Print Report
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewSentHistory(report.id!)}>
+                          <History className="mr-2 h-4 w-4" />
+                          View Sent History
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDeleteReport(report.id!)} className="text-red-600">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete Report
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
@@ -357,6 +342,206 @@ export default function SalesReportsPage() {
         reportId={selectedReportId}
         emailType="report"
       />
+
+      {/* Report Details Dialog */}
+      {showReportDialog && selectedReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowReportDialog(false)} />
+          <div className="relative bg-white rounded-[13.681px] h-[621px] w-[604px]">
+            {/* Close button */}
+            <div className="absolute flex items-center justify-center left-[559.54px] top-[-4.79px] w-[35.57px] h-[27.36px] z-10">
+              <button
+                onClick={() => setShowReportDialog(false)}
+                className="text-[#333333] text-[34.202px] font-normal rotate-[46.133deg] cursor-pointer"
+              >
+                +
+              </button>
+            </div>
+
+            {/* Title */}
+            <p className="text-center font-light">
+              {getReportTypeDisplay(selectedReport.reportType)}_{formatDate(selectedReport.date).replace(/\s+/g, '_').replace(/,/g, '')}.pdf
+            </p>
+
+            {/* Content Area */}
+            <div className="bg-[rgba(217,217,217,0.3)] h-[400px] rounded-[6.84px] w-[575.271px] overflow-y-auto">
+              <div className="">
+                <div className="bg-white shadow-lg rounded-lg m-2" style={{ width: '210mm', minHeight: '297mm', maxWidth: 'none', transform: 'scale(0.7)', transformOrigin: 'top left' }}>
+                  <div className="w-full relative">
+                    <div className="relative h-16 overflow-hidden">
+                      <div className="absolute inset-0 bg-blue-900"></div>
+                      <div
+                        className="absolute top-0 right-0 h-full bg-cyan-400"
+                        style={{
+                          width: "40%",
+                          clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
+                        }}
+                      ></div>
+                      <div className="relative z-10 h-full flex items-center px-6">
+                        <div className="text-white text-lg font-semibold">Logistics</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 space-y-6">
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
+                          {getReportTypeDisplay(selectedReport.reportType)}
+                        </div>
+                        <p className="text-gray-600 text-sm mt-2">as of {formatDate(selectedReport.date)}</p>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <div
+                          className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
+                          style={{ width: "160px", height: "160px" }}
+                        >
+                          <img
+                            src="/ohplus-new-logo.png"
+                            alt="Company Logo"
+                            className="max-h-full max-w-full object-contain"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="shadow-sm border rounded-lg">
+                      <div className="p-6">
+                        <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                              <span className="font-bold text-gray-700 whitespace-nowrap">Site ID:</span>
+                              <span className="text-gray-900">{selectedReport.siteId || "N/A"}</span>
+                            </div>
+                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                              <span className="font-bold text-gray-700 whitespace-nowrap">Job Order:</span>
+                              <span className="text-gray-900">
+                                {selectedReport.joNumber || selectedReport.id?.slice(-4).toUpperCase() || "N/A"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                              <span className="font-bold text-gray-700 whitespace-nowrap">Job Order Date:</span>
+                              <span className="text-gray-900">{formatDate(selectedReport.date)}</span>
+                            </div>
+                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                              <span className="font-bold text-gray-700 whitespace-nowrap">Site:</span>
+                              <span className="text-gray-900">{selectedReport.siteName || "N/A"}</span>
+                            </div>
+                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                              <span className="font-bold text-gray-700 whitespace-nowrap">Start Date:</span>
+                              <span className="text-gray-900">
+                                {selectedReport.bookingDates?.start ? formatDate(selectedReport.bookingDates.start) : "N/A"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                              <span className="font-bold text-gray-700 whitespace-nowrap">End Date:</span>
+                              <span className="text-gray-900">
+                                {selectedReport.bookingDates?.end ? formatDate(selectedReport.bookingDates.end) : "N/A"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                              <span className="font-bold text-gray-700 whitespace-nowrap">Client:</span>
+                              <span className="text-gray-900">{selectedReport.client || "N/A"}</span>
+                            </div>
+                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                              <span className="font-bold text-gray-700 whitespace-nowrap">Sales:</span>
+                              <span className="text-gray-900">{selectedReport.sales || "N/A"}</span>
+                            </div>
+                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
+                              <span className="font-bold text-gray-700 whitespace-nowrap">Status:</span>
+                              <span className="text-gray-900">{selectedReport.status || "N/A"}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedReport.descriptionOfWork && (
+                      <div className="shadow-sm border rounded-lg">
+                        <div className="p-6">
+                          <h2 className="text-xl font-bold mb-4 text-gray-900">Description</h2>
+                          <p className="text-gray-900">{selectedReport.descriptionOfWork}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-end pt-8 border-t">
+                      <div>
+                        <h3 className="font-semibold mb-2">Prepared by:</h3>
+                        <div className="text-sm text-gray-600">
+                          <div>{selectedReport.createdByName || "Unknown"}</div>
+                          <div>LOGISTICS</div>
+                          <div>{formatDate(selectedReport.created)}</div>
+                        </div>
+                      </div>
+                      <div className="text-right text-sm text-gray-500 italic">
+                        "All data are based on the latest available records as of{" "}
+                        {formatDate(new Date().toISOString().split("T")[0])}."
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-full absolute bottom-0">
+                    <div className="relative h-16 overflow-hidden">
+                      <div className="absolute inset-0 bg-cyan-400"></div>
+                      <div
+                        className="absolute top-0 right-0 h-full bg-blue-900"
+                        style={{
+                          width: "75%",
+                          clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
+                        }}
+                      ></div>
+                      <div className="relative z-10 h-full flex items-center justify-between px-8">
+                        <div className="flex items-center gap-6">
+                          <div className="text-white text-lg font-semibold">{""}</div>
+                        </div>
+                        <div className="text-white text-right flex items-center gap-2">
+                          <div className="text-sm font-medium">Smart. Seamless. Scalable</div>
+                          <div className="text-2xl font-bold flex items-center">
+                            OH!
+                            <div className="ml-1 text-cyan-400">
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 2v16M2 10h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Prepared By Section */}
+            <div className="absolute font-light text-[#333333] text-[12px] left-[29px] top-[555px] w-[273px]">
+              <p>
+                <span className="font-bold">Prepared By: </span>
+                <span className="font-normal">{selectedReport.createdByName || "Unknown"} (Logistics)</span>
+              </p>
+              <p>
+                <span className="font-bold">Date:</span>
+                <span> {formatDate(selectedReport.created)}</span>
+              </p>
+              <p>
+                <span className="font-bold">Time: </span>
+                {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false })} GMT
+              </p>
+            </div>
+
+            {/* Forward Button */}
+            <div className="absolute bg-[#1d0beb] h-[32.15px] rounded-[6.84px] left-[453.51px] top-[564.33px] w-[127.23px]">
+              <button className="w-full h-full text-white font-bold text-[13.681px] text-center leading-none">
+                Forward
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
