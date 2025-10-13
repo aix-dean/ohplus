@@ -698,11 +698,31 @@ export default function QuotationsListPage() {
         throw new Error("Quotation not found")
       }
 
+      // If quotation has a pre-generated PDF, download it directly
+      if (quotation.pdf) {
+        const response = await fetch(quotation.pdf)
+        const blob = await response.blob()
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+
+        toast({
+          title: "Success",
+          description: "Quotation PDF downloaded successfully",
+        })
+        return
+      }
+
       // Prepare logo data URL if company logo exists
       let logoDataUrl = null
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const logoResponse = await fetch(companyData.photo_url)
+          const logoResponse = await fetch(companyData.logo)
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             logoDataUrl = await new Promise<string>((resolve) => {
@@ -888,11 +908,39 @@ export default function QuotationsListPage() {
         throw new Error("Quotation not found")
       }
 
+      // If quotation has a pre-generated PDF, open it directly for printing
+      if (quotation.pdf) {
+        const response = await fetch(quotation.pdf)
+        const blob = await response.blob()
+        const pdfUrl = URL.createObjectURL(blob)
+
+        // Open PDF in new window and trigger print
+        const printWindow = window.open(pdfUrl)
+        if (printWindow) {
+          printWindow.onload = () => {
+            printWindow.print()
+            // Clean up the URL after printing
+            printWindow.onafterprint = () => {
+              URL.revokeObjectURL(pdfUrl)
+            }
+          }
+        } else {
+          console.error("Failed to open print window")
+          URL.revokeObjectURL(pdfUrl)
+        }
+
+        toast({
+          title: "Success",
+          description: "Quotation PDF opened for printing",
+        })
+        return
+      }
+
       // Prepare logo data URL if company logo exists
       let logoDataUrl = null
-      if (companyData?.photo_url) {
+      if (companyData?.logo) {
         try {
-          const logoResponse = await fetch(companyData.photo_url)
+          const logoResponse = await fetch(companyData.logo)
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             logoDataUrl = await new Promise<string>((resolve) => {
@@ -1098,6 +1146,7 @@ export default function QuotationsListPage() {
           company_website: companyDataResult.company_website || companyDataResult.website,
           photo_url: companyDataResult.photo_url,
           contact_person: companyDataResult.contact_person,
+          logo: companyDataResult.logo,
           email: companyDataResult.email,
           phone: companyDataResult.phone,
           social_media: companyDataResult.social_media || {},
@@ -1468,26 +1517,30 @@ export default function QuotationsListPage() {
                               View Details
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                 e.stopPropagation()
-                                handleDownloadPDF(quotation.id)
-                              }}
-                              disabled={generatingPDFs.has(quotation.id)}
-                            >
-                              {generatingPDFs.has(quotation.id) ? (
-                                <>
-                                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                  Generating PDF...
-                                </>
-                              ) : (
-                                <>
-                                  <Download className="mr-2 h-4 w-4" />
-                                  Download PDF
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
+                            {quotation.status?.toLowerCase() !== "reserved" && (
+                              <>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDownloadPDF(quotation.id)
+                                  }}
+                                  disabled={generatingPDFs.has(quotation.id)}
+                                >
+                                  {generatingPDFs.has(quotation.id) ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                      Generating PDF...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download className="mr-2 h-4 w-4" />
+                                      Download PDF
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
                             <DropdownMenuItem onClick={() => handleShareQuotation(quotation.id)}>
                               <Share2 className="mr-2 h-4 w-4" />
                               Share
