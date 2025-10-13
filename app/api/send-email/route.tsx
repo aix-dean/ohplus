@@ -377,10 +377,20 @@ function createGmailCompatibleTemplate(
     width: 100%;
 }
         .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-        .header-square-1 { width: 120px; height: 10px; background: ${primaryColor}; opacity: 1.0; z-index: 2; margin-right: 10px; }
-        .header-square-2 { width: 100px; height: 10px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; }
-        .header-content { width: 70%; height: 100px; text-align: left; position: relative; z-index: 3; }
-        .company-name { color: #000000; font-size: 24px; font-weight: bold; margin: 0 0 10px 0; letter-spacing: 1px; }
+        .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center; border-radius: 45% 0 0 45%; }
+        .header-square-1 { width: 80px; height: 100px; background: ${primaryColor}; opacity: 1.0; z-index: 2; border-radius: 50% 0 0 50%; }
+        .header-square-2 { width: 40px; height: 100px; background: transparent; opacity: 0.8; z-index: 1; border-radius: 40% 0 0 40%; }
+        .header-content { width: 85%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; }
+        .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
+        .company-info {  flex: 1; padding-left: 15px; }
+.company-name {
+  color: #000000;
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-align: start;
+  margin: 0px;
+}
         .company-address { color: #000000; font-size: 14px; margin: 0; }
         .content { padding: 40px 30px; background-color: #f9f9f9; }
         .content p { margin: 0 0 16px 0; }
@@ -390,13 +400,15 @@ function createGmailCompatibleTemplate(
         .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
         .footer { background: #ffffff; padding: 30px 0 30px 30px; color: #000000; position: relative; overflow: hidden; width: 100%; }
         .footer-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-        .footer-square-1 { width: 120px; height: 139px; background: ${primaryColor}; opacity: 1.0; z-index: 2; margin-right: 10px; }
-        .footer-square-2 { width: 100px; height: 139px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; }
-        .footer-content { width: 70%; position: relative; z-index: 3; }
-        .footer-header { margin-bottom: 20px; }
-        .footer-company-name { font-size: 18px; font-weight: 600; margin: 0 0 5px 0; color: #000000; }
+        .footer-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center; border-radius: 45% 0 0 45%; }
+        .footer-square-1 { width: 100px; height: 150px; background: ${primaryColor}; opacity: 1.0; z-index: 2; border-radius: 50% 0 0 50%; }
+        .footer-square-2 { width: 60px; height: 150px; background: transparent; opacity: 0.8; z-index: 1; border-radius: 40% 0 0 40%; }
+        .footer-content { width: 75%; position: relative; z-index: 3; }
+        .footer-header { position: absolute; display: flex; justify-content: flex-start;align-items: center; gap: 20px;  }
+        .footer-logo { height: 40px; width: auto; max-width: 120px;  }
+        .footer-company-name { font-size: 18px; font-weight: 600; margin: 0px 15px; color: #000000; }
         .footer-website { color: #000000; font-size: 14px; margin: 0; }
-        .signature { margin-top: 25px; }
+        .signature { margin-top: 5px; }
         .signature-name { font-weight: 600; color: #000000; font-size: 16px; margin: 0; }
         .signature-title { color: #000000; font-size: 14px; margin: 0; }
         .contact-info { font-size: 14px; color: #000000; }
@@ -405,6 +417,7 @@ function createGmailCompatibleTemplate(
             .email-container { width: 100% !important; box-shadow: none; }
             .header, .content, .footer { padding: 20px !important; }
             .header-circles, .footer-circles { display: none !important; }
+            .header-content { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
             .company-name { font-size: 20px !important; }
             .cta-button { padding: 12px 24px !important; font-size: 14px !important; }
         }
@@ -413,15 +426,18 @@ function createGmailCompatibleTemplate(
 <body>
     <div class="email-container">
         <div class="header">
-
                 <div class="header-circles">
-                                <div class="header-content">
-                    <h1 class="company-name">${companyName || "Company"}</h1>
-                    ${companyAddress ? `<p class="company-address">${companyAddress}</p>` : ''}
-                </div>
-                                    <div class="header-square-2"></div>
-
-                    <div class="header-square-1"></div>
+                    <div class="header-content">
+                        ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="header-logo">` : ''}
+                        <div class="company-info">
+                            <h1 class="company-name">${companyName || "Company"}</h1>
+                            ${companyAddress ? `<p class="company-address">${companyAddress}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="header-div">
+                        <div class="header-square-2"></div>
+                        <div class="header-square-1"></div>
+                    </div>
                 </div>
         </div>
 
@@ -447,6 +463,7 @@ function createGmailCompatibleTemplate(
                 <div class="footer-circles">
                                 <div class="footer-content">
                     <div class="footer-header">
+                        ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
                         <h3 class="footer-company-name">${companyName || "Company"}</h3>
                         ${companyWebsite ? `<p class="footer-website">${companyWebsite}</p>` : ''}
                     </div>
@@ -460,9 +477,10 @@ function createGmailCompatibleTemplate(
                         </div>
                     </div>
                 </div>
-                                    <div class="footer-square-2"></div>
-
-                    <div class="footer-square-1"></div>
+                    <div class="footer-div">
+                        <div class="footer-square-2"></div>
+                        <div class="footer-square-1"></div>
+                    </div>
                 </div>
             </div>
     </div>
@@ -485,8 +503,7 @@ function createEmailTemplate(
   proposalPassword?: string
 ): string {
   const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
-
-  
+  const primaryColor = dominantColor || '#667eea'
 
   const processedBody = body
     .split("\n")
@@ -538,8 +555,8 @@ function createEmailTemplate(
             right: -90px;
             width: 240px;
             height: 240px;
-            border-radius: 50%;
-            background: ${dominantColor || '#667eea'};
+            border-radius: 30% 0 0 30%;
+            background: ${primaryColor};
             opacity: 1.0;
             z-index: 2;
         }
@@ -549,43 +566,65 @@ function createEmailTemplate(
             right: 20px;
             width: 220px;
             height: 220px;
-            border-radius: 50%;
-background: ${dominantColor 
-  ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` 
-  : ''};
+            border-radius: 30% 0 0 30%;
+            background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''};
             opacity: 0.8;
             z-index: 1;
+        }
+        .header-square-1 {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 80px;
+            height: 139px;
+            background: ${primaryColor};
+            opacity: 1.0;
+            z-index: 2;
+            border-radius: 50% 0 0 50%;
+        }
+        .header-square-2 {
+            position: absolute;
+            top: 0;
+            right: 20px;
+            width: 60px;
+            height: 139px;
+            background: transparent;
+            opacity: 0.8;
+            z-index: 1;
+            border-radius: 40% 0 0 40%;
         }
         .header-table {
             width: 100%;
             border-collapse: collapse;
         }
         .header-table td {
-            vertical-align: top;
-            padding: 0 10px;
+            vertical-align: middle;
+            padding: 0 15px;
         }
         .logo-cell {
-            width: 100px;
+            width: 120px;
             text-align: left;
         }
         .company-cell {
             text-align: left;
+            flex: 1;
         }
         .empty-cell {
-            width: 120px;
+            width: 100px;
         }
         .logo {
-            height: 40px;
+            height: 60px;
             width: auto;
-            max-width: 300px;
-            margin-bottom: 10px;
+            max-width: 120px;
+            object-fit: contain;
         }
         .company-name {
             color: #2c3e50;
-            font-size: 20px;
+            font-size: 24px;
             font-weight: bold;
-            margin: 0;
+            margin: 0 0 5px 0;
             letter-spacing: 1px;
+            line-height: 1.2;
         }
         .tagline {
             color: #e8eaff;
@@ -718,8 +757,8 @@ background: ${dominantColor
             right: -130px;
             width: 270px;
             height: 270px;
-            border-radius: 50%;
-            background: ${dominantColor || '#667eea'};
+            border-radius: 30% 0 0 30%;
+            background: ${primaryColor};
             opacity: 1.0;
             z-index: 2;
         }
@@ -729,11 +768,32 @@ background: ${dominantColor
             right: -60px;
             width: 290px;
             height: 290px;
-            border-radius: 50%;
-background: ${dominantColor 
-  ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` 
-  : ''};            opacity: 0.8;
+            border-radius: 30% 0 0 30%;
+            background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''};
+            opacity: 0.8;
             z-index: 1;
+        }
+        .footer-square-1 {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 80px;
+            height: 139px;
+            background: ${primaryColor};
+            opacity: 1.0;
+            z-index: 2;
+            border-radius: 50% 0 0 50%;
+        }
+        .footer-square-2 {
+            position: absolute;
+            top: 0;
+            right: 20px;
+            width: 60px;
+            height: 139px;
+            background: transparent;
+            opacity: 0.8;
+            z-index: 1;
+            border-radius: 40% 0 0 40%;
         }
         .signature {
             margin-bottom: 20px;
@@ -781,19 +841,30 @@ background: ${dominantColor
             }
             .header-table tr {
                 display: block !important;
-                text-align: center !important;
             }
             .header-table td {
                 display: block !important;
                 width: 100% !important;
                 padding: 10px 0 !important;
+                text-align: center !important;
+            }
+            .logo-cell {
+                text-align: center !important;
+            }
+            .company-cell {
+                text-align: center !important;
             }
             .logo {
                 height: 50px !important;
                 max-width: 150px !important;
+                margin: 0 auto !important;
             }
             .company-name {
-                font-size: 24px !important;
+                font-size: 20px !important;
+                text-align: center !important;
+            }
+            .company-address {
+                text-align: center !important;
             }
             .header-circles {
                 display: none !important;
@@ -1023,17 +1094,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Convert logo URL to data URI for email compatibility
-    let logoDataUri = null
+    // Keep logo as URL format for better Gmail compatibility
     let dominantColor = null
     if (actualCompanyLogo) {
       try {
-        console.log("[v0] Converting logo URL to data URI:", actualCompanyLogo)
-        logoDataUri = await imageUrlToDataUri(actualCompanyLogo)
-        if (logoDataUri) {
-          console.log("[v0] Successfully converted logo to data URI")
+        console.log("[v0] Using logo URL format for Gmail compatibility:", actualCompanyLogo)
 
-          // Extract dominant color from the logo
+        // Extract dominant color from the logo URL
+        const logoDataUri = await imageUrlToDataUri(actualCompanyLogo)
+        if (logoDataUri) {
           dominantColor = await extractDominantColor(logoDataUri)
           if (dominantColor) {
             console.log("[v0] Successfully extracted dominant color:", dominantColor)
@@ -1042,12 +1111,12 @@ export async function POST(request: NextRequest) {
             dominantColor = undefined // Explicitly set to undefined for fallback
           }
         } else {
-          console.log("[v0] Failed to convert logo to data URI, using original URL")
+          console.log("[v0] Failed to process logo for color extraction, using fallback color")
+          dominantColor = undefined
         }
       } catch (error) {
-        console.error("[v0] Error processing company logo:", error)
-        // Continue without logo - not a critical failure
-        logoDataUri = null
+        console.error("[v0] Error processing company logo for color extraction:", error)
+        // Continue without dominant color - not a critical failure
         dominantColor = null
       }
     }
@@ -1094,7 +1163,7 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Email sending - Body length:", body?.length)
     console.log("[v0] Email sending - Body preview:", body?.substring(0, 100))
     console.log("[v0] Email sending - Company Logo URL:", actualCompanyLogo)
-    console.log("[v0] Email sending - Logo Data URI available:", !!logoDataUri)
+    console.log("[v0] Email sending - Company Logo URL available:", !!actualCompanyLogo)
 
     // Validate required fields with enhanced user data validation
     if (!body || body.trim().length === 0) {
@@ -1243,7 +1312,7 @@ export async function POST(request: NextRequest) {
           from,
           to: otherRecipients,
           subject: subject.trim(),
-          html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
+          html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
         }
 
         if (otherCc.length > 0) {
@@ -1281,7 +1350,7 @@ export async function POST(request: NextRequest) {
           from,
           to: gmailRecipients,
           subject: subject.trim(),
-          html: createGmailCompatibleTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
+          html: createGmailCompatibleTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
         }
 
         if (gmailCc.length > 0) {
