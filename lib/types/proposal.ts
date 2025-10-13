@@ -73,6 +73,28 @@ export type ProposalProduct = {
   address?: string
 }
 
+export type PageElement = {
+  id: string
+  type: 'text' | 'image' | 'video'
+  content: string // text content or media URL
+  position: { x: number; y: number }
+  size: { width: number; height: number }
+  style?: {
+    fontSize?: number
+    fontFamily?: string
+    color?: string
+    fontWeight?: string
+    textAlign?: string
+  }
+}
+
+export type CustomPage = {
+  id: string
+  type: 'blank'
+  elements: PageElement[]
+  position: number // order in proposal
+}
+
 export type Proposal = {
    id: string
    title: string
@@ -81,6 +103,7 @@ export type Proposal = {
    proposalTitle?: string // Add proposal title field for the main heading
    client: ProposalClient
    products: ProposalProduct[]
+   customPages?: CustomPage[] // Add custom blank pages
    totalAmount: number
    validUntil: Date
    notes?: string
@@ -111,7 +134,6 @@ export type Proposal = {
      | "cost_estimate_pending"
      | "cost_estimate_approved"
      | "cost_estimate_rejected"
-   password?: string // Optional password for public access
    createdAt: Date
    updatedAt: Date
  }
