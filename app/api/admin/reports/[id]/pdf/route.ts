@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import puppeteer from "puppeteer"
+import puppeteer from "puppeteer-core"
+import chromium from "@sparticuz/chromium"
 import { getReportById, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { doc, getDoc } from "firebase/firestore"
@@ -65,8 +66,19 @@ function safeToDate(dateValue: any): Date {
 }
 
 // Helper function to format date exactly like the preview page
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("en-US", {
+const formatDate = (dateValue: any) => {
+  if (!dateValue) return "N/A"
+  if (dateValue instanceof Date) return dateValue.toLocaleDateString("en-US", {
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  if (dateValue.toDate && typeof dateValue.toDate === "function") return dateValue.toDate().toLocaleDateString("en-US", {
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  return new Date(dateValue).toLocaleDateString("en-US", {
     year: "2-digit",
     month: "2-digit",
     day: "2-digit",
@@ -121,9 +133,9 @@ const getTechnology = (product: any) => {
   return product.specs_rental?.technology || "Clear Tapes"
 }
 
-const calculateInstallationDuration = (startDate: string, endDate: string) => {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
+const calculateInstallationDuration = (startDate: any, endDate: any) => {
+  const start = safeToDate(startDate)
+  const end = safeToDate(endDate)
   const diffTime = Math.abs(end.getTime() - start.getTime())
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   return diffDays
@@ -234,9 +246,38 @@ export async function GET(
     }
 
     // Launch Puppeteer browser
+    let executablePath: string
+    let args: string[]
+    let headless: boolean
+
+    // Check if we're in a serverless environment (Vercel, AWS Lambda, etc.)
+    const isServerless = process.env.VERCEL || process.env.LAMBDA_TASK_ROOT || process.env.AWS_LAMBDA_FUNCTION_NAME
+
+    if (isServerless) {
+      // Use @sparticuz/chromium for serverless environments
+      executablePath = await chromium.executablePath()
+      args = chromium.args
+      headless = chromium.headless as boolean
+    } else {
+      // Use local Chrome for development
+      if (process.platform === 'darwin') {
+        // macOS
+        executablePath = '/Users/dean/.cache/puppeteer/chrome/mac_arm-141.0.7390.76/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
+      } else if (process.platform === 'linux') {
+        // Linux
+        executablePath = '/home/sbx_user1051/.cache/puppeteer/chrome/linux-141.0.7390.76/chrome-linux64/chrome'
+      } else {
+        // Windows or other
+        executablePath = undefined as any
+      }
+      args = ['--no-sandbox', '--disable-setuid-sandbox']
+      headless = true
+    }
+
     browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      headless,
+      args,
+      executablePath
     })
 
     const page = await browser.newPage()
