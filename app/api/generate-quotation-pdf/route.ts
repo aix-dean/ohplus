@@ -136,40 +136,19 @@ export async function POST(request: NextRequest) {
     // Generate HTML content
     const htmlContent = generateQuotationHTML(quotation, companyData, userData)
 
-    // Launch puppeteer
-    let executablePath: string
-    let args: string[]
-    let headless: boolean
-
-    // Check if we're in a serverless environment (Vercel, AWS Lambda, etc.)
-    const isServerless = process.env.VERCEL || process.env.LAMBDA_TASK_ROOT || process.env.AWS_LAMBDA_FUNCTION_NAME
-
-    if (isServerless) {
-      // Use @sparticuz/chromium for serverless environments
-      executablePath = await chromium.executablePath()
-      args = chromium.args
-      headless = chromium.headless as boolean
-    } else {
-      // Use local Chrome for development
-      if (process.platform === 'darwin') {
-        // macOS
-        executablePath = '/Users/dean/.cache/puppeteer/chrome/mac_arm-141.0.7390.76/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
-      } else if (process.platform === 'linux') {
-        // Linux
-        executablePath = '/home/sbx_user1051/.cache/puppeteer/chrome/linux-141.0.7390.76/chrome-linux64/chrome'
-      } else {
-        // Windows or other
-        executablePath = undefined as any
-      }
-      args = ['--no-sandbox', '--disable-setuid-sandbox']
-      headless = true
-    }
-
-    const browser = await puppeteer.launch({
-      headless,
-      args,
-      executablePath
-    })
+    // Launch puppeteer with @sparticuz/chromium for serverless or local chromium for development
+    const browser = await puppeteer.launch(
+      process.env.NODE_ENV === 'production' || process.env.VERCEL
+        ? {
+            headless: true,
+            args: chromium.args,
+            executablePath: await chromium.executablePath()
+          }
+        : {
+            headless: true,
+            executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+          }
+    )
 
     const page = await browser.newPage()
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
