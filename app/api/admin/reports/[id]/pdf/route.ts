@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import puppeteer from "puppeteer"
+import puppeteer from "puppeteer-core"
+import chromium from "@sparticuz/chromium"
 import { getReportById, type ReportData } from "@/lib/report-service"
 import { getProductById, type Product } from "@/lib/firebase-service"
 import { doc, getDoc } from "firebase/firestore"
@@ -65,8 +66,19 @@ function safeToDate(dateValue: any): Date {
 }
 
 // Helper function to format date exactly like the preview page
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("en-US", {
+const formatDate = (dateValue: any) => {
+  if (!dateValue) return "N/A"
+  if (dateValue instanceof Date) return dateValue.toLocaleDateString("en-US", {
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  if (dateValue.toDate && typeof dateValue.toDate === "function") return dateValue.toDate().toLocaleDateString("en-US", {
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  return new Date(dateValue).toLocaleDateString("en-US", {
     year: "2-digit",
     month: "2-digit",
     day: "2-digit",
@@ -121,9 +133,9 @@ const getTechnology = (product: any) => {
   return product.specs_rental?.technology || "Clear Tapes"
 }
 
-const calculateInstallationDuration = (startDate: string, endDate: string) => {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
+const calculateInstallationDuration = (startDate: any, endDate: any) => {
+  const start = safeToDate(startDate)
+  const end = safeToDate(endDate)
   const diffTime = Math.abs(end.getTime() - start.getTime())
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   return diffDays
@@ -233,11 +245,19 @@ export async function GET(
       }
     }
 
-    // Launch Puppeteer browser
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    })
+    // Launch Puppeteer browser with @sparticuz/chromium for serverless or local chromium for development
+    browser = await puppeteer.launch(
+      process.env.NODE_ENV === 'production' || process.env.VERCEL
+        ? {
+            headless: true,
+            args: chromium.args,
+            executablePath: await chromium.executablePath()
+          }
+        : {
+            headless: true,
+            executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+          }
+    )
 
     const page = await browser.newPage()
 
