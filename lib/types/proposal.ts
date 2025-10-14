@@ -50,6 +50,7 @@ export type ProposalProduct = {
   light?: ProductLight | null
   description?: string
   health_percentage?: number
+  additionalMessage?: string // Additional message for the product
   // Add all other fields from Product interface that might be needed
   active?: boolean
   deleted?: boolean
