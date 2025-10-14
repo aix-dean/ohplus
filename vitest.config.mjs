@@ -1,32 +1,26 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
-import path from 'path'
 
 export default defineConfig({
-  plugins: [react()],
   test: {
-    environment: 'happy-dom',
-    setupFiles: ['./test/setup.ts'],
+    environment: 'jsdom',
     globals: true,
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(process.cwd(), './'),
+    clearMocks: true,
+    coverage: {
+      enabled: true,
+      reporter: ['text', 'json', 'html'],
+      include: [
+        'lib/utils.ts',
+        'lib/types/proposal.ts',
+        'components/blank-page-editor.tsx',
+        'app/sales/proposals/[id]/page.tsx'
+      ],
+      exclude: ['**/*.test.js', '**/*.spec.js'],
     },
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './'),
-    },
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './'),
-    },
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './'),
-    },
+    testMatch: [
+      '**/__tests__/**/*.?([mc])[jt]s?(x)',
+      '**/?(*.)+(spec|test).?([mc])[jt]s?(x)',
+      '**/*.test.js',
+    ],
   },
 })
