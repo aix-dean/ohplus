@@ -150,8 +150,8 @@ async function checkEmailCompliance(domain: string): Promise<EmailComplianceInfo
 function validateFromAddress(from: string): { isValid: boolean, domain: string, recommendations: string[] } {
   const recommendations: string[] = []
 
-  // Extract domain from email address
-  const domainMatch = from.match(/@([^>]+)$/)
+  // Extract domain from email address (handle both "user@domain.com" and "Name <user@domain.com>" formats)
+  const domainMatch = from.match(/@([^>\s]+)(?:\s*>)?$/)
   if (!domainMatch) {
     return { isValid: false, domain: '', recommendations: ['Invalid email format in from address'] }
   }
@@ -379,7 +379,7 @@ function createGmailCompatibleTemplate(
         .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
         .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
         .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
-        .header-square-2 { width: 70px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
         .header-content { width: 85%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px }
         .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
         .company-info {  flex: 1; padding-left: 15px; }
@@ -401,8 +401,8 @@ function createGmailCompatibleTemplate(
         .footer { background: #ffffff; padding: 0 0 0 20px; color: #000000; position: relative; overflow: hidden; width: 100%; }
         .footer-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
         .footer-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
-        .footer-square-1 { width: 100px; height: 210px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
-        .footer-square-2 { width: 80px; height: 210px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .footer-square-1 { width: 80px; height: 210px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .footer-square-2 { width: 60px; height: 210px; background: transparent; opacity: 0.8; z-index: 1;  }
         .footer-content { width: 75%; position: relative; z-index: 3; }
         .footer-header { position: absolute; display: flex; justify-content: flex-start;align-items: center; gap: 20px; padding-top:20px; }
         .footer-logo { height: 40px; width: auto; max-width: 120px;  }
@@ -544,7 +544,7 @@ function createEmailTemplate(
         .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
         .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
         .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
-        .header-square-2 { width: 70px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
         .header-content { width: 85%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px; padding-left: 20px }
         .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
         .company-info {  flex: 1; padding-left: 15px; }
@@ -566,8 +566,8 @@ function createEmailTemplate(
         .footer { background: #ffffff;  color: #000000; position: relative; overflow: hidden; width: 100%; height: 160px}
         .footer-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
         .footer-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
-        .footer-square-1 { width: 100px; height: 210px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
-        .footer-square-2 { width: 80px; height: 210px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .footer-square-1 { width: 80px; height: 210px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .footer-square-2 { width: 60px; height: 210px; background: transparent; opacity: 0.8; z-index: 1;  }
         .footer-content { width: 75%; position: relative; z-index: 3; padding-left:20px; }
         .footer-header {  display: flex; justify-content: flex-start;align-items: center; gap: 20px; padding-top:0px; }
         .footer-logo { height: 40px; width: auto; max-width: 120px;  }
@@ -843,9 +843,9 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Email sending - Company Logo URL available:", !!actualCompanyLogo)
 
     // Validate required fields with enhanced user data validation
-    if (!body || body.trim().length === 0) {
-      console.error("[v0] Email sending failed - Empty body")
-      return NextResponse.json({ error: "Email body cannot be empty" }, { status: 400 })
+    if (!toJson) {
+      console.error("[v0] Email sending failed - Missing recipients")
+      return NextResponse.json({ error: "Email recipients are required" }, { status: 400 })
     }
 
     if (!subject || subject.trim().length === 0) {
@@ -853,9 +853,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email subject cannot be empty" }, { status: 400 })
     }
 
-    if (!toJson) {
-      console.error("[v0] Email sending failed - Missing recipients")
-      return NextResponse.json({ error: "Email recipients are required" }, { status: 400 })
+    if (!body || body.trim().length === 0) {
+      console.error("[v0] Email sending failed - Empty body")
+      return NextResponse.json({ error: "Email body cannot be empty" }, { status: 400 })
     }
 
     // Enhanced user data validation
@@ -1005,14 +1005,17 @@ export async function POST(request: NextRequest) {
         }
 
         console.log("[v0] Sending regular email to non-Gmail recipients:", otherRecipients.length)
-        const { data, error } = await resend.emails.send(regularEmailData)
+        const sendResult = await resend.emails.send(regularEmailData)
 
-        if (error) {
-          console.error("[v0] Error sending regular email:", error)
-          results.push({ type: 'regular', success: false, error: error.message, recipients: otherRecipients.length })
+        if (sendResult && sendResult.error) {
+          console.error("[v0] Error sending regular email:", sendResult.error)
+          results.push({ type: 'regular', success: false, error: sendResult.error.message, recipients: otherRecipients.length })
+        } else if (sendResult && sendResult.data) {
+          console.log("[v0] Regular email sent successfully:", sendResult.data?.id)
+          results.push({ type: 'regular', success: true, data: sendResult.data, recipients: otherRecipients.length })
         } else {
-          console.log("[v0] Regular email sent successfully:", data?.id)
-          results.push({ type: 'regular', success: true, data, recipients: otherRecipients.length })
+          console.error("[v0] Unexpected response from Resend API:", sendResult)
+          results.push({ type: 'regular', success: false, error: 'Unexpected API response', recipients: otherRecipients.length })
         }
       } catch (error) {
         console.error("[v0] Exception sending regular email:", error)
@@ -1043,14 +1046,14 @@ export async function POST(request: NextRequest) {
         }
 
         console.log("[v0] Sending Gmail-optimized email to recipients:", gmailRecipients.length)
-        const { data, error } = await resend.emails.send(gmailEmailData)
+        const gmailSendResult = await resend.emails.send(gmailEmailData)
 
-        if (error) {
-          console.error("[v0] Error sending Gmail-optimized email:", error)
-          results.push({ type: 'gmail', success: false, error: error.message, recipients: gmailRecipients.length })
+        if (gmailSendResult && gmailSendResult.error) {
+          console.error("[v0] Error sending Gmail-optimized email:", gmailSendResult.error)
+          results.push({ type: 'gmail', success: false, error: gmailSendResult.error.message, recipients: gmailRecipients.length })
 
           // If Gmail fails, try alternative approach with simplified template
-          if (error.message.includes("domain") || error.message.includes("spam") || error.message.includes("blocked")) {
+          if (gmailSendResult.error.message.includes("domain") || gmailSendResult.error.message.includes("spam") || gmailSendResult.error.message.includes("blocked")) {
             console.log("[v0] Attempting fallback for Gmail recipients with ultra-simple template")
 
             const fallbackEmailData: any = {
@@ -1064,19 +1067,25 @@ export async function POST(request: NextRequest) {
               fallbackEmailData.reply_to = replyTo.trim()
             }
 
-            const { data: fallbackData, error: fallbackError } = await resend.emails.send(fallbackEmailData)
+            const fallbackSendResult = await resend.emails.send(fallbackEmailData)
 
-            if (fallbackError) {
-              console.error("[v0] Fallback also failed for Gmail:", fallbackError)
-              results.push({ type: 'gmail-fallback', success: false, error: fallbackError.message, recipients: gmailRecipients.length })
+            if (fallbackSendResult && fallbackSendResult.error) {
+              console.error("[v0] Fallback also failed for Gmail:", fallbackSendResult.error)
+              results.push({ type: 'gmail-fallback', success: false, error: fallbackSendResult.error.message, recipients: gmailRecipients.length })
+            } else if (fallbackSendResult && fallbackSendResult.data) {
+              console.log("[v0] Gmail fallback email sent successfully:", fallbackSendResult.data?.id)
+              results.push({ type: 'gmail-fallback', success: true, data: fallbackSendResult.data, recipients: gmailRecipients.length })
             } else {
-              console.log("[v0] Gmail fallback email sent successfully:", fallbackData?.id)
-              results.push({ type: 'gmail-fallback', success: true, data: fallbackData, recipients: gmailRecipients.length })
+              console.error("[v0] Unexpected fallback response from Resend API:", fallbackSendResult)
+              results.push({ type: 'gmail-fallback', success: false, error: 'Unexpected fallback API response', recipients: gmailRecipients.length })
             }
           }
+        } else if (gmailSendResult && gmailSendResult.data) {
+          console.log("[v0] Gmail-optimized email sent successfully:", gmailSendResult.data?.id)
+          results.push({ type: 'gmail', success: true, data: gmailSendResult.data, recipients: gmailRecipients.length })
         } else {
-          console.log("[v0] Gmail-optimized email sent successfully:", data?.id)
-          results.push({ type: 'gmail', success: true, data, recipients: gmailRecipients.length })
+          console.error("[v0] Unexpected Gmail response from Resend API:", gmailSendResult)
+          results.push({ type: 'gmail', success: false, error: 'Unexpected Gmail API response', recipients: gmailRecipients.length })
         }
       } catch (error) {
         console.error("[v0] Exception sending Gmail email:", error)
