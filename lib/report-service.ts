@@ -56,6 +56,7 @@ export interface ReportData {
   tags: string[]
   assignedTo?: string
   // Product information
+  pdf?: string
   product?: {
     id: string
     name: string
