@@ -3612,8 +3612,8 @@ export default function ProposalDetailsPage() {
                 setIsBlankPageEditorOpen(false)
                 setEditingCustomPage(null)
               }}
-              pageWidth={800}
-              pageHeight={600}
+              pageWidth={getPageDimensions(selectedSize, selectedOrientation).width}
+              pageHeight={getPageDimensions(selectedSize, selectedOrientation).height}
             />
           )}
         </DialogContent>
