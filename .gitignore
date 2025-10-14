@@ -29,6 +29,7 @@ next-env.d.ts
 # testing
 coverage/
 .vitest/
+test-blank-page-feature.test.js
 
 #mcp server
 mcp.json
