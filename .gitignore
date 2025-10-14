@@ -34,6 +34,10 @@ lib/proposal-service.test.ts
 lib/types/proposal.test.ts
 app/sales/proposals/__tests__/proposal-details-page.test.tsx
 
+# testing
+coverage/
+.vitest/
+
 #mcp server
 mcp.json
 
