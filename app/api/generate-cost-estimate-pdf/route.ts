@@ -196,21 +196,6 @@ export async function POST(request: NextRequest) {
     await browser.close()
     console.log('[API_PDF] Browser closed')
 
-    // Validate PDF buffer before upload
-    if (!buffer || buffer.length === 0) {
-      console.error('[API_PDF] PDF buffer is empty or invalid')
-      throw new Error('Generated PDF buffer is empty')
-    }
-
-    // Check if buffer starts with PDF header
-    const pdfHeader = buffer.slice(0, 8).toString()
-    console.log('[API_PDF] PDF header bytes:', pdfHeader)
-    if (!pdfHeader.startsWith('%PDF-')) {
-      console.error('[API_PDF] PDF buffer does not start with valid PDF header')
-      throw new Error('Generated PDF does not have valid PDF header')
-    }
-
-    console.log('[API_PDF] PDF validation successful, returning response')
 
     return new NextResponse(Buffer.from(buffer), {
       headers: {
