@@ -30,6 +30,7 @@ next-env.d.ts
 coverage/
 .vitest/
 test-blank-page-feature.test.js
+lib/proposal-service.test.ts
 
 #mcp server
 mcp.json
