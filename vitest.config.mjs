@@ -24,4 +24,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './'),
     },
   },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './'),
+    },
+  },
 })

@@ -421,6 +421,13 @@ export default function ProposalDetailsPage() {
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false)
   const [editingCustomPage, setEditingCustomPage] = useState<CustomPage | null>(null)
   const [isBlankPageEditorOpen, setIsBlankPageEditorOpen] = useState(false)
+  const [fieldVisibility, setFieldVisibility] = useState<{[productId: string]: {
+    location: boolean
+    dimension: boolean
+    type: boolean
+    traffic: boolean
+    srp: boolean
+  }}>({})
 
   const fetchClients = async () => {
     if (!userData?.company_id) return
@@ -1399,8 +1406,8 @@ export default function ProposalDetailsPage() {
     const numberOfSites = proposal?.products?.length || 1
     const sitesPerPage = getSitesPerPage(layout)
     const customPages = proposal?.customPages?.length || 0
-    // Always include 1 page for intro + pages for sites + custom pages
-    return 1 + Math.ceil(numberOfSites / sitesPerPage) + customPages
+    // Always include 1 page for intro + pages for sites + custom pages + 1 page for outro
+    return 1 + Math.ceil(numberOfSites / sitesPerPage) + customPages + 1
   }
 
   const getPageContent = (pageNumber: number, layout: string) => {
@@ -2541,31 +2548,48 @@ export default function ProposalDetailsPage() {
             ) : null}
 
             {/* SRP */}
-            <div className="mb-2">
-              <p className="mb-0">SRP:</p>
-              {isEditMode ? (
-                <input
-                  value={editableProducts[product.id]?.srp || ''}
-                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
-                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                />
-              ) : (
-                <p className="font-normal text-[18px]">
-                  {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
-                </p>
-              )}
-            </div>
+            {isEditMode || fieldVisibility[product.id]?.srp !== false ? (
+              <div className="mb-2 flex items-center">
+                <p className="mb-0 mr-2 flex-shrink-0">SRP:</p>
+                {isEditMode ? (
+                  <input
+                    value={editableProducts[product.id]?.srp || ''}
+                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
+                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
+                  />
+                ) : (
+                  <p className="font-normal text-[18px]">
+                    {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
+                  </p>
+                )}
+                {isEditMode && (
+                  <button
+                    onClick={() => setFieldVisibility(prev => ({
+                      ...prev,
+                      [product.id]: {
+                        ...prev[product.id],
+                        srp: !prev[product.id]?.srp
+                      }
+                    }))}
+                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.srp !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
+                    title={fieldVisibility[product.id]?.srp !== false ? "Hide SRP field" : "Show SRP field"}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ) : null}
 
             {/* Additional Message */}
             {((product as any).additionalMessage || isEditMode) && (
-              <div className="mb-2">
-                <p className="mb-0">Additional Message:</p>
+              <div className="mb-2 flex items-start">
+                <p className="mb-0 mr-2 flex-shrink-0">Additional Message:</p>
                 {isEditMode ? (
                   <textarea
                     value={editableProducts[product.id]?.additionalMessage || ''}
                     onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
                     placeholder="Add Message"
-                    className="font-normal text-[16px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full min-h-[60px] resize-none"
+                    className="font-normal text-[16px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none flex-1 min-h-[60px] resize-none"
                     rows={2}
                   />
                 ) : (
@@ -3116,7 +3140,7 @@ export default function ProposalDetailsPage() {
             const pageNumber = index + 1
             return (
               <div key={pageNumber} className={`${getPageContainerClass(selectedSize, "Landscape")} ${index > 0 ? 'mt-[-65px]' : ''}`} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
-                {pageNumber === 1 ? renderIntroPage(pageNumber) : renderSitePage(pageNumber)}
+                {pageNumber === 1 ? renderIntroPage(pageNumber) : pageNumber === getTotalPages(selectedLayout) ? renderOutroPage(pageNumber) : renderSitePage(pageNumber)}
                 {/* Add blank page button between pages */}
                 {isEditMode && pageNumber < getTotalPages(selectedLayout) && (
                   <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 z-20">
