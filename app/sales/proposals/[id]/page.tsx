@@ -1408,6 +1408,34 @@ export default function ProposalDetailsPage() {
     }
   }
 
+  const getPageDimensions = (size: string, orientation: string) => {
+    const dpi = 96
+    const mmToPx = 3.7795
+
+    switch (size) {
+      case "A4":
+        if (orientation === "Landscape") {
+          return { width: Math.round(280 * mmToPx), height: Math.round(180 * mmToPx) }
+        } else {
+          return { width: Math.round(200 * mmToPx), height: Math.round(240 * mmToPx) }
+        }
+      case "Letter size":
+        if (orientation === "Landscape") {
+          return { width: 10 * dpi, height: 7 * dpi }
+        } else {
+          return { width: 8 * dpi, height: 9 * dpi }
+        }
+      case "Legal size":
+        if (orientation === "Landscape") {
+          return { width: 12 * dpi, height: 7 * dpi }
+        } else {
+          return { width: 8 * dpi, height: 10 * dpi }
+        }
+      default:
+        return { width: 800, height: 600 }
+    }
+  }
+
   const getPageTitle = (pageContent: any[]): string => {
     if (!pageContent || pageContent.length === 0) {
       return "N/A"
@@ -2504,7 +2532,7 @@ export default function ProposalDetailsPage() {
 
         {/* Edit Mode Overlay for Blank Pages */}
         {isEditMode && customPage.elements.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-80 z-10">
+          <div className="absolute top-[350px] left-0 right-0 bottom-[70px] flex items-center justify-center bg-gray-50 bg-opacity-80 z-10">
             <div className="text-center">
               <div className="mb-4">
                 <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -3138,8 +3166,8 @@ export default function ProposalDetailsPage() {
                 setIsBlankPageEditorOpen(false)
                 setEditingCustomPage(null)
               }}
-              pageWidth={800}
-              pageHeight={600}
+              pageWidth={getPageDimensions(selectedSize, selectedOrientation).width}
+              pageHeight={getPageDimensions(selectedSize, selectedOrientation).height}
             />
           )}
         </DialogContent>
