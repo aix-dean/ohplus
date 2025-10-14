@@ -931,8 +931,8 @@ function SalesDashboardContent() {
         open: true, // Add the missing 'open' property
       })
 
-      // Redirect to the new proposal's detail page
-      router.push(`/sales/proposals/${proposalId}`)
+      // Redirect to the new proposal's detail page with edit mode enabled
+      router.push(`/sales/proposals/${proposalId}?action=edit`)
 
       // Reset the proposal creation mode and selected items
       setProposalCreationMode(false)
