@@ -99,7 +99,7 @@ export default function BusinessProductDetailPage() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (files) {
-      setUploadedFiles(prev => [...prev, ...Array.from(files)])
+      setUploadedFiles(prev => [...prev, ...Array.from(files) as File[]])
     }
   }
 
@@ -368,18 +368,27 @@ export default function BusinessProductDetailPage() {
 
           {/* Site Image and Map */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-            {/* Site Image - Left Side */}
+            {/* Site Media - Left Side */}
             <div className="relative aspect-square w-full">
-              <Image
-                src={product.media && product.media.length > 0 ? product.media[0].url : "/placeholder.svg"}
-                alt={product.name}
-                fill
-                className="object-cover rounded-md"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = "/abstract-geometric-sculpture.png"
-                }}
-              />
+              {product.media && product.media.length > 0 && product.media[0].isVideo ? (
+                <video
+                  src={product.media[0].url}
+                  className="w-full h-full object-cover rounded-md"
+                  controls={false}
+                  preload="metadata"
+                />
+              ) : (
+                <Image
+                  src={product.media && product.media.length > 0 ? product.media[0].url : "/placeholder.svg"}
+                  alt={product.name}
+                  fill
+                  className="object-cover rounded-md"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement
+                    target.src = "/abstract-geometric-sculpture.png"
+                  }}
+                />
+              )}
             </div>
 
             {/* Map Placeholder - Right Side */}
@@ -790,24 +799,46 @@ export default function BusinessProductDetailPage() {
                 </div>
               </div>
 
-              {/* Current Images */}
+              {/* Current Media */}
               {product?.media && product.media.length > 0 && (
                 <div>
-                  <Label className="text-[#4e4e4e] font-medium mb-3 block">Current Images:</Label>
+                  <Label className="text-[#4e4e4e] font-medium mb-3 block">Current Media:</Label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                     {product.media
                       .filter(mediaItem => !imagesToRemove.includes(mediaItem.url))
                       .map((mediaItem, index) => (
                         <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 group">
-                          <img
-                            src={mediaItem.url || "/placeholder.svg"}
-                            alt={`Current image ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/abstract-geometric-sculpture.png"
-                            }}
-                          />
+                          {mediaItem.isVideo ? (
+                            <video
+                              src={mediaItem.url || "/placeholder.svg"}
+                              className="w-full h-full object-cover"
+                              preload="metadata"
+                              style={{
+                                pointerEvents: 'auto',
+                                cursor: 'pointer',
+                                WebkitAppearance: 'none',
+                                appearance: 'none'
+                              }}
+                              onClick={(e) => {
+                                const video = e.target as HTMLVideoElement;
+                                if (video.paused) {
+                                  video.play();
+                                } else {
+                                  video.pause();
+                                }
+                              }}
+                            />
+                          ) : (
+                            <img
+                              src={mediaItem.url || "/placeholder.svg"}
+                              alt={`Current media ${index + 1}`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.src = "/abstract-geometric-sculpture.png"
+                              }}
+                            />
+                          )}
                           <Button
                             variant="destructive"
                             size="sm"
@@ -845,23 +876,44 @@ export default function BusinessProductDetailPage() {
                 </div>
               )}
 
-              {/* Photo Upload */}
+              {/* Media Upload */}
               <div>
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">
-                  Add New Photos: <span className="text-[#c4c4c4]">(can upload multiple)</span>
+                  Add New Media: <span className="text-[#c4c4c4]">(can upload multiple)</span>
                 </Label>
 
-                {/* Image Preview/Carousel */}
+                {/* Media Preview/Carousel */}
                 {uploadedFiles.length > 0 && (
                   <div className="mb-4">
                     <div className="relative bg-gray-100 rounded-lg overflow-hidden">
-                      {/* Main Image Display */}
+                      {/* Main Media Display */}
                       <div className="aspect-video relative">
-                        <img
-                          src={URL.createObjectURL(uploadedFiles[currentImageIndex])}
-                          alt={`Preview ${currentImageIndex + 1}`}
-                          className="w-full h-full object-cover"
-                        />
+                        {uploadedFiles[currentImageIndex].type.startsWith('video/') ? (
+                          <video
+                            src={URL.createObjectURL(uploadedFiles[currentImageIndex])}
+                            className="w-full h-full object-cover"
+                            controls={false}
+                            preload="metadata"
+                            style={{
+                              pointerEvents: 'auto',
+                              cursor: 'pointer'
+                            }}
+                            onClick={(e) => {
+                              const video = e.target as HTMLVideoElement;
+                              if (video.paused) {
+                                video.play();
+                              } else {
+                                video.pause();
+                              }
+                            }}
+                          />
+                        ) : (
+                          <img
+                            src={URL.createObjectURL(uploadedFiles[currentImageIndex])}
+                            alt={`Preview ${currentImageIndex + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
 
                         {/* Remove Button */}
                         <Button
@@ -874,7 +926,7 @@ export default function BusinessProductDetailPage() {
                         </Button>
                       </div>
 
-                      {/* Navigation Arrows (only show if multiple images) */}
+                      {/* Navigation Arrows (only show if multiple files) */}
                       {uploadedFiles.length > 1 && (
                         <>
                           <Button
@@ -896,7 +948,7 @@ export default function BusinessProductDetailPage() {
                         </>
                       )}
 
-                      {/* Image Counter */}
+                      {/* Media Counter */}
                       <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 bg-black/50 text-white px-2 py-1 rounded text-sm">
                         {currentImageIndex + 1} / {uploadedFiles.length}
                       </div>
@@ -913,11 +965,20 @@ export default function BusinessProductDetailPage() {
                             }`}
                             onClick={() => setCurrentImageIndex(index)}
                           >
-                            <img
-                              src={URL.createObjectURL(file)}
-                              alt={`Thumbnail ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
+                            {file.type.startsWith('video/') ? (
+                              <video
+                                src={URL.createObjectURL(file)}
+                                className="w-full h-full object-cover pointer-events-none"
+                                preload="metadata"
+                                controls={false}
+                              />
+                            ) : (
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={`Thumbnail ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            )}
                           </button>
                         ))}
                       </div>
@@ -941,7 +1002,7 @@ export default function BusinessProductDetailPage() {
                   </label>
                   {uploadedFiles.length === 0 && (
                     <p className="text-sm text-gray-600 mt-2">
-                      Click to select images
+                      Click to select images and videos
                     </p>
                   )}
                 </div>
