@@ -549,6 +549,8 @@ export async function updateProposal(
     if (data.pdf !== undefined) updateData.pdf = data.pdf
     if (data.password !== undefined) updateData.password = data.password
     if (data.customPages !== undefined) updateData.customPages = data.customPages
+    if (data.contactInfo !== undefined) updateData.contactInfo = data.contactInfo
+    if (data.fieldVisibility !== undefined) updateData.fieldVisibility = data.fieldVisibility
 
     if (data.products !== undefined) {
       updateData.products = data.products
