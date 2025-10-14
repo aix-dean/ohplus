@@ -201,65 +201,8 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
       ...(projectData?.company_website ? [`🌐 ${projectData.company_website}`] : [])
     ].join('\n')
 
-    const defaultReportTemplates = [
-      {
-        name: "Standard Report",
-        subject: "Report: [Project Name] - [Company Name]",
-        body: `Dear [Client Name],
 
-    I hope this email finds you well.
 
-    Please find attached our detailed report for your project. We've carefully reviewed your requirements and prepared a comprehensive assessment that aligns with your objectives.
-
-    The report includes:
-    - Detailed project scope and deliverables
-    - Current status and progress
-    - Findings and recommendations
-    - Next steps and timeline
-
-    We're confident that our report will provide valuable insights for your project.
-
-    Please review the attached report and feel free to reach out if you have any questions or would like to discuss any aspects in detail.
-
-    Looking forward to your feedback!
-
-    Best regards,
-${contactDetails}`,
-        company_id: userData.company_id,
-        template_type: "report" as const,
-      },
-      {
-        name: "Follow-up Report",
-        subject: "Follow-up: Report for [Project Name]",
-        body: `Dear [Client Name],
-
-    I wanted to follow up on the report we sent for [Project Name].
-
-    I hope you've had a chance to review the attached report. We're very interested in your feedback and are available to discuss the findings in detail.
-
-    If you have any questions about our assessment, recommendations, or next steps, I'd be happy to schedule a call to discuss them in detail.
-
-    We're also flexible and open to adjusting our approach based on your feedback or any changes in your requirements.
-
-    Please let me know your thoughts or if you need any additional information.
-
-    Best regards,
-${contactDetails}`,
-        company_id: userData.company_id,
-        template_type: "report" as const,
-      },
-    ]
-
-    try {
-      for (const template of defaultReportTemplates) {
-        await addDoc(collection(db, "email_templates"), {
-          ...template,
-          created: serverTimestamp(),
-        })
-      }
-    } catch (error) {
-      console.error("Error creating default report templates:", error)
-    }
   }
 
   useEffect(() => {
@@ -403,8 +346,8 @@ ${contactDetails}`,
           to: reportData.client_email || "",
           cc: userData?.email || user?.email || "",
           replyTo: userData?.email || user?.email || "",
-          subject: "",
-          message: "",
+          subject: ``,
+          message: ``,
         }))
 
       } catch (error) {

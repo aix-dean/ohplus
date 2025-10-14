@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
 import { getReportsByCompany, type ReportData } from "@/lib/report-service"
+import { CompanyService } from "@/lib/company-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { SentHistoryDialog } from "@/components/sent-history-dialog"
+import { ReportDialog } from "@/components/report-dialog"
 
 export default function SalesReportsPage() {
   const [filteredReports, setFilteredReports] = useState<ReportData[]>([])
@@ -21,6 +23,8 @@ export default function SalesReportsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalReports, setTotalReports] = useState(0)
   const itemsPerPage = 15
+
+  const [companyLogo, setCompanyLogo] = useState<string>("")
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [postedReportId, setPostedReportId] = useState<string>("")
@@ -57,6 +61,54 @@ export default function SalesReportsPage() {
     setCurrentPage(1)
   }, [filterType, searchQuery])
 
+  // Fetch company logo
+  useEffect(() => {
+    const fetchCompanyLogo = async () => {
+      if (userData?.company_id) {
+        try {
+          const companyData = await CompanyService.getCompanyData(userData.company_id)
+          setCompanyLogo(companyData?.logo || "")
+        } catch (error) {
+          console.error("Error fetching company logo:", error)
+        }
+      }
+    }
+    fetchCompanyLogo()
+  }, [userData?.company_id])
+
+  const formatDate = (date: any) => {
+    if (!date) return "N/A"
+
+    let dateObj: Date
+    if (date.toDate) {
+      dateObj = date.toDate()
+    } else if (date instanceof Date) {
+      dateObj = date
+    } else {
+      dateObj = new Date(date)
+    }
+
+    return dateObj.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
+  }
+
+  const getReportTypeDisplay = (reportType: string) => {
+    switch (reportType) {
+      case "completion-report":
+        return "Completion Report"
+      case "monitoring-report":
+        return "Monitoring Report"
+      case "installation-report":
+        return "Installation Report"
+      case "roll-down":
+        return "Roll Down"
+      default:
+        return reportType
+    }
+  }
 
   const filterReports = async () => {
     try {
@@ -114,39 +166,6 @@ export default function SalesReportsPage() {
   }
 
 
-  const formatDate = (date: any) => {
-    if (!date) return "N/A"
-
-    let dateObj: Date
-    if (date.toDate) {
-      dateObj = date.toDate()
-    } else if (date instanceof Date) {
-      dateObj = date
-    } else {
-      dateObj = new Date(date)
-    }
-
-    return dateObj.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    })
-  }
-
-  const getReportTypeDisplay = (reportType: string) => {
-    switch (reportType) {
-      case "completion-report":
-        return "Completion Report"
-      case "monitoring-report":
-        return "Monitoring Report"
-      case "installation-report":
-        return "Installation Report"
-      case "roll-down":
-        return "Roll Down"
-      default:
-        return reportType
-    }
-  }
 
 
   const handleViewReport = (report: ReportData) => {
@@ -344,204 +363,7 @@ export default function SalesReportsPage() {
       />
 
       {/* Report Details Dialog */}
-      {showReportDialog && selectedReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setShowReportDialog(false)} />
-          <div className="relative bg-white rounded-[13.681px] h-[621px] w-[604px]">
-            {/* Close button */}
-            <div className="absolute flex items-center justify-center left-[559.54px] top-[-4.79px] w-[35.57px] h-[27.36px] z-10">
-              <button
-                onClick={() => setShowReportDialog(false)}
-                className="text-[#333333] text-[34.202px] font-normal rotate-[46.133deg] cursor-pointer"
-              >
-                +
-              </button>
-            </div>
-
-            {/* Title */}
-            <p className="text-center font-light">
-              {getReportTypeDisplay(selectedReport.reportType)}_{formatDate(selectedReport.date).replace(/\s+/g, '_').replace(/,/g, '')}.pdf
-            </p>
-
-            {/* Content Area */}
-            <div className="bg-[rgba(217,217,217,0.3)] h-[400px] rounded-[6.84px] w-[575.271px] overflow-y-auto">
-              <div className="">
-                <div className="bg-white shadow-lg rounded-lg m-2" style={{ width: '210mm', minHeight: '297mm', maxWidth: 'none', transform: 'scale(0.7)', transformOrigin: 'top left' }}>
-                  <div className="w-full relative">
-                    <div className="relative h-16 overflow-hidden">
-                      <div className="absolute inset-0 bg-blue-900"></div>
-                      <div
-                        className="absolute top-0 right-0 h-full bg-cyan-400"
-                        style={{
-                          width: "40%",
-                          clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
-                        }}
-                      ></div>
-                      <div className="relative z-10 h-full flex items-center px-6">
-                        <div className="text-white text-lg font-semibold">Logistics</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 space-y-6">
-                    <div className="flex justify-between items-center">
-                      <div className="flex flex-col">
-                        <div className="bg-cyan-400 text-white px-6 py-3 rounded-lg text-base font-medium inline-block">
-                          {getReportTypeDisplay(selectedReport.reportType)}
-                        </div>
-                        <p className="text-gray-600 text-sm mt-2">as of {formatDate(selectedReport.date)}</p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <div
-                          className="bg-white rounded-lg px-4 py-2 flex items-center justify-center shadow-sm"
-                          style={{ width: "160px", height: "160px" }}
-                        >
-                          <img
-                            src="/ohplus-new-logo.png"
-                            alt="Company Logo"
-                            className="max-h-full max-w-full object-contain"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="shadow-sm border rounded-lg">
-                      <div className="p-6">
-                        <h2 className="text-xl font-bold mb-4 text-gray-900">Project Information</h2>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                              <span className="font-bold text-gray-700 whitespace-nowrap">Site ID:</span>
-                              <span className="text-gray-900">{selectedReport.siteId || "N/A"}</span>
-                            </div>
-                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                              <span className="font-bold text-gray-700 whitespace-nowrap">Job Order:</span>
-                              <span className="text-gray-900">
-                                {selectedReport.joNumber || selectedReport.id?.slice(-4).toUpperCase() || "N/A"}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                              <span className="font-bold text-gray-700 whitespace-nowrap">Job Order Date:</span>
-                              <span className="text-gray-900">{formatDate(selectedReport.date)}</span>
-                            </div>
-                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                              <span className="font-bold text-gray-700 whitespace-nowrap">Site:</span>
-                              <span className="text-gray-900">{selectedReport.siteName || "N/A"}</span>
-                            </div>
-                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                              <span className="font-bold text-gray-700 whitespace-nowrap">Start Date:</span>
-                              <span className="text-gray-900">
-                                {selectedReport.bookingDates?.start ? formatDate(selectedReport.bookingDates.start) : "N/A"}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                              <span className="font-bold text-gray-700 whitespace-nowrap">End Date:</span>
-                              <span className="text-gray-900">
-                                {selectedReport.bookingDates?.end ? formatDate(selectedReport.bookingDates.end) : "N/A"}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                              <span className="font-bold text-gray-700 whitespace-nowrap">Client:</span>
-                              <span className="text-gray-900">{selectedReport.client || "N/A"}</span>
-                            </div>
-                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                              <span className="font-bold text-gray-700 whitespace-nowrap">Sales:</span>
-                              <span className="text-gray-900">{selectedReport.sales || "N/A"}</span>
-                            </div>
-                            <div className="grid grid-cols-[auto_1fr] gap-4 items-start">
-                              <span className="font-bold text-gray-700 whitespace-nowrap">Status:</span>
-                              <span className="text-gray-900">{selectedReport.status || "N/A"}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {selectedReport.descriptionOfWork && (
-                      <div className="shadow-sm border rounded-lg">
-                        <div className="p-6">
-                          <h2 className="text-xl font-bold mb-4 text-gray-900">Description</h2>
-                          <p className="text-gray-900">{selectedReport.descriptionOfWork}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-end pt-8 border-t">
-                      <div>
-                        <h3 className="font-semibold mb-2">Prepared by:</h3>
-                        <div className="text-sm text-gray-600">
-                          <div>{selectedReport.createdByName || "Unknown"}</div>
-                          <div>LOGISTICS</div>
-                          <div>{formatDate(selectedReport.created)}</div>
-                        </div>
-                      </div>
-                      <div className="text-right text-sm text-gray-500 italic">
-                        "All data are based on the latest available records as of{" "}
-                        {formatDate(new Date().toISOString().split("T")[0])}."
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="w-full absolute bottom-0">
-                    <div className="relative h-16 overflow-hidden">
-                      <div className="absolute inset-0 bg-cyan-400"></div>
-                      <div
-                        className="absolute top-0 right-0 h-full bg-blue-900"
-                        style={{
-                          width: "75%",
-                          clipPath: "polygon(25% 0%, 100% 0%, 100% 100%, 0% 100%)",
-                        }}
-                      ></div>
-                      <div className="relative z-10 h-full flex items-center justify-between px-8">
-                        <div className="flex items-center gap-6">
-                          <div className="text-white text-lg font-semibold">{""}</div>
-                        </div>
-                        <div className="text-white text-right flex items-center gap-2">
-                          <div className="text-sm font-medium">Smart. Seamless. Scalable</div>
-                          <div className="text-2xl font-bold flex items-center">
-                            OH!
-                            <div className="ml-1 text-cyan-400">
-                              <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M10 2v16M2 10h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Prepared By Section */}
-            <div className="absolute font-light text-[#333333] text-[12px] left-[29px] top-[555px] w-[273px]">
-              <p>
-                <span className="font-bold">Prepared By: </span>
-                <span className="font-normal">{selectedReport.createdByName || "Unknown"} (Logistics)</span>
-              </p>
-              <p>
-                <span className="font-bold">Date:</span>
-                <span> {formatDate(selectedReport.created)}</span>
-              </p>
-              <p>
-                <span className="font-bold">Time: </span>
-                {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: false })} GMT
-              </p>
-            </div>
-
-            {/* Forward Button */}
-            <div className="absolute bg-[#1d0beb] h-[32.15px] rounded-[6.84px] left-[453.51px] top-[564.33px] w-[127.23px]">
-              <button className="w-full h-full text-white font-bold text-[13.681px] text-center leading-none">
-                Forward
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ReportDialog open={showReportDialog} onOpenChange={setShowReportDialog} selectedReport={selectedReport} />
     </div>
   )
 }
