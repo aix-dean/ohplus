@@ -184,10 +184,16 @@ export default function SelectDatesPage() {
     const getBookedRanges = (siteId: string) => {
         const bookings = siteBookings[siteId] || []
 
-        return bookings.map(booking => ({
-            start: convertToDate(booking.start_date),
-            end: convertToDate(booking.end_date),
-        }))
+        return bookings
+            .filter(booking => booking.status !== "COMPLETED" && booking.status !== "CANCELLED")
+            .map(booking => {
+                const start = convertToDate(booking.start_date)
+                const end = convertToDate(booking.end_date)
+                return {
+                    start: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
+                    end: new Date(end.getFullYear(), end.getMonth(), end.getDate()),
+                }
+            })
     }
 
     const checkOverlap = (siteId: string, s: Date, e: Date) =>
