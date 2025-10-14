@@ -28,3 +28,6 @@ next-env.d.ts
 
 #mcp server
 mcp.json
+
+# test files
+app/**/*.test.ts
