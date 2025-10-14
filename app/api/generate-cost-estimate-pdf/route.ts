@@ -206,6 +206,14 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error(`[API_PDF] Error generating ${format}:`, error)
+
+    // Check for specific Puppeteer/Chrome errors
+    if (error instanceof Error && error.message.includes('Could not find Chrome')) {
+      return NextResponse.json({
+        error: 'PDF generation failed: Chrome browser not found. Please ensure Chrome is installed or run: npx puppeteer browsers install chrome'
+      }, { status: 500 })
+    }
+
     return NextResponse.json({ error: `Failed to generate ${format}` }, { status: 500 })
   }
 }
