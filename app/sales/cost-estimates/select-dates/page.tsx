@@ -184,10 +184,16 @@ export default function SelectDatesPage() {
     const getBookedRanges = (siteId: string) => {
         const bookings = siteBookings[siteId] || []
 
-        return bookings.map(booking => ({
-            start: convertToDate(booking.start_date),
-            end: convertToDate(booking.end_date),
-        }))
+        return bookings
+            .filter(booking => booking.status !== "COMPLETED" && booking.status !== "CANCELLED")
+            .map(booking => {
+                const start = convertToDate(booking.start_date)
+                const end = convertToDate(booking.end_date)
+                return {
+                    start: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
+                    end: new Date(end.getFullYear(), end.getMonth(), end.getDate()),
+                }
+            })
     }
 
     const checkOverlap = (siteId: string, s: Date, e: Date) =>
@@ -348,11 +354,8 @@ export default function SelectDatesPage() {
                 {/* Header */}
                 <div className="flex justify-between items-center mb-6">
                     <Button variant="ghost" onClick={() => router.back()} className="flex items-center gap-2">
-                        ← Back
+                        ← Select Dates
                     </Button>
-                    <h1 className="flex-1 text-center text-3xl font-bold text-gray-900">
-                        Select Dates
-                    </h1>
                 </div>
 
                 {/* Start/End Date Inputs */}
