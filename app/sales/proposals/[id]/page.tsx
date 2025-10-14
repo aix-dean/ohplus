@@ -2193,9 +2193,6 @@ export default function ProposalDetailsPage() {
 
     return (
       <div className="relative w-full h-full bg-white">
-        {/* Header - scaled */}
-        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-0 left-0 w-[1310px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
 
         {/* Background borders and accents - scaled */}
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-0 w-[0px]">
@@ -2440,10 +2437,6 @@ export default function ProposalDetailsPage() {
             <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
           )}
         </div>
-
-        {/* Footer - scaled */}
-        <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
       </div>
     )
   }
