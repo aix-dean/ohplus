@@ -74,7 +74,7 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.149",
     "pdfkit": "^0.17.2",
-    "puppeteer": "^22.0.0",
+    "puppeteer": "^24.24.1",
     "qrcode": "latest",
     "react": "^19",
     "react-day-picker": "latest",
