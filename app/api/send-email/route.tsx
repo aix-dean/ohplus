@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -297,6 +297,7 @@ function createUltraSimpleGmailTemplate(
   body: string,
   companyName?: string,
   userDisplayName?: string,
+  userPosition?: string,
   replyTo?: string,
   proposalId?: string
 ): string {
@@ -318,6 +319,7 @@ https://mrk.ohplus.ph/pr/${proposalId || ''}
 ---
 This email was sent from ${companyName || "Company"}
 Contact: ${userDisplayName || "Sales Executive"}
+${userPosition ? `${userPosition}` : ''}
 ${replyTo ? `Email: ${replyTo}` : ''}
 
 Note: If you're having trouble viewing this email, please add our email address to your contacts or safe senders list.
@@ -331,6 +333,7 @@ function createGmailCompatibleTemplate(
   companyWebsite?: string,
   companyAddress?: string,
   userDisplayName?: string,
+  userPosition?: string,
   replyTo?: string,
   companyLogo?: string,
   proposalId?: string,
@@ -401,8 +404,8 @@ function createGmailCompatibleTemplate(
         .footer { background: #ffffff; padding: 0 0 0 20px; color: #000000; position: relative; overflow: hidden; width: 100%; }
         .footer-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
         .footer-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
-        .footer-square-1 { width: 80px; height: 210px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
-        .footer-square-2 { width: 60px; height: 210px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .footer-square-1 { width: 80px; height: 160px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .footer-square-2 { width: 60px; height: 160px; background: transparent; opacity: 0.8; z-index: 1;  }
         .footer-content { width: 75%; position: relative; z-index: 3; }
         .footer-header { position: absolute; display: flex; justify-content: flex-start;align-items: center; gap: 20px; padding-top:20px; }
         .footer-logo { height: 40px; width: auto; max-width: 120px;  }
@@ -447,15 +450,7 @@ function createGmailCompatibleTemplate(
             <div class="cta-section">
                 <a href="https://mrk.ohplus.ph/pr/${proposalId || ''}" class="cta-button">View Proposal</a>
             </div>
-<!--
-            ${proposalPassword ? `
-            <div class="highlight-box">
-                <h4 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px; font-weight: 600;">🔐 Access Code</h4>
-                <p style="margin: 0; font-family: 'Courier New', monospace; font-size: 18px; font-weight: bold; color: ${primaryColor}; background: #f8f9fa; padding: 12px; border-radius: 6px; text-align: center; border: 2px dashed rgba(102, 126, 234, 0.3);">${proposalPassword}</p>
-                <p style="margin: 10px 0 0 0; font-size: 14px; color: #6c757d;">Please use this code to access the proposal online.</p>
-            </div>
-            ` : ''}
-            -->
+
         </div>
 
         <div class="footer">
@@ -470,7 +465,7 @@ function createGmailCompatibleTemplate(
 
                     <div class="signature">
                         <h4 class="signature-name">${userDisplayName || "Sales Executive"}</h4>
-                        <p class="signature-title">Sales Executive</p>
+                        <p class="signature-title">${userPosition || "Sales Executive"}</p>
                         <div class="contact-info">
                             ${replyTo ? `<p style="margin: 0;">${replyTo}</p>` : ''}
                             ${userPhoneNumber ? `<p style="margin: 0;"> ${userPhoneNumber}</p>` : ''}
@@ -496,6 +491,7 @@ function createEmailTemplate(
   companyWebsite?: string,
   companyAddress?: string,
   userDisplayName?: string,
+  userPosition?: string,
   replyTo?: string,
   companyLogo?: string,
   proposalId?: string,
@@ -635,7 +631,7 @@ function createEmailTemplate(
 
                     <div class="signature">
                         <h4 class="signature-name">${userDisplayName || "Sales Executive"}</h4>
-                        <p class="signature-title">Sales Executive</p>
+                        <p class="signature-title">${userPosition || "Sales Executive"}</p>
                         <div class="contact-info">
                             ${replyTo ? `<p style="margin: 0;">${replyTo}</p>` : ''}
                             ${userPhoneNumber ? `<p style="margin: 0;"> ${userPhoneNumber}</p>` : ''}
@@ -652,6 +648,49 @@ function createEmailTemplate(
 </body>
 </html>
   `
+}
+
+async function fetchUserData(userEmail: string) {
+  try {
+    if (!userEmail) {
+      console.log("No user email provided for user data fetch")
+      return null
+    }
+
+    // Query iboard_users collection for user data
+    const usersRef = collection(db, "iboard_users")
+    const q = query(usersRef, where("email", "==", userEmail))
+    const querySnapshot = await getDocs(q)
+
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0]
+      const userData = userDoc.data()
+
+      console.log("User data fetched from iboard_users:", {
+        email: userData.email,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        position: userData.position,
+        phone_number: userData.phone_number
+      })
+
+      return {
+        first_name: userData.first_name || "",
+        last_name: userData.last_name || "",
+        position: userData.position || "Sales Executive",
+        phone_number: userData.phone_number || "",
+        displayName: userData.first_name && userData.last_name
+          ? `${userData.first_name} ${userData.last_name}`.trim()
+          : userData.first_name || userData.last_name || "Sales Executive"
+      }
+    } else {
+      console.log("No user found in iboard_users with email:", userEmail)
+      return null
+    }
+  } catch (error) {
+    console.error("Error fetching user data:", error)
+    return null
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -767,6 +806,22 @@ export async function POST(request: NextRequest) {
         }
       } catch (error) {
         console.error("[v0] Error fetching company data:", error)
+        // Continue with fallback values - not a critical failure
+      }
+    }
+
+    // Fetch user data from iboard_users table
+    let userData = null
+    if (validatedReplyTo) {
+      try {
+        userData = await fetchUserData(validatedReplyTo)
+        if (userData) {
+          console.log("[v0] User data fetched successfully:", userData.displayName, userData.position)
+        } else {
+          console.log("[v0] No user data found, using fallback values")
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching user data:", error)
         // Continue with fallback values - not a critical failure
       }
     }
@@ -989,7 +1044,7 @@ export async function POST(request: NextRequest) {
           from,
           to: otherRecipients,
           subject: subject.trim(),
-          html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
+          html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, userData?.displayName || validatedUserDisplayName, userData?.position || "Sales Executive", validatedReplyTo, actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
         }
 
         if (otherCc.length > 0) {
@@ -1030,7 +1085,7 @@ export async function POST(request: NextRequest) {
           from,
           to: gmailRecipients,
           subject: subject.trim(),
-          html: createGmailCompatibleTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
+          html: createGmailCompatibleTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, userData?.displayName || validatedUserDisplayName, userData?.position || "Sales Executive", validatedReplyTo, actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
         }
 
         if (gmailCc.length > 0) {
@@ -1060,7 +1115,7 @@ export async function POST(request: NextRequest) {
               from,
               to: gmailRecipients,
               subject: `[IMPORTANT] ${subject.trim()}`,
-              html: createUltraSimpleGmailTemplate(body.trim(), actualCompanyName, validatedUserDisplayName, validatedReplyTo, proposalId),
+              html: createUltraSimpleGmailTemplate(body.trim(), actualCompanyName, userData?.displayName || validatedUserDisplayName, userData?.position || "Sales Executive", validatedReplyTo, proposalId),
             }
 
             if (replyTo && replyTo.trim()) {
