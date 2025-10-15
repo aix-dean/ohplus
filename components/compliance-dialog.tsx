@@ -368,9 +368,7 @@ export function ComplianceDialog({
             </div>
             {!viewOnly && (() => {
               const currentItem = toReserveItems.find(item => item.key === selectedItemKey)
-              const isCompletedOrAccepted = currentItem?.status === "accepted" || currentItem?.completed === true
-
-              return !isCompletedOrAccepted ? (
+              return currentItem?.status !== "accepted" ? (
                 <div className="flex gap-2">
                   <Button
                     onClick={() => {
