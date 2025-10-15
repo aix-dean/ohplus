@@ -2356,7 +2356,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             {currentPageIndex === relatedCostEstimates.length - 1 ? (
               <Button
                 onClick={handleSendWithPDFGeneration}
-                disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
+                disabled={generatingPDFsForSend}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
               >
                 {generatingPDFsForSend ? (
@@ -2386,7 +2386,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
               onClick={handleSendWithPDFGeneration}
-              disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
+              disabled={generatingPDFsForSend}
               className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
             >
               {generatingPDFsForSend ? (
@@ -2422,7 +2422,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             {currentProductIndex === Object.keys(siteGroups).length - 1 ? (
               <Button
                 onClick={handleSendWithPDFGeneration}
-                disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
+                disabled={generatingPDFsForSend}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
               >
                 {generatingPDFsForSend ? (
