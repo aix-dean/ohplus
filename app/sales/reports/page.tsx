@@ -348,13 +348,7 @@ export default function SalesReportsPage() {
             />
           </div>
         </div>
-        <Button
-          variant="outline"
-          className="border-gray-400 rounded-[5px] w-[103px] h-[24px] text-xs"
-          onClick={() => setShowSentHistoryDialog(true)}
-        >
-          Sent History
-        </Button>
+
       </div>
 
       {/* Reports List */}
