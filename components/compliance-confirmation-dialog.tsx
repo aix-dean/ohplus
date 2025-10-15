@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle, FileText, X, Upload } from "lucide-react"
@@ -35,6 +36,19 @@ export function ComplianceConfirmationDialog({
   quotationId,
   onItemUpdate,
 }: ComplianceConfirmationDialogProps) {
+  // Auto-proceed when all items are completed
+  useEffect(() => {
+    if (isOpen && complianceItems.length > 0) {
+      const allCompleted = complianceItems.every(item => item.completed || item.file)
+      if (allCompleted) {
+        // Auto-proceed after a brief delay to show completion
+        const timer = setTimeout(() => {
+          onSkip()
+        }, 1000)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [isOpen, complianceItems, onSkip])
   const handleFileUpload = (complianceType: string) => {
     const input = document.createElement("input")
     input.type = "file"
