@@ -17,8 +17,8 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/components/sent-history-dialog', () => ({
-  SentHistoryDialog: ({ open, onOpenChange, companyId, emailType }: any) => (
-    <div data-testid="sent-history-dialog" data-open={open} data-company-id={companyId} data-email-type={emailType}>
+  SentHistoryDialog: ({ open, onOpenChange, emailToShow }: any) => (
+    <div data-testid="sent-history-dialog" data-open={open} data-email-to-show={emailToShow ? 'provided' : 'none'}>
       Sent History Dialog
     </div>
   ),
@@ -310,8 +310,7 @@ describe('SentHistoryPage', () => {
 
       await waitFor(() => {
         const dialog = screen.getByTestId('sent-history-dialog')
-        expect(dialog).toHaveAttribute('data-company-id', 'company-123')
-        expect(dialog).toHaveAttribute('data-email-type', 'report')
+        expect(dialog).toHaveAttribute('data-email-to-show', 'none')
       })
     })
   })

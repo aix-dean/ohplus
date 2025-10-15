@@ -27,6 +27,7 @@ export default function SentHistoryPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null)
 
   const router = useRouter()
   const { userData } = useAuth()
@@ -121,7 +122,7 @@ export default function SentHistoryPage() {
                 <div
                   key={email.id}
                   className="bg-[#f6f9ff] border-2 border-[#b8d9ff] rounded-[10px] p-4 hover:bg-[#e8f0ff] transition-colors cursor-pointer"
-                  onClick={() => setDialogOpen(true)}
+                  onClick={() => { setSelectedEmail(email); setDialogOpen(true); }}
                 >
                   <div className="grid grid-cols-4 gap-4 items-center text-sm">
                     <div className="text-gray-900">
@@ -146,9 +147,8 @@ export default function SentHistoryPage() {
 
       <SentHistoryDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        companyId={userData?.company_id || undefined}
-        emailType="report"
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) setSelectedEmail(null); }}
+        emailToShow={selectedEmail || undefined}
       />
     </div>
   )
