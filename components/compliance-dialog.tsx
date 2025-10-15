@@ -53,8 +53,6 @@ export function ComplianceDialog({
   
   const [declinedItems, setDeclinedItems] = useState<Set<string>>(new Set())
 
-  console.log("[DEBUG] ComplianceDialog quotation:", quotation);
-  console.log("[DEBUG] ComplianceDialog quotation?.projectCompliance:", quotation?.projectCompliance);
   const compliance = quotation?.projectCompliance || {}
 
   const getDisplayFilename = (key: string) => {
@@ -305,9 +303,11 @@ export function ComplianceDialog({
                     <p className="mb-0">
                       <span className="font-bold">Sent from:</span> {compliance?.sent_from || "OH! Plus"}
                     </p>
-                    <p className="mb-0">
-                      <span className="font-bold">Sent by:</span> {compliance?.sent_by || userEmail || "Unknown"}
-                    </p>
+                    {compliance?.sent_by && (
+                      <p className="mb-0">
+                        <span className="font-bold">Sent by:</span> {compliance.sent_by}
+                      </p>
+                    )}
                   </>
                 )
               })()}
@@ -366,40 +366,45 @@ export function ComplianceDialog({
                 )
               })()}
             </div>
-            {!viewOnly && (
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    setDeclinedItems(prev => new Set(prev).add(selectedItemKey))
-                    setAcceptedItems(prev => {
-                      const newSet = new Set(prev)
-                      newSet.delete(selectedItemKey)
-                      return newSet
-                    })
-                    onDecline(quotation.id, selectedItemKey)
-                    setFileViewerOpen(false)
-                  }}
-                  className="bg-white border border-[#c4c4c4] text-black rounded-[10px] h-10 sm:h-[47px] font-medium text-sm sm:text-[20px] px-3 sm:px-6 hover:bg-gray-50"
-                >
-                  Decline
-                </Button>
-                <Button
-                  onClick={() => {
-                    setAcceptedItems(prev => new Set(prev).add(selectedItemKey))
-                    setDeclinedItems(prev => {
-                      const newSet = new Set(prev)
-                      newSet.delete(selectedItemKey)
-                      return newSet
-                    })
-                    onAccept(quotation.id, selectedItemKey)
-                    setFileViewerOpen(false)
-                  }}
-                  className="bg-[#1d0beb] hover:bg-[#1d0beb]/90 text-white rounded-[10px] h-10 sm:h-[47px] font-semibold text-sm sm:text-[20px] px-3 sm:px-6"
-                >
-                  Accept
-                </Button>
-              </div>
-            )}
+            {!viewOnly && (() => {
+              const currentItem = toReserveItems.find(item => item.key === selectedItemKey)
+              const isCompletedOrAccepted = currentItem?.status === "accepted" || currentItem?.completed === true
+
+              return !isCompletedOrAccepted ? (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      setDeclinedItems(prev => new Set(prev).add(selectedItemKey))
+                      setAcceptedItems(prev => {
+                        const newSet = new Set(prev)
+                        newSet.delete(selectedItemKey)
+                        return newSet
+                      })
+                      onDecline(quotation.id, selectedItemKey)
+                      setFileViewerOpen(false)
+                    }}
+                    className="bg-white border border-[#c4c4c4] text-black rounded-[10px] h-10 sm:h-[47px] font-medium text-sm sm:text-[20px] px-3 sm:px-6 hover:bg-gray-50"
+                  >
+                    Decline
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setAcceptedItems(prev => new Set(prev).add(selectedItemKey))
+                      setDeclinedItems(prev => {
+                        const newSet = new Set(prev)
+                        newSet.delete(selectedItemKey)
+                        return newSet
+                      })
+                      onAccept(quotation.id, selectedItemKey)
+                      setFileViewerOpen(false)
+                    }}
+                    className="bg-[#1d0beb] hover:bg-[#1d0beb]/90 text-white rounded-[10px] h-10 sm:h-[47px] font-semibold text-sm sm:text-[20px] px-3 sm:px-6"
+                  >
+                    Accept
+                  </Button>
+                </div>
+              ) : null
+            })()}
           </div>
         </DialogContent>
       </Dialog>

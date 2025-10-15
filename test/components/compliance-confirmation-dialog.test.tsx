@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ComplianceConfirmationDialog } from '@/components/compliance-confirmation-dialog'
 
@@ -331,6 +331,153 @@ describe('ComplianceConfirmationDialog', () => {
       )
 
       expect(screen.getByText('Upload')).toBeInTheDocument()
+    })
+  })
+
+  describe('Auto-Proceed Functionality', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('automatically calls onSkip when all items become completed', () => {
+      const complianceItems = [
+        {
+          name: 'Signed Contract',
+          completed: false,
+          type: 'upload' as const,
+          key: 'signedContract',
+          file: undefined,
+        },
+        {
+          name: 'Irrevocable PO',
+          completed: false,
+          type: 'upload' as const,
+          key: 'irrevocablePo',
+          file: undefined,
+        },
+      ]
+
+      const { rerender } = render(
+        <ComplianceConfirmationDialog
+          isOpen={true}
+          onClose={mockOnClose}
+          onSkip={mockOnSkip}
+          complianceItems={complianceItems}
+          onFileUpload={mockOnFileUpload}
+          uploadingFiles={new Set()}
+          quotationId="test-quotation-id"
+        />
+      )
+
+      // Initially, onSkip should not be called
+      expect(mockOnSkip).not.toHaveBeenCalled()
+
+      // Update items to be completed
+      const completedItems = [
+        {
+          name: 'Signed Contract',
+          completed: true,
+          type: 'upload' as const,
+          key: 'signedContract',
+          file: 'contract.pdf',
+        },
+        {
+          name: 'Irrevocable PO',
+          completed: true,
+          type: 'upload' as const,
+          key: 'irrevocablePo',
+          file: 'po.pdf',
+        },
+      ]
+
+      rerender(
+        <ComplianceConfirmationDialog
+          isOpen={true}
+          onClose={mockOnClose}
+          onSkip={mockOnSkip}
+          complianceItems={completedItems}
+          onFileUpload={mockOnFileUpload}
+          uploadingFiles={new Set()}
+          quotationId="test-quotation-id"
+        />
+      )
+
+      // Fast-forward time by 1 second
+      vi.advanceTimersByTime(1000)
+
+      // onSkip should be called automatically
+      expect(mockOnSkip).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not auto-proceed when items are not all completed', () => {
+      const complianceItems = [
+        {
+          name: 'Signed Contract',
+          completed: true,
+          type: 'upload' as const,
+          key: 'signedContract',
+          file: 'contract.pdf',
+        },
+        {
+          name: 'Irrevocable PO',
+          completed: false,
+          type: 'upload' as const,
+          key: 'irrevocablePo',
+          file: undefined,
+        },
+      ]
+
+      render(
+        <ComplianceConfirmationDialog
+          isOpen={true}
+          onClose={mockOnClose}
+          onSkip={mockOnSkip}
+          complianceItems={complianceItems}
+          onFileUpload={mockOnFileUpload}
+          uploadingFiles={new Set()}
+          quotationId="test-quotation-id"
+        />
+      )
+
+      // Fast-forward time by 1 second
+      vi.advanceTimersByTime(1000)
+
+      // onSkip should not be called since not all items are completed
+      expect(mockOnSkip).not.toHaveBeenCalled()
+    })
+
+    it('does not auto-proceed when dialog is closed', () => {
+      const complianceItems = [
+        {
+          name: 'Signed Contract',
+          completed: true,
+          type: 'upload' as const,
+          key: 'signedContract',
+          file: 'contract.pdf',
+        },
+      ]
+
+      render(
+        <ComplianceConfirmationDialog
+          isOpen={false}
+          onClose={mockOnClose}
+          onSkip={mockOnSkip}
+          complianceItems={complianceItems}
+          onFileUpload={mockOnFileUpload}
+          uploadingFiles={new Set()}
+          quotationId="test-quotation-id"
+        />
+      )
+
+      // Fast-forward time by 1 second
+      vi.advanceTimersByTime(1000)
+
+      // onSkip should not be called since dialog is closed
+      expect(mockOnSkip).not.toHaveBeenCalled()
     })
   })
 })
