@@ -54,6 +54,7 @@ import { copyQuotation, generateQuotationPDF, getQuotationById } from "@/lib/quo
 import { SentHistoryDialog } from "@/components/sent-history-dialog"
 import { ComplianceDialog } from "@/components/compliance-dialog"
 import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-dialog"
+import { ComplianceConfirmationDialog } from "@/components/compliance-confirmation-dialog"
 import { bookingService } from "@/lib/booking-service"
 import { searchQuotations } from "@/lib/algolia-service"
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
@@ -88,6 +89,8 @@ export default function QuotationsListPage() {
   const [selectedQuotationForCompliance, setSelectedQuotationForCompliance] = useState<any>(null)
   const [companyData, setCompanyData] = useState<any>(null)
   const [unsubscribe, setUnsubscribe] = useState<(() => void) | null>(null)
+   const [showReservationConfirmationDialog, setShowReservationConfirmationDialog] = useState(false)
+   const [selectedQuotationForReservation, setSelectedQuotationForReservation] = useState<any>(null)
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
@@ -500,11 +503,14 @@ export default function QuotationsListPage() {
       const quotationRef = doc(db, "quotations", quotationId)
       const updateData: { [key: string]: any } = {
         [`projectCompliance.${complianceType}`]: {
-          status: "uploaded",
+          status: "completed",
+          completed: true,
           fileUrl: downloadURL,
           fileName: file.name,
           uploadedAt: serverTimestamp(),
           uploadedBy: user?.uid,
+          sent_from: "OH Plus",
+          sent_by: `${userData?.first_name || ""} ${userData?.last_name || ""}`.trim() || user?.email || `User-${user?.uid?.slice(-6)}`,
         },
         updated: serverTimestamp(),
       }
@@ -546,10 +552,33 @@ export default function QuotationsListPage() {
             ...updatedQuotation.projectCompliance,
             [complianceType]: {
               ...updatedQuotation.projectCompliance?.[complianceType],
-              status: "uploaded",
+              status: "completed",
+              completed: true,
               fileUrl: downloadURL,
               fileName: file.name,
               uploadedBy: user?.uid,
+              sent_from: "OH Plus",
+              sent_by: `${userData?.first_name || ""} ${userData?.last_name || ""}`.trim() || user?.email || `User-${user?.uid?.slice(-6)}`,
+            }
+          }
+        })
+      }
+
+      // Update the selected quotation for reservation confirmation dialog
+      if (selectedQuotationForReservation && selectedQuotationForReservation.id === quotationId) {
+        setSelectedQuotationForReservation({
+          ...selectedQuotationForReservation,
+          projectCompliance: {
+            ...selectedQuotationForReservation.projectCompliance,
+            [complianceType]: {
+              ...selectedQuotationForReservation.projectCompliance?.[complianceType],
+              status: "completed",
+              completed: true,
+              fileUrl: downloadURL,
+              fileName: file.name,
+              uploadedBy: user?.uid,
+              sent_from: "OH Plus",
+              sent_by: `${userData?.first_name || ""} ${userData?.last_name || ""}`.trim() || user?.email || `User-${user?.uid?.slice(-6)}`,
             }
           }
         })
@@ -582,21 +611,21 @@ export default function QuotationsListPage() {
       {
         key: "signedContract",
         name: "Signed Contract",
-        status: compliance.signedContract?.fileUrl ? "completed" : "upload",
+        status: (compliance.signedContract?.fileUrl || compliance.signedContract?.status === "completed" || compliance.signedContract?.completed === true) ? "completed" : "upload",
         file: compliance.signedContract?.fileName,
         fileUrl: compliance.signedContract?.fileUrl,
       },
       {
         key: "irrevocablePo",
         name: "Irrevocable PO",
-        status: compliance.irrevocablePo?.fileUrl ? "completed" : "upload",
+        status: (compliance.irrevocablePo?.fileUrl || compliance.irrevocablePo?.status === "completed" || compliance.irrevocablePo?.completed === true) ? "completed" : "upload",
         file: compliance.irrevocablePo?.fileName,
         fileUrl: compliance.irrevocablePo?.fileUrl,
       },
       {
         key: "paymentAsDeposit",
         name: "Payment as Deposit",
-        status: compliance.paymentAsDeposit?.fileUrl ? "completed" : "confirmation",
+        status: (compliance.paymentAsDeposit?.fileUrl || compliance.paymentAsDeposit?.status === "completed" || compliance.paymentAsDeposit?.completed === true) ? "completed" : "confirmation",
         note: "For Treasury's confirmation",
         file: compliance.paymentAsDeposit?.fileName,
         fileUrl: compliance.paymentAsDeposit?.fileUrl,
@@ -607,14 +636,14 @@ export default function QuotationsListPage() {
       {
         key: "finalArtwork",
         name: "Final Artwork",
-        status: compliance.finalArtwork?.fileUrl ? "completed" : "upload",
+        status: (compliance.finalArtwork?.fileUrl || compliance.finalArtwork?.status === "completed" || compliance.finalArtwork?.completed === true) ? "completed" : "upload",
         file: compliance.finalArtwork?.fileName,
         fileUrl: compliance.finalArtwork?.fileUrl,
       },
       {
         key: "signedQuotation",
         name: "Signed Quotation",
-        status: compliance.signedQuotation?.fileUrl ? "completed" : "upload",
+        status: (compliance.signedQuotation?.fileUrl || compliance.signedQuotation?.status === "completed" || compliance.signedQuotation?.completed === true) ? "completed" : "upload",
         file: compliance.signedQuotation?.fileName,
         fileUrl: compliance.signedQuotation?.fileUrl,
       },
@@ -1155,6 +1184,8 @@ export default function QuotationsListPage() {
           fileUrl: downloadURL,
           fileName: selectedQuotationForProject.tempFile?.name || "",
           uploadedBy: user?.uid,
+          sent_from: "OH Plus",
+          sent_by: `${userData?.first_name || ""} ${userData?.last_name || ""}`.trim() || user?.email || `User-${user?.uid?.slice(-6)}`,
         },
         status: "reserved", // Update the main status of the quotation
         updated: serverTimestamp(),
@@ -1296,9 +1327,28 @@ export default function QuotationsListPage() {
   }
 
   const handleMarkAsReserved = (quotation: any) => {
-    setSelectedQuotationForProject(quotation)
-    setProjectNameDialogOpen(true)
+    const compliance = getProjectCompliance(quotation)
+    const isComplete = compliance.completed === compliance.total
+
+    if (isComplete) {
+      // If compliance is complete, proceed directly to project name dialog
+      setSelectedQuotationForProject(quotation)
+      setProjectNameDialogOpen(true)
+    } else {
+      // If compliance is incomplete, show confirmation dialog first
+      setSelectedQuotationForReservation(quotation)
+      setShowReservationConfirmationDialog(true)
+    }
     setShowComplianceDialog(false) // Close the compliance dialog
+  }
+  const handleReservationConfirmationSkip = () => {
+    // User acknowledged and wants to skip incomplete compliance
+    if (selectedQuotationForReservation) {
+      setSelectedQuotationForProject(selectedQuotationForReservation)
+      setProjectNameDialogOpen(true)
+      setShowReservationConfirmationDialog(false)
+      setSelectedQuotationForReservation(null)
+    }
   }
 
   return (
@@ -1657,6 +1707,28 @@ export default function QuotationsListPage() {
         onDecline={handleDeclineCompliance}
         onMarkAsReserved={handleMarkAsReserved}
         userEmail={user?.email || userData?.email || undefined}
+      />
+      <ComplianceConfirmationDialog
+        isOpen={showReservationConfirmationDialog}
+        onClose={() => setShowReservationConfirmationDialog(false)}
+        onSkip={handleReservationConfirmationSkip}
+        onFileUpload={(complianceType, file) => handleFileUpload(selectedQuotationForReservation?.id || "", complianceType, file)}
+        uploadingFiles={uploadingFiles}
+        quotationId={selectedQuotationForReservation?.id}
+        complianceItems={
+          selectedQuotationForReservation
+            ? getProjectCompliance(selectedQuotationForReservation).toReserve
+                .concat(getProjectCompliance(selectedQuotationForReservation).otherRequirements)
+                .map(item => ({
+                  name: item.name,
+                  completed: item.status === "completed",
+                  type: item.status === "confirmation" ? "confirmation" : "upload" as "upload" | "confirmation",
+                  key: item.key,
+                  file: item.file,
+                  fileUrl: item.fileUrl
+                }))
+            : []
+        }
       />
     </div>
   )
