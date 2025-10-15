@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { getSentEmailsForProposal } from "@/lib/proposal-service"
-import { getSentEmailsForReport } from "@/lib/report-service"
+import { getSentEmailsForReport, getSentEmailsForCompany } from "@/lib/report-service"
 import { format } from "date-fns"
 import { X } from "lucide-react"
 
@@ -12,6 +12,7 @@ interface SentHistoryDialogProps {
     onOpenChange: (open: boolean) => void
     proposalId?: string
     reportId?: string
+    companyId?: string
     emailType?: "proposal" | "cost_estimate" | "quotation" | "report"
   }
 
@@ -25,7 +26,7 @@ interface EmailRecord {
   attachments: any[]
 }
 
-export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, emailType = "proposal" }: SentHistoryDialogProps) {
+export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, companyId, emailType = "proposal" }: SentHistoryDialogProps) {
   const [emails, setEmails] = useState<EmailRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null)
@@ -34,12 +35,12 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, em
   const [selectedAttachment, setSelectedAttachment] = useState<any>(null)
 
   useEffect(() => {
-    if (open && (proposalId || reportId)) {
+    if (open && (proposalId || reportId || companyId)) {
       fetchEmails()
       setCurrentView('list')
       setSelectedEmail(null)
     }
-  }, [open, proposalId, reportId])
+  }, [open, proposalId, reportId, companyId])
 
   const handleEmailClick = (email: EmailRecord) => {
     setSelectedEmail(email)
@@ -65,7 +66,9 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, em
     setLoading(true)
     try {
       let emailData
-      if (emailType === "report") {
+      if (companyId && emailType === "report") {
+        emailData = await getSentEmailsForCompany(companyId)
+      } else if (emailType === "report") {
         emailData = await getSentEmailsForReport(reportId!)
       } else {
         emailData = await getSentEmailsForProposal(proposalId!, emailType)

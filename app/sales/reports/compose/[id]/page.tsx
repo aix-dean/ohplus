@@ -216,13 +216,22 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
 
         setReport(reportData)
 
-        // Read URL parameters
-        const urlParams = new URLSearchParams(window.location.search)
-        const pdfKey = urlParams.get('pdfKey')
-        const logoParam = urlParams.get('logo')
-        setLogoFromUrl(logoParam || "")
+        // Check if report has logistics_report attachment
+        if (reportData.logistics_report) {
+          const logisticsAttachment: Attachment = {
+            name: "logistics_report.pdf",
+            size: "PDF",
+            type: "report",
+            url: reportData.logistics_report,
+          }
+          setAttachments([logisticsAttachment])
+          setTempPdfLoaded(true)
+        } else {
+          // Read URL parameters
+          const urlParams = new URLSearchParams(window.location.search)
+          const pdfKey = urlParams.get('pdfKey')
 
-        if (pdfKey && !tempPdfLoaded) {
+          if (pdfKey && !tempPdfLoaded) {
           // Use pre-generated PDF from IndexedDB
           try {
             const pdfData = await getPDFFromIndexedDB(pdfKey)
@@ -258,9 +267,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
           console.warn('No PDF key provided, no PDF attachment will be included')
           setTempPdfLoaded(true)
         }
-
-        // Set report data
-        setReport(reportData)
+        }
 
         // Determine company name - prioritize report's companyId, fallback to projectData
         let finalCompanyName = 'Your Company'
