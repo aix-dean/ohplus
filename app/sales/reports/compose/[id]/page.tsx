@@ -231,14 +231,14 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
           const urlParams = new URLSearchParams(window.location.search)
           const pdfKey = urlParams.get('pdfKey')
 
-          if (pdfKey && !tempPdfLoaded) {
-            // Use pre-generated PDF from IndexedDB
-            try {
-              const pdfData = await getPDFFromIndexedDB(pdfKey)
-              if (pdfData) {
-                const pdfFile = new File([pdfData.blob], pdfData.filename, {
-                  type: "application/pdf",
-                })
+        if (pdfKey && !tempPdfLoaded) {
+          // Use pre-generated PDF from IndexedDB
+          try {
+            const pdfData = await getPDFFromIndexedDB(pdfKey)
+            if (pdfData) {
+              const pdfFile = new File([pdfData.blob], pdfData.filename, {
+                type: "application/pdf",
+              })
 
                 const reportPDFs: Attachment[] = [
                   {
@@ -268,6 +268,9 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
             setTempPdfLoaded(true)
           }
         }
+
+        // Set report data
+        setReport(reportData)
 
         // Determine company name - prioritize report's companyId, fallback to projectData
         let finalCompanyName = 'Your Company'
