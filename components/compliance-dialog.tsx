@@ -7,6 +7,7 @@ import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { X, Upload, CheckCircle } from "lucide-react"
 import { format } from "date-fns"
 import { getProjectCompliance } from "@/lib/utils"
+import { ComplianceConfirmationDialog } from "@/components/compliance-confirmation-dialog"
 
 interface ComplianceItem {
   key: string
@@ -49,6 +50,7 @@ export function ComplianceDialog({
   const [selectedFileUrl, setSelectedFileUrl] = useState<string>("")
   const [selectedItemKey, setSelectedItemKey] = useState<string>("")
   const [acceptedItems, setAcceptedItems] = useState<Set<string>>(new Set())
+  
   const [declinedItems, setDeclinedItems] = useState<Set<string>>(new Set())
 
   console.log("[DEBUG] ComplianceDialog quotation:", quotation);
@@ -256,7 +258,7 @@ export function ComplianceDialog({
         {!viewOnly && (
           <div className="flex justify-end pb-4 pr-4">
             <Button
-              disabled={completed === 0 || quotation?.status === "reserved"}
+              disabled={quotation?.status === "reserved"}
               onClick={() => {
                 if (onMarkAsReserved) {
                   onMarkAsReserved(quotation)
@@ -296,12 +298,19 @@ export function ComplianceDialog({
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row sm:justify-between items-center p-4 pt-0 shrink-0 gap-4 sm:gap-0">
             <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
-              <p className="mb-0">
-                <span className="font-bold">Sent from:</span> OH! Plus
-              </p>
-              <p className="mb-0">
-                <span className="font-bold">Sent by:</span> {userEmail || "Unknown"}
-              </p>
+              {(() => {
+                const compliance = quotation?.projectCompliance?.[selectedItemKey]
+                return (
+                  <>
+                    <p className="mb-0">
+                      <span className="font-bold">Sent from:</span> {compliance?.sent_from || "OH! Plus"}
+                    </p>
+                    <p className="mb-0">
+                      <span className="font-bold">Sent by:</span> {compliance?.sent_by || userEmail || "Unknown"}
+                    </p>
+                  </>
+                )
+              })()}
               {(() => {
                 const compliance = quotation?.projectCompliance?.[selectedItemKey]
                 const uploadedAt = compliance?.uploadedAt
@@ -394,6 +403,8 @@ export function ComplianceDialog({
           </div>
         </DialogContent>
       </Dialog>
+
+      
     </Dialog>
   )
 }
