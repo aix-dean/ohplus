@@ -874,7 +874,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center mb-6">
           <Button
             variant="ghost"
@@ -891,54 +891,54 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
         <div className="flex flex-col space-y-4">
           <div className="flex space-x-6">
             <div className="flex-1">
-              <div className="space-y-4">
-                <div className="flex space-x-8">
+              <div className="sm:gap-8 space-y-2">
+                <div className="flex flex-col space-y-2 sm:flex-row sm:space-x-8 sm:space-y-0">
                   <div className="flex items-center space-x-4 flex-1">
-                    <label className="leading-tight font-medium text-darkslategray w-[80px] text-xs">To:</label>
+                    <label className="leading-tight font-medium text-darkslategray w-[60px] sm:w-[80px] text-xs">To:</label>
                     <Input
                       value={emailData.to}
                       onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
                       placeholder="Enter recipient email"
-                      className="w-full h-[23.4px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
+                      className="w-full h-[27px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
                     />
                   </div>
-                  <div className="flex items-center space-x-2 flex-1">
-                    <label className="leading-tight font-medium text-darkslategray w-[80px] text-xs">CC:</label>
+                  <div className="flex items-center space-x-4 flex-1">
+                    <label className="leading-tight font-medium text-darkslategray w-[60px] sm:w-[80px] text-xs">CC:</label>
                     <Input
                       value={emailData.cc}
                       onChange={(e) => setEmailData((prev) => ({ ...prev, cc: e.target.value }))}
                       placeholder="Enter CC email"
-                      className="w-full h-[23.4px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
+                      className="w-full h-[27px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
                     />
                   </div>
                 </div>
 
-                <div className="flex space-x-8">
-                  <div className="flex items-center space-x-2 gap-2 flex-1">
-                    <label className="leading-tight font-medium text-darkslategray w-[80px] text-xs">Subject:</label>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:gap-8">
+                  <div className="flex items-center space-x-4 flex-1">
+                    <label className="leading-tight font-medium text-darkslategray w-[60px] sm:w-[80px] text-xs">Subject:</label>
                     <Input
                       value={emailData.subject}
                       onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
                       placeholder="Enter email subject"
-                      className="w-full h-[23.4px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
+                      className="w-full h-[27px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
                     />
                   </div>
-                  <div className="flex items-center space-x-2 flex-1">
-                    <label className="leading-tight font-medium font-inter text-darkslategray w-[80px] text-xs">Reply-To:</label>
+                  <div className="flex items-center space-x-4 flex-1">
+                    <label className="leading-tight font-medium font-inter text-darkslategray w-[60px] sm:w-[80px] text-xs">Reply-To:</label>
                     <Input
                       value={emailData.replyTo}
                       onChange={(e) => setEmailData((prev) => ({ ...prev, replyTo: e.target.value }))}
                       placeholder="Enter reply-to email"
-                      className="w-full h-[23.4px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
+                      className="w-full h-[27px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
                     />
                   </div>
                 </div>
               </div>
             </div>
-            <div className="w-[276px]"></div>
+            <div className="hidden lg:block w-[276px]"></div>
           </div>
 
-          <div className="flex space-x-6">
+          <div className="flex flex-col space-y-4 lg:flex-row lg:space-x-6 lg:space-y-0">
             <div className="flex-1">
               <Textarea
                 value={emailData.message}
@@ -948,7 +948,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
               />
             </div>
 
-            <div className="w-[276px]">
+            <div className="w-full lg:w-[276px]">
               <div className="bg-white rounded-xl shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] p-4">
                 <h3 className="font-semibold text-base text-black mb-4">Templates</h3>
                 {templatesLoading ? (
@@ -1048,7 +1048,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
           </div>
               {/* send and cancel button */}
           <div className="flex justify-center mt-6">
-            <div className="flex space-x-6 w-full">
+            <div className="flex flex-col space-y-4 lg:flex-row lg:space-x-6 lg:space-y-0 w-full">
               <div className="flex-1 flex justify-center">
                 <div className="bg-white rounded-[50px] border border-gray-300 shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] h-[67px] flex items-center justify-between px-4">
                   <button onClick={handleBack} className="w-[108px] h-[17px] relative text-base [text-decoration:underline] leading-[100%] inline-block font-inter text-darkslategray text-center cursor-pointer">Cancel</button>
@@ -1059,7 +1059,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
                   </Button>
                 </div>
               </div>
-              <div className="w-[276px]"></div>
+              <div className="w-full lg:w-[276px]"></div>
             </div>
           </div>
         </div>
