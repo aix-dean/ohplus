@@ -53,25 +53,25 @@ export function ReportDialog({ open, onOpenChange, selectedReport }: ReportDialo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => onOpenChange(false)} />
-      <div className="relative bg-white rounded-[13.681px] h-[621px] w-[604px] p-6 flex flex-col">
+      <div className="relative bg-white rounded-[13.681px] h-[627px] w-[900px] px-6 py-2 flex flex-col">
         {/* Close button */}
         <div className="absolute top-2 right-2 z-10">
           <button
             onClick={() => onOpenChange(false)}
             className="text-[#333333] cursor-pointer hover:bg-gray-100 rounded-full p-1"
           >
-            <X size={20}/>
+            <X size={20} className="font-bold"/>
           </button>
         </div>
 
         {/* Title */}
-        <p className="text-center font-light py-2">
+        <p className="text-center font-light py-2 text-[#333333] text-[16px]">
           {getReportTypeDisplay(selectedReport.reportType)}_{formatDate(selectedReport.date).replace(/\s+/g, '_').replace(/,/g, '')}.pdf
         </p>
 
         {/* Content Area - Centered */}
-        <div className="flex-1 flex items-center justify-center">
-          <div className="bg-[rgba(217,217,217,0.3)] h-[400px] rounded-[6.84px] w-[575.271px] overflow-y-auto flex items-center justify-center">
+        <div className="flex-1 flex items-start justify-center bg-gray-100 w-full">
+          <div className="bg-white h-[500px] rounded-[6.84px] w-[575.271px] overflow-y-auto flex items-center justify-center">
             {(() => {
               const pdfAttachment = selectedReport.pdf
 
@@ -92,7 +92,7 @@ export function ReportDialog({ open, onOpenChange, selectedReport }: ReportDialo
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-end mt-4">
+        <div className="flex justify-between items-center mt-4">
           {/* Prepared By Section */}
           <div className="font-light text-[#333333] text-[12px] w-[273px]">
             <p>
@@ -115,7 +115,7 @@ export function ReportDialog({ open, onOpenChange, selectedReport }: ReportDialo
               onClick={() => router.push(`/sales/reports/compose/${selectedReport.id}`)}
               className="w-full h-full text-white font-bold text-[13.681px] text-center leading-none"
             >
-              Forward
+              Share
             </button>
           </div>
         </div>
