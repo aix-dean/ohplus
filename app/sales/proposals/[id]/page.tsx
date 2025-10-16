@@ -2715,7 +2715,7 @@ export default function ProposalDetailsPage() {
             {/* Additional Message */}
             {((product as any).additionalMessage || isEditMode) && (
               <div className="mb-2 flex items-start">
-                <p className="mb-0 mr-2 flex-shrink-0">Additional Message:</p>
+                <p className="mb-0 mr-2 flex-shrink-0"></p>
                 {isEditMode ? (
                   <textarea
                     value={editableProducts[product.id]?.additionalMessage || ''}
@@ -3588,7 +3588,7 @@ export default function ProposalDetailsPage() {
 
       {/* Blank Page Editor Dialog */}
       <Dialog open={isBlankPageEditorOpen} onOpenChange={setIsBlankPageEditorOpen}>
-        <DialogContent className="max-w-7xl mx-auto border-0 shadow-lg h-[90vh]">
+        <DialogContent className="w-full max-w-7xl mx-auto border-0 shadow-lg h-[90vh] sm:h-[95vh]">
           <DialogTitle className="sr-only">Blank Page Editor</DialogTitle>
           {editingCustomPage && (
             <BlankPageEditor
