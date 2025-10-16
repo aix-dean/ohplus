@@ -199,7 +199,7 @@ export default function SalesReportsPage() {
 
   const { isMobile } = useResponsive()
 
- function getFileNameFromFirebaseUrl(url) {
+ function getFileNameFromFirebaseUrl(url: string) {
   const decoded = decodeURIComponent(url);
   const lastPart = decoded.split("/").pop()?.split("?")[0] ?? "";
   
