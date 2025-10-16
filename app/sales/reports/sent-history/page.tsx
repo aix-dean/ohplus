@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { getSentEmailsForCompany } from "@/lib/report-service"
+import { searchEmails } from "@/lib/algolia-service"
 import { useAuth } from "@/contexts/auth-context"
 import { format } from "date-fns"
 import { SentHistoryDialog } from "@/components/sent-history-dialog"
@@ -23,7 +24,6 @@ interface EmailRecord {
 
 export default function SentHistoryPage() {
   const [emails, setEmails] = useState<EmailRecord[]>([])
-  const [filteredEmails, setFilteredEmails] = useState<EmailRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -34,33 +34,40 @@ export default function SentHistoryPage() {
 
   useEffect(() => {
     if (userData?.company_id) {
-      fetchEmails()
+      performSearch()
     }
   }, [userData?.company_id])
 
   useEffect(() => {
-    // Filter emails based on search query
-    if (searchQuery.trim()) {
-      const filtered = emails.filter(email =>
-        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.to.some(recipient => recipient.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        email.body.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-      setFilteredEmails(filtered)
-    } else {
-      setFilteredEmails(emails)
-    }
-  }, [emails, searchQuery])
+    performSearch()
+  }, [searchQuery])
 
-  const fetchEmails = async () => {
+  const performSearch = async () => {
     if (!userData?.company_id) return
 
     setLoading(true)
     try {
-      const emailData = await getSentEmailsForCompany(userData.company_id)
-      setEmails(emailData as EmailRecord[])
+      const filters = `company_id:${userData.company_id} AND email_type:report`
+      const searchResponse = await searchEmails(searchQuery, userData.company_id, 0, 10, filters)
+      if (searchResponse.error) {
+        console.error("Search error:", searchResponse.error)
+        setEmails([])
+      } else {
+        // Map Algolia results to EmailRecord format
+        const emailRecords: EmailRecord[] = searchResponse.hits.map(hit => ({
+          id: (hit as any).id,
+          sentAt: new Date((hit as any).sentAt), // Assuming sentAt is ISO string
+          subject: (hit as any).subject,
+          to: Array.isArray((hit as any).to) ? (hit as any).to : [(hit as any).to], // Ensure array
+          cc: (hit as any).cc ? (Array.isArray((hit as any).cc) ? (hit as any).cc : [(hit as any).cc]) : undefined,
+          body: (hit as any).body,
+          attachments: (hit as any).attachments || []
+        }))
+        setEmails(emailRecords)
+      }
     } catch (error) {
-      console.error("Error fetching emails:", error)
+      console.error("Error searching emails:", error)
+      setEmails([])
     } finally {
       setLoading(false)
     }
@@ -112,15 +119,15 @@ export default function SentHistoryPage() {
                 <span className="ml-2">Loading sent history...</span>
               </div>
             </div>
-          ) : filteredEmails.length === 0 ? (
+          ) : emails.length === 0 ? (
             <div className="px-6 py-8 text-center text-gray-500">
               {searchQuery ? "No emails found matching your search" : "No sent emails found"}
             </div>
           ) : (
             <div className="p-4 space-y-3">
-              {filteredEmails.map((email) => (
+              {emails.map((email, index) => (
                 <div
-                  key={email.id}
+                  key={`${email.id}-${index}`}
                   className="bg-[#f6f9ff] border-2 border-[#b8d9ff] rounded-[10px] p-4 hover:bg-[#e8f0ff] transition-colors cursor-pointer"
                   onClick={() => { setSelectedEmail(email); setDialogOpen(true); }}
                 >

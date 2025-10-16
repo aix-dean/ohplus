@@ -7,16 +7,19 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
-import { getReportsByCompany, type ReportData } from "@/lib/report-service"
+import { type ReportData } from "@/lib/report-service"
 import { CompanyService } from "@/lib/company-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { ReportDialog } from "@/components/report-dialog"
 import { useResponsive } from "@/hooks/use-responsive"
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function SalesReportsPage() {
-  const [filteredReports, setFilteredReports] = useState<ReportData[]>([])
+  const [filteredReports, setFilteredReports] = useState<Partial<ReportData>[]>([])
+  const [allReports, setAllReports] = useState<ReportData[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("All")
@@ -35,12 +38,33 @@ export default function SalesReportsPage() {
   const { user, userData } = useAuth()
   const { toast } = useToast()
 
+  // Set up real-time listener for reports
   useEffect(() => {
-    const loadReports = async () => {
-      await filterReports()
+    if (!userData?.company_id) {
+      setAllReports([])
+      setLoading(false)
+      return
     }
-    loadReports()
-  }, [searchQuery, filterType, userData, currentPage])
+
+    console.log("Setting up real-time listener for company:", userData.company_id)
+    const q = query(collection(db, "reports"), where("companyId", "==", userData.company_id), orderBy("created", "desc"))
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      console.log("Received snapshot update with", querySnapshot.docs.length, "reports")
+      const reports = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
+      })) as ReportData[]
+      setAllReports(reports)
+    })
+
+    return unsubscribe
+  }, [userData?.company_id])
+
+  // Filter and paginate reports when data or filters change
+  useEffect(() => {
+    filterReports()
+  }, [allReports, searchQuery, currentPage, userData])
 
   useEffect(() => {
     // Check if we just posted a report
@@ -108,59 +132,42 @@ export default function SalesReportsPage() {
     }
   }
 
-  const filterReports = async () => {
-    try {
-      setLoading(true)
+  const filterReports = () => {
+    console.log("filterReports called with searchQuery:", `"${searchQuery}"`, "currentPage:", currentPage, "allReports length:", allReports.length)
 
-      if (!userData?.company_id) {
-        setFilteredReports([])
-        setTotalReports(0)
-        return
-      }
-
-      // Get all reports for the company (ordered by created desc)
-      const allReports = await getReportsByCompany(userData.company_id)
-      console.log("All reports data:", allReports)
-
-      // Apply client-side filters
-      let filtered = allReports
-
-      // Status filter - exclude draft reports
-      filtered = filtered.filter(report => report.status !== 'draft')
-
-      // Report type filter
-      if (filterType !== "All") {
-        filtered = filtered.filter(report => report.reportType === filterType)
-      }
-
-      // Search query filter (search in siteName, reportType, createdByName)
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase()
-        filtered = filtered.filter(report =>
-          report.siteName?.toLowerCase().includes(query) ||
-          report.reportType?.toLowerCase().includes(query) ||
-          report.createdByName?.toLowerCase().includes(query) ||
-          report.report_id?.toLowerCase().includes(query)
-        )
-      }
-
-      // Apply pagination client-side
-      const startIndex = (currentPage - 1) * itemsPerPage
-      const endIndex = startIndex + itemsPerPage
-      const paginatedReports = filtered.slice(startIndex, endIndex)
-
-      setFilteredReports(paginatedReports)
-      setTotalReports(filtered.length)
-    } catch (error) {
-      console.error("Error filtering reports:", error)
-      toast({
-        title: "Error",
-        description: "Failed to filter reports",
-        variant: "destructive",
-      })
-    } finally {
+    if (!userData?.company_id) {
+      setFilteredReports([])
+      setTotalReports(0)
       setLoading(false)
+      return
     }
+
+    // Filter to published reports (exclude drafts)
+    let filteredReportsList = allReports.filter((report: ReportData) => report.status !== 'draft')
+    console.log("Published reports:", filteredReportsList.length)
+
+    if (searchQuery.trim().length > 0) {
+      console.log("Filtering by search query:", `"${searchQuery}"`)
+      const searchTerm = searchQuery.trim().toLowerCase()
+      filteredReportsList = filteredReportsList.filter((report: ReportData) =>
+        report.siteName?.toLowerCase().includes(searchTerm) ||
+        report.reportType?.toLowerCase().includes(searchTerm) ||
+        report.createdByName?.toLowerCase().includes(searchTerm) ||
+        report.id?.toLowerCase().includes(searchTerm) ||
+        report.report_id?.toLowerCase().includes(searchTerm) ||
+        report.client?.toLowerCase().includes(searchTerm)
+      )
+      console.log("Filtered reports:", filteredReportsList.length)
+    }
+
+    // Paginate client-side
+    const offset = (currentPage - 1) * itemsPerPage
+    const paginatedReports = filteredReportsList.slice(offset, offset + itemsPerPage)
+    console.log("Paginated reports for page", currentPage, ":", paginatedReports.length)
+
+    setFilteredReports(paginatedReports)
+    setTotalReports(filteredReportsList.length)
+    setLoading(false)
   }
 
 
@@ -261,7 +268,7 @@ export default function SalesReportsPage() {
         ) : (
           <div className="p-4 space-y-3">
             {filteredReports.map((report) => (
-              <div key={report.id} className="bg-[#f6f9ff] border-2 border-[#b8d9ff] rounded-[10px] p-4 cursor-pointer hover:bg-[#e8f0ff]" onClick={() => handleViewReport(report)}>
+              <div key={report.id} className="bg-[#f6f9ff] border-2 border-[#b8d9ff] rounded-[10px] p-4 cursor-pointer hover:bg-[#e8f0ff]" onClick={() => handleViewReport(report as ReportData)}>
                 {isMobile ? (
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -274,7 +281,7 @@ export default function SalesReportsPage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-700">Report Type:</span>
-                      <span className="text-gray-900">{getReportTypeDisplay(report.reportType)}</span>
+                      <span className="text-gray-900">{getReportTypeDisplay(report.reportType || "")}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-700">Site:</span>
@@ -311,11 +318,11 @@ export default function SalesReportsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewReport(report)}>
+                          <DropdownMenuItem onClick={() => handleViewReport(report as ReportData)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Report
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handlePrintReport(report)}>
+                          <DropdownMenuItem onClick={() => handlePrintReport(report as ReportData)}>
                             <Printer className="mr-2 h-4 w-4" />
                             Print Report
                           </DropdownMenuItem>
@@ -340,7 +347,7 @@ export default function SalesReportsPage() {
                       {report.report_id || "N/A"}
                     </div>
                     <div className="text-gray-900 truncate">
-                      {getReportTypeDisplay(report.reportType)}
+                      {getReportTypeDisplay(report.reportType || "")}
                     </div>
                     <div className="text-gray-900 font-bold truncate">
                       {report.siteName || "Unknown Site"}
@@ -369,11 +376,11 @@ export default function SalesReportsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewReport(report)}>
+                          <DropdownMenuItem onClick={() => handleViewReport(report as ReportData)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Report
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handlePrintReport(report)}>
+                          <DropdownMenuItem onClick={() => handlePrintReport(report as ReportData)}>
                             <Printer className="mr-2 h-4 w-4" />
                             Print Report
                           </DropdownMenuItem>

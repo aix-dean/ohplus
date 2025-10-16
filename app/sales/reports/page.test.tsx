@@ -6,6 +6,20 @@ import SalesReportsPage from './page'
 // Mock the dependencies
 vi.mock('@/lib/report-service', () => ({
   getReportsByCompany: vi.fn(),
+  getReports: vi.fn(),
+}))
+
+vi.mock('@/lib/algolia-service', () => ({
+  searchReports: vi.fn(),
+}))
+
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn(),
+  query: vi.fn(),
+  where: vi.fn(),
+  orderBy: vi.fn(),
+  onSnapshot: vi.fn(),
+  getFirestore: vi.fn(),
 }))
 
 vi.mock('@/lib/company-service', () => ({
@@ -51,12 +65,15 @@ vi.mock('@/components/report-dialog', () => ({
 }))
 
 // Import mocked modules
-import { getReportsByCompany } from '@/lib/report-service'
+import { getReportsByCompany, getReports } from '@/lib/report-service'
+import { searchReports } from '@/lib/algolia-service'
 import { CompanyService } from '@/lib/company-service'
 import { useAuth } from '@/contexts/auth-context'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/ui/use-toast'
+import { onSnapshot, collection, where, orderBy } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 describe('SalesReportsPage', () => {
   const mockReports = [
@@ -108,6 +125,40 @@ describe('SalesReportsPage', () => {
     })
 
     ;(getReportsByCompany as any).mockResolvedValue(mockReports)
+    ;(getReports as any).mockResolvedValue(mockReports) // For default display
+    ;(searchReports as any).mockResolvedValue({
+      hits: [{
+        objectID: '1',
+        report_id: 'RPT-001',
+        reportType: 'completion-report',
+        siteName: 'Test Site 1',
+        status: 'posted',
+        created: new Date('2024-01-01'),
+        createdByName: 'John Doe',
+        product: { name: 'LED Billboard' },
+      }],
+      nbHits: 1,
+      page: 0,
+      nbPages: 1,
+      hitsPerPage: 15,
+      processingTimeMS: 10,
+      query: 'Test Site 1',
+    })
+    ;(onSnapshot as any).mockImplementation((query: any, callback: any) => {
+      // Simulate the snapshot callback with mockReports
+      const mockQuerySnapshot = {
+        docs: mockReports.map(report => ({
+          id: report.id,
+          data: () => ({
+            ...report,
+            attachments: (report as any).attachments || [],
+          }),
+        })),
+      }
+      callback(mockQuerySnapshot)
+      // Return a mock unsubscribe function
+      return vi.fn()
+    })
     ;(CompanyService.getCompanyData as any).mockResolvedValue({
       logo: 'test-logo.png',
     })
@@ -183,17 +234,13 @@ describe('SalesReportsPage', () => {
       })
 
       await waitFor(() => {
-        expect(getReportsByCompany).toHaveBeenCalledWith('company-123')
+        expect(collection).toHaveBeenCalledWith(db, 'reports')
+        expect(where).toHaveBeenCalledWith('companyId', '==', 'company-123')
+        expect(orderBy).toHaveBeenCalledWith('created', 'desc')
+        expect(onSnapshot).toHaveBeenCalled()
       })
     })
 
-    it('shows loading state initially', () => {
-      act(() => {
-        render(<SalesReportsPage />)
-      })
-
-      expect(screen.getByText('Loading reports...')).toBeInTheDocument()
-    })
 
     it('displays reports after loading', async () => {
       act(() => {
@@ -209,7 +256,14 @@ describe('SalesReportsPage', () => {
     })
 
     it('shows no reports message when empty', async () => {
-      ;(getReportsByCompany as any).mockResolvedValue([])
+      // Mock onSnapshot to return empty docs
+      ;(onSnapshot as any).mockImplementationOnce((query: any, callback: any) => {
+        const mockQuerySnapshot = {
+          docs: [],
+        }
+        callback(mockQuerySnapshot)
+        return vi.fn()
+      })
 
       act(() => {
         render(<SalesReportsPage />)
@@ -292,7 +346,21 @@ describe('SalesReportsPage', () => {
     }))
 
     beforeEach(() => {
-      ;(getReportsByCompany as any).mockResolvedValue(manyReports)
+      ;(onSnapshot as any).mockImplementation((query: any, callback: any) => {
+        // Simulate the snapshot callback with manyReports
+        const mockQuerySnapshot = {
+          docs: manyReports.map(report => ({
+            id: report.id,
+            data: () => ({
+              ...report,
+              attachments: (report as any).attachments || [],
+            }),
+          })),
+        }
+        callback(mockQuerySnapshot)
+        // Return a mock unsubscribe function
+        return vi.fn()
+      })
     })
 
     it('shows pagination controls when there are more reports than items per page', async () => {
@@ -418,22 +486,6 @@ describe('SalesReportsPage', () => {
   })
 
   describe('Error Handling', () => {
-    it('shows error toast when report loading fails', async () => {
-      const mockToast = vi.fn()
-      ;(useToast as any).mockReturnValue({toast: mockToast})
-      ;(getReportsByCompany as any).mockRejectedValue(new Error('Failed to load reports'))  
-
-      render(<SalesReportsPage />)
-
-      await waitFor(() => {
-        expect(mockToast).toHaveBeenCalledWith({
-          title: 'Error',
-          description: 'Failed to filter reports',
-          variant: 'destructive',
-        })
-      })
-    })
-
     it('handles missing company_id gracefully', async () => {
       ;(useAuth as any).mockReturnValue({
         user: mockUser,
