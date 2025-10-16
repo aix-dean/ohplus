@@ -137,6 +137,7 @@ interface CostEstimateSiteData {
   type: string
   image?: string // Added image field for product images
   specs_rental?: any // Added specs_rental field to match quotation structure
+  content_type?: string // Added content_type field to match quotation structure
 }
 
 // Generate an 8-digit password for cost estimate PDF access
@@ -309,7 +310,7 @@ export async function createDirectCostEstimate(
           category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
           notes: `Location: ${site.location}`,
           image: site.image || undefined, // Added image field to line items
-          content_type: site.type || "", // Added content_type field to match quotation structure
+          content_type: site.content_type ? site.content_type.charAt(0).toUpperCase() + site.content_type.slice(1) : "", // Added content_type field to match quotation structure
           specs: site.specs_rental, // Added specs field to match quotation structure
         })
       })
@@ -859,7 +860,7 @@ export async function createMultipleCostEstimates(
         notes: `Location: ${site.location}`,
         image: site.image || undefined, // Added image field to line items for multiple cost estimates
         specs: site.specs_rental, // Added specs field to match quotation structure
-        content_type: site.type || "", // Added content_type field to match quotation structure
+        content_type: site.content_type ? site.content_type.charAt(0).toUpperCase() + site.content_type.slice(1) : "", // Added content_type field to match quotation structure
       })
 
       // Calculate total amount for this site

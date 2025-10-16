@@ -31,3 +31,6 @@ mcp.json
 
 # test files
 app/**/*.test.ts
+
+#DS files
+.DS_Store
