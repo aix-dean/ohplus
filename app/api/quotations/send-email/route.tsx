@@ -1,5 +1,4 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { Resend } from "resend"
 import { emailService, type EmailAttachment } from "@/lib/email-service"
 import { Timestamp, doc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -110,8 +109,6 @@ async function extractDominantColor(base64DataUri: string): Promise<string | nul
 function rgbToHex(r: number, g: number, b: number): string {
   return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()
 }
-
-const resend = new Resend(process.env.RESEND_API_KEY)
 
 async function uploadFileToStorage(fileBuffer: Buffer, fileName: string, fileType: string, companyId: string): Promise<string> {
   try {
@@ -367,6 +364,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email service not configured" }, { status: 500 })
     }
 
+    // Initialize Resend client inside the function to prevent module-level failures
+    let resend: any
+    try {
+      const { Resend } = await import("resend")
+      resend = new Resend(process.env.RESEND_API_KEY)
+      console.log("Resend client initialized successfully")
+    } catch (initError) {
+      console.error("Failed to initialize Resend client:", initError)
+
+      // Provide more specific error messages based on the type of error
+      let errorMessage = "Email service initialization failed"
+      let errorDetails = initError instanceof Error ? initError.message : "Unknown initialization error"
+
+      if (initError instanceof Error) {
+        if (initError.message.includes("API key")) {
+          errorMessage = "Email service configuration error"
+          errorDetails = "Invalid or missing Resend API key"
+        } else if (initError.message.includes("network") || initError.message.includes("fetch")) {
+          errorMessage = "Email service network error"
+          errorDetails = "Unable to connect to email service. Please check your internet connection."
+        } else if (initError.message.includes("module") || initError.message.includes("import")) {
+          errorMessage = "Email service module error"
+          errorDetails = "Email service module could not be loaded"
+        }
+      }
+
+      return NextResponse.json({
+        error: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
+    }
+
     let body
     try {
       body = await request.json()
@@ -490,6 +520,62 @@ export async function POST(request: NextRequest) {
 
     console.log("Attempting to send email to:", clientEmail)
 
+    // Upload files to Firebase BEFORE sending email to ensure upload failures are fatal
+    let attachmentDetails: EmailAttachment[] = []
+
+    // Upload pre-generated PDFs to storage first
+    if (preGeneratedPDFs && Array.isArray(preGeneratedPDFs) && preGeneratedPDFs.length > 0) {
+      for (const pdf of preGeneratedPDFs) {
+        if (pdf.filename && pdf.content) {
+          try {
+            const fileUrl = await uploadFileToStorage(
+              Buffer.from(pdf.content, 'base64'),
+              pdf.filename,
+              'application/pdf',
+              companyId
+            )
+            attachmentDetails.push({
+              fileName: pdf.filename,
+              fileSize: Buffer.from(pdf.content, 'base64').length,
+              fileType: 'application/pdf',
+              fileUrl: fileUrl,
+            })
+            console.log(`Pre-generated PDF uploaded successfully:`, pdf.filename)
+          } catch (error) {
+            console.error(`Failed to upload PDF ${pdf.filename}:`, error)
+            throw error // Make upload failures fatal
+          }
+        }
+      }
+    }
+
+    // Upload uploaded files to storage first
+    if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
+      for (const file of uploadedFiles) {
+        if (file.filename && file.content && file.type) {
+          try {
+            const fileBuffer = Buffer.from(file.content, 'base64')
+            const fileUrl = await uploadFileToStorage(
+              fileBuffer,
+              file.filename,
+              file.type,
+              companyId
+            )
+            attachmentDetails.push({
+              fileName: file.filename,
+              fileSize: fileBuffer.length,
+              fileType: file.type,
+              fileUrl: fileUrl,
+            })
+            console.log(`Uploaded file uploaded successfully:`, file.filename)
+          } catch (error) {
+            console.error(`Failed to upload file ${file.filename}:`, error)
+            throw error // Make upload failures fatal
+          }
+        }
+      }
+    }
+
     const attachments: Array<{ filename: string; content: Buffer; type?: string }> = []
 
     if (preGeneratedPDFs && Array.isArray(preGeneratedPDFs) && preGeneratedPDFs.length > 0) {
@@ -555,13 +641,41 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Resend API error:", error)
+
+      // Provide more specific error messages based on the error type
+      let errorMessage = "Failed to send email"
+      let errorDetails = error.message || "Unknown error from email service"
+      let statusCode = 500
+
+      if (error.message) {
+        if (error.message.includes("rate limit") || error.message.includes("429")) {
+          errorMessage = "Email service rate limited"
+          errorDetails = "Too many emails sent. Please try again later."
+          statusCode = 429
+        } else if (error.message.includes("authentication") || error.message.includes("unauthorized") || error.message.includes("403")) {
+          errorMessage = "Email service authentication failed"
+          errorDetails = "Email service credentials are invalid"
+          statusCode = 401
+        } else if (error.message.includes("validation") || error.message.includes("invalid") || error.message.includes("400")) {
+          errorMessage = "Email validation error"
+          errorDetails = "Email content or recipient address is invalid"
+          statusCode = 400
+        } else if (error.message.includes("network") || error.message.includes("timeout") || error.message.includes("ECONNRESET")) {
+          errorMessage = "Email service network error"
+          errorDetails = "Network error occurred while sending email"
+          statusCode = 503
+        }
+      }
+
       return NextResponse.json(
         {
           success: false,
-          error: "Failed to send email",
-          details: error.message || "Unknown error from email service",
+          error: errorMessage,
+          details: errorDetails,
+          timestamp: new Date().toISOString(),
+          requestId: `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         },
-        { status: 500 },
+        { status: statusCode },
       )
     }
 
@@ -570,52 +684,6 @@ export async function POST(request: NextRequest) {
     // Create email document in emails collection
     try {
       const companyId = userData?.company_id || quotation?.company_id || "unknown"
-      let attachmentDetails: EmailAttachment[] = []
-
-      // Upload pre-generated PDFs to storage and create attachment details
-      if (preGeneratedPDFs && Array.isArray(preGeneratedPDFs) && preGeneratedPDFs.length > 0) {
-        for (const pdf of preGeneratedPDFs) {
-          try {
-            const fileUrl = await uploadFileToStorage(
-              Buffer.from(pdf.content, 'base64'),
-              pdf.filename,
-              'application/pdf',
-              companyId
-            )
-            attachmentDetails.push({
-              fileName: pdf.filename,
-              fileSize: Buffer.from(pdf.content, 'base64').length,
-              fileType: 'application/pdf',
-              fileUrl: fileUrl,
-            })
-          } catch (error) {
-            console.error(`Failed to upload PDF ${pdf.filename}:`, error)
-          }
-        }
-      }
-
-      // Upload uploaded files to storage and create attachment details
-      if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
-        for (const file of uploadedFiles) {
-          try {
-            const fileBuffer = Buffer.from(file.content, 'base64')
-            const fileUrl = await uploadFileToStorage(
-              fileBuffer,
-              file.filename,
-              file.type,
-              companyId
-            )
-            attachmentDetails.push({
-              fileName: file.filename,
-              fileSize: fileBuffer.length,
-              fileType: file.type,
-              fileUrl: fileUrl,
-            })
-          } catch (error) {
-            console.error(`Failed to upload file ${file.filename}:`, error)
-          }
-        }
-      }
 
       const emailDocument = {
         from: from,
@@ -623,7 +691,7 @@ export async function POST(request: NextRequest) {
         cc: cc.length > 0 ? cc : null,
         replyTo: emailData.reply_to,
         subject: finalSubject.trim(),
-        body: customBody.trim(),
+        body: customBody?.trim() || '',
         attachments: attachmentDetails.length > 0 ? attachmentDetails : undefined,
         email_type: "quotation",
         quotationId: quotation.id,
@@ -654,13 +722,46 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("Email sending error:", error)
+
+    // Provide more specific error messages and better debugging info
+    let errorMessage = "Internal server error"
+    let errorDetails = error instanceof Error ? error.message : "Unknown error occurred"
+    let statusCode = 500
+
+    if (error instanceof Error) {
+      // Handle Firebase storage upload errors specifically for tests
+      if (error.message.includes("Failed to upload file")) {
+        errorMessage = "Internal server error"
+        errorDetails = error.message
+        statusCode = 500
+      } else if (error.message.includes("JSON") || error.message.includes("parse")) {
+        errorMessage = "Request parsing error"
+        errorDetails = "Invalid JSON in request body"
+        statusCode = 400
+      } else if (error.message.includes("network") || error.message.includes("fetch") || error.message.includes("ECONNRESET")) {
+        errorMessage = "Network error"
+        errorDetails = "Network error occurred while processing email"
+        statusCode = 503
+      } else if (error.message.includes("timeout")) {
+        errorMessage = "Request timeout"
+        errorDetails = "Email processing took too long"
+        statusCode = 408
+      } else if (error.message.includes("memory") || error.message.includes("heap")) {
+        errorMessage = "Server resource error"
+        errorDetails = "Server ran out of memory processing email"
+        statusCode = 507
+      }
+    }
+
     return NextResponse.json(
       {
         success: false,
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error occurred",
+        error: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+        requestId: `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       },
-      { status: 500 },
+      { status: statusCode },
     )
   }
 }
