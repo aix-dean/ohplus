@@ -2583,7 +2583,7 @@ export default function ProposalDetailsPage() {
             {/* Additional Message */}
             {((product as any).additionalMessage || isEditMode) && (
               <div className="mb-2 flex items-start">
-                <p className="mb-0 mr-2 flex-shrink-0">Additional Message:</p>
+                <p className="mb-0 mr-2 flex-shrink-0"></p>
                 {isEditMode ? (
                   <textarea
                     value={editableProducts[product.id]?.additionalMessage || ''}
