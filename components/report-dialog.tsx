@@ -60,12 +60,12 @@ export function ReportDialog({ open, onOpenChange, selectedReport }: ReportDialo
             onClick={() => onOpenChange(false)}
             className="text-[#333333] cursor-pointer hover:bg-gray-100 rounded-full p-1"
           >
-            <X size={20}/>
+            <X size={20} className="font-bold"/>
           </button>
         </div>
 
         {/* Title */}
-        <p className="text-center font-light py-2">
+        <p className="text-center font-light py-2 text-[#333333] text-[16px]">
           {getReportTypeDisplay(selectedReport.reportType)}_{formatDate(selectedReport.date).replace(/\s+/g, '_').replace(/,/g, '')}.pdf
         </p>
 
@@ -115,7 +115,7 @@ export function ReportDialog({ open, onOpenChange, selectedReport }: ReportDialo
               onClick={() => router.push(`/sales/reports/compose/${selectedReport.id}`)}
               className="w-full h-full text-white font-bold text-[13.681px] text-center leading-none"
             >
-              Forward
+              Share
             </button>
           </div>
         </div>
