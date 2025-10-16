@@ -7,6 +7,7 @@ import { PDFViewer } from "@/components/ui/pdf-viewer"
 import { X, Upload, CheckCircle } from "lucide-react"
 import { format } from "date-fns"
 import { getProjectCompliance } from "@/lib/utils"
+import { ComplianceConfirmationDialog } from "@/components/compliance-confirmation-dialog"
 
 interface ComplianceItem {
   key: string
@@ -49,10 +50,9 @@ export function ComplianceDialog({
   const [selectedFileUrl, setSelectedFileUrl] = useState<string>("")
   const [selectedItemKey, setSelectedItemKey] = useState<string>("")
   const [acceptedItems, setAcceptedItems] = useState<Set<string>>(new Set())
+  
   const [declinedItems, setDeclinedItems] = useState<Set<string>>(new Set())
 
-  console.log("[DEBUG] ComplianceDialog quotation:", quotation);
-  console.log("[DEBUG] ComplianceDialog quotation?.projectCompliance:", quotation?.projectCompliance);
   const compliance = quotation?.projectCompliance || {}
 
   const getDisplayFilename = (key: string) => {
@@ -256,7 +256,7 @@ export function ComplianceDialog({
         {!viewOnly && (
           <div className="flex justify-end pb-4 pr-4">
             <Button
-              disabled={completed === 0 || quotation?.status === "reserved"}
+              disabled={quotation?.status === "reserved"}
               onClick={() => {
                 if (onMarkAsReserved) {
                   onMarkAsReserved(quotation)
@@ -296,12 +296,21 @@ export function ComplianceDialog({
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row sm:justify-between items-center p-4 pt-0 shrink-0 gap-4 sm:gap-0">
             <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
-              <p className="mb-0">
-                <span className="font-bold">Sent from:</span> OH! Plus
-              </p>
-              <p className="mb-0">
-                <span className="font-bold">Sent by:</span> {userEmail || "Unknown"}
-              </p>
+              {(() => {
+                const compliance = quotation?.projectCompliance?.[selectedItemKey]
+                return (
+                  <>
+                    <p className="mb-0">
+                      <span className="font-bold">Sent from:</span> {compliance?.sent_from || "OH! Plus"}
+                    </p>
+                    {compliance?.sent_by && (
+                      <p className="mb-0">
+                        <span className="font-bold">Sent by:</span> {compliance.sent_by}
+                      </p>
+                    )}
+                  </>
+                )
+              })()}
               {(() => {
                 const compliance = quotation?.projectCompliance?.[selectedItemKey]
                 const uploadedAt = compliance?.uploadedAt
@@ -357,43 +366,48 @@ export function ComplianceDialog({
                 )
               })()}
             </div>
-            {!viewOnly && (
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    setDeclinedItems(prev => new Set(prev).add(selectedItemKey))
-                    setAcceptedItems(prev => {
-                      const newSet = new Set(prev)
-                      newSet.delete(selectedItemKey)
-                      return newSet
-                    })
-                    onDecline(quotation.id, selectedItemKey)
-                    setFileViewerOpen(false)
-                  }}
-                  className="bg-white border border-[#c4c4c4] text-black rounded-[10px] h-10 sm:h-[47px] font-medium text-sm sm:text-[20px] px-3 sm:px-6 hover:bg-gray-50"
-                >
-                  Decline
-                </Button>
-                <Button
-                  onClick={() => {
-                    setAcceptedItems(prev => new Set(prev).add(selectedItemKey))
-                    setDeclinedItems(prev => {
-                      const newSet = new Set(prev)
-                      newSet.delete(selectedItemKey)
-                      return newSet
-                    })
-                    onAccept(quotation.id, selectedItemKey)
-                    setFileViewerOpen(false)
-                  }}
-                  className="bg-[#1d0beb] hover:bg-[#1d0beb]/90 text-white rounded-[10px] h-10 sm:h-[47px] font-semibold text-sm sm:text-[20px] px-3 sm:px-6"
-                >
-                  Accept
-                </Button>
-              </div>
-            )}
+            {!viewOnly && (() => {
+              const currentItem = toReserveItems.find(item => item.key === selectedItemKey)
+              return currentItem?.status !== "accepted" ? (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => {
+                      setDeclinedItems(prev => new Set(prev).add(selectedItemKey))
+                      setAcceptedItems(prev => {
+                        const newSet = new Set(prev)
+                        newSet.delete(selectedItemKey)
+                        return newSet
+                      })
+                      onDecline(quotation.id, selectedItemKey)
+                      setFileViewerOpen(false)
+                    }}
+                    className="bg-white border border-[#c4c4c4] text-black rounded-[10px] h-10 sm:h-[47px] font-medium text-sm sm:text-[20px] px-3 sm:px-6 hover:bg-gray-50"
+                  >
+                    Decline
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setAcceptedItems(prev => new Set(prev).add(selectedItemKey))
+                      setDeclinedItems(prev => {
+                        const newSet = new Set(prev)
+                        newSet.delete(selectedItemKey)
+                        return newSet
+                      })
+                      onAccept(quotation.id, selectedItemKey)
+                      setFileViewerOpen(false)
+                    }}
+                    className="bg-[#1d0beb] hover:bg-[#1d0beb]/90 text-white rounded-[10px] h-10 sm:h-[47px] font-semibold text-sm sm:text-[20px] px-3 sm:px-6"
+                  >
+                    Accept
+                  </Button>
+                </div>
+              ) : null
+            })()}
           </div>
         </DialogContent>
       </Dialog>
+
+      
     </Dialog>
   )
 }
