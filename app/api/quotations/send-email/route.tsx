@@ -228,82 +228,108 @@ function createEmailTemplate(
      </noscript>
      <![endif]-->
      <style>
-         * { box-sizing: border-box; }
-         body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; background-color: #f5f5f5; }
-         .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
- .header {
-     background: #ffffff;
-     padding: 0 0 0 20px; /* top right bottom left */
-     text-align: center;
-     position: relative;
-     overflow: hidden;
-     width: 100%;
- }
-         .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-         .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
-         .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
-         .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
-         .header-content { width: 85%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px }
-         .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
-         .company-info {  flex: 1; padding-left: 15px; }
- .company-name {
-   color: #000000;
-   font-size: 24px;
-   font-weight: bold;
-   letter-spacing: 1px;
-   text-align: start;
-   margin: 0px;
- }
-         .company-address { color: #000000; font-size: 14px; margin: 0; }
-         .content { padding: 40px 30px; background-color: #f9f9f9; }
-         .content p { margin: 0 0 16px 0; }
-         .highlight-box { background-color: #f8f9ff; border-left: 4px solid ${primaryColor}; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
-         .cta-section { text-align: center; margin: 30px 0; }
-         .cta-button { display: inline-block; background: ${primaryColor}; color: #ffffff !important; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: 600; font-size: 16px; transition: transform 0.2s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
-         .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
-         .footer { background: #ffffff; padding: 0 0 0 20px; color: #000000; position: relative; overflow: hidden; width: 100%; }
-        .footer-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-        .footer-div {  padding-left:10px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; background-color: #f5f5f5; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.header {
+        background: #ffffff;
+    padding: 0 0 0 20px;
+    color: #000000;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;  /* align footer-content to the right */
+    align-items: center;
+}
+        .header-circles { position: absolute; top: 0; right: 0; width: 140px; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+        .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .header-content { width: 100%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px }
+        .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
+        .company-info {  flex: 1; padding-left: 15px; }
+.company-name {
+  color: #000000;
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-align: start;
+  margin: 0px;
+}
+        .company-address { color: #000000; font-size: 14px; margin: 0; }
+        .content { padding: 40px 30px; background-color: #f9f9f9; }
+        .content p { margin: 0 0 16px 0; }
+        .highlight-box { background-color: #f8f9ff; border-left: 4px solid ${primaryColor}; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
+        .cta-section { text-align: center; margin: 30px 0; }
+        .cta-button { display: inline-block; background: ${primaryColor}; color: #ffffff !important; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: 600; font-size: 16px; transition: transform 0.2s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
+        .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
+.footer {
+    background: #ffffff;
+    padding: 0 0 0 20px;
+    color: #000000;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;  /* align footer-content to the right */
+    align-items: center;
+}
+
+.footer-circles {
+    position: relative;
+    top: 0;
+    right: 0;
+    bottom: 0;                  /* ensure full height coverage */
+    height: 100%;
+    width: 140px;
+    pointer-events: none;
+    display: flex;
+    justify-content: flex-end;  /* align the squares to the right edge */
+    align-items: center;
+    gap: 0;                     /* remove gap so they stay flush right */
+    z-index: 1;                 /* keep it behind the text content */
+}
+.footer-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
         .footer-square-1 { width: 80px; height: 160px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
         .footer-square-2 { width: 60px; height: 160px; background: transparent; opacity: 0.8; z-index: 1;  }
-        .footer-content { width: 75%; position: relative; z-index: 3;}
-        .footer-header { position: absolute; display: flex; justify-content: flex-start; align-items: center; gap: 20px; padding-top:20px; }
+        .footer-content { height: 160px; width: 100%; position: relative; z-index: 3; }
+        .footer-header {  display: flex; justify-content: flex-start;align-items: center; gap: 20px; padding-top:20px; }
         .footer-logo { height: 40px; width: auto; max-width: 120px;  }
-        .footer-company-name { font-size: 18px; font-weight: 600; margin: 0px 15px; color: #000000; padding-top: 10px; }
+        .footer-company-name { font-size: 18px; font-weight: 600; margin: 0px 15px; color: #000000; }
         .footer-website { color: #000000; font-size: 14px; margin: 0; }
-         .signature { margin-top: 5px; }
-         .signature-name { font-weight: 600; color: #000000; font-size: 16px; margin: 0; }
-         .signature-title { color: #000000; font-size: 14px; margin: 0; }
-         .contact-info { font-size: 14px; color: #000000; }
-         .contact-info strong { color: #000000; }
-         .divider { height: 1px; background-color: #e9ecef; margin: 20px 0; }
-         .disclaimer { font-size: 12px; color: #adb5bd; text-align: center; margin-top: 20px; line-height: 1.4; }
-         @media only screen and (max-width: 600px) {
-             .email-container { width: 100% !important; box-shadow: none; }
-             .header, .content, .footer { padding: 20px !important; }
-             .header-circles, .footer-circles { display: none !important; }
-             .header-content { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
-             .company-name { font-size: 20px !important; }
-             .cta-button { padding: 12px 24px !important; font-size: 14px !important; }
-         }
+        .signature { margin-top: 5px; }
+        .signature-name { font-weight: 600; color: #000000; font-size: 16px; margin: 0; }
+        .signature-title { color: #000000; font-size: 14px; margin: 0; }
+        .contact-info { font-size: 14px; color: #000000; }
+        .contact-info strong { color: #000000; }
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; box-shadow: none; }
+            .header, .content, .footer { padding: 20px !important; }
+            .header-circles, .footer-circles { display: none !important; }
+            .header-content { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+            .company-name { font-size: 20px !important; }
+            .cta-button { padding: 12px 24px !important; font-size: 14px !important; }
+        }
      </style>
  </head>
  <body>
      <div class="email-container">
          <div class="header">
-                 <div class="header-circles">
-                     <div class="header-content">
-                         ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="header-logo">` : ''}
-                         <div class="company-info">
-                             <h1 class="company-name">${companyName}</h1>
-                             ${companyLocation ? `<p class="company-address">${companyLocation}</p>` : ''}
-                         </div>
-                     </div>
-                     <div class="header-div">
-                         <div class="header-square-2"></div>
-                         <div class="header-square-1"></div>
-                     </div>
+             <div class="header-content">
+                 ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="header-logo">` : ''}
+                 <div class="company-info">
+                     <h1 class="company-name">${companyName}</h1>
+                     ${companyLocation ? `<p class="company-address">${companyLocation}</p>` : ''}
                  </div>
+             </div>
+             <div class="header-circles">
+                 <div class="header-div">
+                     <div class="header-square-2"></div>
+                     <div class="header-square-1"></div>
+                 </div>
+             </div>
          </div>
 
          <div class="content">
@@ -316,37 +342,30 @@ function createEmailTemplate(
          </div>
 
          <div class="footer">
-
-                 <div class="footer-circles">
-                                 <div class="footer-content">
-                     <div class="footer-header">
-                         ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
-                         <h3 class="footer-company-name">${companyName}</h3>
-                     </div>
-
-                     <div class="signature">
-                         <h4 class="signature-name">${userName || 'Sales Executive'}</h4>
-                         <p class="signature-title">${userPosition ? `${userPosition}` : ``}</p>
-                         <div class="contact-info">
-                            ${companyEmail}<br>
-                             ${phoneNumber ? `${phoneNumber}` : ''}
-                         </div>
-                     </div>
-
+             <div class="footer-content">
+                 <div class="footer-header">
+                     ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
+                     <h3 class="footer-company-name">${companyName}</h3>
                  </div>
-                     <div class="footer-div">
-                         <div class="footer-square-2"></div>
-                         <div class="footer-square-1"></div>
+
+                 <div class="signature">
+                     <h4 class="signature-name">${userName || 'Sales Executive'}</h4>
+                     <p class="signature-title">${userPosition ? `${userPosition}` : ``}</p>
+                     <div class="contact-info">
+                        ${companyEmail}<br>
+                         ${phoneNumber ? `${phoneNumber}` : ''}
                      </div>
                  </div>
              </div>
-
-             <div class="divider"></div>
-
-             <div class="disclaimer">
-                 This email contains confidential information intended only for the recipient.
-                 If you have received this email in error, please notify the sender and delete this message.
+             <div class="footer-circles">
+                 <div class="footer-div">
+                     <div class="footer-square-2"></div>
+                     <div class="footer-square-1"></div>
+                 </div>
              </div>
+         </div>
+
+
          </div>
      </div>
  </body>
