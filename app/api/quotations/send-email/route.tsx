@@ -500,9 +500,15 @@ export async function POST(request: NextRequest) {
         const companyDoc = await getDoc(doc(db, "companies", companyId))
         if (companyDoc.exists()) {
           const companyDocData = companyDoc.data()
-          if (companyDocData?.photo_url) {
-            companyLogo = companyDocData.photo_url
-            console.log("Company logo found:", companyLogo)
+          if (companyDocData?.logo || companyDocData?.photo_url) {
+            companyLogo = companyDocData.logo || companyDocData.photo_url
+            console.log("Company logo found:", companyLogo, {
+              logo: !!companyDocData.logo,
+              photo_url: !!companyDocData.photo_url,
+              usingField: companyDocData.logo ? 'logo' : 'photo_url'
+            })
+          } else {
+            console.log("No company logo found in document")
           }
         }
       } catch (error) {
