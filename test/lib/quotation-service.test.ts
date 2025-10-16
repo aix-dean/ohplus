@@ -158,3 +158,90 @@ describe('Quotation Service - Content Type Capitalization', () => {
     })
   })
 })
+import { safeString } from '@/lib/quotation-service'
+
+describe('safeString', () => {
+  it('should format numbers with 2 decimal places', () => {
+    expect(safeString(100)).toBe('100.00')
+    expect(safeString(100.5)).toBe('100.50')
+    expect(safeString(100.123)).toBe('100.12')
+    expect(safeString(0)).toBe('0.00')
+  })
+
+  it('should handle string inputs', () => {
+    expect(safeString('test string')).toBe('test string')
+    expect(safeString('')).toBe('')
+  })
+
+  it('should handle boolean inputs', () => {
+    expect(safeString(true)).toBe('true')
+    expect(safeString(false)).toBe('false')
+  })
+
+  it('should handle null and undefined', () => {
+    expect(safeString(null)).toBe('N/A')
+    expect(safeString(undefined)).toBe('N/A')
+  })
+
+  it('should handle object inputs', () => {
+    expect(safeString({ id: 'test' })).toBe('test')
+    expect(safeString({ name: 'test' })).toBe('[object Object]')
+    expect(safeString({ toString: () => 'custom' })).toBe('custom')
+  })
+
+  it('should handle edge cases', () => {
+    expect(safeString(NaN)).toBe('NaN')
+    expect(safeString(Infinity)).toBe('∞')
+    expect(safeString(-100)).toBe('-100.00')
+  })
+})
+
+describe('Decimal Formatting', () => {
+  describe('Price Input Validation', () => {
+    const validatePriceInput = (value: string): boolean => {
+      const regex = /^\d*\.?\d{0,2}$/
+      return regex.test(value) || value === ""
+    }
+
+    it('should allow valid price inputs', () => {
+      expect(validatePriceInput('')).toBe(true)
+      expect(validatePriceInput('123')).toBe(true)
+      expect(validatePriceInput('123.')).toBe(true)
+      expect(validatePriceInput('123.4')).toBe(true)
+      expect(validatePriceInput('123.45')).toBe(true)
+      expect(validatePriceInput('0')).toBe(true)
+      expect(validatePriceInput('0.00')).toBe(true)
+    })
+
+    it('should reject invalid price inputs', () => {
+      expect(validatePriceInput('123.456')).toBe(false)
+      expect(validatePriceInput('123.4567')).toBe(false)
+      expect(validatePriceInput('abc')).toBe(false)
+      expect(validatePriceInput('12.34.56')).toBe(false)
+      expect(validatePriceInput('12..34')).toBe(false)
+    })
+  })
+
+  describe('Price Formatting on Blur', () => {
+    const formatPriceOnBlur = (value: string): string => {
+      if (value && !isNaN(Number.parseFloat(value))) {
+        const parsed = Number.parseFloat(value)
+        return parsed.toFixed(2)
+      }
+      return value
+    }
+
+    it('should format valid numbers to 2 decimal places', () => {
+      expect(formatPriceOnBlur('100')).toBe('100.00')
+      expect(formatPriceOnBlur('100.5')).toBe('100.50')
+      expect(formatPriceOnBlur('100.123')).toBe('100.12')
+      expect(formatPriceOnBlur('0')).toBe('0.00')
+    })
+
+    it('should handle edge cases', () => {
+      expect(formatPriceOnBlur('')).toBe('')
+      expect(formatPriceOnBlur('abc')).toBe('abc')
+      expect(formatPriceOnBlur('NaN')).toBe('NaN')
+    })
+  })
+})

@@ -1269,9 +1269,18 @@ The OH Plus Team`,
                 <Input
                   type="number"
                   value={tempValues.price || ""}
-                  onChange={(e) => updateTempValues("price", Number.parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const parsed = Number.parseFloat(value);
+                    if (!isNaN(parsed)) {
+                      updateTempValues("price", Number(parsed.toFixed(2)));
+                    } else if (value === "") {
+                      updateTempValues("price", 0);
+                    }
+                  }}
                   className="w-32 h-6 text-sm"
                   placeholder={item?.price?.toString() || "0.00"}
+                  step="0.01"
                 />
                 <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
               </div>

@@ -1852,9 +1852,18 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                   <Input
                     type="number"
                     value={tempValues.unitPrice || ""}
-                    onChange={(e) => updateTempValues("unitPrice", Number.parseFloat(e.target.value) || 0)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const parsed = Number.parseFloat(value);
+                      if (!isNaN(parsed)) {
+                        updateTempValues("unitPrice", Number(parsed.toFixed(2)));
+                      } else if (value === "") {
+                        updateTempValues("unitPrice", 0);
+                      }
+                    }}
                     className="w-32 h-6 text-sm"
                     placeholder={monthlyRate?.toString() || "0.00"}
+                    step="0.01"
                     onBlur={() => setEditingField(null)}
                   />
                   <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
@@ -2278,7 +2287,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                       {historyItem.costEstimateNumber || historyItem.id.slice(-8)}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {historyItem.totalAmount.toLocaleString()}/month
+                      PHP {historyItem.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month
                     </div>
                     <div className="flex justify-end">
                       <span
@@ -2654,7 +2663,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                         </div>
                         <div className="text-xs text-gray-500">
                           Total: ₱
-                          {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString()}
+                          {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                       </div>
                     </div>
