@@ -36,3 +36,6 @@ app/sales/proposals/__tests__/proposal-details-page.test.tsx
 
 #mcp server
 mcp.json
+
+# test files
+app/**/*.test.ts
