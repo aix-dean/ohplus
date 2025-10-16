@@ -232,41 +232,41 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
           const pdfKey = urlParams.get('pdfKey')
 
           if (pdfKey && !tempPdfLoaded) {
-          // Use pre-generated PDF from IndexedDB
-          try {
-            const pdfData = await getPDFFromIndexedDB(pdfKey)
-            if (pdfData) {
-              const pdfFile = new File([pdfData.blob], pdfData.filename, {
-                type: "application/pdf",
-              })
+            // Use pre-generated PDF from IndexedDB
+            try {
+              const pdfData = await getPDFFromIndexedDB(pdfKey)
+              if (pdfData) {
+                const pdfFile = new File([pdfData.blob], pdfData.filename, {
+                  type: "application/pdf",
+                })
 
-              const reportPDFs: Attachment[] = [
-                {
-                  name: pdfData.filename,
-                  size: formatFileSize(pdfData.blob.size),
-                  type: "report",
-                  file: pdfFile,
-                },
-              ]
+                const reportPDFs: Attachment[] = [
+                  {
+                    name: pdfData.filename,
+                    size: formatFileSize(pdfData.blob.size),
+                    type: "report",
+                    file: pdfFile,
+                  },
+                ]
 
-              setAttachments(reportPDFs)
-              setTempPdfLoaded(true)
+                setAttachments(reportPDFs)
+                setTempPdfLoaded(true)
 
-              // Clean up IndexedDB
-              await deletePDFFromIndexedDB(pdfKey)
-            } else {
-              console.warn('PDF not found in IndexedDB, no PDF attachment will be included')
+                // Clean up IndexedDB
+                await deletePDFFromIndexedDB(pdfKey)
+              } else {
+                console.warn('PDF not found in IndexedDB, no PDF attachment will be included')
+                setTempPdfLoaded(true)
+              }
+            } catch (error) {
+              console.error('Error retrieving PDF from IndexedDB:', error)
               setTempPdfLoaded(true)
             }
-          } catch (error) {
-            console.error('Error retrieving PDF from IndexedDB:', error)
+          } else if (!pdfKey && !tempPdfLoaded) {
+            // No PDF available
+            console.warn('No PDF key provided, no PDF attachment will be included')
             setTempPdfLoaded(true)
           }
-        } else if (!pdfKey && !tempPdfLoaded) {
-          // No PDF available
-          console.warn('No PDF key provided, no PDF attachment will be included')
-          setTempPdfLoaded(true)
-        }
         }
 
         // Determine company name - prioritize report's companyId, fallback to projectData
@@ -434,9 +434,9 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
         .filter((email) => email)
       const ccEmails = emailData.cc
         ? emailData.cc
-            .split(",")
-            .map((email) => email.trim())
-            .filter((email) => email)
+          .split(",")
+          .map((email) => email.trim())
+          .filter((email) => email)
         : []
 
       formData.append("to", JSON.stringify(toEmails))
@@ -873,9 +873,9 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <div className="max-w-7xl mx-auto p-6">
-        <div className="flex items-center space-x-4 mb-6">
+    <div className="min-h-screen bg-white">
+      <div className="p-6">
+        <div className="flex items-center mb-6">
           <Button
             variant="ghost"
             size="sm"
@@ -883,184 +883,188 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
             className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span>Back</span>
+            <h1 className="text-base leading-tight font-bold text-gray-900">Compose email</h1>
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Compose email</h1>
+          
         </div>
 
-        <div className="flex flex-col lg:flex-row space-y-6 lg:space-y-0 lg:space-x-6">
+        <div className="flex flex-col space-y-4">
+          <div className="flex space-x-6">
             <div className="flex-1">
               <div className="space-y-4">
-                    <div className="flex items-center space-x-4">
-                      <label className="text-lg font-medium text-gray-900 w-20">To:</label>
-                      <Input
-                        value={emailData.to}
-                        onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
-                        placeholder="Enter recipient email"
-                        className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-4">
-                      <label className="text-lg font-medium text-gray-900 w-20">CC:</label>
-                      <Input
-                        value={emailData.cc}
-                        onChange={(e) => setEmailData((prev) => ({ ...prev, cc: e.target.value }))}
-                        placeholder="Enter CC email"
-                        className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center space-x-4">
-                      <label className="text-lg font-medium text-gray-900 w-20">Reply-To:</label>
-                      <Input
-                        value={emailData.replyTo}
-                        onChange={(e) => setEmailData((prev) => ({ ...prev, replyTo: e.target.value }))}
-                        placeholder="Enter reply-to email"
-                        className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
-                      />
-                    </div>
-
-
-                    <div className="flex items-center space-x-4">
-                      <label className="text-lg font-medium text-gray-900 w-20">Subject:</label>
-                      <Input
-                        value={emailData.subject}
-                        onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
-                        placeholder="Enter email subject"
-                        className="bg-white rounded-[10px] border-2 border-[#c4c4c4] h-[39px] flex-1"
-                      />
-                    </div>
-
-                    <div>
-                      <Textarea
-                        value={emailData.message}
-                        onChange={(e) => setEmailData((prev) => ({ ...prev, message: e.target.value }))}
-                        placeholder="Enter your message"
-                        className="bg-white rounded-[10px] border-2 border-[#c4c4c4] w-full h-[543px] resize-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Attachments:</label>
-
-                      {/* File size warning */}
-                      {totalAttachmentSize > 30 * 1024 * 1024 && (
-                        <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                              </svg>
-                            </div>
-                            <div className="ml-3">
-                              <h3 className="text-sm font-medium text-yellow-800">
-                                Large attachment size detected
-                              </h3>
-                              <div className="mt-1 text-sm text-yellow-700">
-                                <p>
-                                  Total attachment size: {(totalAttachmentSize / (1024 * 1024)).toFixed(1)}MB.
-                                  Email services have a 40MB limit. Consider removing or compressing files.
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-2">
-                        {attachments.map((attachment, index) => (
-                          <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                            <div className="flex items-center space-x-2">
-                              <Paperclip className="h-4 w-4 text-gray-500" />
-                              <span className="text-sm text-gray-700">{attachment.name}</span>
-                              <span className="text-xs text-gray-500">({attachment.size})</span>
-                              {attachment.type === "user-upload" && (
-                                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewAttachment(attachment)}
-                                title="View attachment"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-4">
-                        <button onClick={handleAddAttachment} className="text-[#2d3fff] underline text-lg font-medium">+Add attachment</button>
-                      </div>
-                    </div>
+                <div className="flex space-x-8">
+                  <div className="flex items-center space-x-4 flex-1">
+                    <label className="leading-tight font-medium text-darkslategray w-[80px] text-xs">To:</label>
+                    <Input
+                      value={emailData.to}
+                      onChange={(e) => setEmailData((prev) => ({ ...prev, to: e.target.value }))}
+                      placeholder="Enter recipient email"
+                      className="w-full h-[23.4px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
+                    />
                   </div>
+                  <div className="flex items-center space-x-2 flex-1">
+                    <label className="leading-tight font-medium text-darkslategray w-[80px] text-xs">CC:</label>
+                    <Input
+                      value={emailData.cc}
+                      onChange={(e) => setEmailData((prev) => ({ ...prev, cc: e.target.value }))}
+                      placeholder="Enter CC email"
+                      className="w-full h-[23.4px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex space-x-8">
+                  <div className="flex items-center space-x-2 gap-2 flex-1">
+                    <label className="leading-tight font-medium text-darkslategray w-[80px] text-xs">Subject:</label>
+                    <Input
+                      value={emailData.subject}
+                      onChange={(e) => setEmailData((prev) => ({ ...prev, subject: e.target.value }))}
+                      placeholder="Enter email subject"
+                      className="w-full h-[23.4px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2 flex-1">
+                    <label className="leading-tight font-medium font-inter text-darkslategray w-[80px] text-xs">Reply-To:</label>
+                    <Input
+                      value={emailData.replyTo}
+                      onChange={(e) => setEmailData((prev) => ({ ...prev, replyTo: e.target.value }))}
+                      placeholder="Enter reply-to email"
+                      className="w-full h-[23.4px] relative rounded-md bg-white border-silver border-solid border-[1.2px] box-border"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="w-[276px]"></div>
+          </div>
+
+          <div className="flex space-x-6">
+            <div className="flex-1">
+              <Textarea
+                value={emailData.message}
+                onChange={(e) => setEmailData((prev) => ({ ...prev, message: e.target.value }))}
+                placeholder="Enter your message"
+                className="bg-white rounded-lg border border-gray-300 box-border w-full h-[351px] resize-none text-xs"
+              />
             </div>
 
-            <div className="w-[346px]">
-             <div className="bg-white rounded-[20px] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] p-4">
-               <h3 className="font-semibold text-lg text-black mb-4">Templates</h3>
-                 {templatesLoading ? (
-                   <div className="text-center py-4">
-                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
-                     <p className="text-sm text-gray-500 mt-2">Loading templates...</p>
-                   </div>
-                 ) : templates.length === 0 ? (
-                   <div className="text-center py-4">
-                     <p className="text-sm text-gray-500">No email templates available.</p>
-                     <p className="text-xs text-gray-400 mt-1">Create your first template to get started.</p>
-                   </div>
-                 ) : (
-                   <div className="space-y-2">
-                     {templates.map((template) => (
-                       <div key={template.id} className="bg-[#c4c4c4] bg-opacity-20 h-[56px] rounded-[10px] flex items-center justify-between px-4">
-                         <span
-                           className="text-lg font-medium text-gray-900 cursor-pointer"
-                           onClick={() => handleTemplateAction(template.id!, "copy")}
-                           title="Apply template"
-                         >
-                           {template.name}
-                         </span>
-                         <div className="flex items-center space-x-2">
-                           <Button
-                             variant="ghost"
-                             size="sm"
-                             onClick={() => handleTemplateAction(template.id!, "edit")}
-                             className="p-0"
-                           >
-                             <Edit className="h-6 w-6 opacity-50" />
-                           </Button>
-                           <Button
-                             variant="ghost"
-                             size="sm"
-                             onClick={() => handleTemplateAction(template.id!, "delete")}
-                             className="p-0"
-                           >
-                             <Trash2 className="h-6 w-6 opacity-50" />
-                           </Button>
-                         </div>
-                       </div>
-                     ))}
-                   </div>
-                 )}
-                 <Button onClick={handleAddTemplate} className="w-full mt-4 bg-white border-2 border-[#c4c4c4] rounded-[10px] text-gray-900 font-medium text-lg h-[39px]">
-                   +Add Template
-                 </Button>
-             </div>
-           </div>
-        </div>
+            <div className="w-[276px]">
+              <div className="bg-white rounded-xl shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] p-4">
+                <h3 className="font-semibold text-base text-black mb-4">Templates</h3>
+                {templatesLoading ? (
+                  <div className="text-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Loading templates...</p>
+                  </div>
+                ) : templates.length === 0 ? (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-gray-500">No email templates available.</p>
+                    <p className="text-xs text-gray-400 mt-1">Create your first template to get started.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {templates.map((template) => (
+                      <div key={template.id} className="bg-gray-100 opacity-20 h-[33px] rounded-lg flex items-center justify-between px-4">
+                        <span
+                          className="text-base font-medium text-gray-900 cursor-pointer"
+                          onClick={() => handleTemplateAction(template.id!, "copy")}
+                          title="Apply template"
+                        >
+                          {template.name}
+                        </span>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleTemplateAction(template.id!, "edit")}
+                            className="p-0"
+                          >
+                            <Edit className="h-6 w-6 opacity-50" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleTemplateAction(template.id!, "delete")}
+                            className="p-0"
+                          >
+                            <Trash2 className="h-6 w-6 opacity-50" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <Button onClick={handleAddTemplate} className="w-full mt-4 bg-white border border-gray-300 rounded-lg text-gray-900 font-medium text-base h-[29px]">
+                  +Add Template
+                </Button>
+              </div>
+            </div>
+          </div>
+                {/* attachment */}
+          <div>
+ 
+            {/* File size warning */}
+            {totalAttachmentSize > 30 * 1024 * 1024 && (
+              <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Large attachment size detected
+                    </h3>
+                    <div className="mt-1 text-sm text-yellow-700">
+                      <p>
+                        Total attachment size: {(totalAttachmentSize / (1024 * 1024)).toFixed(1)}MB.
+                        Email services have a 40MB limit. Consider removing or compressing files.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
-        <div className="flex justify-center mt-6">
-          <div className="bg-white rounded-[50px] border-[1.5px] border-[#c4c4c4] shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] w-[440px] h-[61px] flex items-center justify-between px-4">
-            <button onClick={handleBack} className="text-gray-900 underline text-lg">Cancel</button>
-            <Button onClick={handleSendEmail} disabled={sending} className="bg-[#1d0beb] text-white rounded-[15px] px-6 py-2 text-2xl font-bold">
-              {sending ? "Sending..." : "Send email"}
-            </Button>
+            <div className="">
+              {attachments.map((attachment, index) => (
+                <div key={index} className="flex items-center justify-between rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Paperclip className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-700 cursor-pointer" onClick={() => handleViewAttachment(attachment)}>{attachment.name}</span>
+                    <span className="text-xs text-gray-500">({attachment.size})</span>
+                    {attachment.type === "user-upload" && (
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Uploaded</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <button onClick={handleAddAttachment} className="text-blue-600 underline text-base text-xs font-medium leading-tight">+Add attachment</button>
+            </div>
+          </div>
+              {/* send and cancel button */}
+          <div className="flex justify-center mt-6">
+            <div className="flex space-x-6 w-full">
+              <div className="flex-1 flex justify-center">
+                <div className="bg-white rounded-[50px] border border-gray-300 shadow-[-2px_4px_10.5px_-2px_rgba(0,0,0,0.25)] h-[67px] flex items-center justify-between px-4">
+                  <button onClick={handleBack} className="w-[108px] h-[17px] relative text-base [text-decoration:underline] leading-[100%] inline-block font-inter text-darkslategray text-center cursor-pointer">Cancel</button>
+                  <Button onClick={handleSendEmail} disabled={sending} className="bg-[#1d0beb] rounded-[10px] w-[133px] h-[27px] text-base">
+                    <span className="text-base leading-[100%] inline-block font-inter text-white text-center">
+                      {sending ? "Sending..." : "Send email"}
+                    </span>
+                  </Button>
+                </div>
+              </div>
+              <div className="w-[276px]"></div>
+            </div>
           </div>
         </div>
+
+
 
         <input
           ref={fileInputRef}

@@ -247,7 +247,7 @@ describe('ComposeEmailPage', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Back')).toBeInTheDocument()
+        expect(screen.getByText('Compose email')).toBeInTheDocument()
       })
     })
 
@@ -426,13 +426,13 @@ describe('ComposeEmailPage', () => {
 
     it('shows file size warning for large attachments', async () => {
       // This test would require mocking file inputs and attachment state
-      // For now, we'll test that the component renders the attachment size calculation
+      // For now, we'll test that the component renders existing attachments
       act(() => {
         render(<ComposeEmailPage params={Promise.resolve({ id: 'BNwkVzMRSlSzdLMza6y6' })} />)
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Attachments:')).toBeInTheDocument()
+        expect(screen.getByText('logistics_report.pdf')).toBeInTheDocument()
       })
     })
   })
@@ -634,10 +634,10 @@ describe('ComposeEmailPage', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Back')).toBeInTheDocument()
+        expect(screen.getByText('Compose email')).toBeInTheDocument()
       })
 
-      const backButton = screen.getByText('Back').closest('button')
+      const backButton = screen.getByText('Compose email').closest('button')
       if (backButton) {
         await user.click(backButton)
         expect(mockBack).toHaveBeenCalled()
