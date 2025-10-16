@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import SentHistoryPage from './page'
 
 // Mock the dependencies
-vi.mock('@/lib/report-service', () => ({
-  getSentEmailsForCompany: vi.fn(),
+vi.mock('@/lib/algolia-service', () => ({
+  searchEmails: vi.fn(),
 }))
 
 vi.mock('@/contexts/auth-context', () => ({
@@ -25,7 +25,7 @@ vi.mock('@/components/sent-history-dialog', () => ({
 }))
 
 // Import mocked modules
-import { getSentEmailsForCompany } from '@/lib/report-service'
+import { searchEmails } from '@/lib/algolia-service'
 import { useAuth } from '@/contexts/auth-context'
 import { useRouter } from 'next/navigation'
 
@@ -33,7 +33,7 @@ describe('SentHistoryPage', () => {
   const mockEmails = [
     {
       id: '1',
-      sentAt: new Date('2024-01-01T10:00:00Z'),
+      sentAt: '2024-01-01T10:00:00Z',
       subject: 'Test Report Email',
       to: ['recipient1@example.com', 'recipient2@example.com'],
       cc: ['cc@example.com'],
@@ -42,7 +42,7 @@ describe('SentHistoryPage', () => {
     },
     {
       id: '2',
-      sentAt: new Date('2024-01-02T14:30:00Z'),
+      sentAt: '2024-01-02T14:30:00Z',
       subject: 'Another Report',
       to: ['another@example.com'],
       body: 'Another email content',
@@ -71,7 +71,26 @@ describe('SentHistoryPage', () => {
       back: vi.fn(),
     })
 
-    ;(getSentEmailsForCompany as any).mockResolvedValue(mockEmails)
+    ;(searchEmails as any).mockImplementation((query: string, companyId?: string, page?: number, hitsPerPage?: number, filters?: string) => {
+      let filteredEmails = mockEmails
+      if (query) {
+        const lowerQuery = query.toLowerCase()
+        filteredEmails = mockEmails.filter(email =>
+          email.subject.toLowerCase().includes(lowerQuery) ||
+          email.to.some(recipient => recipient.toLowerCase().includes(lowerQuery)) ||
+          email.body.toLowerCase().includes(lowerQuery)
+        )
+      }
+      return Promise.resolve({
+        hits: filteredEmails,
+        nbHits: filteredEmails.length,
+        page: page || 0,
+        nbPages: 1,
+        hitsPerPage: hitsPerPage || 10,
+        processingTimeMS: 10,
+        query: query || "",
+      })
+    })
   })
 
   describe('Rendering', () => {
@@ -124,7 +143,7 @@ describe('SentHistoryPage', () => {
       render(<SentHistoryPage />)
 
       await waitFor(() => {
-        expect(getSentEmailsForCompany).toHaveBeenCalledWith('company-123')
+        expect(searchEmails).toHaveBeenCalledWith('', 'company-123', 0, 10, 'company_id:company-123 AND email_type:report')
       })
     })
 
@@ -137,7 +156,7 @@ describe('SentHistoryPage', () => {
       render(<SentHistoryPage />)
 
       await waitFor(() => {
-        expect(getSentEmailsForCompany).not.toHaveBeenCalled()
+        expect(searchEmails).not.toHaveBeenCalled()
       })
     })
 
@@ -159,7 +178,15 @@ describe('SentHistoryPage', () => {
     })
 
     it('shows no emails message when empty', async () => {
-      ;(getSentEmailsForCompany as any).mockResolvedValue([])
+      ;(searchEmails as any).mockResolvedValue({
+        hits: [],
+        nbHits: 0,
+        page: 0,
+        nbPages: 0,
+        hitsPerPage: 10,
+        processingTimeMS: 10,
+        query: "",
+      })
 
       render(<SentHistoryPage />)
 
@@ -318,12 +345,12 @@ describe('SentHistoryPage', () => {
   describe('Error Handling', () => {
     it('handles fetch errors gracefully', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      ;(getSentEmailsForCompany as any).mockRejectedValue(new Error('Fetch failed'))
+      ;(searchEmails as any).mockRejectedValue(new Error('Fetch failed'))
 
       render(<SentHistoryPage />)
 
       await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith('Error fetching emails:', expect.any(Error))
+        expect(consoleSpy).toHaveBeenCalledWith('Error searching emails:', expect.any(Error))
       })
 
       consoleSpy.mockRestore()
@@ -331,7 +358,7 @@ describe('SentHistoryPage', () => {
 
     it('shows loading state during error', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      ;(getSentEmailsForCompany as any).mockRejectedValue(new Error('Fetch failed'))
+      ;(searchEmails as any).mockRejectedValue(new Error('Fetch failed'))
 
       render(<SentHistoryPage />)
 
@@ -352,14 +379,22 @@ describe('SentHistoryPage', () => {
       const emailsWithoutCc = [
         {
           id: '1',
-          sentAt: new Date(),
+          sentAt: new Date().toISOString(),
           subject: 'Test Email',
           to: ['test@example.com'],
           body: 'Test body',
           attachments: [],
         },
       ]
-      ;(getSentEmailsForCompany as any).mockResolvedValue(emailsWithoutCc)
+      ;(searchEmails as any).mockResolvedValue({
+        hits: emailsWithoutCc,
+        nbHits: emailsWithoutCc.length,
+        page: 0,
+        nbPages: 1,
+        hitsPerPage: 10,
+        processingTimeMS: 10,
+        query: "",
+      })
 
       render(<SentHistoryPage />)
 
@@ -372,14 +407,22 @@ describe('SentHistoryPage', () => {
       const emailsWithEmptyTo = [
         {
           id: '1',
-          sentAt: new Date(),
+          sentAt: new Date().toISOString(),
           subject: 'Test Email',
           to: [],
           body: 'Test body',
           attachments: [],
         },
       ]
-      ;(getSentEmailsForCompany as any).mockResolvedValue(emailsWithEmptyTo)
+      ;(searchEmails as any).mockResolvedValue({
+        hits: emailsWithEmptyTo,
+        nbHits: emailsWithEmptyTo.length,
+        page: 0,
+        nbPages: 1,
+        hitsPerPage: 10,
+        processingTimeMS: 10,
+        query: "",
+      })
 
       render(<SentHistoryPage />)
 
