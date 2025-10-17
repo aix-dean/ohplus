@@ -46,7 +46,7 @@ export default function LogisticsDashboardPage() {
                   setTimeout(() => setIsLoading(false), 1000)
                 }}
                 disabled={isLoading}
-                className="w-[140px] rounded-[6.02px] text-xs font-medium bg-white border-silver border-solid border-[1.2px] box-border h-6"
+                className="w-[140px] rounded-[6.02px] h-[23px] text-xs font-medium bg-white border-silver border-solid border-[1.2px] box-border h-6"
               >
                 {isLoading ? (
                   <>
@@ -58,20 +58,12 @@ export default function LogisticsDashboardPage() {
               </button>
                  <button
                 onClick={() => {
-                  setIsLoading(true)
                   router.push("/logistics/reports/select-service-assignment")
-                  setTimeout(() => setIsLoading(false), 1000)
                 }}
                 disabled={isLoading}
-                className="w-[90px] rounded-[6.02px] text-xs font-medium bg-white border-silver border-solid border-[1.2px] box-border h-6"
+                className="w-[93px] rounded-[6.02px] h-[23px] text-xs font-medium bg-white border-silver border-solid border-[1.2px] box-border h-6"
               >
-                {isLoading ? (
-                  <>
-                    Reports..
-                  </>
-                ) : (
-                  "Reports"
-                )}
+                  Reports
               </button>
               </div>
             </div>
