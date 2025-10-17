@@ -303,7 +303,7 @@ export default function SalesReportsPage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-700">Sender:</span>
-                      <span className="text-gray-900">{report.createdByName || "Unknown User"}</span>
+                      <span className="text-gray-900 truncate">{report.createdByName || "Unknown User"}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="font-medium text-gray-700">Attachment:</span>
