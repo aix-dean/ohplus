@@ -16,6 +16,7 @@ import { ReportDialog } from "@/components/report-dialog"
 import { useResponsive } from "@/hooks/use-responsive"
 import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { ca } from "date-fns/locale"
 
 export default function SalesReportsPage() {
   const [filteredReports, setFilteredReports] = useState<Partial<ReportData>[]>([])
@@ -178,19 +179,24 @@ export default function SalesReportsPage() {
     setShowReportDialog(true)
   }
 
-
-  const handleDeleteReport = (reportId: string) => {
-    // Implement delete functionality
-    toast({
-      title: "Delete Report",
-      description: "Delete functionality will be implemented",
-    })
-  }
-
-  const handlePrintReport = (report: ReportData) => {
+  const handlePrintReport = async (report: string) => {
     // Navigate to detail page and trigger print there
     // This ensures the report is rendered and can be printed
-    router.push(`/sales/reports/${report.id}?action=print`)
+    if (!report) {
+      toast({
+        title: "Print Report",
+        description: "No report available to print.",
+      })
+      return
+    } 
+    try {
+      const response = await fetch(report);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank')?.print();
+    }catch (error) {
+      console.error("Error printing report:", error);
+    }
   }
 
   const handleViewSentHistory = (reportId: string) => {
@@ -268,7 +274,11 @@ export default function SalesReportsPage() {
         ) : (
           <div className="p-4 space-y-3">
             {filteredReports.map((report) => (
-              <div key={report.id} className="bg-[#f6f9ff] border-2 border-[#b8d9ff] rounded-[10px] p-4 cursor-pointer hover:bg-[#e8f0ff]" onClick={() => handleViewReport(report as ReportData)}>
+              <div key={report.id} className="bg-[#f6f9ff] border-2 border-[#b8d9ff] rounded-[10px] p-4 cursor-pointer hover:bg-[#e8f0ff]" 
+              onClick={(e) => {
+                e.stopPropagation()
+                handleViewReport(report as ReportData)}}
+                >
                 {isMobile ? (
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
@@ -300,7 +310,7 @@ export default function SalesReportsPage() {
                       <div
                         className={report.logistics_report ? "text-[#2d3fff] underline cursor-pointer truncate" : "text-gray-500"}
                         onClick={(e) => {
-                          e.stopPropagation();
+                          e.stopPropagation()
                           if (report.logistics_report) {
                             window.open(report.logistics_report, '_blank');
                           }
@@ -318,21 +328,20 @@ export default function SalesReportsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewReport(report as ReportData)}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewReport(report as ReportData); }}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Report
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handlePrintReport(report as ReportData)}>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation()
+                            handlePrintReport(report.logistics_report || "")
+                            }}>
                             <Printer className="mr-2 h-4 w-4" />
                             Print Report
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleViewSentHistory(report.id!)}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewSentHistory(report.id!); }}>
                             <History className="mr-2 h-4 w-4" />
                             View Sent History
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteReport(report.id!)} className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Report
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -360,7 +369,8 @@ export default function SalesReportsPage() {
                     </div>
                     <div
                       className={report.logistics_report ? "text-[#2d3fff] underline cursor-pointer truncate" : "text-gray-500"}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         if (report.logistics_report) {
                           window.open(report.logistics_report, '_blank');
                         }
@@ -376,21 +386,17 @@ export default function SalesReportsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewReport(report as ReportData)}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewReport(report as ReportData); }}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Report
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handlePrintReport(report as ReportData)}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePrintReport(report.logistics_report || ""); }}>
                             <Printer className="mr-2 h-4 w-4" />
                             Print Report
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleViewSentHistory(report.id!)}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewSentHistory(report.id!); }}>
                             <History className="mr-2 h-4 w-4" />
                             View Sent History
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteReport(report.id!)} className="text-red-600">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete Report
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
