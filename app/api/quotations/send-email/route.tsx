@@ -193,7 +193,8 @@ function createEmailTemplate(
     dominantColor?: string,
     replyToEmail?: string,
     userName?: string,
-    userPosition?: string
+    userPosition?: string,
+    quotationUrl?: string
   ): string {
    const phoneNumber = userPhoneNumber || companyData?.phone || "+639XXXXXXXXX"
    const companyName = companyData?.company_name || ""
@@ -337,7 +338,7 @@ function createEmailTemplate(
 
 
              <div class="cta-section">
-                 <a href="mailto:${companyEmail}" class="cta-button">Get In Touch</a>
+                 <a href="${quotationUrl}" target="_blank" class="cta-button">View Quotation</a>
              </div>
          </div>
 
@@ -478,7 +479,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const quotationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/sales/quotations/${quotation.id}`
+    const quotationUrl = `https://mrk.ohplus.ph/q/${quotation.id}`
 
     console.log(`Using ${preGeneratedPDFs?.length || 0} pre-generated PDFs for email attachments`)
     console.log("Generated quotation URL:", quotationUrl)
@@ -541,7 +542,7 @@ export async function POST(request: NextRequest) {
       ? `${userData.first_name} ${userData.last_name}`.trim()
       : userData?.displayName || userData?.displayName || "Sales Executive"
 
-    const finalBody = createEmailTemplate(customBody || "We are excited to present you with a detailed quotation tailored to your specific advertising needs. Our team has carefully prepared this quotation to help you plan your marketing investment.", userData?.phone_number, companyData, companyLogo, dominantColor, replyToEmail, userName, userData?.position || "Sales Executive")
+    const finalBody = createEmailTemplate(customBody || "We are excited to present you with a detailed quotation tailored to your specific advertising needs. Our team has carefully prepared this quotation to help you plan your marketing investment.", userData?.phone_number, companyData, companyLogo, dominantColor, replyToEmail, userName, userData?.position || "Sales Executive", quotationUrl)
 
     console.log("Attempting to send email to:", clientEmail)
 
