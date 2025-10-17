@@ -53,7 +53,7 @@ export function ReportDialog({ open, onOpenChange, selectedReport }: ReportDialo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => onOpenChange(false)} />
-      <div className="relative bg-white rounded-[13.681px] h-[90vh] sm:h-[650px] w-full max-w-[900px] px-6 py-2 flex flex-col">
+      <div className="relative bg-white rounded-[13.681px] w-[95vw] max-w-6xl h-[95vh] px-6 py-2 flex flex-col">
         {/* Close button */}
         <div className="absolute top-2 right-2 z-10">
           <button
@@ -92,12 +92,12 @@ export function ReportDialog({ open, onOpenChange, selectedReport }: ReportDialo
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center mt-4">
+        <div className="flex justify-between items-start my-4">
           {/* Prepared By Section */}
           <div className="font-light text-[#333333] text-[12px] w-[273px]">
             <p>
               <span className="font-bold">Prepared By: </span>
-              <span className="font-normal">{selectedReport.createdByName || "Unknown"} (Logistics)</span>
+              <span className="font-normal">{selectedReport.createdByName || "Unknown"}</span>
             </p>
             <p>
               <span className="font-bold">Date:</span>
