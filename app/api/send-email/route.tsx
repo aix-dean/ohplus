@@ -378,9 +378,10 @@ function createGmailCompatibleTemplate(
     position: relative;
     overflow: hidden;
     width: 100%;
+    height: 130px;
 }
-        .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-        .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+        .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 130px; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        .header-div { height: 130px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
         .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
         .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
         .header-content { width: 85%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px }
@@ -535,10 +536,10 @@ function createEmailTemplate(
     position: relative;
     overflow: hidden;
     width: 100%;
-    height: 120px;
+    height: 130px;
 }
-        .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-        .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+        .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 130px; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        .header-div { height: 130px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
         .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
         .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
         .header-content { width: 85%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px; padding-left: 20px }
