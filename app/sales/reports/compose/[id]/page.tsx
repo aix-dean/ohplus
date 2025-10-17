@@ -885,7 +885,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
             <ArrowLeft className="h-4 w-4" />
             <h1 className="text-base leading-tight font-bold text-gray-900">Compose email</h1>
           </Button>
-          
+
         </div>
 
         <div className="flex flex-col space-y-4">
@@ -964,9 +964,9 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
                 ) : (
                   <div className="space-y-2">
                     {templates.map((template) => (
-                      <div key={template.id} className="bg-gray-100 opacity-20 h-[33px] rounded-lg flex items-center justify-between px-4">
+                      <div key={template.id} className="bg-gray-100 h-[33px] rounded-lg flex items-center justify-between px-4">
                         <span
-                          className="text-base font-medium text-gray-900 cursor-pointer"
+                          className="text-xs font-medium text-gray-900 cursor-pointer text-darkslategray"
                           onClick={() => handleTemplateAction(template.id!, "copy")}
                           title="Apply template"
                         >
@@ -994,15 +994,16 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
                     ))}
                   </div>
                 )}
-                <Button onClick={handleAddTemplate} className="w-full mt-4 bg-white border border-gray-300 rounded-lg text-gray-900 font-medium text-base h-[29px]">
-                  +Add Template
-                </Button>
               </div>
+              <button onClick={handleAddTemplate} className="w-full mt-4 bg-white box-border  border-[1.2px] border-gray-300 rounded-lg text-gray-900 font-medium text-xs h-[29px]">
+                +Add Template
+              </button>
             </div>
+
           </div>
-                {/* attachment */}
+          {/* attachment */}
           <div>
- 
+
             {/* File size warning */}
             {totalAttachmentSize > 30 * 1024 * 1024 && (
               <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -1046,7 +1047,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
               <button onClick={handleAddAttachment} className="text-blue-600 underline text-base text-xs font-medium leading-tight">+Add attachment</button>
             </div>
           </div>
-              {/* send and cancel button */}
+          {/* send and cancel button */}
           <div className="flex justify-center mt-6">
             <div className="flex flex-col space-y-4 lg:flex-row lg:space-x-6 lg:space-y-0 w-full">
               <div className="flex-1 flex justify-center">
