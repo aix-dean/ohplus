@@ -236,6 +236,7 @@ export default function LogisticsWeatherPage() {
                   controls
                   autoPlay
                   muted
+                  loop
                   src={videoUrl}
                   poster=""
                   onLoadStart={() => console.log('Weather page: Video load started')}
