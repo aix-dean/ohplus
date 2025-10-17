@@ -492,7 +492,7 @@ export async function POST(request: NextRequest) {
     const companyData = await fetchCompanyData(companyId)
 
     // Fetch company logo and extract dominant color
-    let companyLogo = undefined
+    let companyLogo = "/ohplus-new-logo.png" // Default fallback logo
     let dominantColor = undefined
 
     if (companyId && companyId !== "unknown") {
@@ -500,19 +500,18 @@ export async function POST(request: NextRequest) {
         const companyDoc = await getDoc(doc(db, "companies", companyId))
         if (companyDoc.exists()) {
           const companyDocData = companyDoc.data()
-          if (companyDocData?.logo || companyDocData?.photo_url) {
-            companyLogo = companyDocData.logo || companyDocData.photo_url
+          if (companyDocData?.logo) {
+            companyLogo = companyDocData.logo
             console.log("Company logo found:", companyLogo, {
-              logo: !!companyDocData.logo,
-              photo_url: !!companyDocData.photo_url,
-              usingField: companyDocData.logo ? 'logo' : 'photo_url'
+              usingField: 'logo'
             })
           } else {
-            console.log("No company logo found in document")
+            console.log("No company logo found in document, using default OH+ logo")
           }
         }
       } catch (error) {
         console.error("Error fetching company logo:", error)
+        console.log("Using default OH+ logo due to error")
       }
     }
 

@@ -100,19 +100,7 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
     cc: "",
     replyTo: "",
     subject: "",
-    message: `Hi AAA,
-
-I hope you're doing well!
-
-Please find attached the report for your project. The report includes the site details and project status based on our recent work.
-
-If you have any questions or would like to discuss the findings, feel free to reach out to us. I'll be happy to assist you further.
-
-Best regards,
-Sales Executive
-[Company Name]
-📞 +639XXXXXXXXX
-📧 [Reply-To Email]`,
+    message: "",
   })
 
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -410,30 +398,8 @@ ${contactDetails}`,
           to: reportData.client_email || "",
           cc: userData?.email || user?.email || "",
           replyTo: userData?.email || user?.email || "",
-          subject: `Report: ${reportData.siteName} - ${finalCompanyName}`,
-          message: `Dear ${reportData.client},
-
-I hope this email finds you well.
-
-Please find attached our detailed report for your project. We've carefully reviewed your requirements and prepared a comprehensive assessment that aligns with your objectives.
-
-The report includes:
-- Detailed project scope and deliverables
-- Current status and progress
-- Findings and recommendations
-- Next steps and timeline
-
-We're confident that our report will provide valuable insights for your project.
-
-Please review the attached report and feel free to reach out if you have any questions or would like to discuss any aspects in detail.
-
-Looking forward to your feedback!
-
-Best regards,
-Sales Executive
-${finalCompanyName}
-📞 ${userData?.phone_number || '+639XXXXXXXXX'}
-📧 ${replyToEmail}`,
+          subject: "",
+          message: "",
         }))
 
       } catch (error) {

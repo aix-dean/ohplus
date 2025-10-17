@@ -210,11 +210,11 @@ export default function SalesReportViewPage() {
             setPreparedByName(name)
             console.log("Set prepared by name to:", name)
 
-            if (companyData.photo_url && companyData.photo_url.trim() !== "") {
-              console.log("Setting company logo to:", companyData.photo_url)
-              setCompanyLogo(companyData.photo_url)
+            if (companyData.logo && companyData.logo.trim() !== "") {
+              console.log("Setting company logo to:", companyData.logo)
+              setCompanyLogo(companyData.logo)
             } else {
-              console.log("No company photo_url found, using default OH+ logo")
+              console.log("No company logo found, using default OH+ logo")
               setCompanyLogo("/ohplus-new-logo.png")
             }
             return
