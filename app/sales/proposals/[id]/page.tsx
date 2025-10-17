@@ -569,7 +569,7 @@ export default function ProposalDetailsPage() {
               dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
-              srp: product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'
+              srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'
             }
           })
           setEditableProducts(products)
@@ -2271,7 +2271,7 @@ export default function ProposalDetailsPage() {
                 />
               ) : (
                 <p className="font-normal text-[18px]">
-                  {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
+                  {product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'}
                 </p>
               )}
             </div>
@@ -2725,7 +2725,7 @@ export default function ProposalDetailsPage() {
                               {product.specs_rental?.location || (product as any).light?.location || "Unknown location"}
                             </div>
                             <div className="text-xs text-black font-medium">
-                              ₱{product.price ? Number(product.price).toLocaleString() : "Not set"}
+                              ₱{product.price ? Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "Not set"}
                             </div>
                           </div>
                         </div>

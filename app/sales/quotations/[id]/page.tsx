@@ -138,8 +138,15 @@ const formatDuration = (days: number, startDate?: Date | any, endDate?: Date | a
 }
 
 const safeFormatNumber = (value: any, options?: Intl.NumberFormatOptions): string => {
-  if (value === null || value === undefined || isNaN(Number(value))) return "0.00"
-  const numValue = typeof value === "string" ? Number.parseFloat(value) : Number(value)
+  if (value === null || value === undefined) return "0.00"
+  let numValue: number
+  if (typeof value === "string") {
+    // Remove commas and parse
+    const cleaned = value.replace(/,/g, '').replace(/[^0-9.-]/g, '')
+    numValue = Number.parseFloat(cleaned)
+  } else {
+    numValue = Number(value)
+  }
   if (isNaN(numValue)) return "0.00"
   return numValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, ...options })
 }

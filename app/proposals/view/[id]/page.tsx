@@ -434,7 +434,7 @@ export default function ProposalDetailsPage() {
 
                         {getSitesPerPage(selectedLayout) === 1 ? (
                           <div className="inline-block bg-green-500 text-white px-3 py-1 md:px-4 md:py-1 rounded-md font-semibold text-sm md:text-base">
-                            ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                            ₱{getPagePrice(pageContent).toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                           </div>
                         ) : null}
                       </div>
@@ -527,7 +527,7 @@ export default function ProposalDetailsPage() {
                           {getSitesPerPage(selectedLayout) > 1 && (
                             <div className="mt-3 flex justify-center">
                               <div className="bg-green-500 text-white h-8 px-2 pb-2.5 rounded-md font-semibold text-xs flex items-center justify-center">
-                                ₱{product.price?.toLocaleString("en-PH", { minimumFractionDigits: 2 }) || "0.00"}
+                                ₱{product.price?.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) || "0.00"}
                               </div>
                             </div>
                           )}
