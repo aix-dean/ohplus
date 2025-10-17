@@ -26,7 +26,7 @@ import { collection, query, where, getDocs, onSnapshot, orderBy, limit, startAft
 import { db } from "@/lib/firebase"
 
 // Number of items to display per page
-const ITEMS_PER_PAGE = 12
+const ITEMS_PER_PAGE = 10
 
 interface AllSitesTabProps {
   searchQuery?: string
@@ -117,9 +117,22 @@ export default function AllSitesTab({
           let constraints: any[] = [
             where("company_id", "==", userData.company_id),
             where("active", "==", true),
+          ]
+
+          // Add content type filter server-side (case insensitive)
+          if (contentTypeFilter !== "All") {
+            const filterType = contentTypeFilter.toLowerCase()
+            if (filterType === "static") {
+              constraints.push(where("content_type", "in", ["static", "Static", "STATIC"]))
+            } else if (filterType === "dynamic") {
+              constraints.push(where("content_type", "in", ["dynamic", "Dynamic", "DYNAMIC", "digital", "Digital", "DIGITAL"]))
+            }
+          }
+
+          constraints.push(
             orderBy("created", "desc"),
             limit(ITEMS_PER_PAGE + 1) // +1 to check if there's a next page
-          ]
+          )
     
           // Add startAfter cursor for pagination
           const lastDoc = lastDocsRef.current.get(page - 1)
@@ -145,22 +158,14 @@ export default function AllSitesTab({
           lastDocsRef.current.set(page, lastDocOfPage || null)
           setHasNextPage(hasNext)
     
-          // Apply client-side filters
+          // Apply client-side filters (only search query now)
           let filtered = currentPageProducts
           if (searchQuery) {
             filtered = currentPageProducts.filter(p =>
               p.name?.toLowerCase().includes(searchQuery.toLowerCase())
             )
           }
-    
-          if (contentTypeFilter !== "All") {
-            filtered = filtered.filter((product) => {
-              const productType = (product.content_type || "").toLowerCase()
-              const filterType = contentTypeFilter.toLowerCase()
-              return productType === filterType
-            })
-          }
-    
+
           setProducts(filtered)
           setLoading(false)
           setError(null)
@@ -453,7 +458,7 @@ function UnifiedSiteCard({
 
   return (
     <div className="relative">
-      {product.content_type === "Dynamic" ? (
+      {(product.content_type?.toLowerCase() === "dynamic" || product.content_type?.toLowerCase() === "digital") ? (
         <div
           className="p-[2px] rounded-[12px] gradient-border"
         >
@@ -471,8 +476,8 @@ function UnifiedSiteCard({
                 <Image
                   src={site.image || "/placeholder.svg"}
                   alt={site.name}
-                  width={192}
-                  height={192}
+                  width={150}
+                  height={150}
                   className="object-cover w-full h-full"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
@@ -544,15 +549,6 @@ function UnifiedSiteCard({
                     </div>
                   )}
                 </div>
-
-                {/* Create Report Button */}
-                <Button
-                  variant="outline"
-                  className="mt-3 w-full h-8 text-xs text-black border hover:bg-gray-50 rounded-md font-bold bg-transparent"
-                  onClick={handleCreateReport}
-                >
-                  Create Report
-                </Button>
               </div>
             </CardContent>
           </Card>
@@ -568,13 +564,13 @@ function UnifiedSiteCard({
             </div>
           )}
           <CardContent className="p-3">
-            <div className="relative w-full aspect-square bg-gray-200">
+            <div className="relative w-full aspect-square bg-gray-200 rounded-[10px]">
               <Image
                 src={site.image || "/placeholder.svg"}
                 alt={site.name}
-                width={192}
-                height={192}
-                className="object-cover w-full h-full"
+                width={150}
+                height={150}
+                className="object-cover w-full h-full rounded-[10px]"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement
                   target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
@@ -645,15 +641,6 @@ function UnifiedSiteCard({
                   </div>
                 )}
               </div>
-
-              {/* Create Report Button */}
-              <Button
-                variant="outline"
-                className="mt-3 w-full h-8 text-xs text-black border hover:bg-gray-50 rounded-md font-bold bg-transparent"
-                onClick={handleCreateReport}
-              >
-                Create Report
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -782,17 +769,6 @@ function UnifiedSiteListItem({
                 )}
                 {/* Debug info - remove in production */}
               </div>
-            </div>
-
-            {/* Create Report Button */}
-            <div className="flex-shrink-0">
-              <Button
-                variant="outline"
-                className="h-10 px-6 text-sm text-black border hover:bg-gray-50 rounded-md font-bold bg-transparent"
-                onClick={handleCreateReport}
-              >
-                Create Report
-              </Button>
             </div>
           </div>
         </CardContent>
