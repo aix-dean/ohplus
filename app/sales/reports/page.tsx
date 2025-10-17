@@ -446,7 +446,7 @@ export default function SalesReportsPage() {
                             : "text-gray-500"
                         }
                         onClick={(e) => {
-                          e.stopPropagation();
+                          e.stopPropagation()
                           if (report.logistics_report) {
                             window.open(report.logistics_report, "_blank");
                           }
