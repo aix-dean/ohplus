@@ -70,14 +70,14 @@ export function ReportDialog({ open, onOpenChange, selectedReport }: ReportDialo
         </p>
 
         {/* Content Area - Centered */}
-        <div className="flex-1 flex items-start justify-center bg-gray-100 w-full">
-          <div className="bg-white h-[500px] rounded-[6.84px] w-[575.271px] overflow-y-auto flex items-center justify-center">
+        <div className="flex-1 flex items-start justify-center bg-gray-100 w-full h-full">
+          <div className="flex-1 min-h-0 overflow-hidden w-full h-full">
             {(() => {
-              const pdfAttachment = selectedReport.pdf
+              const pdfAttachment = selectedReport.logistics_report
 
               if (pdfAttachment) {
                 return (
-                  <PDFViewer fileUrl={`${pdfAttachment}#toolbar=0&navpanes=0&scrollbar=0 `} />
+                  <PDFViewer fileUrl={`${pdfAttachment}#toolbar=0&navpanes=0&scrollbar=0`} className="w-full h-full rounded-lg border"/>
                 )
               } else {
                 return (
