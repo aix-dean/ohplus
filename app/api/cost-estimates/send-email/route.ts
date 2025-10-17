@@ -195,7 +195,8 @@ function createEmailTemplate(
     dominantColor?: string,
     replyToEmail?: string,
     userName?: string,
-    userPosition?: string
+    userPosition?: string,
+    costEstimateId?: string
   ): string {
     const phoneNumber = userPhoneNumber || companyData?.phone || "+639XXXXXXXXX"
     const companyName = companyData?.company_name || ""
@@ -339,7 +340,7 @@ function createEmailTemplate(
 
 
               <div class="cta-section">
-                  <a href="mailto:${companyEmail}" class="cta-button">Get In Touch</a>
+                  <a href="https://mrk.ohplus.ph/ce/${costEstimateId}" target="_blank" class="cta-button">View Cost Estimate</a>
               </div>
           </div>
 
@@ -565,7 +566,7 @@ export async function POST(request: NextRequest) {
       ? `${userData.first_name} ${userData.last_name}`.trim()
       : userData?.displayName || userData?.displayName || "Sales Executive"
 
-    const finalBody = createEmailTemplate(body.trim(), userData?.phone_number, companyData, companyLogo, dominantColor, replyToEmail, userName, userData?.position || "Sales Executive")
+    const finalBody = createEmailTemplate(body.trim(), userData?.phone_number, companyData, companyLogo, dominantColor, replyToEmail, userName, userData?.position || "Sales Executive", costEstimate.id)
 
     // Prepare email data
     const from = `${companyData.company_name} <${companyData.email}>`
