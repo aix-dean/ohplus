@@ -125,6 +125,8 @@ export default function ComposeEmailPage({ params }: ComposeEmailPageProps) {
   })
 
   const [companyName, setCompanyName] = useState<string>("")
+  const [logoFromUrl, setLogoFromUrl] = useState<string>("")
+  const [companyIdToUse, setCompanyIdToUse] = useState<string>("")
 
   const fetchReportTemplates = useCallback(async () => {
     if (!userData?.company_id) return
@@ -274,6 +276,8 @@ ${contactDetails}`,
         // Read URL parameters
         const urlParams = new URLSearchParams(window.location.search)
         const pdfKey = urlParams.get('pdfKey')
+        const logoParam = urlParams.get('logo')
+        setLogoFromUrl(logoParam || "")
 
         if (pdfKey && !tempPdfLoaded) {
           // Use pre-generated PDF from IndexedDB
@@ -325,6 +329,7 @@ ${contactDetails}`,
 
         // First try to get company name from report's companyId
         let companyIdToUse = reportData.companyId
+        setCompanyIdToUse(companyIdToUse || "")
 
         if (!companyIdToUse && reportData.clientId) {
           // Try to get company from client
@@ -511,6 +516,39 @@ ${contactDetails}`,
       const displayName = userData?.displayName || user?.displayName || user?.email?.split('@')[0] || "Sales Executive"
       formData.append("userDisplayName", displayName)
 
+      // Pass the company logo from URL parameter or fetch from database
+      let companyLogoToUse = "/ohplus-new-logo.png"
+
+      // Use logo from URL parameter if provided
+      if (logoFromUrl) {
+        companyLogoToUse = logoFromUrl
+        console.log("Using logo from URL parameter for email:", companyLogoToUse)
+      } else if (companyIdToUse) {
+        // Otherwise fetch from database as fallback
+        try {
+          const { doc, getDoc } = await import("firebase/firestore")
+          const { db } = await import("@/lib/firebase")
+
+          const companyDocRef = doc(db, "companies", companyIdToUse)
+          const companyDocSnap = await getDoc(companyDocRef)
+
+          if (companyDocSnap.exists()) {
+            const companyData = companyDocSnap.data()
+            if (companyData?.logo && companyData.logo.trim()) {
+              companyLogoToUse = companyData.logo
+              console.log("Using company logo for email:", companyLogoToUse)
+            }
+          }
+        } catch (logoError) {
+          console.error("Error fetching company logo for email:", logoError)
+          // Continue with default logo
+        }
+      }
+
+      if (companyLogoToUse && companyLogoToUse !== "/ohplus-new-logo.png") {
+        formData.append("companyLogo", companyLogoToUse)
+      }
+
       for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
         try {
@@ -534,7 +572,9 @@ ${contactDetails}`,
 
       console.log('Sending email with company data:', {
         companyId: userData?.company_id,
-        companyName: projectData?.company_name
+        companyName: projectData?.company_name,
+        companyLogo: companyLogoToUse,
+        logoFromUrl: logoFromUrl
       })
 
       console.log("Sending email request to /api/send-email", {

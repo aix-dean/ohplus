@@ -844,6 +844,7 @@ export default function SalesReportViewPage() {
           onClose={() => setIsSendDialogOpen(false)}
           report={report}
           onSelectOption={handleSendOption}
+          companyLogo={companyLogo}
         />
       )}
 
