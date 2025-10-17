@@ -53,7 +53,9 @@ export function ReportDialog({ open, onOpenChange, selectedReport }: ReportDialo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => onOpenChange(false)} />
+
       <div className="relative bg-white rounded-[13.681px] w-[95vw] max-w-6xl h-[95vh] px-6 py-2 flex flex-col">
+
         {/* Close button */}
         <div className="absolute top-2 right-2 z-10">
           <button
