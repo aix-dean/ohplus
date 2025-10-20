@@ -1041,6 +1041,174 @@ export default function SiteDetailsPage({ params }: Props) {
                         </div>
                       </div>
 
+                        {/* Power Consumption */}
+                        <div className="border-t pt-3">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1 text-sm">
+                              <div>
+                                <span className="font-medium">Power Consumption:</span>{" "}
+                                <span className="text-green-600">150 kWh/month</span>
+                              </div>
+                              <div>
+                                <span className="font-medium">Average Power Consumption:</span>{" "}
+                                <span className="text-blue-600">160 kWh /over last 3 months</span>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="bg-transparent"
+                              onClick={() => setIlluminationIndexCardDialogOpen(true)}
+                            >
+                              View Index Card
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Site Data Grid - Updated layout without Illumination */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Display - Show only for Dynamic sites */}
+                  {isDynamic && (
+                    <Card>
+                      <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle className="text-base flex items-center">
+                          <Sun className="h-4 w-4 mr-2" />
+                          Display
+                        </CardTitle>
+                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                      </CardHeader>
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="text-sm">
+                            <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
+                            <div className="text-gray-600 text-xs">
+                              <span className="font-medium">Operating Time:</span> 6:00 pm to 11:00 pm
+                            </div>
+                          </div>
+
+                          <div className="space-y-1 text-sm">
+                            <div>
+                              <span className="font-medium">Brightness:</span>
+                              <div className="text-xs text-gray-600 ml-2">
+                                7:00 am-3:00 pm (20%)
+                                <br />
+                                3:00 pm-11:00 pm (100%)
+                              </div>
+                            </div>
+                            <div>
+                              <span className="font-medium">Spots in a loop:</span> 10 spots
+                            </div>
+                            <div>
+                              <span className="font-medium">Service Life:</span> 3 years, 8 months, and 10 days
+                            </div>
+                            <div>
+                              <span className="font-medium">Power Consumption:</span> 150 kWh/month
+                            </div>
+                            <div>
+                              <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-4 w-full bg-transparent"
+                          onClick={() => setDisplayIndexCardDialogOpen(true)}
+                        >
+                          View Index Card
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Compliance - Always show */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle
+                        className="text-base flex items-center"
+                        style={{
+                          fontFamily: 'Inter',
+                          fontWeight: 600,
+                          fontSize: '22px',
+                          lineHeight: '120%',
+                          letterSpacing: '0%',
+                          color: '#000000'
+                        }}
+                      >
+                        <Shield className="h-4 w-4 mr-2" />
+                        Compliance{" "}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      <div className="flex flex-col space-y-3" style={{ transform: 'translateX(35px) translateY(-20px)' }}>
+                        <div className="flex items-center space-x-2">
+                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.lease_agreement ? '✅' : '☐'}</span>
+                          <label
+                            style={{
+                              fontFamily: 'Inter',
+                              fontWeight: 600,
+                              fontSize: '18px',
+                              lineHeight: '132%',
+                              letterSpacing: '0%',
+                              color: '#000000'
+                            }}
+                          >
+                            Lease Agreement
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.mayors_permit ? '✅' : '☐'}</span>
+                          <label
+                            style={{
+                              fontFamily: 'Inter',
+                              fontWeight: 600,
+                              fontSize: '18px',
+                              lineHeight: '132%',
+                              letterSpacing: '0%',
+                              color: '#000000'
+                            }}
+                          >
+                            Mayor's Permit
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.bir_registration ? '✅' : '☐'}</span>
+                          <label
+                            style={{
+                              fontFamily: 'Inter',
+                              fontWeight: 600,
+                              fontSize: '18px',
+                              lineHeight: '132%',
+                              letterSpacing: '0%',
+                              color: '#000000'
+                            }}
+                          >
+                            BIR Registration
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.structural_approval ? '✅' : '☐'}</span>
+                          <label
+                            style={{
+                              fontFamily: 'Inter',
+                              fontWeight: 600,
+                              fontSize: '18px',
+                              lineHeight: '132%',
+                              letterSpacing: '0%',
+                              color: '#000000'
+                            }}
+                          >
+                            Structural Approval
+                          </label>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                       {/* Divider */}
                       <hr className="border-gray-300" />
 
@@ -1143,6 +1311,133 @@ export default function SiteDetailsPage({ params }: Props) {
                         </div>
                       </div>
 
+                  {/* Structure - Always show */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>
+                        <span style={{
+                          fontFamily: 'Inter',
+                          fontWeight: 600,
+                          fontSize: '20px',
+                          lineHeight: '100%',
+                          letterSpacing: '0%',
+                          transform: 'translate(0px, 0px)' // Add transform for position control
+                        }}>
+                          Structure
+                        </span>
+                      </CardTitle>
+                      <div className="flex items-center space-x-2">
+                        <Bell className="h-4 w-4 text-gray-500" />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={handleStructureEdit}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      <div className="space-y-4" style={{ transform: 'translateY(-30px) translateX(15px)' }}>
+                        <div style={{
+                          fontFamily: 'Inter',
+                          fontWeight: 600,
+                          fontSize: '18px',
+                          lineHeight: '132%',
+                          letterSpacing: '0%',
+                          color: '#000000'
+                        }}>
+                          <span>Color:</span>{" "}
+                          <span style={{
+                            fontFamily: 'Inter',
+                            fontWeight: 400,
+                            fontSize: '18px',
+                            lineHeight: '132%',
+                            letterSpacing: '0%',
+                            color: '#333333'
+                          }}>
+                            {product.structure?.color || "Not Available"}
+                          </span>
+                        </div>
+                        <div style={{
+                          fontFamily: 'Inter',
+                          fontWeight: 600,
+                          fontSize: '18px',
+                          lineHeight: '132%',
+                          letterSpacing: '0%',
+                          color: '#000000'
+                        }}>
+                          <span>Contractor:</span>{" "}
+                          <span style={{
+                            fontFamily: 'Inter',
+                            fontWeight: 400,
+                            fontSize: '18px',
+                            lineHeight: '132%',
+                            letterSpacing: '0%',
+                            color: '#333333'
+                          }}>
+                            {product.structure?.contractor || "Not Available"}
+                          </span>
+                        </div>
+                        <div style={{
+                          fontFamily: 'Inter',
+                          fontWeight: 600,
+                          fontSize: '18px',
+                          lineHeight: '132%',
+                          letterSpacing: '0%',
+                          color: '#000000'
+                        }}>
+                          <span>Condition:</span>{" "}
+                          <span style={{
+                            fontFamily: 'Inter',
+                            fontWeight: 400,
+                            fontSize: '18px',
+                            lineHeight: '132%',
+                            letterSpacing: '0%',
+                            color: '#333333'
+                          }}>
+                            {product.structure?.condition || "Not Available"}
+                          </span>
+                        </div>
+                        <div style={{
+                          fontFamily: 'Inter',
+                          fontWeight: 600,
+                          fontSize: '18px',
+                          lineHeight: '132%',
+                          letterSpacing: '0%',
+                          color: '#000000'
+                        }}>
+                          <span>Last Maintenance:</span>{" "}
+                          <span style={{
+                            fontFamily: 'Inter',
+                            fontWeight: 400,
+                            fontSize: '18px',
+                            lineHeight: '132%',
+                            letterSpacing: '0%',
+                            color: '#333333'
+                          }}>
+                            {formatFirebaseDate(product.structure?.last_maintenance) || "Not Available"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setBlueprintDialogOpen(true)}>
+                          View Blueprint
+                        </Button>
+                        <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={handleViewHistory}>
+                          <History className="h-4 w-4 mr-2" />
+                          View History
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
                       {/* Divider */}
                       <hr className="border-gray-300" />
 
@@ -1219,6 +1514,63 @@ export default function SiteDetailsPage({ params }: Props) {
                 </Card>
               </TabsContent>
 
+                {/* Content and Crew - Single row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Content */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle
+                        className="text-base flex items-center"
+                        style={{
+                          fontFamily: 'Inter',
+                          fontWeight: 600,
+                          fontSize: '22px',
+                          lineHeight: '120%',
+                          letterSpacing: '0%',
+                          color: '#000000'
+                        }}
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Content
+                      </CardTitle>
+                      <div className="flex items-center space-x-2">
+                        <Bell className="h-4 w-4 text-gray-500" />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => console.log("Edit content clicked")}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                      {product.content_schedule && product.content_schedule.length > 0 ? (
+                        <div className="space-y-2 text-sm">
+                          {product.content_schedule.map((content: { start_date: any; end_date: any; name: string }, index: number) => (
+                            <div key={index}>
+                              <span className="font-medium">
+                                {formatFirebaseDate(content.start_date)} - {formatFirebaseDate(content.end_date)}:
+                              </span>{" "}
+                              {content.name}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm">No content scheduled</div>
+                      )}
+                      <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
+                        <History className="h-4 w-4 mr-2" />
+                        View History
+                      </Button>
+                    </CardContent>
+                  </Card>
               <TabsContent value="content-history" className="">
                 <Card>
                   <CardHeader>
