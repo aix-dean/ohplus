@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import type { Product } from "@/lib/firebase-service"
@@ -17,9 +17,34 @@ import { JobOrdersListDialog } from "@/components/job-orders-list-dialog"
 // CSS for static gradient border
 const gradientBorderStyles = `
 .gradient-border {
-  background: linear-gradient(45deg, #ff0000, #ffff00, #00ff00, #0000ff, #8B00FF);
+  position: relative;
+  border-radius: 12px;
+  padding: 3px; /* border thickness */
+  background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #0000ff, #8B00FF);
+  background-size: 300% 300%;
+  animation: gradientMove 5s linear infinite;
 }
-`
+
+.gradient-border > * {
+  background: #fff; /* inner background color */
+  border-radius: 10px;
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+/* Keyframes for moving gradient */
+@keyframes gradientMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}`
 
 // Direct Firebase imports for job order fetching
 import { collection, query, where, getDocs, onSnapshot, orderBy, limit, startAfter } from "firebase/firestore"
@@ -32,21 +57,35 @@ interface AllSitesTabProps {
   searchQuery?: string
   contentTypeFilter?: string
   viewMode?: "grid" | "list"
+  onJobOrdersChange?: (jobOrders: { static: boolean; digital: boolean }) => void
 }
 
 export default function AllSitesTab({
   searchQuery = "",
   contentTypeFilter = "All",
   viewMode = "grid",
+  onJobOrdersChange,
 }: AllSitesTabProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [jobOrderCounts, setJobOrderCounts] = useState<Record<string, number>>({})
+  const [contentTypeMap, setContentTypeMap] = useState<Record<string, string>>({})
+  const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [globalJobOrderCounts, setGlobalJobOrderCounts] = useState<Record<string, number>>({})
 
   const { toast } = useToast()
   const { userData } = useAuth()
   const router = useRouter()
+
+  // Global content type map
+  const globalContentTypeMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    allProducts.forEach(p => {
+      map[p.id || ''] = (p.content_type || 'static').toLowerCase()
+    })
+    return map
+  }, [allProducts])
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -76,36 +115,89 @@ export default function AllSitesTab({
       lastDocsRef.current = new Map()
       setHasNextPage(false)
     }, [searchQuery, contentTypeFilter])
+
+    // Fetch all products for global indicators
+    useEffect(() => {
+      if (!userData?.company_id) return
+
+      const fetchAllProducts = async () => {
+        const q = query(collection(db, "products"), where("company_id", "==", userData.company_id), where("active", "==", true))
+        const querySnapshot = await getDocs(q)
+        const allProds: Product[] = []
+        querySnapshot.forEach((doc) => {
+          allProds.push({ id: doc.id, ...doc.data() } as Product)
+        })
+        setAllProducts(allProds)
+      }
+
+      fetchAllProducts()
+    }, [userData?.company_id])
   
   // Debug effect to log JO counts when they change
-    useEffect(() => {
-      Object.entries(jobOrderCounts).forEach(([productId, count]) => {
-        console.log(`Product ${productId}: ${count} JOs`)
-      })
-    }, [jobOrderCounts])
+   useEffect(() => {
+     Object.entries(jobOrderCounts).forEach(([productId, count]) => {
+       console.log(`Product ${productId}: ${count} JOs`)
+     })
+   }, [jobOrderCounts])
+
+   // Effect to notify parent about job orders presence
+   useEffect(() => {
+     let hasStatic = false
+     let hasDigital = false
+     Object.entries(globalJobOrderCounts).forEach(([productId, count]) => {
+       if (count > 0) {
+         const contentType = globalContentTypeMap[productId]
+         if (contentType === 'static') hasStatic = true
+         else if (contentType === 'digital' || contentType === 'dynamic') hasDigital = true
+       }
+     })
+     onJobOrdersChange?.({ static: hasStatic, digital: hasDigital })
+   }, [globalJobOrderCounts, globalContentTypeMap, onJobOrdersChange])
   
-    // Real-time job orders listener
-      useEffect(() => {
-        if (!userData?.company_id) return
-    
-        const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id), where("status", "==", "pending"))
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const counts: Record<string, number> = {}
-          const productIds = products.map(p => p.id).filter(Boolean)
-    
-          querySnapshot.forEach((doc) => {
-            const data = doc.data()
-            const productId = data.product_id
-            if (productId && productIds.includes(productId)) {
-              counts[productId] = (counts[productId] || 0) + 1
-            }
-          })
-    
-          setJobOrderCounts(counts)
+    // Real-time job orders listener for filtered products
+    useEffect(() => {
+      if (!userData?.company_id) return
+
+      const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id), where("status", "==", "pending"))
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const counts: Record<string, number> = {}
+        const productIds = products.map(p => p.id).filter(Boolean)
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          const productId = data.product_id
+          if (productId && productIds.includes(productId)) {
+            counts[productId] = (counts[productId] || 0) + 1
+          }
         })
-    
-        return unsubscribe
-      }, [userData?.company_id, products])
+
+        setJobOrderCounts(counts)
+      })
+
+      return unsubscribe
+    }, [userData?.company_id, products])
+
+    // Global job orders listener for indicators
+    useEffect(() => {
+      if (!userData?.company_id) return
+
+      const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id), where("status", "==", "pending"))
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        const counts: Record<string, number> = {}
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data()
+          const productId = data.product_id
+          if (productId) {
+            counts[productId] = (counts[productId] || 0) + 1
+          }
+        })
+
+        setGlobalJobOrderCounts(counts)
+      })
+
+      return unsubscribe
+    }, [userData?.company_id])
     
       // Fetch paginated products
       const fetchProducts = useCallback(async (page: number = 1) => {
@@ -165,6 +257,13 @@ export default function AllSitesTab({
               p.name?.toLowerCase().includes(searchQuery.toLowerCase())
             )
           }
+
+          // Update content type map
+          const newContentTypeMap: Record<string, string> = {}
+          filtered.forEach(p => {
+            newContentTypeMap[p.id || ''] = (p.content_type || 'static').toLowerCase()
+          })
+          setContentTypeMap(newContentTypeMap)
 
           setProducts(filtered)
           setLoading(false)

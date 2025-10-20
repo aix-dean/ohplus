@@ -236,7 +236,7 @@ describe('LogisticsDashboardPage', () => {
       const digitalTab = screen.getByText('Digital').closest('button')
 
       expect(staticTab).toHaveClass('bg-green-500')
-      expect(digitalTab).toHaveClass('border-2')
+      expect(digitalTab).toHaveClass('border')
     })
 
     it('switches to Digital tab and updates filter when Digital tab is clicked', () => {
@@ -250,7 +250,7 @@ describe('LogisticsDashboardPage', () => {
 
       // Check active tab styling
       expect(digitalTab).toHaveClass('bg-green-500')
-      expect(screen.getByText('Static').closest('button')).toHaveClass('border-2')
+      expect(screen.getByText('Static').closest('button')).toHaveClass('border')
     })
 
     it('switches back to Static tab when Static tab is clicked', () => {

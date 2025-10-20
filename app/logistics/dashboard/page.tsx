@@ -18,6 +18,7 @@ export default function LogisticsDashboardPage() {
   const [activeTab, setActiveTab] = useState<'Static' | 'Digital'>('Static')
   const { user, userData } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
+  const [jobOrdersIndicators, setJobOrdersIndicators] = useState({ static: false, digital: false })
 
   const clearSearch = () => {
     setSearchQuery("")
@@ -116,23 +117,29 @@ export default function LogisticsDashboardPage() {
 
               {/* Tab Buttons */}
               <div className="flex gap-2">
-                <button
-                  onClick={() => { setActiveTab('Static'); setContentTypeFilter('Static'); }}
-                  className={`px-6 rounded-lg ${activeTab === 'Static' ? 'bg-green-500 text-white' : 'border-2 border-gray-200 text-black'}`}
-                >
-                  Static
-                </button>
-                <button
-                  onClick={() => { setActiveTab('Digital'); setContentTypeFilter('Dynamic'); }}
-                  className={`px-6 rounded-lg ${activeTab === 'Digital' ? 'bg-green-500 text-white' : 'border-2 border-gray-200 text-black'}`}
-                >
-                  Digital
-                </button>
+                <div className="relative h-8">
+                  <button
+                    onClick={() => { setActiveTab('Static'); setContentTypeFilter('Static'); }}
+                    className={`px-6 rounded-lg ${activeTab === 'Static' ? 'bg-green-500 text-white border' : 'border border-gray-200 text-black'}`}
+                  >
+                    Static
+                  </button>
+                  {jobOrdersIndicators.static && <div className="absolute top-[-0.3rem] right-[-0.1rem] bg-[#48a7fa] rounded-full w-3 h-3 z-10"></div>}
+                </div>
+                <div className="relative h-8">
+                  <button
+                    onClick={() => { setActiveTab('Digital'); setContentTypeFilter('Dynamic'); }}
+                    className={`px-6 rounded-lg ${activeTab === 'Digital' ? 'bg-green-500 text-white border' : 'border border-gray-200 text-black'}`}
+                  >
+                    Digital
+                  </button>
+                  {jobOrdersIndicators.digital && <div className="absolute top-[-0.5rem] right-[-0.5rem] bg-[#48a7fa] rounded-full w-4 h-4 z-10"></div>}
+                </div>
               </div>
             </div>
 
             {/* All Sites Display */}
-              <AllSitesTab searchQuery={searchQuery} contentTypeFilter={contentTypeFilter} viewMode={viewMode} />
+              <AllSitesTab searchQuery={searchQuery} contentTypeFilter={contentTypeFilter} viewMode={viewMode} onJobOrdersChange={setJobOrdersIndicators} />
             
           </div>
         </main>
