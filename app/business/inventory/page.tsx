@@ -951,13 +951,16 @@ export default function BusinessInventoryPage() {
                     >
                       <div className="h-48 bg-gray-200 relative">
                         {product.media && product.media.length > 0 && product.media[0].isVideo ? (
-                          <MediaPlayer
-                            src={product.media[0].url}
-                            className="w-full h-full"
-                            showCustomControls={false}
-                            showControlsOnHover={true}
-                            muted={true}
-                          />
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <MediaPlayer
+                              src={product.media[0].url}
+                              className="w-full h-full"
+                              showCustomControls={false}
+                              showControlsOnHover={false}
+                              controls={false}
+                              muted={true}
+                            />
+                          </div>
                         ) : (
                           <Image
                             src={
@@ -1041,13 +1044,16 @@ export default function BusinessInventoryPage() {
                           <div className="col-span-4 flex items-center space-x-3">
                             <div className="w-12 h-12 bg-gray-200 rounded overflow-hidden flex-shrink-0">
                               {product.media && product.media.length > 0 && product.media[0].isVideo ? (
-                                <MediaPlayer
-                                  src={product.media[0].url}
-                                  className="w-full h-full"
-                                  showCustomControls={false}
-                                  showControlsOnHover={true}
-                                  muted={true}
-                                />
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <MediaPlayer
+                                    src={product.media[0].url}
+                                    className="w-full h-full"
+                                    showCustomControls={false}
+                                    showControlsOnHover={false}
+                                    controls={false}
+                                    muted={true}
+                                  />
+                                </div>
                               ) : (
                                 <Image
                                   src={

@@ -1340,6 +1340,9 @@ export default function BusinessProductDetailPage({ params }: Props) {
         ? "/roadside-billboard.png"
         : "/led-billboard-1.png"
 
+  // Check if thumbnail is a video
+  const isThumbnailVideo = product.media && product.media.length > 0 && product.media[0].isVideo
+
   // Check if we should show specific view content
   const isFromContent = view === "content"
   const isFromStructure = view === "structure"
@@ -1377,16 +1380,25 @@ export default function BusinessProductDetailPage({ params }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
               {/* Site Image - Left Side */}
               <div className="relative aspect-square w-full">
-                <Image
-                  src={thumbnailUrl || "/placeholder.svg"}
-                  alt={product.name}
-                  fill
-                  className="object-cover rounded-md"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
-                  }}
-                />
+                {isThumbnailVideo ? (
+                  <video
+                    src={thumbnailUrl}
+                    className="w-full h-full object-cover rounded-md"
+                    controls={false}
+                    preload="metadata"
+                  />
+                ) : (
+                  <Image
+                    src={thumbnailUrl || "/placeholder.svg"}
+                    alt={product.name}
+                    fill
+                    className="object-cover rounded-md"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
+                    }}
+                  />
+                )}
               </div>
 
               {/* Google Map - Right Side */}
@@ -4235,11 +4247,10 @@ export default function BusinessProductDetailPage({ params }: Props) {
                               preload="metadata"
                               style={{
                                 pointerEvents: 'auto',
-                                cursor: 'pointer',
                                 WebkitAppearance: 'none',
                                 appearance: 'none'
                               }}
-                              onClick={(e) => {
+                              onClick={isThumbnailVideo ? undefined : (e) => {
                                 const video = e.target as HTMLVideoElement;
                                 if (video.paused) {
                                   video.play();
@@ -4315,8 +4326,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
                             controls={false}
                             preload="metadata"
                             style={{
-                              pointerEvents: 'auto',
-                              cursor: 'pointer'
+                              pointerEvents: 'auto'
                             }}
                             onClick={(e) => {
                               const video = e.target as HTMLVideoElement;
