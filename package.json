@@ -6,11 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start",
-    "postinstall": "npx puppeteer browsers install chrome",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "start": "next start"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.12",
@@ -110,7 +106,6 @@
     "@vitejs/plugin-react": "^5.0.4",
     "eslint": "^8",
     "eslint-config-next": "15.0.3",
-    "happy-dom": "^20.0.0",
     "jsdom": "^27.0.0",
     "npm-audit-resolver": "^3.0.0-RC.0",
     "postcss": "^8.5",
