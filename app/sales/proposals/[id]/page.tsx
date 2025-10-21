@@ -2715,17 +2715,17 @@ export default function ProposalDetailsPage() {
             {/* Additional Message */}
             {((product as any).additionalMessage || isEditMode) && (
               <div className="mb-2 flex items-start">
-                <p className="mb-0 mr-2 flex-shrink-0"></p>
+                <div className="flex-shrink-0 w-[180px]"></div>
                 {isEditMode ? (
                   <textarea
                     value={editableProducts[product.id]?.additionalMessage || ''}
                     onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
                     placeholder="Add Message"
-                    className="font-normal text-[16px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none flex-1 min-h-[60px] resize-none"
+                    className="font-normal text-[16px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none flex-1 min-h-[60px] resize-none ml-[-180px]"
                     rows={2}
                   />
                 ) : (
-                  <p className="font-normal text-[16px]">{(product as any).additionalMessage}</p>
+                  <p className="font-normal text-[16px] ml-[-178px]">{(product as any).additionalMessage}</p>
                 )}
               </div>
             )}
