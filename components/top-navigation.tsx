@@ -226,7 +226,7 @@ export function TopNavigation() {
           <div className="top-nav-left">
             <div className="top-nav-logo flex items-center">
               <DepartmentDropdown />
-              <h1 className="text-xl font-semibold text-white ml-4 hidden">
+              <h1 className="text-xl font-semibold text-white ml-4">
                 {(() => {
                   let title = pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle.replace(/\bIt\b/g, "I.T")
                   return title.includes(" - ") ? title.split(" - ").slice(1).join(" - ") : title

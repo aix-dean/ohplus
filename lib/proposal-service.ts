@@ -105,34 +105,6 @@ export async function createProposal(
       company_id: options.client_company_id || "", // Add client_company_id to client field map
     }
 
-    // Initialize contact info with current user data (will be editable in proposal)
-    let contactInfo = {
-      heading: "contact us!",
-      name: userId, // Default to userId
-      role: "Sales",
-      phone: "",
-      email: "",
-    }
-
-    // Try to fetch user data to populate contact info
-    try {
-      const userDocRef = doc(db, "iboard_users", userId)
-      const userDocSnap = await getDoc(userDocRef)
-      if (userDocSnap.exists()) {
-        const userData = userDocSnap.data()
-        contactInfo = {
-          heading: "contact us!",
-          name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userId,
-          role: "Sales", // Default role, can be updated
-          phone: userData.phone_number || "",
-          email: userData.email || "",
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching user data for contact info:", error)
-      // Continue with default values
-    }
-
     // Clean the products data to ensure no undefined values
     const cleanProducts: ProposalProduct[] = products.map((product) => ({
       id: product.id,
@@ -176,25 +148,10 @@ export async function createProposal(
       password = generateProposalPassword()
     }
 
-    // Initialize field visibility for each product
-    const fieldVisibility: { [productId: string]: any } = {}
-    cleanProducts.forEach(product => {
-      fieldVisibility[product.id] = {
-        location: true,
-        dimension: true,
-        type: true,
-        traffic: true,
-        srp: true,
-      }
-    })
-
     const proposalData = {
       title: title || "",
       proposalNumber: proposalNumber, // Add the new proposal number
       proposalTitle: "Site Proposals", // Add default proposal title
-      proposalMessage: "Thank You", // Add default proposal message
-      contactInfo: contactInfo, // Add contact info initialized with user data
-      fieldVisibility: fieldVisibility, // Initialize field visibility per product
       client: cleanClient,
       products: cleanProducts,
       totalAmount: totalAmount || 0,
@@ -525,7 +482,6 @@ export async function updateProposal(
 
     if (data.title !== undefined) updateData.title = data.title
     if (data.proposalTitle !== undefined) updateData.proposalTitle = data.proposalTitle
-    if (data.proposalMessage !== undefined) updateData.proposalMessage = data.proposalMessage
     if (data.validUntil !== undefined) updateData.validUntil = data.validUntil
     if (data.notes !== undefined) updateData.notes = data.notes
     if (data.customMessage !== undefined) updateData.customMessage = data.customMessage
@@ -548,9 +504,6 @@ export async function updateProposal(
 
     if (data.pdf !== undefined) updateData.pdf = data.pdf
     if (data.password !== undefined) updateData.password = data.password
-    if (data.customPages !== undefined) updateData.customPages = data.customPages
-    if (data.contactInfo !== undefined) updateData.contactInfo = data.contactInfo
-    if (data.fieldVisibility !== undefined) updateData.fieldVisibility = data.fieldVisibility
 
     if (data.products !== undefined) {
       updateData.products = data.products

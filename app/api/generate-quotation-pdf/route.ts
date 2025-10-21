@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import puppeteer from 'puppeteer-core'
-import chromium from '@sparticuz/chromium'
+import puppeteer from 'puppeteer'
 import type { Quotation } from '@/lib/types/quotation'
 
 const formatDate = (date: any) => {
@@ -136,19 +135,11 @@ export async function POST(request: NextRequest) {
     // Generate HTML content
     const htmlContent = generateQuotationHTML(quotation, companyData, userData)
 
-    // Launch puppeteer with @sparticuz/chromium for serverless or local chromium for development
-    const browser = await puppeteer.launch(
-      process.env.NODE_ENV === 'production' || process.env.VERCEL
-        ? {
-            headless: true,
-            args: chromium.args,
-            executablePath: await chromium.executablePath()
-          }
-        : {
-            headless: true,
-            executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-          }
-    )
+    // Launch puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    })
 
     const page = await browser.newPage()
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
@@ -185,14 +176,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error(`Error generating ${format}:`, error)
-
-    // Check for specific Puppeteer/Chrome errors
-    if (error instanceof Error && error.message.includes('Could not find Chrome')) {
-      return NextResponse.json({
-        error: 'PDF generation failed: Chrome browser not found. Please ensure Chrome is installed or run: npx puppeteer browsers install chrome'
-      }, { status: 500 })
-    }
-
     return NextResponse.json({ error: `Failed to generate ${format}` }, { status: 500 })
   }
 }

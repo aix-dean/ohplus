@@ -21,14 +21,6 @@ const nextConfig = {
         fs: false,
       }
     }
-
-    // Exclude .map files from @sparticuz/chromium to prevent webpack parsing errors
-    config.module.rules.push({
-      test: /\.map$/,
-      use: 'ignore-loader',
-      include: /node_modules\/@sparticuz\/chromium/
-    })
-
     return config
   },
 }

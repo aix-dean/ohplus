@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PDFDocument, rgb } from 'pdf-lib'
-import puppeteer from 'puppeteer-core'
-import chromium from '@sparticuz/chromium'
+import puppeteer from 'puppeteer'
 import type { CostEstimate } from '@/lib/types/cost-estimate'
 
 
@@ -155,20 +153,12 @@ export async function POST(request: NextRequest) {
     const htmlContent = generateCostEstimateHTML(costEstimate, companyData, userData)
     console.log('[API_PDF] HTML content generated, length:', htmlContent.length)
 
-    // Launch puppeteer with @sparticuz/chromium for serverless or local chromium for development
+    // Launch puppeteer
     console.log('[API_PDF] Launching Puppeteer browser...')
-    const browser = await puppeteer.launch(
-      process.env.NODE_ENV === 'production' || process.env.VERCEL
-        ? {
-            headless: true,
-            args: chromium.args,
-            executablePath: await chromium.executablePath()
-          }
-        : {
-            headless: true,
-            executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-          }
-    )
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    })
     console.log('[API_PDF] Browser launched successfully')
 
     const page = await browser.newPage()
@@ -199,13 +189,28 @@ export async function POST(request: NextRequest) {
     })
     console.log('[API_PDF] PDF buffer generated, size:', buffer.length, 'bytes')
 
-    await browser.close()
-    console.log('[API_PDF] Browser closed')
-
     const contentType = 'application/pdf'
     const filename = `${costEstimate.costEstimateNumber || costEstimate.id || 'cost-estimate'}.pdf`
     console.log('[API_PDF] Generated filename:', filename)
 
+    await browser.close()
+    console.log('[API_PDF] Browser closed')
+
+    // Validate PDF buffer before upload
+    if (!buffer || buffer.length === 0) {
+      console.error('[API_PDF] PDF buffer is empty or invalid')
+      throw new Error('Generated PDF buffer is empty')
+    }
+
+    // Check if buffer starts with PDF header
+    const pdfHeader = buffer.slice(0, 8).toString()
+    console.log('[API_PDF] PDF header bytes:', pdfHeader)
+    if (!pdfHeader.startsWith('%PDF-')) {
+      console.error('[API_PDF] PDF buffer does not start with valid PDF header')
+      throw new Error('Generated PDF does not have valid PDF header')
+    }
+
+    console.log('[API_PDF] PDF validation successful, returning response')
 
     return new NextResponse(Buffer.from(buffer), {
       headers: {
@@ -216,14 +221,6 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error(`[API_PDF] Error generating ${format}:`, error)
-
-    // Check for specific Puppeteer/Chrome errors
-    if (error instanceof Error && error.message.includes('Could not find Chrome')) {
-      return NextResponse.json({
-        error: 'PDF generation failed: Chrome browser not found. Please ensure Chrome is installed or run: npx puppeteer browsers install chrome'
-      }, { status: 500 })
-    }
-
     return NextResponse.json({ error: `Failed to generate ${format}` }, { status: 500 })
   }
 }
