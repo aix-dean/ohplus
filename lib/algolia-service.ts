@@ -445,7 +445,7 @@ export async function searchQuotations(query: string, companyId?: string, page: 
     console.log(`Searching quotations for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
 
     // Create the request body
-    const requestBody: any = { query, indexName: 'quotaions', page, hitsPerPage }
+    const requestBody: any = { query, indexName: 'quotations', page, hitsPerPage }
 
     // Add filters if companyId is provided
     if (companyId) {

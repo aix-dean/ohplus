@@ -1,17 +1,20 @@
 "use client"
 
-import { ArrowLeft, Search, X, FileText, Loader2, CheckCircle, PlusCircle, MoreVertical, List, Grid3X3 } from "lucide-react"
+import { ArrowLeft, Search, X, FileText, Loader2, CheckCircle, PlusCircle, MoreVertical, List, Grid3X3, Bell, Settings, Camera } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect, useState, useRef } from "react"
+import { useDebounce } from "@/hooks/use-debounce"
 import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, getDoc, DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Product } from "@/lib/firebase-service"
+import { searchBookings } from "@/lib/algolia-service"
 import { Pagination } from "@/components/ui/pagination"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 
 interface JobOrderCount {
   [productId: string]: number
@@ -56,6 +59,7 @@ interface Booking {
   created?: any
   quotation_id?: string
   project_name?: string
+  reservation_id?: string
 }
 
 export default function LogisticsBulletinBoardPage() {
@@ -69,6 +73,7 @@ export default function LogisticsBulletinBoardPage() {
   const [latestJoIds, setLatestJoIds] = useState<{ [productId: string]: string }>({})
   const [productReports, setProductReports] = useState<ProductReports>({})
   const [projectNames, setProjectNames] = useState<{ [productId: string]: string }>({})
+  const [bookingIds, setBookingIds] = useState<{ [productId: string]: string }>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -77,54 +82,67 @@ export default function LogisticsBulletinBoardPage() {
   const [itemsPerPage] = useState(15)
   const [lastVisibleDocs, setLastVisibleDocs] = useState<QueryDocumentSnapshot<DocumentData>[]>([null as any])
   const [hasMore, setHasMore] = useState(true)
-
-
+  const [searchTerm, setSearchTerm] = useState("")
+  const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
   const fetchProductReports = async (productIds: string[]) => {
     if (!userData?.company_id || productIds.length === 0) return
 
     try {
-      // First, get all job orders for the products
+      // Get job orders for the specific products to build joNumber mapping
       const jobOrdersRef = collection(db, "job_orders")
-      const jobOrdersQuery = query(jobOrdersRef, where("company_id", "==", userData.company_id))
-      const jobOrdersSnapshot = await getDocs(jobOrdersQuery)
-
-      // Create a map of joNumber to product_id
+      const batchSize = 10
       const joNumberToProductId: { [joNumber: string]: string } = {}
-      jobOrdersSnapshot.forEach((doc) => {
-        const data = doc.data()
-        if (data.joNumber && data.product_id && productIds.includes(data.product_id)) {
-          joNumberToProductId[data.joNumber] = data.product_id
-        }
-      })
+
+      // Batch fetch job orders by product_id
+      for (let i = 0; i < productIds.length; i += batchSize) {
+        const batch = productIds.slice(i, i + batchSize)
+        const jobOrdersQuery = query(
+          jobOrdersRef,
+          where("company_id", "==", userData.company_id),
+          where("product_id", "in", batch)
+        )
+        const jobOrdersSnapshot = await getDocs(jobOrdersQuery)
+
+        jobOrdersSnapshot.forEach((doc) => {
+          const data = doc.data()
+          if (data.joNumber && data.product_id) {
+            joNumberToProductId[data.joNumber] = data.product_id
+          }
+        })
+      }
 
       // Get all joNumbers for the products
       const joNumbers = Object.keys(joNumberToProductId)
 
       if (joNumbers.length === 0) return
 
-      // Fetch reports for these joNumbers and company
-      const reportsRef = collection(db, "reports")
-      const reportsQuery = query(
-        reportsRef,
-        where("joNumber", "in", joNumbers),
-        where("companyId", "==", userData.company_id)
-      )
-      const reportsSnapshot = await getDocs(reportsQuery)
-
-      // Group reports by product_id
+      // Batch fetch reports by joNumber
       const reportsByProduct: ProductReports = {}
-      reportsSnapshot.forEach((doc) => {
-        const reportData = { id: doc.id, ...doc.data() } as Report
-        const productId = joNumberToProductId[reportData.joNumber]
+      const reportBatchSize = 10
 
-        if (productId) {
-          if (!reportsByProduct[productId]) {
-            reportsByProduct[productId] = []
+      for (let i = 0; i < joNumbers.length; i += reportBatchSize) {
+        const batch = joNumbers.slice(i, i + reportBatchSize)
+        const reportsRef = collection(db, "reports")
+        const reportsQuery = query(
+          reportsRef,
+          where("joNumber", "in", batch),
+          where("companyId", "==", userData.company_id)
+        )
+        const reportsSnapshot = await getDocs(reportsQuery)
+
+        reportsSnapshot.forEach((doc) => {
+          const reportData = { id: doc.id, ...doc.data() } as Report
+          const productId = joNumberToProductId[reportData.joNumber]
+
+          if (productId) {
+            if (!reportsByProduct[productId]) {
+              reportsByProduct[productId] = []
+            }
+            reportsByProduct[productId].push(reportData)
           }
-          reportsByProduct[productId].push(reportData)
-        }
-      })
+        })
+      }
 
       // Sort reports by updated timestamp (newest first) for each product
       Object.keys(reportsByProduct).forEach((productId) => {
@@ -149,60 +167,80 @@ export default function LogisticsBulletinBoardPage() {
       const latestJoNumbersMap: { [productId: string]: string } = {}
       const latestJoIdsMap: { [productId: string]: string } = {}
 
-      // Fetch job orders for all products at once
-      const jobOrdersRef = collection(db, "job_orders")
-      const q = query(jobOrdersRef, where("company_id", "==", userData.company_id))
-      const querySnapshot = await getDocs(q)
+      // Batch fetch job orders by product_id in chunks of 10 (Firestore 'in' limit)
+      const batchSize = 10
+      const jobOrderPromises: Promise<void>[] = []
 
-      // Group job orders by productId
-      const jobOrdersByProduct: { [productId: string]: JobOrder[] } = {}
-      querySnapshot.forEach((doc) => {
-        const data = doc.data()
-        const productId = data.product_id
-        if (productId && productIds.includes(productId)) {
-          if (!jobOrdersByProduct[productId]) {
-            jobOrdersByProduct[productId] = []
-          }
-          jobOrdersByProduct[productId].push({ id: doc.id, ...data } as JobOrder)
-        }
-      })
+      for (let i = 0; i < productIds.length; i += batchSize) {
+        const batch = productIds.slice(i, i + batchSize)
+        jobOrderPromises.push(
+          (async () => {
+            try {
+              const jobOrdersRef = collection(db, "job_orders")
+              const q = query(
+                jobOrdersRef,
+                where("company_id", "==", userData.company_id),
+                where("product_id", "in", batch)
+              )
+              const querySnapshot = await getDocs(q)
 
-      // For each product, sort job orders by createdAt descending and get latest joNumber and ID
-      Object.keys(jobOrdersByProduct).forEach((productId) => {
-        const jobOrders = jobOrdersByProduct[productId]
-        counts[productId] = jobOrders.length
+              // Group job orders by productId
+              const jobOrdersByProduct: { [productId: string]: JobOrder[] } = {}
+              querySnapshot.forEach((doc) => {
+                const data = doc.data()
+                const productId = data.product_id
+                if (productId) {
+                  if (!jobOrdersByProduct[productId]) {
+                    jobOrdersByProduct[productId] = []
+                  }
+                  jobOrdersByProduct[productId].push({ id: doc.id, ...data } as JobOrder)
+                }
+              })
 
-        if (jobOrders.length > 0) {
-          // Sort by createdAt descending (newest first)
-          jobOrders.sort((a, b) => {
-            let aTime: Date
-            let bTime: Date
+              // Process each product's job orders
+              Object.keys(jobOrdersByProduct).forEach((productId) => {
+                const jobOrders = jobOrdersByProduct[productId]
+                counts[productId] = jobOrders.length
 
-            if (a.createdAt?.toDate) {
-              aTime = a.createdAt.toDate()
-            } else if (a.createdAt) {
-              aTime = new Date(a.createdAt)
-            } else {
-              aTime = new Date(0)
+                if (jobOrders.length > 0) {
+                  // Sort by createdAt descending (newest first)
+                  jobOrders.sort((a, b) => {
+                    let aTime: Date
+                    let bTime: Date
+
+                    if (a.createdAt?.toDate) {
+                      aTime = a.createdAt.toDate()
+                    } else if (a.createdAt) {
+                      aTime = new Date(a.createdAt)
+                    } else {
+                      aTime = new Date(0)
+                    }
+
+                    if (b.createdAt?.toDate) {
+                      bTime = b.createdAt.toDate()
+                    } else if (b.createdAt) {
+                      bTime = new Date(b.createdAt)
+                    } else {
+                      bTime = new Date(0)
+                    }
+
+                    return bTime.getTime() - aTime.getTime()
+                  })
+
+                  // Get the latest job order
+                  const latestJo = jobOrders[0]
+                  latestJoNumbersMap[productId] = latestJo.joNumber || latestJo.id.slice(-6)
+                  latestJoIdsMap[productId] = latestJo.id
+                }
+              })
+            } catch (error) {
+              console.error(`Error fetching job orders batch:`, error)
             }
+          })()
+        )
+      }
 
-            if (b.createdAt?.toDate) {
-              bTime = b.createdAt.toDate()
-            } else if (b.createdAt) {
-              bTime = new Date(b.createdAt)
-            } else {
-              bTime = new Date(0)
-            }
-
-            return bTime.getTime() - aTime.getTime()
-          })
-
-          // Get the latest job order
-          const latestJo = jobOrders[0]
-          latestJoNumbersMap[productId] = latestJo.joNumber || latestJo.id.slice(-6)
-          latestJoIdsMap[productId] = latestJo.id
-        }
-      })
+      await Promise.all(jobOrderPromises)
 
       console.log('Job Order Counts:', counts)
       console.log('Latest JO Numbers:', latestJoNumbersMap)
@@ -226,6 +264,13 @@ export default function LogisticsBulletinBoardPage() {
       setCurrentPage((prevPage) => prevPage - 1)
     }
   }
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1)
+    setLastVisibleDocs([null as any])
+    setHasMore(true)
+  }, [debouncedSearchTerm])
 
   const handleOpenDialog = async (product: Product) => {
     setSelectedProduct(product)
@@ -282,7 +327,6 @@ export default function LogisticsBulletinBoardPage() {
     }
   }
 
-
   useEffect(() => {
     const fetchBookings = async () => {
       if (!userData?.company_id) {
@@ -292,76 +336,194 @@ export default function LogisticsBulletinBoardPage() {
 
       try {
         setLoading(true)
-        const bookingsRef = collection(db, "booking")
-        let bookingsQuery = query(
-          bookingsRef,
-          where("company_id", "==", userData.company_id),
-          where("quotation_id", "!=", null),
-          orderBy("created", "desc"),
-          limit(itemsPerPage + 1)
-        )
 
-        const lastDoc = lastVisibleDocs[currentPage - 1]
-        if (lastDoc) {
-          bookingsQuery = query(
+        // If there's a search term, use Algolia search
+        if (debouncedSearchTerm.trim()) {
+          const searchResults = await searchBookings(debouncedSearchTerm.trim(), userData.company_id, currentPage - 1, itemsPerPage)
+
+          if (searchResults.error) {
+            console.error("Search error:", searchResults.error)
+            setBookings([])
+            setProducts([])
+            setProjectNames({})
+            setBookingIds({})
+            setHasMore(false)
+            return
+          }
+
+
+          // Transform Algolia results to match expected format
+          const fetchedBookings: Booking[] = searchResults.hits.map((hit: any) => ({
+            id: hit.objectID,
+            product_id: hit.product_id,
+            product_owner: hit.product_owner || hit.product_name,
+            client_name: hit.client_name || hit.client?.name,
+            start_date: hit.start_date,
+            end_date: hit.end_date,
+            status: hit.status,
+            created: hit.created ? new Date(hit.created) : null,
+            quotation_id: hit.quotation_id,
+            project_name: hit.project_name || "No Project Name",
+            reservation_id: hit.reservation_id || `RV-${hit.objectID?.slice(-6)}`,
+          }))
+
+          setBookings(fetchedBookings)
+          setHasMore(searchResults.page < searchResults.nbPages - 1)
+
+          // Create project names map and booking IDs map
+          const namesMap: { [productId: string]: string } = {}
+          const bookingIdsMap: { [productId: string]: string } = {}
+          fetchedBookings.forEach((booking) => {
+            if (booking.product_id) {
+              namesMap[booking.product_id] = booking.project_name || "No Project Name"
+              bookingIdsMap[booking.product_id] = booking.reservation_id || booking.id
+            }
+          })
+          setProjectNames(namesMap)
+          setBookingIds(bookingIdsMap)
+
+          const productIds = fetchedBookings
+            .map((booking) => booking.product_id)
+            .filter((id): id is string => Boolean(id))
+
+          const uniqueProductIds = [...new Set(productIds)]
+
+          // Batch fetch products in chunks of 10 (Firestore limit for 'in' queries)
+          const productData: { [key: string]: Product } = {}
+          const batchSize = 10
+
+          for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
+            const batch = uniqueProductIds.slice(i, i + batchSize)
+            try {
+              const productsRef = collection(db, "products")
+              const productsQuery = query(productsRef, where("__name__", "in", batch))
+              const productsSnapshot = await getDocs(productsQuery)
+
+              productsSnapshot.forEach((doc) => {
+                productData[doc.id] = { id: doc.id, ...doc.data() } as Product
+              })
+            } catch (error) {
+              console.error(`Error fetching product batch:`, error)
+              // Fallback to individual fetches for this batch
+              const batchPromises = batch.map(async (productId) => {
+                try {
+                  const productDoc = await getDoc(doc(db, "products", productId))
+                  if (productDoc.exists()) {
+                    productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
+                  }
+                } catch (err) {
+                  console.error(`Error fetching product ${productId}:`, err)
+                }
+              })
+              await Promise.all(batchPromises)
+            }
+          }
+
+          setProducts(Object.values(productData).filter(p => p.id))
+
+          if (uniqueProductIds.length > 0) {
+            await Promise.all([
+              fetchJobOrderCounts(uniqueProductIds),
+              fetchProductReports(uniqueProductIds)
+            ])
+          }
+        } else {
+          // No search term, use Firestore query
+          const bookingsRef = collection(db, "booking")
+          let bookingsQuery = query(
             bookingsRef,
             where("company_id", "==", userData.company_id),
             where("quotation_id", "!=", null),
             orderBy("created", "desc"),
-            startAfter(lastDoc),
             limit(itemsPerPage + 1)
           )
-        }
 
-        const querySnapshot = await getDocs(bookingsQuery)
-        const fetchedBookings: Booking[] = []
-        const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
-
-        setHasMore(querySnapshot.docs.length > itemsPerPage)
-
-        querySnapshot.docs.slice(0, itemsPerPage).forEach((doc) => {
-          fetchedBookings.push({ id: doc.id, ...doc.data() })
-        })
-
-        setBookings(fetchedBookings)
-
-        // Create project names map
-        const namesMap: { [productId: string]: string } = {}
-        fetchedBookings.forEach((booking) => {
-          if (booking.product_id && booking.project_name) {
-            namesMap[booking.product_id] = booking.project_name
+          const lastDoc = lastVisibleDocs[currentPage - 1]
+          if (lastDoc) {
+            bookingsQuery = query(
+              bookingsRef,
+              where("company_id", "==", userData.company_id),
+              where("quotation_id", "!=", null),
+              orderBy("created", "desc"),
+              startAfter(lastDoc),
+              limit(itemsPerPage + 1)
+            )
           }
-        })
-        setProjectNames(namesMap)
 
-        // Only update lastVisibleDocs if we are moving to a new page
-        if (newLastVisible && currentPage === lastVisibleDocs.length) {
-          setLastVisibleDocs((prev) => [...prev, newLastVisible])
-        }
+          const querySnapshot = await getDocs(bookingsQuery)
+          const fetchedBookings: Booking[] = []
+          const newLastVisible = querySnapshot.docs[querySnapshot.docs.length - 1]
 
-        const productIds = fetchedBookings
-          .map((booking) => booking.product_id)
-          .filter((id): id is string => Boolean(id))
+          setHasMore(querySnapshot.docs.length > itemsPerPage)
 
-        const uniqueProductIds = [...new Set(productIds)]
-        const productData: { [key: string]: Product } = {}
+          querySnapshot.docs.slice(0, itemsPerPage).forEach((doc) => {
+            fetchedBookings.push({ id: doc.id, ...doc.data() })
+          })
 
-        for (const productId of uniqueProductIds) {
-          try {
-            const productDoc = await getDoc(doc(db, "products", productId))
-            if (productDoc.exists()) {
-              productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
+          setBookings(fetchedBookings)
+
+          // Create project names map and booking IDs map
+          const namesMap: { [productId: string]: string } = {}
+          const bookingIdsMap: { [productId: string]: string } = {}
+          fetchedBookings.forEach((booking) => {
+            if (booking.product_id) {
+              namesMap[booking.product_id] = booking.project_name || "No Project Name"
+              bookingIdsMap[booking.product_id] = booking.reservation_id || booking.id
             }
-          } catch (error) {
-            console.error(`Error fetching product ${productId}:`, error)
+          })
+          setProjectNames(namesMap)
+          setBookingIds(bookingIdsMap)
+
+          // Only update lastVisibleDocs if we are moving to a new page
+          if (newLastVisible && currentPage === lastVisibleDocs.length) {
+            setLastVisibleDocs((prev) => [...prev, newLastVisible])
           }
-        }
 
-        setProducts(Object.values(productData).filter(p => p.id))
+          const productIds = fetchedBookings
+            .map((booking) => booking.product_id)
+            .filter((id): id is string => Boolean(id))
 
-        if (uniqueProductIds.length > 0) {
-          await fetchJobOrderCounts(uniqueProductIds)
-          await fetchProductReports(uniqueProductIds)
+          const uniqueProductIds = [...new Set(productIds)]
+
+          // Batch fetch products in chunks of 10 (Firestore limit for 'in' queries)
+          const productData: { [key: string]: Product } = {}
+          const batchSize = 10
+
+          for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
+            const batch = uniqueProductIds.slice(i, i + batchSize)
+            try {
+              const productsRef = collection(db, "products")
+              const productsQuery = query(productsRef, where("__name__", "in", batch))
+              const productsSnapshot = await getDocs(productsQuery)
+
+              productsSnapshot.forEach((doc) => {
+                productData[doc.id] = { id: doc.id, ...doc.data() } as Product
+              })
+            } catch (error) {
+              console.error(`Error fetching product batch:`, error)
+              // Fallback to individual fetches for this batch
+              const batchPromises = batch.map(async (productId) => {
+                try {
+                  const productDoc = await getDoc(doc(db, "products", productId))
+                  if (productDoc.exists()) {
+                    productData[productId] = { id: productDoc.id, ...productDoc.data() } as Product
+                  }
+                } catch (err) {
+                  console.error(`Error fetching product ${productId}:`, err)
+                }
+              })
+              await Promise.all(batchPromises)
+            }
+          }
+
+          setProducts(Object.values(productData).filter(p => p.id))
+
+          if (uniqueProductIds.length > 0) {
+            await Promise.all([
+              fetchJobOrderCounts(uniqueProductIds),
+              fetchProductReports(uniqueProductIds)
+            ])
+          }
         }
       } catch (error) {
         console.error("Error fetching bookings:", error)
@@ -371,162 +533,188 @@ export default function LogisticsBulletinBoardPage() {
     }
 
     fetchBookings()
-   }, [userData?.company_id, currentPage, itemsPerPage, lastVisibleDocs.length])
-
-
-
+  }, [userData?.company_id, currentPage, itemsPerPage, lastVisibleDocs.length, debouncedSearchTerm])
 
   return (
-    <div className="p-6 bg-[#fafafa] min-h-screen" role="main" aria-labelledby="logistics-bulletin-title">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 id="logistics-bulletin-title" className="text-2xl font-semibold text-[#333333]">Logistics Bulletin Board</h1>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mb-6">
-        <div className="relative w-80">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#b7b7b7] h-4 w-4" aria-hidden="true" />
-          <Input
-            placeholder="Search projects..."
-            className="pl-10 bg-[#ffffff] border-[#c4c4c4] text-[#333333] placeholder:text-[#b7b7b7] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            aria-label="Search projects"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" className="text-[#b7b7b7] hover:text-[#333333] hover:bg-gray-100 transition-colors" aria-label="List view" title="Switch to list view">
-            <List className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <Button variant="ghost" size="sm" className="text-[#333333] bg-gray-100" aria-label="Grid view (current)" title="Grid view (currently active)" aria-pressed="true">
-            <Grid3X3 className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </div>
-      </div>
-
-
-      <div>
-        {loading ? (
-          <div className="text-center py-12" role="status" aria-live="polite">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
-            <p className="text-gray-600">Loading projects...</p>
-            <span className="sr-only">Loading project data</span>
+    <div className="min-h-screen bg-white">
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        <div className="mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Bulletin Board</h1>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-600 whitespace-nowrap">Search:</label>
+              <input
+                type="text"
+                placeholder="Search projects..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full sm:w-48 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex gap-2 ml-auto">
+              <Bell className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-pointer" />
+              <Settings className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-pointer" />
+            </div>
           </div>
-        ) : products.length > 0 ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {products
-                .filter((product: Product) => latestJoNumbers[product.id!])
-                .map((product: Product) => (
+        </div>
+
+        <div className="bg-gray-50 rounded-lg p-4 md:p-6">
+          {loading ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+                {Array.from({ length: 6 }).map((_, index) => (
                   <div
-                    key={product.id}
-                    className="bg-[#ffffff] border border-[#c4c4c4] p-4 relative cursor-pointer hover:shadow-lg focus-within:shadow-lg transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-                    style={{ width: '461.339px', height: '284px' }}
-                    onClick={() => {
-                      console.log('Product ID:', product.id)
-                      console.log('Latest JO IDs:', latestJoIds)
-                      console.log('Latest JO ID for this product:', latestJoIds[product.id!])
-                      if (latestJoIds[product.id!]) {
-                        router.push(`/logistics/bulletin-board/details/${latestJoIds[product.id!]}`)
-                      } else {
-                        console.log('No latest JO ID found for product:', product.id)
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Project: ${projectNames[product.id!] || "No Project Name"}, JO Number: ${latestJoNumbers[product.id!] || 'No JO'}`}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        if (latestJoIds[product.id!]) {
-                          router.push(`/logistics/bulletin-board/details/${latestJoIds[product.id!]}`)
-                        }
-                      }
-                    }}
+                    key={index}
+                    className="bg-white rounded-[10.32px] shadow-[-1.3755556344985962px_2.7511112689971924px_5.3646674156188965px_-0.6877778172492981px_rgba(0,0,0,0.25)] p-4 min-h-[192px]"
                   >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 text-[#b7b7b7] hover:text-[#333333] hover:bg-gray-100 p-1 transition-colors"
-                      aria-label="More options"
-                      title="More options"
-                    >
-                      <MoreVertical className="h-4 w-4" aria-hidden="true" />
-                    </Button>
+                    <div className="absolute top-3 right-3">
+                      <Skeleton className="w-5 h-5" />
+                    </div>
 
-                    <div className="flex items-start gap-4">
-                      <Image src={product.media?.[0]?.url || '/placeholder.jpg'} alt={`Site image for ${projectNames[product.id!] || "project"}`} width={108} height={108} className="object-cover rounded-lg mb-4" style={{ width: '108.429px', height: '108.429px' }} onError={(e) => { const target = e.target as HTMLImageElement; target.src = '/placeholder.jpg' }} />
-                      <div className="flex-1">
-                        <div className="mb-1" style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>{latestJoNumbers[product.id!] || 'No JO'}</div>
-
-                        <h3 className="mb-2" style={{ color: '#000', fontFamily: 'Inter', fontSize: '31px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>{projectNames[product.id!] || "No Project Name"}</h3>
-
-                        <div className="mb-2">
-                          <span style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>Site:</span> <span style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: '400', lineHeight: '100%' }}>{product.specs_rental?.location || product.name || "No site code available"}</span>
-                        </div>
+                    <div className="flex items-start gap-3 mb-3">
+                      <Skeleton className="w-16 h-16 rounded-md flex-shrink-0" />
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-5 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
                       </div>
                     </div>
 
-                    <hr className="my-2 border-[#c4c4c4]" />
+                    <Skeleton className="h-px w-full mb-3" />
 
                     <div>
-                      <h4 className="mb-2" style={{ color: '#000', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: '600', lineHeight: '100%' }}>Latest Activities:</h4>
+                      <Skeleton className="h-4 w-32 mb-2" />
                       <div className="space-y-1">
-                        {productReports[product.id!] && productReports[product.id!].length > 0 ? (
-                          productReports[product.id!].slice(0, 3).map((report: Report, index: number) => {
-                            const reportDate = report.updated?.toDate ? report.updated.toDate() : new Date(report.updated || report.date || 0)
-                            const formattedDate = reportDate.toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                            })
-
-                            return (
-                              <div key={report.id} style={{ color: '#000', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: '300', lineHeight: '100%' }}>
-                                {formattedDate} - {report.descriptionOfWork || report.description || "No description available"}
-                              </div>
-                            )
-                          })
-                        ) : (
-                          <div style={{ color: '#000', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: '300', lineHeight: '100%' }}>No recent activity</div>
-                        )}
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-4/5" />
+                        <Skeleton className="h-3 w-3/4" />
                       </div>
                     </div>
                   </div>
                 ))}
+              </div>
             </div>
+          ) : products.length > 0 ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
+                {products.map((product: Product) => (
+                    <div
+                      key={product.id}
+                      className="bg-white rounded-[10.32px] shadow-[-1.3755556344985962px_2.7511112689971924px_5.3646674156188965px_-0.6877778172492981px_rgba(0,0,0,0.25)] relative cursor-pointer hover:shadow-lg transition-shadow p-4 min-h-[192px]"
+                      onClick={() => {
+                        console.log('Clicked product:', product.id, 'latestJoId:', latestJoIds[product.id!])
+                        const targetId = latestJoIds[product.id!] || product.id!
+                        router.push(`/logistics/bulletin-board/details/${targetId}`)
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Project: ${projectNames[product.id!] || "No Project Name"}, Reservation: ${bookingIds[product.id!] || 'No Reservation'}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          if (latestJoIds[product.id!]) {
+                            router.push(`/logistics/bulletin-board/details/${latestJoIds[product.id!]}`)
+                          }
+                        }
+                      }}
+                    >
+                      <div className="absolute top-3 right-3">
+                        <MoreVertical className="w-5 h-5 text-gray-400" />
+                      </div>
 
-            {/* Pagination Controls */}
-            <div className="flex justify-end mt-4">
-              <Pagination
-                currentPage={currentPage}
-                itemsPerPage={itemsPerPage}
-                totalItems={products.length} // This will be inaccurate for true total, but works for current page display
-                onNextPage={handleNextPage}
-                onPreviousPage={handlePreviousPage}
-                hasMore={hasMore}
-              />
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {product.media?.[0]?.url ? (
+                            <Image
+                              src={product.media[0].url}
+                              alt="Product image"
+                              width={64}
+                              height={64}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  parent.innerHTML = '<div class="w-6 h-6 text-gray-500"><svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div>';
+                                }
+                              }}
+                            />
+                          ) : (
+                            <Camera className="w-6 h-6 text-gray-500" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-gray-600 mb-1">
+                            {bookingIds[product.id!] ? `${bookingIds[product.id!]}` : 'No Reservation'}
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 truncate mb-1">
+                            {projectNames[product.id!] || "No Project Name"}
+                          </h3>
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Site:</span>{' '}
+                            <span className="truncate block">
+                              {product.specs_rental?.location || product.name || "No site"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <hr className="border-gray-200 mb-3" />
+
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2">Latest Activities:</h4>
+                        <div className="space-y-1">
+                          {productReports[product.id!] && productReports[product.id!].length > 0 ? (
+                            productReports[product.id!].slice(0, 3).map((report: Report, index: number) => {
+                              const reportDate = report.updated?.toDate ? report.updated.toDate() : new Date(report.updated || report.date || 0)
+                              const formattedDate = reportDate.toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })
+
+                              return (
+                                <div key={report.id} className="text-xs text-gray-600 truncate">
+                                  {formattedDate} - {(report.descriptionOfWork || report.description || "No description").substring(0, 40)}{(report.descriptionOfWork || report.description || "").length > 40 ? "..." : ""}
+                                </div>
+                              )
+                            })
+                          ) : (
+                            <div className="text-xs text-gray-500">No recent activity</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+
+              {/* Pagination Controls */}
+              <div className="flex justify-center md:justify-end mt-6">
+                <Pagination
+                  currentPage={currentPage}
+                  itemsPerPage={itemsPerPage}
+                  totalItems={products.length}
+                  onNextPage={handleNextPage}
+                  onPreviousPage={handlePreviousPage}
+                  hasMore={hasMore}
+                />
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-12" role="status" aria-live="polite">
-            <div className="text-gray-400 mb-4">
-              <Search className="h-12 w-12 mx-auto" aria-hidden="true" />
+          ) : (
+            <div className="text-center py-12" role="status" aria-live="polite">
+              <div className="text-gray-400 mb-4">
+                <Search className="h-12 w-12 mx-auto" aria-hidden="true" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No projects found</h3>
+              <p className="text-gray-500">Try adjusting your search criteria or check back later.</p>
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No projects found</h3>
-            <p className="text-gray-500">Try adjusting your search criteria or check back later.</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-
       {isDialogOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-lg p-6 w-[600px] max-w-[90vw] max-h-[80vh] relative animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-in fade-in duration-200 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-[600px] max-h-[80vh] relative animate-in zoom-in-95 duration-300">
             <button
               onClick={() => setIsDialogOpen(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -537,7 +725,7 @@ export default function LogisticsBulletinBoardPage() {
             <div className="mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Job Orders</h2>
               {selectedProduct && (
-                <p className="text-sm text-gray-600 mt-1">
+                <p className="text-sm text-gray-600 mt-1 truncate">
                   {selectedProduct.specs_rental?.location || selectedProduct.name || "Unknown Site"}
                 </p>
               )}
@@ -558,11 +746,11 @@ export default function LogisticsBulletinBoardPage() {
                       onClick={() => router.push(`/logistics/bulletin-board/details/${jobOrder.id}`)}
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-gray-900">
+                        <h3 className="font-medium text-gray-900 truncate">
                           Job Order #: {jobOrder.joNumber || jobOrder.id.slice(-6)}
                         </h3>
                         <span
-                          className={`px-2 py-1 text-xs rounded-full ${
+                          className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ml-2 ${
                             jobOrder.status === "completed"
                               ? "bg-green-100 text-green-800"
                               : jobOrder.status === "in_progress"
@@ -576,7 +764,11 @@ export default function LogisticsBulletinBoardPage() {
                         </span>
                       </div>
 
-                      {jobOrder.description && <p className="text-sm text-gray-600 mb-2">{jobOrder.description}</p>}
+                      {jobOrder.description && (
+                        <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                          {jobOrder.description}
+                        </p>
+                      )}
 
                       <div className="text-xs text-gray-500">
                         Created: {(() => {
@@ -599,7 +791,6 @@ export default function LogisticsBulletinBoardPage() {
           </div>
         </div>
       )}
-
     </div>
   )
 }

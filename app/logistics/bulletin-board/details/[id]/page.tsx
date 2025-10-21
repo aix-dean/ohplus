@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Plus } from "lucide-react"
+import { ArrowLeft, Plus, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { CreateReportDialog } from "@/components/create-report-dialog"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, startAfter, QueryDocumentSnapshot, DocumentData } from "firebase/firestore"
@@ -70,6 +71,8 @@ interface Booking {
   cost: number
   total_cost: number
   type: string
+  project_name?: string
+  reservation_id?: string
   // Add other fields as needed
 }
 
@@ -205,6 +208,31 @@ export default function JobOrderDetailsPage() {
               } as Booking)
             }
           }
+        } else {
+          // Try as product
+          const productRef = doc(db, "products", params.id as string)
+          const productSnap = await getDoc(productRef)
+
+          if (productSnap.exists()) {
+            const productData = {
+              id: productSnap.id,
+              ...productSnap.data(),
+            } as Product
+
+            setProduct(productData)
+
+            if (productData.seller_id) {
+              const sellerRef = doc(db, "iboard_users", productData.seller_id)
+              const sellerSnap = await getDoc(sellerRef)
+
+              if (sellerSnap.exists()) {
+                setSeller({
+                  id: sellerSnap.id,
+                  ...sellerSnap.data(),
+                } as Seller)
+              }
+            }
+          }
         }
       } catch (error) {
         console.error("Error fetching job order, product, booking, seller, or reports:", error)
@@ -239,10 +267,10 @@ export default function JobOrderDetailsPage() {
 
     try {
       if (dateField?.toDate) {
-        return dateField.toDate().toLocaleDateString()
+        return dateField.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       } else if (dateField) {
         const date = new Date(dateField)
-        return isNaN(date.getTime()) ? "Invalid Date" : date.toLocaleDateString()
+        return isNaN(date.getTime()) ? "Invalid Date" : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       }
       return "Not specified"
     } catch (error) {
@@ -300,184 +328,94 @@ export default function JobOrderDetailsPage() {
             : "Not specified",
         seller: seller?.first_name && seller?.last_name ? `${seller.first_name} ${seller.last_name}` : "Not specified",
       }
+    } else if (product) {
+      return {
+        site: product.specs_rental?.location || product.name || "Not specified",
+        client: "Not specified",
+        bookingDates: "Not specified",
+        seller: seller?.first_name && seller?.last_name ? `${seller.first_name} ${seller.last_name}` : "Not specified",
+      }
     }
 
     return {
       site: "Not specified",
       client: "Not specified",
       bookingDates: "Not specified",
-      seller: "Not specified", // Added seller fallback
+      seller: "Not specified",
     }
   }
 
   const siteData = getSiteData()
 
   return (
-    <div className="space-y-6 relative">
-      <div className="flex items-center gap-3 py-2">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="p-1 h-8 w-8">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-
-        <Badge variant="default" className="bg-blue-500 text-white px-3 py-1 text-sm font-medium" style={{ fontSize: '27.7px', fontWeight: '700', borderRadius: '10px' }}>
-          Lilo & Stitch
-        </Badge>
-
-        <div style={{ borderRadius: '10px', padding: '0 10px', backgroundColor: '#efefef' }}>
-          <span className="text-lg font-medium text-gray-900" style={{ fontSize: '25.1px', color: '#0f76ff', fontWeight: '650' }}>
-            {loading ? "Loading..." : jobOrder?.joNumber || "Job Order Not Found"}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex justify-start">
-        <div className="flex items-start gap-6 max-w-2xl">
-          {/* Product image placeholder */}
-          <div className="flex-shrink-0">
-            <img
-              src={product?.media?.[0]?.url || "/lilo-and-stitch-product-box.png"}
-              alt="Product"
-              className="w-32 h-32 object-cover rounded-md border"
-            />
+    <div className="w-[1280px] h-[720px] relative">
+      <div onClick={() => router.back()} className="w-80 h-6 left-[30px] top-[30px] absolute justify-start text-gray-700 text-base font-bold font-['Inter'] leading-none cursor-pointer">← View Project Bulletin</div>
+      <div className="w-[990px] h-20 left-[34px] top-[60px] absolute bg-white rounded-[5px] shadow-[-2px_4px_5px_0px_rgba(0,0,0,0.25)]" />
+      <div className="w-24 h-3.5 left-[60.14px] top-[80.44px] absolute justify-start text-gray-700 text-xs font-semibold font-['Inter'] leading-3">Reservation ID</div>
+      <div className="w-32 h-3.5 left-[60.14px] top-[96.95px] absolute justify-start text-gray-700 text-xs font-normal font-['Inter'] leading-3">{booking?.reservation_id || 'N/A'}</div>
+      <div className="w-24 h-3.5 left-[250px] top-[80.44px] absolute justify-start text-gray-700 text-xs font-semibold font-['Inter'] leading-3">Site</div>
+      <div className="w-40 h-6 left-[250px] top-[96.95px] absolute justify-start text-blue-600 text-xs font-bold font-['Inter'] leading-3 break-words">{siteData.site}</div>
+      <div className="w-24 h-3.5 left-[453px] top-[84px] absolute justify-start text-gray-700 text-xs font-semibold font-['Inter'] leading-3">Client</div>
+      <div className="w-24 h-3 left-[453px] top-[99.56px] absolute justify-start text-gray-700 text-xs font-normal font-['Inter'] leading-3">{siteData.client}</div>
+      <div className="w-24 h-3.5 left-[647px] top-[80.44px] absolute justify-start text-gray-700 text-xs font-semibold font-['Inter'] leading-3">Booking Dates</div>
+      <div className="w-36 h-3 left-[647px] top-[96px] absolute justify-start text-gray-700 text-xs font-normal font-['Inter'] leading-3">{siteData.bookingDates}</div>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <div className="w-24 h-6 left-[905px] top-[84.40px] absolute bg-white rounded-md border border-gray-300 cursor-pointer flex items-center justify-between px-2">
+            <span className="text-gray-700 text-xs font-medium">Actions</span>
+            <ChevronDown className="w-3 h-3 text-gray-700" />
           </div>
-
-          {/* Site information */}
-          <div className="flex-1 space-y-3 text-base">
-            <div>
-              <span className="font-semibold text-gray-900">Site: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.site}</span>
-            </div>
-
-            <div>
-              <span className="font-semibold text-gray-900">Client: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.client}</span>
-            </div>
-
-            <div>
-              <span className="font-semibold text-gray-900">Booking Dates: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.bookingDates}</span>
-            </div>
-
-            <div>
-              <span className="font-semibold text-gray-900">Seller: </span>
-              <span className="text-gray-700">{loading ? "Loading..." : siteData.seller}</span>
-            </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem onClick={() => setCreateReportDialogOpen(true)}>Create Report</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <div className="w-[990px] h-7 left-[34px] top-[162px] absolute" style={{ backgroundColor: 'var(--ADMIN-BLUE, #2A31B4)' }} />
+      <div className="w-14 h-4 left-[60px] top-[170px] absolute justify-start text-white text-xs font-semibold font-['Inter'] leading-3">Date</div>
+      <div className="w-14 h-4 left-[179px] top-[169px] absolute justify-start text-white text-xs font-semibold font-['Inter'] leading-3">By</div>
+      <div className="w-20 h-4 left-[342px] top-[170px] absolute justify-start text-white text-xs font-semibold font-['Inter'] leading-3">Department</div>
+      <div className="w-14 h-4 left-[674px] top-[170px] absolute justify-start text-white text-xs font-semibold font-['Inter'] leading-3">Item</div>
+      <div className="w-24 h-4 left-[495px] top-[170px] absolute justify-start text-white text-xs font-semibold font-['Inter'] leading-3">Campaign Name</div>
+      <div className="w-28 h-4 left-[873px] top-[170px] absolute justify-start text-white text-xs font-semibold font-['Inter'] leading-3">Attachment</div>
+      <div className="w-[990px] h-[496px] left-[34px] top-[190px] absolute bg-white overflow-y-auto">
+        {loading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-gray-500">Loading...</div>
           </div>
-        </div>
-      </div>
-
-      <div className="mt-8">
-        <div className="bg-gradient-to-r from-blue-600 to-teal-400 text-white px-4 py-3 rounded-t-lg">
-          <h2 className="text-lg font-semibold">Project Monitoring</h2>
-        </div>
-
-        <div className="bg-white border border-gray-200 rounded-b-lg overflow-x-auto max-h-96 overflow-y-auto">
-          <table className="w-full min-w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Date</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Time</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Team</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Update</th>
-                <th className="px-4 py-3 text-left text-sm font-medium text-gray-900">Attachments</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                    Loading project monitoring data...
-                  </td>
-                </tr>
-              ) : reports.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                    No project monitoring data available for this job order.
-                  </td>
-                </tr>
-              ) : (
-                reports.map((report) => (
-                  <tr key={report.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm text-gray-900">{formatDate(report.updated || report.created || report.date)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">{formatTime(report.updated || report.created)}</td>
-                    <td className="px-4 py-3">{getTeamBadge(report.category)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
-                      <button
-                        className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
-                        onClick={() => router.push(`/logistics/reports/${report.id}`)}
-                      >
-                        {getUpdateText(report)}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      {report.attachments && report.attachments.length > 0 ? (
-                        <button
-                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          onClick={() => window.open(report.attachments![0].fileUrl, "_blank")}
-                        >
-                          See Attachment
-                        </button>
-                      ) : (
-                        <span className="text-sm text-gray-500">N/A</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination Controls */}
-        {reports.length > 0 && (
-          <div className="flex justify-between items-center mt-4 px-4">
-            <button
-              onClick={handlePreviousPage}
-              disabled={currentPage === 1}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {currentPage}
-            </span>
-            <button
-              onClick={handleNextPage}
-              disabled={!hasMore}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
+        ) : reports.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-gray-500">No project monitoring data available for this {jobOrder ? 'job order' : 'product'}.</div>
+          </div>
+        ) : (
+          <div className="space-y-0">
+            {reports.map((report, index) => (
+              <div key={report.id} className="relative h-16">
+                <div className="w-24 h-3.5 left-[26.14px] top-[16px] absolute justify-start text-gray-700 text-xs font-normal font-['Inter'] leading-3">
+                  {formatDate(report.updated || report.created || report.date)}
+                </div>
+                <div className="w-28 h-3.5 left-[140px] top-[16px] absolute justify-start text-gray-700 text-xs font-normal font-['Inter'] leading-3">
+                  {'System'}
+                </div>
+                <div className="w-28 h-3.5 left-[303px] top-[16px] absolute justify-start text-gray-700 text-xs font-normal font-['Inter'] leading-3">
+                  {getTeamBadge(report.category).props.children || report.category}
+                </div>
+                <div className="w-28 h-3.5 left-[636px] top-[16px] absolute justify-start text-gray-700 text-xs font-normal font-['Inter'] leading-3">
+                  {getUpdateText(report)}
+                </div>
+                <div className="w-28 h-3.5 left-[457px] top-[16px] absolute justify-start text-gray-700 text-xs font-normal font-['Inter'] leading-3">
+                  {booking?.project_name || 'N/A'}
+                </div>
+                <div className="w-28 h-3.5 left-[834px] top-[16px] absolute justify-start text-blue-600 text-xs font-bold font-['Inter'] underline leading-3">
+                  {report.attachments && report.attachments.length > 0 ? 'View Attachment' : 'N/A'}
+                </div>
+                {index < reports.length - 1 && (
+                  <div className="w-[970px] h-0 left-[12px] top-[50px] absolute outline outline-1 outline-offset-[-0.50px] outline-black/25"></div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
-
-      <div className="fixed bottom-6 right-6 z-50">
-        <Button
-          className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-lg px-4 py-2 flex items-center gap-2"
-          onClick={() => {
-            if (jobOrder?.product_id) {
-              setCreateReportDialogOpen(true)
-            } else {
-              console.log("No product ID available for creating report")
-            }
-          }}
-        >
-          <Plus className="h-4 w-4" />
-          Create Report
-        </Button>
-      </div>
-
-      {jobOrder?.product_id && (
-        <CreateReportDialog
-          open={createReportDialogOpen}
-          onOpenChange={setCreateReportDialogOpen}
-          siteId={jobOrder.product_id}
-          module="sales"
-          hideJobOrderSelection={true}
-          preSelectedJobOrder={jobOrder.joNumber}
-        />
-      )}
     </div>
   )
 }
