@@ -450,7 +450,7 @@ function generateQuotationHTML(
      <li>
       <div class="details-row">
         <div class="details-label">Lease rate per month:</div>
-        <div class="details-value">PHP ${item?.price ? item.price.toLocaleString() : "0"} (Exclusive of VAT)</div>
+        <div class="details-value">PHP ${item?.price ? item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0"} (Exclusive of VAT)</div>
       </div>
     </li>
   </ul>
@@ -464,7 +464,7 @@ function generateQuotationHTML(
     <div class="price-breakdown">
       <div class="price-row">
         <span>Lease rate per month</span>
-        <span>PHP ${(item?.price || 0).toLocaleString()}</span>
+        <span>PHP ${(item?.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row">
         <span>Contract duration</span>
@@ -476,7 +476,7 @@ function generateQuotationHTML(
       item?.price || 0,
       getDateObject(startDate) || new Date(),
       getDateObject(endDate) || new Date()
-    ).toLocaleString()}</span>
+    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row">
         <span>Add: VAT</span>
@@ -484,7 +484,7 @@ function generateQuotationHTML(
       item?.price || 0,
       getDateObject(startDate) || new Date(),
       getDateObject(endDate) || new Date()
-    ) * 0.12).toLocaleString()}</span>
+    ) * 0.12).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row price-total">
         <span>Total</span>
@@ -494,7 +494,7 @@ function generateQuotationHTML(
         getDateObject(startDate) || new Date(),
         getDateObject(endDate) || new Date()
       ) * 1.12
-    ).toLocaleString()}</span>
+    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
     </div>
 

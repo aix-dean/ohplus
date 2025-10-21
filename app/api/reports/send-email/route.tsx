@@ -193,46 +193,45 @@ function createEmailTemplate(
     dominantColor?: string,
     replyToEmail?: string,
     userName?: string,
-    userPosition?: string,
-    quotationUrl?: string
+    userPosition?: string
   ): string {
-   const phoneNumber = userPhoneNumber || companyData?.phone || "+639XXXXXXXXX"
-   const companyName = companyData?.company_name || ""
-   const companyLocation = companyData?.company_location || ""
-   const companyEmail = replyToEmail || companyData?.email || "noreply@ohplus.ph"
-   const companyWebsite = companyData?.website || "www.ohplus.ph"
+    const phoneNumber = userPhoneNumber || companyData?.phone || "+639XXXXXXXXX"
+    const companyName = companyData?.company_name || ""
+    const companyLocation = companyData?.company_location || ""
+    const companyEmail = replyToEmail || companyData?.email || "noreply@ohplus.ph"
+    const companyWebsite = companyData?.website || "www.ohplus.ph"
 
-   // Use primary color for branding (dynamic based on logo or fallback)
-   const primaryColor = dominantColor || '#667eea'
+    // Use primary color for branding (dynamic based on logo or fallback)
+    const primaryColor = dominantColor || '#667eea'
 
-   const processedBody = body
-     .split("\n")
-     .map((line: string) => line.trim())
-     .filter((line: string) => line.length > 0)
-     .map((line: string) => `<p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.6; color: #333333;">${line}</p>`)
-     .join("")
+    const processedBody = body
+      .split("\n")
+      .map((line: string) => line.trim())
+      .filter((line: string) => line.length > 0)
+      .map((line: string) => `<p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.6; color: #333333;">${line}</p>`)
+      .join("")
 
-   return `
- <!DOCTYPE html>
- <html lang="en">
- <head>
-     <meta charset="UTF-8">
-     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-     <title>${companyName} - Quotation</title>
-     <!--[if mso]>
-     <noscript>
-         <xml>
-             <o:OfficeDocumentSettings>
-                 <o:PixelsPerInch>96</o:PixelsPerInch>
-             </o:OfficeDocumentSettings>
-         </xml>
-     </noscript>
-     <![endif]-->
-     <style>
+    return `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${companyName} - Report</title>
+      <!--[if mso]>
+      <noscript>
+          <xml>
+              <o:OfficeDocumentSettings>
+                  <o:PixelsPerInch>96</o:PixelsPerInch>
+              </o:OfficeDocumentSettings>
+          </xml>
+      </noscript>
+      <![endif]-->
+      <style>
 
-        * { box-sizing: border-box; }
-        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; background-color: #f5f5f5; }
-        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+         * { box-sizing: border-box; }
+         body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; background-color: #f5f5f5; }
+         .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 .header {
         background: #ffffff;
     padding: 0 0 0 20px;
@@ -244,13 +243,13 @@ function createEmailTemplate(
     justify-content: flex-end;  /* align footer-content to the right */
     align-items: center;
 }
-        .header-circles { position: absolute; top: 0; right: 0; width: 140px; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-        .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
-        .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
-        .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
-        .header-content { width: 100%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px }
-        .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
-        .company-info {  flex: 1; padding-left: 15px; }
+         .header-circles { position: absolute; top: 0; right: 0; width: 140px; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+         .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+         .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+         .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
+         .header-content { width: 100%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px }
+         .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
+         .company-info {  flex: 1; padding-left: 15px; }
 .company-name {
   color: #000000;
   font-size: 24px;
@@ -259,13 +258,13 @@ function createEmailTemplate(
   text-align: start;
   margin: 0px;
 }
-        .company-address { color: #000000; font-size: 14px; margin: 0; }
-        .content { padding: 40px 30px; background-color: #f9f9f9; }
-        .content p { margin: 0 0 16px 0; }
-        .highlight-box { background-color: #f8f9ff; border-left: 4px solid ${primaryColor}; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
-        .cta-section { text-align: center; margin: 30px 0; }
-        .cta-button { display: inline-block; background: ${primaryColor}; color: #ffffff !important; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: 600; font-size: 16px; transition: transform 0.2s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
-        .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
+         .company-address { color: #000000; font-size: 14px; margin: 0; }
+         .content { padding: 40px 30px; background-color: #f9f9f9; }
+         .content p { margin: 0 0 16px 0; }
+         .highlight-box { background-color: #f8f9ff; border-left: 4px solid ${primaryColor}; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
+         .cta-section { text-align: center; margin: 30px 0; }
+         .cta-button { display: inline-block; background: ${primaryColor}; color: #ffffff !important; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: 600; font-size: 16px; transition: transform 0.2s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
+         .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
 .footer {
     background: #ffffff;
     padding: 0 0 0 20px;
@@ -313,70 +312,70 @@ function createEmailTemplate(
             .company-name { font-size: 20px !important; }
             .cta-button { padding: 12px 24px !important; font-size: 14px !important; }
         }
-     </style>
- </head>
- <body>
-     <div class="email-container">
-         <div class="header">
-             <div class="header-content">
-                 ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="header-logo">` : ''}
-                 <div class="company-info">
-                     <h1 class="company-name">${companyName}</h1>
-                     ${companyLocation ? `<p class="company-address">${companyLocation}</p>` : ''}
-                 </div>
-             </div>
-             <div class="header-circles">
-                 <div class="header-div">
-                     <div class="header-square-2"></div>
-                     <div class="header-square-1"></div>
-                 </div>
-             </div>
-         </div>
+      </style>
+  </head>
+  <body>
+      <div class="email-container">
+          <div class="header">
+              <div class="header-content">
+                  ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="header-logo">` : ''}
+                  <div class="company-info">
+                      <h1 class="company-name">${companyName}</h1>
+                      ${companyLocation ? `<p class="company-address">${companyLocation}</p>` : ''}
+                  </div>
+              </div>
+              <div class="header-circles">
+                  <div class="header-div">
+                      <div class="header-square-2"></div>
+                      <div class="header-square-1"></div>
+                  </div>
+              </div>
+          </div>
 
-         <div class="content">
-             ${processedBody}
-
-
-             <div class="cta-section">
-                 <a href="${quotationUrl}" target="_blank" class="cta-button">View Quotation</a>
-             </div>
-         </div>
-
-         <div class="footer">
-             <div class="footer-content">
-                 <div class="footer-header">
-                     ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
-                     <h3 class="footer-company-name">${companyName}</h3>
-                 </div>
-
-                 <div class="signature">
-                     <h4 class="signature-name">${userName || 'Sales Executive'}</h4>
-                     <p class="signature-title">${userPosition ? `${userPosition}` : ``}</p>
-                     <div class="contact-info">
-                        ${companyEmail}<br>
-                         ${phoneNumber ? `${phoneNumber}` : ''}
-                     </div>
-                 </div>
-             </div>
-             <div class="footer-circles">
-                 <div class="footer-div">
-                     <div class="footer-square-2"></div>
-                     <div class="footer-square-1"></div>
-                 </div>
-             </div>
-         </div>
+          <div class="content">
+              ${processedBody}
 
 
-         </div>
-     </div>
- </body>
- </html>
-   `
- }
+              <div class="cta-section">
+                  <a href="mailto:${companyEmail}" class="cta-button">Get In Touch</a>
+              </div>
+          </div>
+
+          <div class="footer">
+              <div class="footer-content">
+                  <div class="footer-header">
+                      ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
+                      <h3 class="footer-company-name">${companyName}</h3>
+                  </div>
+
+                  <div class="signature">
+                      <h4 class="signature-name">${userName || 'Operations Manager'}</h4>
+                      <p class="signature-title">${userPosition ? `${userPosition}` : ``}</p>
+                      <div class="contact-info">
+                         ${companyEmail}<br>
+                          ${phoneNumber ? `${phoneNumber}` : ''}
+                      </div>
+                  </div>
+              </div>
+              <div class="footer-circles">
+                  <div class="footer-div">
+                      <div class="footer-square-2"></div>
+                      <div class="footer-square-1"></div>
+                  </div>
+              </div>
+          </div>
+
+
+          </div>
+      </div>
+  </body>
+  </html>
+    `
+  }
 
 export async function POST(request: NextRequest) {
   try {
-    console.log("Quotation email API route called")
+    console.log("Report email API route called")
 
     // Check if API key exists
     if (!process.env.RESEND_API_KEY) {
@@ -426,9 +425,9 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("Request body received:", {
-      hasQuotation: !!body.quotation,
+      hasReport: !!body.report,
       hasClientEmail: !!body.clientEmail,
-      quotationId: body.quotation?.id,
+      reportId: body.report?.id,
       customSubject: body.subject,
       customBody: body.body,
       currentUserEmail: body.currentUserEmail,
@@ -439,7 +438,7 @@ export async function POST(request: NextRequest) {
     })
 
     const {
-      quotation,
+      report,
       clientEmail,
       subject,
       body: customBody,
@@ -452,9 +451,9 @@ export async function POST(request: NextRequest) {
       userData,
     } = body
 
-    if (!quotation || !clientEmail) {
-      console.error("Missing required fields:", { quotation: !!quotation, clientEmail: !!clientEmail })
-      return NextResponse.json({ error: "Missing quotation or client email address" }, { status: 400 })
+    if (!report || !clientEmail) {
+      console.error("Missing required fields:", { report: !!report, clientEmail: !!clientEmail })
+      return NextResponse.json({ error: "Missing report or client email address" }, { status: 400 })
     }
 
     // Validate email format for 'To'
@@ -479,21 +478,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const quotationUrl = `https://mrk.ohplus.ph/q/${quotation.id}`
+    const reportUrl = `${process.env.NEXT_PUBLIC_APP_URL}/logistics/reports/${report.id}`
 
     console.log(`Using ${preGeneratedPDFs?.length || 0} pre-generated PDFs for email attachments`)
-    console.log("Generated quotation URL:", quotationUrl)
+    console.log("Generated report URL:", reportUrl)
 
     // Use custom subject and body if provided, otherwise fall back to default
     const finalSubject =
-      subject || `Quotation: ${quotation.items?.[0]?.name || "Custom Advertising Solution"} - ${companyName || "Company"}`
+      subject || `Report: ${report.title || report.name || "Service Report"} - ${companyName || "Company"}`
 
     // Fetch company data for email template
-    const companyId = userData?.company_id || quotation?.company_id || "unknown"
+    const companyId = userData?.company_id || report?.company_id || "unknown"
     const companyData = await fetchCompanyData(companyId)
 
     // Fetch company logo and extract dominant color
-    let companyLogo = undefined
+    let companyLogo = "/ohplus-new-logo.png" // Default fallback logo
     let dominantColor = undefined
 
     if (companyId && companyId !== "unknown") {
@@ -501,19 +500,18 @@ export async function POST(request: NextRequest) {
         const companyDoc = await getDoc(doc(db, "companies", companyId))
         if (companyDoc.exists()) {
           const companyDocData = companyDoc.data()
-          if (companyDocData?.logo || companyDocData?.photo_url) {
-            companyLogo = companyDocData.logo || companyDocData.photo_url
+          if (companyDocData?.logo) {
+            companyLogo = companyDocData.logo
             console.log("Company logo found:", companyLogo, {
-              logo: !!companyDocData.logo,
-              photo_url: !!companyDocData.photo_url,
-              usingField: companyDocData.logo ? 'logo' : 'photo_url'
+              usingField: 'logo'
             })
           } else {
-            console.log("No company logo found in document")
+            console.log("No company logo found in document, using default OH+ logo")
           }
         }
       } catch (error) {
         console.error("Error fetching company logo:", error)
+        console.log("Using default OH+ logo due to error")
       }
     }
 
@@ -540,9 +538,9 @@ export async function POST(request: NextRequest) {
     // Create email template - construct user name from available fields
     const userName = userData?.first_name && userData?.last_name
       ? `${userData.first_name} ${userData.last_name}`.trim()
-      : userData?.displayName || userData?.displayName || "Sales Executive"
+      : userData?.displayName || userData?.displayName || "Operations Manager"
 
-    const finalBody = createEmailTemplate(customBody || "We are excited to present you with a detailed quotation tailored to your specific advertising needs. Our team has carefully prepared this quotation to help you plan your marketing investment.", userData?.phone_number, companyData, companyLogo, dominantColor, replyToEmail, userName, userData?.position || "Sales Executive", quotationUrl)
+    const finalBody = createEmailTemplate(customBody || "We are pleased to share this comprehensive report with you. Our detailed analysis covers all key aspects and provides valuable insights for your consideration.", userData?.phone_number, companyData, companyLogo, dominantColor, replyToEmail, userName, userData?.position || "Operations Manager")
 
     console.log("Attempting to send email to:", clientEmail)
 
@@ -709,7 +707,7 @@ export async function POST(request: NextRequest) {
 
     // Create email document in emails collection
     try {
-      const companyId = userData?.company_id || quotation?.company_id || "unknown"
+      const companyId = userData?.company_id || report?.company_id || "unknown"
 
       const emailDocument = {
         from: from,
@@ -719,10 +717,10 @@ export async function POST(request: NextRequest) {
         subject: finalSubject.trim(),
         body: customBody?.trim() || '',
         attachments: attachmentDetails.length > 0 ? attachmentDetails : undefined,
-        email_type: "quotation",
-        quotationId: quotation.id,
+        email_type: "report",
+        quotationId: undefined,
         templateId: undefined,
-        reportId: undefined,
+        reportId: report.id,
         status: "sent" as const,
         userId: userData?.email || currentUserEmail || "unknown",
         company_id: companyId,

@@ -62,6 +62,32 @@ const STEPS = [
   { id: 4, title: "Media", description: "Upload product media files" },
 ]
 
+// Price validation functions
+const validatePriceInput = (value: string): boolean => {
+  // Allow empty string, numbers, and decimal point
+  const regex = /^(\d*\.?\d{0,2}|\d+\.)$/;
+  return regex.test(value);
+};
+
+const formatPriceOnBlur = (value: string): string => {
+  if (!value || value === '') return '0';
+  const num = parseFloat(value);
+  if (isNaN(num)) return '0';
+  return num.toFixed(2);
+};
+
+const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>, setPrice: (value: string) => void) => {
+  const value = e.target.value;
+  if (validatePriceInput(value)) {
+    setPrice(value);
+  }
+};
+
+const handlePriceBlur = (e: React.FocusEvent<HTMLInputElement>, setPrice: (value: string) => void) => {
+  const value = e.target.value;
+  const formatted = formatPriceOnBlur(value);
+  setPrice(formatted);
+};
 export default function BusinessEditProductPage() {
   const params = useParams()
   const router = useRouter()
@@ -136,7 +162,7 @@ export default function BusinessEditProductPage() {
         // Initialize form data with product data
         setProductName(productData.name || "")
         setDescription(productData.description || "")
-        setPrice(productData.price ? String(productData.price) : "")
+        setPrice(productData.price ? formatPriceOnBlur(String(productData.price)) : "0")
 
         setFormData({
           name: productData.name || "",
@@ -738,7 +764,8 @@ export default function BusinessEditProductPage() {
                 type="text"
                 placeholder="e.g., LED Billboard 10x20"
                 value={productName}
-                onChange={handleInputChange}
+                onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                 required
               />
             </div>
@@ -749,7 +776,8 @@ export default function BusinessEditProductPage() {
                 name="description"
                 placeholder="A brief description of the product..."
                 value={description}
-                onChange={handleInputChange}
+                onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                 rows={4}
               />
             </div>
@@ -757,11 +785,12 @@ export default function BusinessEditProductPage() {
               <Label htmlFor="price">Price</Label>
               <Input
                 id="price"
-                name="price"
+                
                 type="number"
                 placeholder="0.00"
                 value={price}
-                onChange={handleInputChange}
+                onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                 step="0.01"
                 required
               />
@@ -794,7 +823,8 @@ export default function BusinessEditProductPage() {
                   name="cms.start_time"
                   type="time"
                   value={formData.cms.start_time || ""}
-                  onChange={handleInputChange}
+                  onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                   required
                 />
               </div>
@@ -806,7 +836,8 @@ export default function BusinessEditProductPage() {
                   name="cms.end_time"
                   type="time"
                   value={formData.cms.end_time || ""}
-                  onChange={handleInputChange}
+                  onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                   required
                 />
               </div>
@@ -818,7 +849,8 @@ export default function BusinessEditProductPage() {
                   name="cms.spot_duration"
                   type="number"
                   value={formData.cms.spot_duration || ""}
-                  onChange={handleInputChange}
+                  onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                   placeholder="Enter duration in seconds"
                   required
                 />
@@ -831,7 +863,8 @@ export default function BusinessEditProductPage() {
                   name="cms.loops_per_day"
                   type="number"
                   value={formData.cms.loops_per_day || ""}
-                  onChange={handleInputChange}
+                  onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                   placeholder="Enter spots per loop"
                   required
                 />
@@ -948,7 +981,8 @@ export default function BusinessEditProductPage() {
                   name="specs_rental.traffic_count"
                   type="number"
                   value={formData.specs_rental.traffic_count || ""}
-                  onChange={handleInputChange}
+                  onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                   placeholder="Enter average daily traffic count"
                   min="0"
                   disabled={loading}
@@ -962,7 +996,8 @@ export default function BusinessEditProductPage() {
                   name="specs_rental.elevation"
                   type="number"
                   value={formData.specs_rental.elevation || ""}
-                  onChange={handleInputChange}
+                  onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                   placeholder="Enter elevation from ground level in feet"
                   min="0"
                   step="0.01"
@@ -979,7 +1014,8 @@ export default function BusinessEditProductPage() {
                   name="specs_rental.height"
                   type="number"
                   value={formData.specs_rental.height || ""}
-                  onChange={handleInputChange}
+                  onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                   placeholder="Enter height in feet"
                   min="0"
                   step="0.01"
@@ -994,7 +1030,8 @@ export default function BusinessEditProductPage() {
                   name="specs_rental.width"
                   type="number"
                   value={formData.specs_rental.width || ""}
-                  onChange={handleInputChange}
+                  onChange={(e) => handlePriceChange(e, setPrice)}
+                onBlur={(e) => handlePriceBlur(e, setPrice)}
                   placeholder="Enter width in feet"
                   min="0"
                   step="0.01"
