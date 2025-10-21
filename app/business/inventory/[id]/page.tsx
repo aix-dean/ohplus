@@ -1035,6 +1035,14 @@ export default function BusinessProductDetailPage({ params }: Props) {
     setPriceUnit(siteType === "static" ? "per month" : "per spot")
   }, [siteType])
 
+  // Update category when site type changes
+  useEffect(() => {
+    const categories = siteType === "static"
+      ? ["Billboard", "Wallboard", "Transit Ads", "Column", "Bridgeway billboard", "Banner", "Lampost", "Lightbox", "Building Wrap", "Gantry", "Toll Plaza"]
+      : ["Digital Billboard", "LED Poster", "Digital Transit Ads"]
+    setCategory(categories[0])
+  }, [siteType])
+
   const handleBack = () => {
     router.back()
   }
@@ -1627,6 +1635,14 @@ export default function BusinessProductDetailPage({ params }: Props) {
 
             {/* Action Buttons */}
             <div className="border-t pt-4 space-y-2">
+              <Button
+                variant="outline"
+                className="w-full h-[47px] bg-[#737fff] hover:bg-[#5a67d8] text-white border-[#737fff]"
+                onClick={handleEdit}
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Site
+              </Button>
               <Button
                 variant="outline"
                 className="w-full h-[47px] bg-[#737fff] hover:bg-[#5a67d8] text-white border-[#737fff]"
