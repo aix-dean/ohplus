@@ -1559,7 +1559,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
                       color: '#333333'
                     }}
                   >
-                    {product.specs_rental?.site_orientation || ""}
+                    {product.specs_rental?.site_orientation || "N/A"}
                   </span>
                 </div>
                 <div>
@@ -1585,7 +1585,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
                       color: '#333333'
                     }}
                   >
-                    {product.site_owner || ""}
+                    {product.site_owner || "N/A"}
                   </span>
                 </div>
                 <div>
@@ -1611,7 +1611,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
                       color: '#333333'
                     }}
                   >
-                    {product.specs_rental?.land_owner || ""}
+                    {product.specs_rental?.land_owner || "N/A"}
                   </span>
                 </div>
                 <div>
@@ -1637,7 +1637,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
                       color: '#333333'
                     }}
                   >
-                    {product.partner || ""}
+                    {product.partner || "N/A"}
                   </span>
                 </div>
               </div>
