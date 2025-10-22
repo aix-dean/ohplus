@@ -1,23 +1,10 @@
 {
   "mcpServers": {
-    "@magicuidesign/mcp": {
+    "sequentialthinking": {
       "command": "npx",
       "args": [
         "-y",
-        "@magicuidesign/mcp@latest"
-      ]
-    },
-    "figma-dev-mode": {
-      "type": "sse",
-      "url": "http://127.0.0.1:3845/sse",
-      "disabled": false,
-      "alwaysAllow": []
-    },
-    "memory": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-memory"
+        "@modelcontextprotocol/server-sequential-thinking"
       ]
     }
   }
