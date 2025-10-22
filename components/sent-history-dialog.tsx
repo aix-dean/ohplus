@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { format } from "date-fns"
 import { ArrowLeft, X } from "lucide-react"
+import { searchEmails } from "@/lib/algolia-service"
 
 interface SentHistoryDialogProps {
   open: boolean
@@ -25,7 +26,7 @@ interface EmailRecord {
   attachments: any[]
 }
 
-export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, companyId, emailType = "proposal", emailToShow }: SentHistoryDialogProps) {
+export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, companyId, emailType, emailToShow }: SentHistoryDialogProps) {
   const [emails, setEmails] = useState<EmailRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null)
@@ -36,8 +37,59 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, co
   useEffect(() => {
     if (open && emailToShow) {
       setSelectedEmail(emailToShow)
+      setCurrentView('detail')
+    } else if (open && (proposalId || reportId)) {
+      // Fetch emails for the specific item
+      fetchEmails()
     }
-  }, [open, emailToShow])
+  }, [open, emailToShow, proposalId, reportId])
+
+  const fetchEmails = async () => {
+    if (!companyId) return
+
+    setLoading(true)
+    try {
+      let filters = `company_id:${companyId} AND email_type:${emailType}`
+      const additionalFilters = []
+
+      if (reportId) {
+        additionalFilters.push(`report_id:${reportId}`)
+      } else if (proposalId) {
+        additionalFilters.push(`proposal_id:${proposalId}`)
+      }
+
+      if (additionalFilters.length > 0) {
+        filters += ` AND (${additionalFilters.join(' OR ')})`
+      }
+
+      const searchResponse = await searchEmails('', companyId, 0, 50, filters)
+      if (searchResponse.error) {
+        console.error("Search error:", searchResponse.error)
+        setEmails([])
+      } else {
+        // Map Algolia results to EmailRecord format
+        const emailRecords: EmailRecord[] = searchResponse.hits.map(hit => ({
+          id: (hit as any).id,
+          sentAt: new Date((hit as any).sentAt), // Assuming sentAt is ISO string
+          subject: (hit as any).subject,
+          to: Array.isArray((hit as any).to) ? (hit as any).to : [(hit as any).to], // Ensure array
+          cc: (hit as any).cc ? (Array.isArray((hit as any).cc) ? (hit as any).cc : [(hit as any).cc]) : undefined,
+          body: (hit as any).body,
+          attachments: (hit as any).attachments || []
+        }))
+        setEmails(emailRecords)
+        if (emailRecords.length > 0) {
+          setSelectedEmail(emailRecords[0])
+          setCurrentView('detail')
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching emails:", error)
+      setEmails([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
 
   const handleAttachmentClick = (attachment: any) => {
@@ -53,8 +105,9 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, co
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogTitle className="sr-only p-0 gap-0 m-0">Email</DialogTitle>
       <DialogContent className="w-[750px] max-w-[95vw] bg-white rounded-md p-0 border-0 shadow-xl">
-        <DialogTitle className="sr-only p-0 gap-0 m-0">Email</DialogTitle>
+        
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-4">
           <button

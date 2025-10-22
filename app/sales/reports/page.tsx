@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { ReportDialog } from "@/components/report-dialog"
+import { SentHistoryDialog } from "@/components/sent-history-dialog"
 import { useResponsive } from "@/hooks/use-responsive"
 import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -34,6 +35,8 @@ export default function SalesReportsPage() {
   const [postedReportId, setPostedReportId] = useState<string>("")
   const [showReportDialog, setShowReportDialog] = useState(false)
   const [selectedReport, setSelectedReport] = useState<ReportData | null>(null)
+  const [showSentHistoryDialog, setShowSentHistoryDialog] = useState(false)
+  const [selectedReportForHistory, setSelectedReportForHistory] = useState<ReportData | null>(null)
 
   const router = useRouter()
   const { user, userData } = useAuth()
@@ -199,8 +202,9 @@ export default function SalesReportsPage() {
     }
   }
 
-  const handleViewSentHistory = (reportId: string) => {
-    router.push(`/sales/reports/sent-history?reportId=${reportId}`)
+  const handleViewSentHistory = (report: ReportData) => {
+    setSelectedReportForHistory(report)
+    setShowSentHistoryDialog(true)
   }
 
   const { isMobile } = useResponsive()
@@ -224,7 +228,7 @@ export default function SalesReportsPage() {
           className="border-gray-400 rounded-[5px] w-[103px] h-[24px] text-xs"
           onClick={() => router.push('/sales/reports/sent-history')}
         >
-          Sent History
+          All Sent History
         </Button>
       </div>
 
@@ -339,7 +343,7 @@ export default function SalesReportsPage() {
                             <Printer className="mr-2 h-4 w-4" />
                             Print Report
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewSentHistory(report.id!); }}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewSentHistory(report as ReportData); }}>
                             <History className="mr-2 h-4 w-4" />
                             View Sent History
                           </DropdownMenuItem>
@@ -394,7 +398,7 @@ export default function SalesReportsPage() {
                             <Printer className="mr-2 h-4 w-4" />
                             Print Report
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewSentHistory(report.id!); }}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewSentHistory(report as ReportData); }}>
                             <History className="mr-2 h-4 w-4" />
                             View Sent History
                           </DropdownMenuItem>
@@ -446,6 +450,15 @@ export default function SalesReportsPage() {
 
       {/* Report Details Dialog */}
       <ReportDialog open={showReportDialog} onOpenChange={setShowReportDialog} selectedReport={selectedReport} />
+
+      {/* Sent History Dialog */}
+      <SentHistoryDialog
+        open={showSentHistoryDialog}
+        onOpenChange={setShowSentHistoryDialog}
+        reportId={selectedReportForHistory?.id}
+        companyId={userData?.company_id || undefined}
+        emailType="report"
+      />
     </div>
   )
 }
