@@ -1,34 +1,51 @@
-/// <reference types="vitest" />
-import { defineConfig } from 'vitest/config'
-import path from 'path'
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import path from 'path';
 
 export default defineConfig({
+  plugins: [react()],
   test: {
     environment: 'jsdom',
+    setupFiles: ['./__tests__/setup.ts'],
     globals: true,
-    silent: true,
-    logHeapUsage: false,
-    clearMocks: true,
+    include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    exclude: ['node_modules', 'dist', '.next', '.vercel'],
     coverage: {
-      enabled: true,
-      reporter: ['text', 'json', 'html'],
-      include: [
-        'lib/utils.ts',
-        'lib/types/proposal.ts',
-        'components/blank-page-editor.tsx',
-        'app/sales/proposals/[id]/page.tsx'
+      provider: 'v8',
+      reporter: ['text', 'json', 'html', 'lcov'],
+      exclude: [
+        'coverage/**',
+        'dist/**',
+        'packages/*/test{,s}/**',
+        '**/*.d.ts',
+        'cypress/**',
+        'test{,s}/**',
+        'test{,-*}.{js,cjs,mjs,ts,tsx,jsx}',
+        '**/*{.,-}test.{js,cjs,mjs,ts,tsx,jsx}',
+        '**/*{.,-}spec.{js,cjs,mjs,ts,tsx,jsx}',
+        '**/__tests__/**',
+        '**/{karma,rollup,webpack,vite,vitest,jest,ava,babel,nyc,cypress,tsup,build}.config.*',
+        '**/.{eslint,mocha,prettier}rc.{js,cjs,yml}',
+        'next.config.mjs',
+        'postcss.config.mjs',
+        'tailwind.config.ts'
       ],
-      exclude: ['**/*.test.js', '**/*.spec.js'],
+      all: true,
+      lines: 80,
+      functions: 80,
+      branches: 80,
+      statements: 80
     },
-    testMatch: [
-      '**/__tests__/**/*.?([mc])[jt]s?(x)',
-      '**/?(*.)+(spec|test).?([mc])[jt]s?(x)',
-      '**/*.test.js',
-    ],
+    testTimeout: 10000,
+    hookTimeout: 10000,
+    teardownTimeout: 10000
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './'),
-    },
+      '@': path.resolve(__dirname, './')
+    }
   },
-})
+  esbuild: {
+    target: 'es2020'
+  }
+});

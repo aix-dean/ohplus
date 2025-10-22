@@ -1,31 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createDirectQuotation, createMultipleQuotations } from '@/lib/quotation-service'
 
-// Mock Firebase
-vi.mock('@/lib/firebase', () => ({
-  db: {},
-}))
+
 
 // Mock console.log to suppress verbose output
 const mockConsoleLog = vi.fn()
 console.log = mockConsoleLog
 
-vi.mock('firebase/firestore', () => ({
-  collection: vi.fn(),
-  addDoc: vi.fn(() => Promise.resolve({ id: 'test-doc-id' })),
-  serverTimestamp: vi.fn(() => new Date()),
-  getDoc: vi.fn(),
-  doc: vi.fn(),
-  updateDoc: vi.fn(),
-  query: vi.fn(),
-  where: vi.fn(),
-  getDocs: vi.fn(),
-  orderBy: vi.fn(),
-  limit: vi.fn(),
-  Timestamp: {
-    fromDate: vi.fn((date) => date),
-  },
-}))
+
 
 describe('Quotation Service - Content Type Capitalization', () => {
   beforeEach(() => {
