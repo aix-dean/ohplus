@@ -168,7 +168,7 @@ export function CreateServiceAssignmentForm({
 }) {
   return (
     <div className="flex flex-col lg:flex-row  p-4">
-      <div className="flex flex-col gap-6 w-full lg:w-[60%]">
+      <div className="flex flex-col gap-6 w-full lg:w-[75%]">
         <ServiceAssignmentCard
           companyId={companyId}
           productId={productId}
@@ -181,7 +181,7 @@ export function CreateServiceAssignmentForm({
           onOpenProductSelection={onOpenProductSelection}
         />
       </div>
-      <div className="flex flex-col gap-6 w-full lg:w-[40%]">
+      <div className="flex flex-col gap-6 w-full lg:w-[25%]">
         {jobOrderData ? (
           <JobOrderDetailsCard
             jobOrder={jobOrderData}
@@ -189,8 +189,8 @@ export function CreateServiceAssignmentForm({
           />
         ) : (
           onIdentifyJO && (
-            <Card className="w-full">
-              <CardContent className="flex justify-center items-center p-4">
+            <Card className="w-full aspect-square bg-[#E6F5FF] border-[3px] border-dashed border-[#00D0FF]">
+              <CardContent className="flex justify-center items-center h-full p-4">
                 <Button variant="outline" className="bg-white text-gray-700 border-gray-300" onClick={onIdentifyJO}>
                   <Search className="h-4 w-4 mr-2" />
                   Identify JO

@@ -17,7 +17,7 @@ export function ActionButtons({
       </Button>
       <Button onClick={onSubmit} disabled={loading}>
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Submit SA
+        {loading ? "Creating SA..." : "Submit SA"}
       </Button>
     </div>
   );

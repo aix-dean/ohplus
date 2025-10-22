@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarIcon, Search, X, ArrowRight } from 'lucide-react';
@@ -330,36 +331,46 @@ export function ServiceAssignmentCard({
   };
 
   return (
-    <Card className="w-[90%]">
-      <CardHeader>
-        <CardTitle>
-           <div className="flex justify-between items-center bg-gray-100 p-2 rounded-md">
-             <div className="flex flex-col">
-               <span className="text-xl font-bold">
-                 {products.find(p => p.id === productId)?.site_code || products.find(p => p.id === productId)?.id?.substring(0, 8) || "-"}
-               </span>
-              <span className="text-base text-gray-500">
-                {products.find(p => p.id === productId)?.name || (
-                  <>
-                    Select Project Site
-                    <span className="text-red-500">*</span>
-                  </>
-                )}
-              </span>
+    <Card className="w-[90%] aspect-square bg-white border-3 border-dashed border-[#00D0FF] text-center">
+      <CardContent className="flex flex-col lg:flex-row gap-4 p-4">
+        <div className="flex flex-col gap-4 w-full lg:w-2/5">
+          {/* Products card */}
+          <Card className="aspect-square bg-[#E2E2E2] text-black p-4 flex flex-col justify-center items-center">
+            <div className="flex flex-col items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onOpenProductSelection}
+                className="rounded-full"
+              >
+                {productId ? "Change Site" : "Select Site"}
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenProductSelection}
-              className="ml-4"
-            >
-              {productId ? "Change Site" : "Select Site"}
-            </Button>
+          </Card>
+          {/* Site Name */}
+          <div className="flex items-center">
+            <span className="flex-1 text-left">
+              {products.find(p => p.id === productId)?.name || "Select Project Site"}
+            </span>
           </div>
-        </CardTitle>
-      </CardHeader>
-      <div className="flex flex-col lg:flex-row gap-4 p-4">
-        <div className="flex flex-col gap-4 w-full lg:w-[70%]">
+          {/* Site Location */}
+          <div className="flex items-center">
+            <span className="flex-1 text-left">
+              {products.find(p => p.id === productId)?.site_code || "-"}
+            </span>
+          </div>
+          {/* Remarks */}
+          <div className="flex items-center">
+            <Textarea
+              id="remarks"
+              placeholder="Add any remarks here"
+              value={formData.remarks}
+              onChange={(e) => handleInputChange("remarks", e.target.value)}
+              className="flex-1 aspect-square resize-none"
+            />
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 w-full lg:w-3/5">
           <div className="flex justify-between items-start mb-4">
             <div className="flex flex-col text-sm">
               <p>SA#: {saNumber}</p>
@@ -369,278 +380,248 @@ export function ServiceAssignmentCard({
             </div>
             <p className="text-sm">{currentTime}</p>
           </div>
-          <CardContent className="grid gap-4">
-            {/* Service Type - Row Layout */}
+          {/* Service Type */}
+          <div className="flex items-center space-x-4">
+            <Label htmlFor="serviceType" className="w-32 flex-shrink-0">Service Type:</Label>
+            <Select value={formData.serviceType} onValueChange={(value) => handleInputChange("serviceType", value)}>
+              <SelectTrigger id="serviceType" className="flex-1">
+                <SelectValue placeholder="Select service type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Roll Up">Roll Up</SelectItem>
+                <SelectItem value="Roll Down">Roll Down</SelectItem>
+                <SelectItem value="Monitoring">Monitoring</SelectItem>
+                <SelectItem value="Change Material">Change Material</SelectItem>
+                <SelectItem value="Maintenance">Maintenance</SelectItem>
+                <SelectItem value="Repair">Repair</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Campaign Name */}
+          {formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair" && (
             <div className="flex items-center space-x-4">
-              <Label htmlFor="serviceType" className="w-32 flex-shrink-0">Service Type:</Label>
-              <Select value={formData.serviceType} onValueChange={(value) => handleInputChange("serviceType", value)}>
-                <SelectTrigger id="serviceType" className="flex-1">
-                  <SelectValue placeholder="Select service type" />
+              <Label htmlFor="campaignName" className="w-32 flex-shrink-0">
+                Campaign Name: <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="campaignName"
+                placeholder="Enter campaign name"
+                value={formData.campaignName || ""}
+                onChange={(e) => handleInputChange("campaignName", e.target.value)}
+                className="flex-1"
+                required
+              />
+            </div>
+          )}
+          {/* Service Start Date */}
+          <div className="flex items-center space-x-4">
+            <Label className="w-32 flex-shrink-0">
+              {["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) ? "Service Date:" : "Service Start Date:"}
+            </Label>
+            <div className="flex-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
+                      !formData.startDate && "text-gray-500",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                    {formData.startDate ? (
+                      format(formData.startDate, "PPP")
+                    ) : (
+                      <span>Choose Date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.startDate || undefined}
+                    onSelect={(date) => handleInputChange("startDate", date || null)}
+                    disabled={{ before: new Date() }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          {/* Service End Date */}
+          <div className="flex items-center space-x-4">
+            <Label className="w-32 flex-shrink-0">Service End Date:</Label>
+            <div className="flex-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
+                      !formData.endDate && "text-gray-500",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                    {formData.endDate ? (
+                      format(formData.endDate, "PPP")
+                    ) : (
+                      <span>Choose Date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.endDate || undefined}
+                    onSelect={(date) => handleInputChange("endDate", date || null)}
+                    disabled={{ before: new Date() }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+          {/* Service Duration */}
+          <div className="flex items-center space-x-4">
+            <Label htmlFor="serviceDuration" className="w-32 flex-shrink-0">Service Duration:</Label>
+            <div className="flex-1 flex items-center space-x-2">
+              <Input
+                id="serviceDuration"
+                type="number"
+                placeholder="0"
+                value={formData.serviceDuration || ""}
+                onChange={(e) => handleInputChange("serviceDuration", parseInt(e.target.value) || 0)}
+                className="flex-1"
+                min="0"
+              />
+              <span className="text-sm text-gray-600 whitespace-nowrap">days</span>
+            </div>
+          </div>
+          {/* Material Specs */}
+          {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
+            <div className="flex items-center space-x-4">
+              <Label htmlFor="materialSpecs" className="w-32 flex-shrink-0">
+                Material Specs: <span className="text-red-500">*</span>
+              </Label>
+              <Select value={formData.materialSpecs} onValueChange={(value) => handleInputChange("materialSpecs", value)}>
+                <SelectTrigger id="materialSpecs" className="flex-1">
+                  <SelectValue placeholder="Select material" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Roll Up">Roll Up</SelectItem>
-                  <SelectItem value="Roll Down">Roll Down</SelectItem>
-                  <SelectItem value="Monitoring">Monitoring</SelectItem>
-                  <SelectItem value="Change Material">Change Material</SelectItem>
-                  <SelectItem value="Maintenance">Maintenance</SelectItem>
-                  <SelectItem value="Repair">Repair</SelectItem>
+                  <SelectItem value="Tarpaulin">Tarpaulin</SelectItem>
+                  <SelectItem value="Sticker">Sticker</SelectItem>
+                  <SelectItem value="Digital File">Digital File</SelectItem>
+                  <SelectItem value="Others">Others</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Campaign Name - Row Layout */}
-            {formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair" && (
-              <div className="flex items-center space-x-4">
-                <Label htmlFor="campaignName" className="w-32 flex-shrink-0">
-                  Campaign Name: <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="campaignName"
-                  placeholder="Enter campaign name"
-                  value={formData.campaignName || ""}
-                  onChange={(e) => handleInputChange("campaignName", e.target.value)}
-                  className="flex-1"
-                  required
-                />
-              </div>
-            )}
-
-            {/* Service Start Date - Row Layout */}
-            <div className="flex items-center space-x-4">
-              <Label className="w-32 flex-shrink-0">
-                {["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) ? "Service Date:" : "Service Start Date:"}
-              </Label>
-              <div className="flex-1">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
-                        !formData.startDate && "text-gray-500",
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                      {formData.startDate ? (
-                        format(formData.startDate, "PPP")
+          )}
+          {/* Attachment */}
+          <div className="flex items-start space-x-4">
+            <Label htmlFor="attachment" className="w-32 flex-shrink-0 pt-2">Attachment:</Label>
+            <div className="flex-1">
+              {formData.serviceType === "Change Material" ? (
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <div className="relative">
+                      {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
+                        <img
+                          src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
+                          alt="Old Material"
+                          className="rounded-md h-32 w-32 object-cover"
+                        />
                       ) : (
-                        <span>Choose Date</span>
+                        <img src="https://via.placeholder.com/150" alt="Old Material" className="rounded-md h-32 w-32 object-cover" />
                       )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.startDate || undefined}
-                      onSelect={(date) => handleInputChange("startDate", date || null)}
-                      disabled={{ before: new Date() }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-
-            {/* Service End Date - Row Layout */}
-            <div className="flex items-center space-x-4">
-              <Label className="w-32 flex-shrink-0">Service End Date:</Label>
-              <div className="flex-1">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
-                        !formData.endDate && "text-gray-500",
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                      {formData.endDate ? (
-                        format(formData.endDate, "PPP")
-                      ) : (
-                        <span>Choose Date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.endDate || undefined}
-                      onSelect={(date) => handleInputChange("endDate", date || null)}
-                      disabled={{ before: new Date() }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-4">
-              <Label htmlFor="serviceDuration" className="w-32 flex-shrink-0">Service Duration:</Label>
-              <div className="flex-1 flex items-center space-x-2">
-                <Input
-                  id="serviceDuration"
-                  type="number"
-                  placeholder="0"
-                  value={formData.serviceDuration || ""}
-                  onChange={(e) => handleInputChange("serviceDuration", parseInt(e.target.value) || 0)}
-                  className="flex-1"
-                  min="0"
-                />
-                <span className="text-sm text-gray-600 whitespace-nowrap">days</span>
-              </div>
-            </div>
-
-            {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
-              <div className="flex items-center space-x-4">
-                <Label htmlFor="materialSpecs" className="w-32 flex-shrink-0">
-                  Material Specs: <span className="text-red-500">*</span>
-                </Label>
-                <Select value={formData.materialSpecs} onValueChange={(value) => handleInputChange("materialSpecs", value)}>
-                  <SelectTrigger id="materialSpecs" className="flex-1">
-                    <SelectValue placeholder="Select material" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Tarpaulin">Tarpaulin</SelectItem>
-                    <SelectItem value="Sticker">Sticker</SelectItem>
-                    <SelectItem value="Digital File">Digital File</SelectItem>
-                    <SelectItem value="Others">Others</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="flex items-start space-x-4">
-              <Label htmlFor="attachment" className="w-32 flex-shrink-0 pt-2">Attachment:</Label>
-              <div className="flex-1">
-                {formData.serviceType === "Change Material" ? (
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <div className="relative">
-                        {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
-                          <img
-                            src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
-                            alt="Old Material"
-                            className="rounded-md h-32 w-32 object-cover"
-                          />
-                        ) : (
-                          <img src="https://via.placeholder.com/150" alt="Old Material" className="rounded-md h-32 w-32 object-cover" />
-                        )}
-                        <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-center">
-                      <ArrowRight className="h-8 w-8" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="relative">
-                        {(selectedJobOrder?.attachments as any)?.url ? (
-                          <img
-                            src={(selectedJobOrder?.attachments as any).url}
-                            alt="New Material"
-                            className="rounded-md h-32 w-32 object-cover"
-                          />
-                        ) : (
-                          <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-32 object-cover" />
-                        )}
-                        <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
-                      </div>
+                      <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
                     </div>
                   </div>
+                  <div className="flex items-center justify-center">
+                    <ArrowRight className="h-8 w-8" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="relative">
+                      {(selectedJobOrder?.attachments as any)?.url ? (
+                        <img
+                          src={(selectedJobOrder?.attachments as any).url}
+                          alt="New Material"
+                          className="rounded-md h-32 w-32 object-cover"
+                        />
+                      ) : (
+                        <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-32 object-cover" />
+                      )}
+                      <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
+                  <img
+                    src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
+                    alt="Site Image"
+                    className="rounded-md h-32 w-32 object-cover"
+                  />
                 ) : (
-                  selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
-                    <img
-                      src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
-                      alt="Site Image"
-                      className="rounded-md h-32 w-32 object-cover"
-                    />
-                  ) : (
-                    <img src="https://via.placeholder.com/150" alt="Attachment" className="rounded-md h-32 w-32 object-cover" />
-                  )
-                )}
-              </div>
+                  <img src="https://via.placeholder.com/150" alt="Attachment" className="rounded-md h-32 w-32 object-cover" />
+                )
+              )}
             </div>
-
+          </div>
+          {/* Crew */}
+          <div className="flex items-center space-x-4">
+            <Label htmlFor="crew" className="w-32 flex-shrink-0">
+              Crew: <span className="text-red-500">*</span>
+            </Label>
+            <Select value={formData.crew} onValueChange={(value) => {
+              if (value === "add-new-team") {
+                handleInputChange("crew", value);
+              } else {
+                handleInputChange("crew", value);
+                handleInputChange("assignedTo", value);
+              }
+            }}>
+              <SelectTrigger id="crew" className="flex-1">
+                <SelectValue placeholder="Choose a Crew" />
+              </SelectTrigger>
+              <SelectContent>
+                {teams.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name}
+                  </SelectItem>
+                ))}
+                <SelectItem value="add-new-team">+ Add New Team</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Gondola */}
+          {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
             <div className="flex items-center space-x-4">
-              <Label htmlFor="remarks" className="w-32 flex-shrink-0">Remarks:</Label>
+              <Label className="w-32 flex-shrink-0">Gondola:</Label>
+              <Select value={formData.gondola} onValueChange={(value) => handleInputChange("gondola", value)}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Select Yes or No" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          {/* Logistics */}
+          {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
+            <div className="flex items-center space-x-4">
+              <Label className="w-32 flex-shrink-0">Logistics:</Label>
               <Input
-                id="remarks"
-                placeholder="Add any remarks here"
-                value={formData.remarks}
-                onChange={(e) => handleInputChange("remarks", e.target.value)}
+                placeholder="Enter logistics details"
+                value={formData.sales}
+                onChange={(e) => handleInputChange("sales", e.target.value)}
                 className="flex-1"
               />
             </div>
-
-            <div className="flex items-center space-x-4">
-              <Label htmlFor="crew" className="w-32 flex-shrink-0">
-                Crew: <span className="text-red-500">*</span>
-              </Label>
-              <Select value={formData.crew} onValueChange={(value) => {
-                if (value === "add-new-team") {
-                  // This will be handled by the parent component
-                  handleInputChange("crew", value);
-                } else {
-                  handleInputChange("crew", value);
-                  handleInputChange("assignedTo", value);
-                }
-              }}>
-                <SelectTrigger id="crew" className="flex-1">
-                  <SelectValue placeholder="Choose a Crew" />
-                </SelectTrigger>
-                <SelectContent>
-                  {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>
-                      {team.name}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="add-new-team">+ Add New Team</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-
-            {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
-              <div className="flex items-center space-x-4">
-                <Label className="w-32 flex-shrink-0">Gondola:</Label>
-                <Select value={formData.gondola} onValueChange={(value) => handleInputChange("gondola", value)}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select Yes or No" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Yes">Yes</SelectItem>
-                    <SelectItem value="No">No</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
-              <div className="flex items-center space-x-4">
-                <Label className="w-32 flex-shrink-0">Logistics:</Label>
-                <Input
-                  placeholder="Enter logistics details"
-                  value={formData.sales}
-                  onChange={(e) => handleInputChange("sales", e.target.value)}
-                  className="flex-1"
-                />
-              </div>
-            )}
-          </CardContent>
+          )}
         </div>
-        <div className="flex flex-col gap-4 w-full lg:w-[30%]">
-           {/* Job order details are now shown in the sidebar */}
-           {/*
-           {showJobOrderDetails && selectedJobOrder && (
-             <JobOrderDetailsCard
-               jobOrder={selectedJobOrder}
-               onHide={handleHideJobOrderDetails}
-               onChange={handleChangeJobOrder}
-             />
-           )}
-           */}
-         </div>
-       </div>
+      </CardContent>
 
 
 
