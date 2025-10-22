@@ -81,8 +81,8 @@ const SelectServiceAssignmentPage = () => {
 
   const handleReportTypeSelect = (reportType: "progress" | "completion") => {
     if (selectedAssignment) {
-      // Navigate to the appropriate report page with the selected assignment and report type
-      router.push(`/logistics/reports/${reportType}/${selectedAssignment.id}`)
+      // Navigate to the create report page with the selected assignment
+      router.push(`/logistics/reports/create/${selectedAssignment.id}`)
     }
   }
 
@@ -131,7 +131,7 @@ const SelectServiceAssignmentPage = () => {
         </div>
 
         <div className="bg-white rounded-t-lg overflow-hidden shadow-sm">
-          <div className="grid grid-cols-8 gap-4 p-4 border-b border-gray-200 text-sm font-medium bg-gray-50">
+          <div className="grid grid-cols-8 gap-4 p-4 border-b border-gray-200 text-sm font-medium">
             <div>Date</div>
             <div>SA I.D.</div>
             <div>Type</div>
@@ -142,7 +142,7 @@ const SelectServiceAssignmentPage = () => {
             <div>Status</div>
           </div>
 
-          <div className="p-4 space-y-4">
+          <div className="p-4 space-y-2">
             {filteredAssignments.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No service assignments found

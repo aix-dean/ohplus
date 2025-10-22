@@ -2,7 +2,7 @@
 
 import { useCallback } from "react"
 import Image from "next/image"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 
 interface ReportTypeDialogProps {
   isOpen: boolean
@@ -23,6 +23,7 @@ const ReportTypeDialog = ({ isOpen, onClose, onSelectReport }: ReportTypeDialogP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogTitle></DialogTitle>
       <DialogContent className="w-[283px] h-[175px] p-0 border-0 bg-transparent shadow-none">
         <div className="w-full h-full relative text-center text-xs text-darkslategray font-inter">
           <div className="absolute top-[-0.17px] left-[0px] rounded-[11.98px] bg-white w-[283px] h-44 shadow-lg" />
