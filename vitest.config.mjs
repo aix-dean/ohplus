@@ -6,6 +6,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    silent: true,
+    logHeapUsage: false,
     clearMocks: true,
     coverage: {
       enabled: true,

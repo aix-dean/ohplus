@@ -611,8 +611,7 @@ export default function ProposalDetailsPage() {
               dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
-              srp: product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A',
-              additionalMessage: (product as any).additionalMessage || ''
+              srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'
             }
           })
           setEditableProducts(products)
@@ -2548,55 +2547,20 @@ export default function ProposalDetailsPage() {
             ) : null}
 
             {/* SRP */}
-            {isEditMode || fieldVisibility[product.id]?.srp !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">SRP:</p>
-                {isEditMode ? (
-                  <input
-                    value={editableProducts[product.id]?.srp || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
-                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
-                  />
-                ) : (
-                  <p className="font-normal text-[18px]">
-                    {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
-                  </p>
-                )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        srp: !prev[product.id]?.srp
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.srp !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.srp !== false ? "Hide SRP field" : "Show SRP field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ) : null}
-
-            {/* Additional Message */}
-            {((product as any).additionalMessage || isEditMode) && (
-              <div className="mb-2 flex items-start">
-                <p className="mb-0 mr-2 flex-shrink-0"></p>
-                {isEditMode ? (
-                  <textarea
-                    value={editableProducts[product.id]?.additionalMessage || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
-                    placeholder="Add Message"
-                    className="font-normal text-[16px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none flex-1 min-h-[60px] resize-none"
-                    rows={2}
-                  />
-                ) : (
-                  <p className="font-normal text-[16px]">{(product as any).additionalMessage}</p>
-                )}
-              </div>
-            )}
+            <div className="mb-2">
+              <p className="mb-0">SRP:</p>
+              {isEditMode ? (
+                <input
+                  value={editableProducts[product.id]?.srp || ''}
+                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
+                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                />
+              ) : (
+                <p className="font-normal text-[18px]">
+                  {product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -3320,7 +3284,7 @@ export default function ProposalDetailsPage() {
                               {product.specs_rental?.location || (product as any).light?.location || "Unknown location"}
                             </div>
                             <div className="text-xs text-black font-medium">
-                              ₱{product.price ? Number(product.price).toLocaleString() : "Not set"}
+                              ₱{product.price ? Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "Not set"}
                             </div>
                           </div>
                         </div>

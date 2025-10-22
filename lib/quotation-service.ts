@@ -301,10 +301,10 @@ const formatDate = (date: any) => {
 }
 
 // Helper to safely convert to string for PDF
-const safeString = (value: any): string => {
+export const safeString = (value: any): string => {
   if (value === null || value === undefined) return "N/A"
   if (typeof value === "string") return value
-  if (typeof value === "number") return value.toLocaleString()
+  if (typeof value === "number") return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   if (typeof value === "boolean") return value.toString()
   if (value && typeof value === "object") {
     if (value.id) return value.id.toString()

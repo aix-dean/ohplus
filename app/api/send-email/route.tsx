@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
@@ -150,8 +150,8 @@ async function checkEmailCompliance(domain: string): Promise<EmailComplianceInfo
 function validateFromAddress(from: string): { isValid: boolean, domain: string, recommendations: string[] } {
   const recommendations: string[] = []
 
-  // Extract domain from email address
-  const domainMatch = from.match(/@([^>]+)$/)
+  // Extract domain from email address (handle both "user@domain.com" and "Name <user@domain.com>" formats)
+  const domainMatch = from.match(/@([^>\s]+)(?:\s*>)?$/)
   if (!domainMatch) {
     return { isValid: false, domain: '', recommendations: ['Invalid email format in from address'] }
   }
@@ -297,6 +297,7 @@ function createUltraSimpleGmailTemplate(
   body: string,
   companyName?: string,
   userDisplayName?: string,
+  userPosition?: string,
   replyTo?: string,
   proposalId?: string
 ): string {
@@ -318,6 +319,7 @@ https://mrk.ohplus.ph/pr/${proposalId || ''}
 ---
 This email was sent from ${companyName || "Company"}
 Contact: ${userDisplayName || "Sales Executive"}
+${userPosition ? `${userPosition}` : ''}
 ${replyTo ? `Email: ${replyTo}` : ''}
 
 Note: If you're having trouble viewing this email, please add our email address to your contacts or safe senders list.
@@ -331,6 +333,7 @@ function createGmailCompatibleTemplate(
   companyWebsite?: string,
   companyAddress?: string,
   userDisplayName?: string,
+  userPosition?: string,
   replyTo?: string,
   companyLogo?: string,
   proposalId?: string,
@@ -370,17 +373,28 @@ function createGmailCompatibleTemplate(
         .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 .header {
     background: #ffffff;
-    padding: 30px 0 30px 20px; /* top right bottom left */
+    padding: 0 0 0 20px; /* top right bottom left */
     text-align: center;
     position: relative;
     overflow: hidden;
     width: 100%;
+    height: 130px;
 }
-        .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-        .header-square-1 { width: 120px; height: 10px; background: ${primaryColor}; opacity: 1.0; z-index: 2; margin-right: 10px; }
-        .header-square-2 { width: 100px; height: 10px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; }
-        .header-content { width: 70%; height: 100px; text-align: left; position: relative; z-index: 3; }
-        .company-name { color: #000000; font-size: 24px; font-weight: bold; margin: 0 0 10px 0; letter-spacing: 1px; }
+        .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 130px; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        .header-div { height: 130px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+        .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .header-content { width: 85%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px }
+        .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
+        .company-info {  flex: 1; padding-left: 15px; }
+.company-name {
+  color: #000000;
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-align: start;
+  margin: 0px;
+}
         .company-address { color: #000000; font-size: 14px; margin: 0; }
         .content { padding: 40px 30px; background-color: #f9f9f9; }
         .content p { margin: 0 0 16px 0; }
@@ -388,15 +402,17 @@ function createGmailCompatibleTemplate(
         .cta-section { text-align: center; margin: 30px 0; }
         .cta-button { display: inline-block; background: ${primaryColor}; color: #ffffff !important; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: 600; font-size: 16px; transition: transform 0.2s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
         .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
-        .footer { background: #ffffff; padding: 30px 0 30px 30px; color: #000000; position: relative; overflow: hidden; width: 100%; }
+        .footer { background: #ffffff; padding: 0 0 0 20px; color: #000000; position: relative; overflow: hidden; width: 100%; }
         .footer-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
-        .footer-square-1 { width: 120px; height: 139px; background: ${primaryColor}; opacity: 1.0; z-index: 2; margin-right: 10px; }
-        .footer-square-2 { width: 100px; height: 139px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; }
-        .footer-content { width: 70%; position: relative; z-index: 3; }
-        .footer-header { margin-bottom: 20px; }
-        .footer-company-name { font-size: 18px; font-weight: 600; margin: 0 0 5px 0; color: #000000; }
+        .footer-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+        .footer-square-1 { width: 80px; height: 160px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .footer-square-2 { width: 60px; height: 160px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .footer-content { width: 75%; position: relative; z-index: 3; }
+        .footer-header { position: absolute; display: flex; justify-content: flex-start;align-items: center; gap: 20px; padding-top:20px; }
+        .footer-logo { height: 40px; width: auto; max-width: 120px;  }
+        .footer-company-name { font-size: 18px; font-weight: 600; margin: 0px 15px; color: #000000; }
         .footer-website { color: #000000; font-size: 14px; margin: 0; }
-        .signature { margin-top: 25px; }
+        .signature { margin-top: 5px; }
         .signature-name { font-weight: 600; color: #000000; font-size: 16px; margin: 0; }
         .signature-title { color: #000000; font-size: 14px; margin: 0; }
         .contact-info { font-size: 14px; color: #000000; }
@@ -405,6 +421,7 @@ function createGmailCompatibleTemplate(
             .email-container { width: 100% !important; box-shadow: none; }
             .header, .content, .footer { padding: 20px !important; }
             .header-circles, .footer-circles { display: none !important; }
+            .header-content { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
             .company-name { font-size: 20px !important; }
             .cta-button { padding: 12px 24px !important; font-size: 14px !important; }
         }
@@ -413,15 +430,176 @@ function createGmailCompatibleTemplate(
 <body>
     <div class="email-container">
         <div class="header">
-
                 <div class="header-circles">
-                                <div class="header-content">
-                    <h1 class="company-name">${companyName || "Company"}</h1>
-                    ${companyAddress ? `<p class="company-address">${companyAddress}</p>` : ''}
+                    <div class="header-content">
+                        ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="header-logo">` : ''}
+                        <div class="company-info">
+                            <h1 class="company-name">${companyName || "Company"}</h1>
+                            ${companyAddress ? `<p class="company-address">${companyAddress}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="header-div">
+                        <div class="header-square-2"></div>
+                        <div class="header-square-1"></div>
+                    </div>
                 </div>
-                                    <div class="header-square-2"></div>
+        </div>
 
-                    <div class="header-square-1"></div>
+        <div class="content">
+            ${processedBody}
+
+            <div class="cta-section">
+                <a href="https://mrk.ohplus.ph/pr/${proposalId || ''}" class="cta-button">View Proposal</a>
+            </div>
+
+        </div>
+
+        <div class="footer">
+
+                <div class="footer-circles">
+                                <div class="footer-content">
+                    <div class="footer-header">
+                        ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
+                        <h3 class="footer-company-name">${companyName || "Company"}</h3>
+                        ${companyWebsite ? `<p class="footer-website">${companyWebsite}</p>` : ''}
+                    </div>
+
+                    <div class="signature">
+                        <h4 class="signature-name">${userDisplayName || "Sales Executive"}</h4>
+                        <p class="signature-title">${userPosition || "Sales Executive"}</p>
+                        <div class="contact-info">
+                            ${replyTo ? `<p style="margin: 0;">${replyTo}</p>` : ''}
+                            ${userPhoneNumber ? `<p style="margin: 0;"> ${userPhoneNumber}</p>` : ''}
+                        </div>
+                    </div>
+                </div>
+                    <div class="footer-div">
+                        <div class="footer-square-2"></div>
+                        <div class="footer-square-1"></div>
+                    </div>
+                </div>
+            </div>
+    </div>
+</body>
+</html>
+  `
+}
+
+function createEmailTemplate(
+  body: string,
+  userPhoneNumber?: string,
+  companyName?: string,
+  companyWebsite?: string,
+  companyAddress?: string,
+  userDisplayName?: string,
+  userPosition?: string,
+  replyTo?: string,
+  companyLogo?: string,
+  proposalId?: string,
+  dominantColor?: string,
+  proposalPassword?: string
+): string {
+  const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
+  const primaryColor = dominantColor || '#667eea'
+
+  const processedBody = body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => `<p>${line}</p>`)
+    .join("")
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${companyName || "Company"} - Proposal</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; background-color: #f5f5f5; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.header {
+    background: #ffffff;
+    padding: 30px 0 30px 20px; /* top right bottom left */
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    height: 130px;
+}
+        .header-circles { position: absolute; top: 0; right: 0; width: 100%; height: 130px; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        .header-div { height: 130px; background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+        .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .header-content { width: 85%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px; padding-left: 20px }
+        .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
+        .company-info {  flex: 1; padding-left: 15px; }
+.company-name {
+  color: #000000;
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-align: start;
+  margin: 0px;
+}
+        .company-address { color: #000000; font-size: 14px; margin: 0;   text-align: start; }
+        .content { padding: 40px 30px; background-color: #f9f9f9; }
+        .content p { margin: 0 0 16px 0; }
+        .highlight-box { background-color: #f8f9ff; border-left: 4px solid ${primaryColor}; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
+        .cta-section { text-align: center; margin: 30px 0; }
+        .cta-button { display: inline-block; background: ${primaryColor}; color: #ffffff !important; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: 600; font-size: 16px; transition: transform 0.2s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
+        .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
+        .footer { background: #ffffff;  color: #000000; position: relative; overflow: hidden; width: 100%; height: 160px}
+        .footer-circles { position: absolute; top: 0; right: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        .footer-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+        .footer-square-1 { width: 80px; height: 210px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .footer-square-2 { width: 60px; height: 210px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .footer-content { width: 75%; position: relative; z-index: 3; padding-left:20px; }
+        .footer-header {  display: flex; justify-content: flex-start;align-items: center; gap: 20px; padding-top:0px; }
+        .footer-logo { height: 40px; width: auto; max-width: 120px;  }
+        .footer-company-name { font-size: 18px; font-weight: 600; margin: 0px 15px; color: #000000; }
+        .footer-website { color: #000000; font-size: 14px; margin: 0; }
+        .signature { margin-top: 5px; }
+        .signature-name { font-weight: 600; color: #000000; font-size: 16px; margin: 0; }
+        .signature-title { color: #000000; font-size: 14px; margin: 0; }
+        .contact-info { font-size: 14px; color: #000000; }
+        .contact-info strong { color: #000000; }
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; box-shadow: none; }
+            .header, .content, .footer { padding: 20px !important; }
+            .header-circles, .footer-circles { display: none !important; }
+            .header-content { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+            .company-name { font-size: 20px !important; }
+            .cta-button { padding: 12px 24px !important; font-size: 14px !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="header">
+                <div class="header-circles">
+                    <div class="header-content">
+                        ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="header-logo">` : ''}
+                        <div class="company-info">
+                            <h1 class="company-name">${companyName || "Company"}</h1>
+                            ${companyAddress ? `<p class="company-address">${companyAddress}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="header-div">
+                        <div class="header-square-2"></div>
+                        <div class="header-square-1"></div>
+                    </div>
                 </div>
         </div>
 
@@ -447,22 +625,24 @@ function createGmailCompatibleTemplate(
                 <div class="footer-circles">
                                 <div class="footer-content">
                     <div class="footer-header">
+                        ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
                         <h3 class="footer-company-name">${companyName || "Company"}</h3>
                         ${companyWebsite ? `<p class="footer-website">${companyWebsite}</p>` : ''}
                     </div>
 
                     <div class="signature">
                         <h4 class="signature-name">${userDisplayName || "Sales Executive"}</h4>
-                        <p class="signature-title">Sales Executive</p>
+                        <p class="signature-title">${userPosition || "Sales Executive"}</p>
                         <div class="contact-info">
                             ${replyTo ? `<p style="margin: 0;">${replyTo}</p>` : ''}
                             ${userPhoneNumber ? `<p style="margin: 0;"> ${userPhoneNumber}</p>` : ''}
                         </div>
                     </div>
                 </div>
-                                    <div class="footer-square-2"></div>
-
-                    <div class="footer-square-1"></div>
+                    <div class="footer-div">
+                        <div class="footer-square-2"></div>
+                        <div class="footer-square-1"></div>
+                    </div>
                 </div>
             </div>
     </div>
@@ -471,439 +651,47 @@ function createGmailCompatibleTemplate(
   `
 }
 
-function createEmailTemplate(
-  body: string,
-  userPhoneNumber?: string,
-  companyName?: string,
-  companyWebsite?: string,
-  companyAddress?: string,
-  userDisplayName?: string,
-  replyTo?: string,
-  companyLogo?: string,
-  proposalId?: string,
-  dominantColor?: string,
-  proposalPassword?: string
-): string {
-  const phoneNumber = userPhoneNumber || "+639XXXXXXXXX"
+async function fetchUserData(userEmail: string) {
+  try {
+    if (!userEmail) {
+      console.log("No user email provided for user data fetch")
+      return null
+    }
 
-  
+    // Query iboard_users collection for user data
+    const usersRef = collection(db, "iboard_users")
+    const q = query(usersRef, where("email", "==", userEmail))
+    const querySnapshot = await getDocs(q)
 
-  const processedBody = body
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => `<p>${line}</p>`)
-    .join("")
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0]
+      const userData = userDoc.data()
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
+      console.log("User data fetched from iboard_users:", {
+        email: userData.email,
+        first_name: userData.first_name,
+        last_name: userData.last_name,
+        position: userData.position,
+        phone_number: userData.phone_number
+      })
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${companyName || "Company"} - Proposal</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333333;
-            background-color: #d9dfe6ff;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .header {
-            background: #ffffff;
-            padding: 20px 40px;
-            position: relative;
-            overflow: hidden;
-        }
-        .header-circles {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-        .header-circle-1 {
-            position: absolute;
-            top: -70px;
-            right: -90px;
-            width: 240px;
-            height: 240px;
-            border-radius: 50%;
-            background: ${dominantColor || '#667eea'};
-            opacity: 1.0;
-            z-index: 2;
-        }
-        .header-circle-2 {
-            position: absolute;
-            top: -50px;
-            right: 20px;
-            width: 220px;
-            height: 220px;
-            border-radius: 50%;
-background: ${dominantColor 
-  ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` 
-  : ''};
-            opacity: 0.8;
-            z-index: 1;
-        }
-        .header-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .header-table td {
-            vertical-align: top;
-            padding: 0 10px;
-        }
-        .logo-cell {
-            width: 100px;
-            text-align: left;
-        }
-        .company-cell {
-            text-align: left;
-        }
-        .empty-cell {
-            width: 120px;
-        }
-        .logo {
-            height: 40px;
-            width: auto;
-            max-width: 300px;
-            margin-bottom: 10px;
-        }
-        .company-name {
-            color: #2c3e50;
-            font-size: 20px;
-            font-weight: bold;
-            margin: 0;
-            letter-spacing: 1px;
-        }
-        .tagline {
-            color: #e8eaff;
-            font-size: 14px;
-            margin: 5px 0 0 0;
-            font-weight: 300;
-        }
-.content {
-    padding: 40px;
-    background-color: #eaeaea;
-}
-
-
-        .content p {
-            margin: 0 0 16px 0;
-            font-size: 16px;
-            line-height: 1.6;
-        }
-        .highlight-box {
-            background-color: #f8f9ff;
-            border-left: 4px solid #667eea;
-            padding: 20px;
-            margin: 25px 0;
-            border-radius: 0 8px 8px 0;
-        }
-        .cta-section {
-            text-align: center;
-            margin: 30px 0;
-        }
-        .cta-button {
-            display: inline-block;
-            background: ${dominantColor || '#667eea'};
-            color: #ffffff !important;
-            text-decoration: none;
-            padding: 14px 30px;
-            border-radius: 25px;
-            font-weight: 600;
-            font-size: 16px;
-            transition: transform 0.2s ease;
-        }
-        .cta-button:link,
-        .cta-button:visited,
-        .cta-button:hover,
-        .cta-button:active {
-            color: #ffffff !important;
-            text-decoration: none !important;
-        }
-.footer {
-    background-color: #ffffff;
-    padding: 0px 0px 0px 30px; /* top:20px, right:0, bottom:0px, left:30px */
-}
-
-        .footer-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .footer-left-column {
-            width: 40%;
-            vertical-align: top;
-            padding-right: 20px;
-            padding-bottom: 20px;
-        }
-        .footer-right-column {
-            width: 60%;
-            vertical-align: top;
-            position: relative;
-            overflow: hidden;
-            padding-right: 0;
-            margin-right: 0;
-        }
-        .footer-left-content {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        .footer-logo-company-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 8px;
-        }
-        .footer-logo {
-            width: 40px;
-            height: 40px;
-            object-fit: contain;
-            flex-shrink: 0;
-        }
-        .footer-company-name {
-            margin: 0;
-            color: #2c3e50;
-            font-size: 16px;
-            font-weight: 600;
-            line-height: 1.2;
-        }
-        .sales-info {
-            margin: 0;
-            padding: 0;
-        }
-        .sales-name {
-            margin: 0;
-            padding: 0;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .sales-position {
-            margin: 0;
-            padding: 0;
-            color: #6c757d;
-            font-size: 11px;
-            font-weight: normal;
-            font-style: normal;
-        }
-        .sales-contact {
-            margin: 0;
-            padding: 0;
-            color: #6c757d;
-            font-size: 11px;
-        }
-        .footer-circles {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-        .footer-circle-1 {
-            position: absolute;
-            top: -50px;
-            right: -130px;
-            width: 270px;
-            height: 270px;
-            border-radius: 50%;
-            background: ${dominantColor || '#667eea'};
-            opacity: 1.0;
-            z-index: 2;
-        }
-        .footer-circle-2 {
-            position: absolute;
-            top: -50px;
-            right: -60px;
-            width: 290px;
-            height: 290px;
-            border-radius: 50%;
-background: ${dominantColor 
-  ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` 
-  : ''};            opacity: 0.8;
-            z-index: 1;
-        }
-        .signature {
-            margin-bottom: 20px;
-        }
-        .signature-name {
-            font-weight: 600;
-            color: #667eea;
-            font-size: 18px;
-            margin-bottom: 5px;
-        }
-        .signature-title {
-            color: #6c757d;
-            font-size: 14px;
-            margin-bottom: 15px;
-        }
-        .contact-info {
-            font-size: 14px;
-            color: #6c757d;
-            line-height: 1.4;
-        }
-        .contact-info strong {
-            color: #495057;
-        }
-        .divider {
-            height: 1px;
-            background-color: #e9ecef;
-            margin: 20px 0;
-        }
-        .disclaimer {
-            font-size: 12px;
-            color: #adb5bd;
-            text-align: center;
-            margin-top: 20px;
-            line-height: 1.4;
-        }
-        @media only screen and (max-width: 600px) {
-            .email-container {
-                width: 100% !important;
-            }
-            .header, .content, .footer {
-                padding: 20px !important;
-            }
-            .header-table {
-                display: block !important;
-            }
-            .header-table tr {
-                display: block !important;
-                text-align: center !important;
-            }
-            .header-table td {
-                display: block !important;
-                width: 100% !important;
-                padding: 10px 0 !important;
-            }
-            .logo {
-                height: 50px !important;
-                max-width: 150px !important;
-            }
-            .company-name {
-                font-size: 24px !important;
-            }
-            .header-circles {
-                display: none !important;
-            }
-            .footer-circles {
-                display: none !important;
-            }
-            .footer-table {
-                display: block !important;
-            }
-            .footer-left-column,
-            .footer-right-column {
-                display: block !important;
-                width: 100% !important;
-            }
-            .footer-left-column {
-                text-align: center !important;
-            }
-            .footer-right-column {
-                position: relative !important;
-                height: 150px !important;
-            }
-            .footer-left-content {
-                align-items: center !important;
-                text-align: center !important;
-            }
-            .footer-logo-company-row {
-                flex-direction: column !important;
-                align-items: center !important;
-                text-align: center !important;
-                gap: 8px !important;
-            }
-            .footer-company-name {
-                font-size: 14px !important;
-                text-align: center !important;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="email-container">
- 
-    <div class="header">
-        <div class="header-circles">
-            <div class="header-square-1"></div>
-            <div class="header-square-2"></div>
-        </div>
-        <table class="header-table">
-            <tr>
-                <td class="logo-cell">
-                    ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="logo" style="display: block; height: 60px; width: auto; max-width: 100px;" height="60" width="auto">` : ''}
-                </td>
-                <td class="company-cell">
-                    <h1 class="company-name">${companyName || "Company"}</h1>
-                    ${companyAddress ? `<p class="company-address" style="margin: 5px 0 0 0; color: #34495e; font-size: 12px;">${companyAddress}</p>` : ''}
-                </td>
-                <td class="empty-cell">
-                    <!-- Empty column -->
-                </td>
-            </tr>
-        </table>
-    </div>
-        
-        <div class="content">
-            ${processedBody}
-
-            <div class="cta-section">
-                <a href="https://mrk.ohplus.ph/pr/${proposalId || ''}" class="cta-button">View</a>
-            </div>
-<!--
-            ${proposalPassword ? `
-            <div class="highlight-box" style="border-left-color: ${dominantColor || '#667eea'} !important;">
-                <h4 style="margin: 0 0 10px 0; color: #2c3e50;">🔐 Access Code</h4>
-                <p style="margin: 0; font-family: monospace; font-size: 18px; font-weight: bold; color: ${dominantColor || '#667eea'}; background: #f8f9fa; padding: 10px; border-radius: 4px; text-align: center;">${proposalPassword}</p>
-                <p style="margin: 10px 0 0 0; font-size: 14px; color: #6c757d;">Please use this code to access the proposal online.</p>
-            </div>
-            ` : ''}
-            -->
-        </div>
-        
-        <div class="footer">
-            <table class="footer-table">
-                <tr>
-                    <td class="footer-left-column">
-                        <div class="footer-left-content">
-                            <div class="footer-logo-company-row">
-                                ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
-                                <h3 class="footer-company-name">${companyName || "Company"}</h3>
-                            </div>
-                            <div class="sales-info">
-                                <h4 class="sales-name" style="color: #000000; margin: 0 0 0; font-size: 14px; font-weight: 600;">${userDisplayName || "Sales Executive"}</h4>
-                                <p class="sales-position" style="margin: 0; color: #030404ff; font-size: 11px;">Sales Executive</p>
-                                ${replyTo ? `<p class="sales-contact" style="margin: 0; color: #030404ff; font-size: 11px;">${replyTo}</p>` : ''}
-                                ${userPhoneNumber ? `<p class="sales-contact" style="margin: 0; color: #030404ff; font-size: 11px;">${userPhoneNumber}</p>` : ''}
-                            </div>
-                        </div>
-                    </td>
-                    <td class="footer-right-column">
-                        <div class="footer-circles">
-                            <div class="footer-square-1"></div>
-                            <div class="footer-square-2"></div>
-                        </div>
-                    </td>
-                </tr>
-            </table>
-        </div>
-    </div>
-</body>
-</html>
-  `
+      return {
+        first_name: userData.first_name || "",
+        last_name: userData.last_name || "",
+        position: userData.position || "Sales Executive",
+        phone_number: userData.phone_number || "",
+        displayName: userData.first_name && userData.last_name
+          ? `${userData.first_name} ${userData.last_name}`.trim()
+          : userData.first_name || userData.last_name || "Sales Executive"
+      }
+    } else {
+      console.log("No user found in iboard_users with email:", userEmail)
+      return null
+    }
+  } catch (error) {
+    console.error("Error fetching user data:", error)
+    return null
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -1023,17 +811,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Convert logo URL to data URI for email compatibility
-    let logoDataUri = null
+    // Fetch user data from iboard_users table
+    let userData = null
+    if (validatedReplyTo) {
+      try {
+        userData = await fetchUserData(validatedReplyTo)
+        if (userData) {
+          console.log("[v0] User data fetched successfully:", userData.displayName, userData.position)
+        } else {
+          console.log("[v0] No user data found, using fallback values")
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching user data:", error)
+        // Continue with fallback values - not a critical failure
+      }
+    }
+
+    // Keep logo as URL format for better Gmail compatibility
     let dominantColor = null
     if (actualCompanyLogo) {
       try {
-        console.log("[v0] Converting logo URL to data URI:", actualCompanyLogo)
-        logoDataUri = await imageUrlToDataUri(actualCompanyLogo)
-        if (logoDataUri) {
-          console.log("[v0] Successfully converted logo to data URI")
+        console.log("[v0] Using logo URL format for Gmail compatibility:", actualCompanyLogo)
 
-          // Extract dominant color from the logo
+        // Extract dominant color from the logo URL
+        const logoDataUri = await imageUrlToDataUri(actualCompanyLogo)
+        if (logoDataUri) {
           dominantColor = await extractDominantColor(logoDataUri)
           if (dominantColor) {
             console.log("[v0] Successfully extracted dominant color:", dominantColor)
@@ -1042,12 +844,12 @@ export async function POST(request: NextRequest) {
             dominantColor = undefined // Explicitly set to undefined for fallback
           }
         } else {
-          console.log("[v0] Failed to convert logo to data URI, using original URL")
+          console.log("[v0] Failed to process logo for color extraction, using fallback color")
+          dominantColor = undefined
         }
       } catch (error) {
-        console.error("[v0] Error processing company logo:", error)
-        // Continue without logo - not a critical failure
-        logoDataUri = null
+        console.error("[v0] Error processing company logo for color extraction:", error)
+        // Continue without dominant color - not a critical failure
         dominantColor = null
       }
     }
@@ -1094,12 +896,12 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Email sending - Body length:", body?.length)
     console.log("[v0] Email sending - Body preview:", body?.substring(0, 100))
     console.log("[v0] Email sending - Company Logo URL:", actualCompanyLogo)
-    console.log("[v0] Email sending - Logo Data URI available:", !!logoDataUri)
+    console.log("[v0] Email sending - Company Logo URL available:", !!actualCompanyLogo)
 
     // Validate required fields with enhanced user data validation
-    if (!body || body.trim().length === 0) {
-      console.error("[v0] Email sending failed - Empty body")
-      return NextResponse.json({ error: "Email body cannot be empty" }, { status: 400 })
+    if (!toJson) {
+      console.error("[v0] Email sending failed - Missing recipients")
+      return NextResponse.json({ error: "Email recipients are required" }, { status: 400 })
     }
 
     if (!subject || subject.trim().length === 0) {
@@ -1107,9 +909,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email subject cannot be empty" }, { status: 400 })
     }
 
-    if (!toJson) {
-      console.error("[v0] Email sending failed - Missing recipients")
-      return NextResponse.json({ error: "Email recipients are required" }, { status: 400 })
+    if (!body || body.trim().length === 0) {
+      console.error("[v0] Email sending failed - Empty body")
+      return NextResponse.json({ error: "Email body cannot be empty" }, { status: 400 })
     }
 
     // Enhanced user data validation
@@ -1243,7 +1045,7 @@ export async function POST(request: NextRequest) {
           from,
           to: otherRecipients,
           subject: subject.trim(),
-          html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
+          html: createEmailTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, userData?.displayName || validatedUserDisplayName, userData?.position || "Sales Executive", validatedReplyTo, actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
         }
 
         if (otherCc.length > 0) {
@@ -1259,14 +1061,17 @@ export async function POST(request: NextRequest) {
         }
 
         console.log("[v0] Sending regular email to non-Gmail recipients:", otherRecipients.length)
-        const { data, error } = await resend.emails.send(regularEmailData)
+        const sendResult = await resend.emails.send(regularEmailData)
 
-        if (error) {
-          console.error("[v0] Error sending regular email:", error)
-          results.push({ type: 'regular', success: false, error: error.message, recipients: otherRecipients.length })
+        if (sendResult && sendResult.error) {
+          console.error("[v0] Error sending regular email:", sendResult.error)
+          results.push({ type: 'regular', success: false, error: sendResult.error.message, recipients: otherRecipients.length })
+        } else if (sendResult && sendResult.data) {
+          console.log("[v0] Regular email sent successfully:", sendResult.data?.id)
+          results.push({ type: 'regular', success: true, data: sendResult.data, recipients: otherRecipients.length })
         } else {
-          console.log("[v0] Regular email sent successfully:", data?.id)
-          results.push({ type: 'regular', success: true, data, recipients: otherRecipients.length })
+          console.error("[v0] Unexpected response from Resend API:", sendResult)
+          results.push({ type: 'regular', success: false, error: 'Unexpected API response', recipients: otherRecipients.length })
         }
       } catch (error) {
         console.error("[v0] Exception sending regular email:", error)
@@ -1281,7 +1086,7 @@ export async function POST(request: NextRequest) {
           from,
           to: gmailRecipients,
           subject: subject.trim(),
-          html: createGmailCompatibleTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, validatedUserDisplayName, validatedReplyTo, logoDataUri || actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
+          html: createGmailCompatibleTemplate(body.trim(), validatedPhoneNumber, actualCompanyName, actualCompanyWebsite, actualCompanyAddress, userData?.displayName || validatedUserDisplayName, userData?.position || "Sales Executive", validatedReplyTo, actualCompanyLogo, proposalId, dominantColor || undefined, proposalPassword),
         }
 
         if (gmailCc.length > 0) {
@@ -1297,40 +1102,46 @@ export async function POST(request: NextRequest) {
         }
 
         console.log("[v0] Sending Gmail-optimized email to recipients:", gmailRecipients.length)
-        const { data, error } = await resend.emails.send(gmailEmailData)
+        const gmailSendResult = await resend.emails.send(gmailEmailData)
 
-        if (error) {
-          console.error("[v0] Error sending Gmail-optimized email:", error)
-          results.push({ type: 'gmail', success: false, error: error.message, recipients: gmailRecipients.length })
+        if (gmailSendResult && gmailSendResult.error) {
+          console.error("[v0] Error sending Gmail-optimized email:", gmailSendResult.error)
+          results.push({ type: 'gmail', success: false, error: gmailSendResult.error.message, recipients: gmailRecipients.length })
 
           // If Gmail fails, try alternative approach with simplified template
-          if (error.message.includes("domain") || error.message.includes("spam") || error.message.includes("blocked")) {
+          if (gmailSendResult.error.message.includes("domain") || gmailSendResult.error.message.includes("spam") || gmailSendResult.error.message.includes("blocked")) {
             console.log("[v0] Attempting fallback for Gmail recipients with ultra-simple template")
 
             const fallbackEmailData: any = {
               from,
               to: gmailRecipients,
               subject: `[IMPORTANT] ${subject.trim()}`,
-              html: createUltraSimpleGmailTemplate(body.trim(), actualCompanyName, validatedUserDisplayName, validatedReplyTo, proposalId),
+              html: createUltraSimpleGmailTemplate(body.trim(), actualCompanyName, userData?.displayName || validatedUserDisplayName, userData?.position || "Sales Executive", validatedReplyTo, proposalId),
             }
 
             if (replyTo && replyTo.trim()) {
               fallbackEmailData.reply_to = replyTo.trim()
             }
 
-            const { data: fallbackData, error: fallbackError } = await resend.emails.send(fallbackEmailData)
+            const fallbackSendResult = await resend.emails.send(fallbackEmailData)
 
-            if (fallbackError) {
-              console.error("[v0] Fallback also failed for Gmail:", fallbackError)
-              results.push({ type: 'gmail-fallback', success: false, error: fallbackError.message, recipients: gmailRecipients.length })
+            if (fallbackSendResult && fallbackSendResult.error) {
+              console.error("[v0] Fallback also failed for Gmail:", fallbackSendResult.error)
+              results.push({ type: 'gmail-fallback', success: false, error: fallbackSendResult.error.message, recipients: gmailRecipients.length })
+            } else if (fallbackSendResult && fallbackSendResult.data) {
+              console.log("[v0] Gmail fallback email sent successfully:", fallbackSendResult.data?.id)
+              results.push({ type: 'gmail-fallback', success: true, data: fallbackSendResult.data, recipients: gmailRecipients.length })
             } else {
-              console.log("[v0] Gmail fallback email sent successfully:", fallbackData?.id)
-              results.push({ type: 'gmail-fallback', success: true, data: fallbackData, recipients: gmailRecipients.length })
+              console.error("[v0] Unexpected fallback response from Resend API:", fallbackSendResult)
+              results.push({ type: 'gmail-fallback', success: false, error: 'Unexpected fallback API response', recipients: gmailRecipients.length })
             }
           }
+        } else if (gmailSendResult && gmailSendResult.data) {
+          console.log("[v0] Gmail-optimized email sent successfully:", gmailSendResult.data?.id)
+          results.push({ type: 'gmail', success: true, data: gmailSendResult.data, recipients: gmailRecipients.length })
         } else {
-          console.log("[v0] Gmail-optimized email sent successfully:", data?.id)
-          results.push({ type: 'gmail', success: true, data, recipients: gmailRecipients.length })
+          console.error("[v0] Unexpected Gmail response from Resend API:", gmailSendResult)
+          results.push({ type: 'gmail', success: false, error: 'Unexpected Gmail API response', recipients: gmailRecipients.length })
         }
       } catch (error) {
         console.error("[v0] Exception sending Gmail email:", error)
