@@ -95,7 +95,7 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, co
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTitle className="sr-only p-0 gap-0 m-0">Email</DialogTitle>
-      <DialogContent className="w-[900px] max-h-[500px] flex flex-col bg-white rounded-md p-0 border-0 shadow-xl">
+      <DialogContent className="w-[900px] min-h-[500px] max-h-[500px] flex flex-col bg-white rounded-md p-0 border-0 shadow-xl">
         
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-2">
