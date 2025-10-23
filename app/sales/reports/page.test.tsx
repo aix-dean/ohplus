@@ -36,8 +36,17 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: vi.fn(),
 }))
 
+vi.mock('@/hooks/use-responsive', () => ({
+  useResponsive: vi.fn(() => ({ isMobile: false })),
+}))
+
+vi.mock('@/lib/firebase', () => ({
+  db: {},
+}))
+
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
+  usePathname: vi.fn(),
 }))
 
 vi.mock('@/components/report-post-success-dialog', () => ({
@@ -205,7 +214,7 @@ describe('SalesReportsPage', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Sent History')).toBeInTheDocument()
+        expect(screen.getByText('All Sent History')).toBeInTheDocument()
       })
     })
 
@@ -252,6 +261,9 @@ describe('SalesReportsPage', () => {
         // RPT-002 is draft status, so it gets filtered out by default
         expect(screen.getByText('Completion')).toBeInTheDocument()
         // Only posted reports are shown, so only Completion appears
+        expect(screen.getByText('Test Site 1')).toBeInTheDocument()
+        expect(screen.getByText('LED Billboard')).toBeInTheDocument()
+        expect(screen.getByText('John Doe')).toBeInTheDocument()
       })
     })
 
@@ -318,9 +330,7 @@ describe('SalesReportsPage', () => {
         // Only posted reports are shown, so only Jan 1, 2024 appears
       })
     })
-  })
 
-  describe('Report Type Display', () => {
     it('displays report types correctly', async () => {
       act(() => {
         render(<SalesReportsPage />)
@@ -332,6 +342,7 @@ describe('SalesReportsPage', () => {
       })
     })
   })
+
 
   describe('Pagination', () => {
     const manyReports = Array.from({ length: 20 }, (_, i) => ({
@@ -380,7 +391,7 @@ describe('SalesReportsPage', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText(/1 to 15 of 20 reports/)).toBeInTheDocument()
+        expect(screen.getByText('Showing 1 to 15 of 20 reports')).toBeInTheDocument()
         expect(screen.getByText('Page 1 of 2')).toBeInTheDocument()
       })
     })
@@ -394,8 +405,7 @@ describe('SalesReportsPage', () => {
       })
 
       await waitFor(() => {
-        const reportRow = screen.getByText('RPT-001').closest('div')
-        expect(reportRow).toBeInTheDocument()
+        expect(screen.getByText('RPT-001')).toBeInTheDocument()
       })
 
       const reportRow = screen.getByText('RPT-001').closest('div')
@@ -418,10 +428,10 @@ describe('SalesReportsPage', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Sent History')).toBeInTheDocument()
+        expect(screen.getByText('All Sent History')).toBeInTheDocument()
       })
 
-      const sentHistoryButton = screen.getByText('Sent History')
+      const sentHistoryButton = screen.getByText('All Sent History')
       await user.click(sentHistoryButton)
 
       expect(mockPush).toHaveBeenCalledWith('/sales/reports/sent-history')
@@ -463,6 +473,7 @@ describe('SalesReportsPage', () => {
       // and the router mock is available for future integration tests
       expect(mockPush).toBeDefined()
     })
+
 
     it('calls handleDeleteReport when delete action is triggered', async () => {
       const mockToast = vi.fn()
