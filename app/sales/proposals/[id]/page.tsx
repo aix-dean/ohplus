@@ -2431,21 +2431,6 @@ export default function ProposalDetailsPage() {
                 ) : (
                   <p className="font-normal text-[18px] truncate" title={product.location || 'N/A'}>{product.location || 'N/A'}</p>
                 )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        location: !prev[product.id]?.location
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.location !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.location !== false ? "Hide Location field" : "Show Location field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
               </div>
             ) : null}
 
@@ -2467,21 +2452,6 @@ export default function ProposalDetailsPage() {
                     {!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}
                   </p>
                 )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        dimension: !prev[product.id]?.dimension
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.dimension !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.dimension !== false ? "Hide Dimension field" : "Show Dimension field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
               </div>
             ) : null}
 
@@ -2497,21 +2467,6 @@ export default function ProposalDetailsPage() {
                   />
                 ) : (
                   <p className="font-normal text-[18px]">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
-                )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        type: !prev[product.id]?.type
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.type !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.type !== false ? "Hide Type field" : "Show Type field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
                 )}
               </div>
             ) : null}
@@ -2530,21 +2485,6 @@ export default function ProposalDetailsPage() {
                   <p className="font-normal text-[18px]">
                     {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
                   </p>
-                )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        traffic: !prev[product.id]?.traffic
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.traffic !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.traffic !== false ? "Hide Traffic Count field" : "Show Traffic Count field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
                 )}
               </div>
             ) : null}
