@@ -188,7 +188,7 @@ export default function ChangePasswordPage() {
   if (!user) return null
 
   return (
-    <div className="w-full h-screen bg-neutral-50 relative">
+    <div className="relative size-full">
       {/* Title */}
       <div className="w-96 h-6 left-[251px] top-[83px] absolute justify-start text-black text-base font-bold font-['Inter'] leading-none">
         Change Password
