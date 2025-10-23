@@ -615,6 +615,12 @@ export default function AccountPage() {
         {userData?.first_name || "Noemi"}
       </p>
       <button
+        className="absolute left-[937px] top-[364px] bg-white border-2 border-gray-400 h-[27px] rounded-[10px] w-[80px] text-gray-700 hover:bg-gray-50"
+        onClick={handleLogout}
+      >
+        Logout
+      </button>
+      <button
         className="absolute left-[993px] size-[23.996px] top-[134px]"
         onClick={() => setIsEditingPersonal(!isEditingPersonal)}
         aria-label="Edit account info"
