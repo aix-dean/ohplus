@@ -45,7 +45,7 @@ export default function SignaturePage() {
                 </div>
               ) : (
                 <img
-                  className={`w-full h-full object-cover ${isImageLoading ? 'hidden' : ''}`}
+                  className={`w-full h-full object-contain ${isImageLoading ? 'hidden' : ''}`}
                   src={currentSignature || "https://placehold.co/256x256"}
                   onLoad={() => setIsImageLoading(false)}
                   onError={() => setIsImageLoading(false)}
