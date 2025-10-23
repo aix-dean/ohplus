@@ -427,6 +427,7 @@ export default function ProposalDetailsPage() {
     type: boolean
     traffic: boolean
     srp: boolean
+    additionalMessage: boolean
   }}>({})
 
   const fetchClients = async () => {
@@ -579,6 +580,7 @@ export default function ProposalDetailsPage() {
               type: proposalData.fieldVisibility?.[product.id]?.type ?? true,
               traffic: proposalData.fieldVisibility?.[product.id]?.traffic ?? true,
               srp: proposalData.fieldVisibility?.[product.id]?.srp ?? true,
+              additionalMessage: proposalData.fieldVisibility?.[product.id]?.additionalMessage ?? true,
             }
           })
           setFieldVisibility(productFieldVisibility)
@@ -611,7 +613,8 @@ export default function ProposalDetailsPage() {
               dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
-              srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'
+              srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A',
+              additionalMessage: product.additionalMessage || ''
             }
           })
           setEditableProducts(products)
@@ -2561,6 +2564,37 @@ export default function ProposalDetailsPage() {
                 </p>
               )}
             </div>
+
+            {/* Additional Message */}
+            {isEditMode || fieldVisibility[product.id]?.additionalMessage !== false ? (
+              <div className="mb-2 flex items-center">
+                {isEditMode ? (
+                  <input
+                    value={editableProducts[product.id]?.additionalMessage || ''}
+                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
+                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
+                    placeholder="Additional message..."
+                  />
+                ) : (
+                  <p className="font-normal text-[18px]">{product.additionalMessage}</p>
+                )}
+                {isEditMode && (
+                  <button
+                    onClick={() => setFieldVisibility(prev => ({
+                      ...prev,
+                      [product.id]: {
+                        ...prev[product.id],
+                        additionalMessage: !prev[product.id]?.additionalMessage
+                      }
+                    }))}
+                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.additionalMessage !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
+                    title={fieldVisibility[product.id]?.additionalMessage !== false ? "Hide Additional Message field" : "Show Additional Message field"}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
 
