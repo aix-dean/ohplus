@@ -180,7 +180,7 @@ export default function ChangePasswordPage() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <Loader2 className="h-10 w-10 animate-spin text-primary" data-testid="loader" />
       </div>
     )
   }
