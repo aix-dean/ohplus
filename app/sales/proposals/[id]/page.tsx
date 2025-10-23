@@ -2428,7 +2428,7 @@ export default function ProposalDetailsPage() {
             )}
           </div>
 
-          <div className="ml-2">
+          <div className="ml-2 flex flex-col items-start">
             {/* Location */}
             {isEditMode || fieldVisibility[product.id]?.location !== false ? (
               <div className="mb-2 flex items-center">
@@ -2565,7 +2565,7 @@ export default function ProposalDetailsPage() {
                   }
                 }}
                 disabled={(editableProducts[product.id]?.additionalSpecs || []).length >= 3}
-                className={`mt-2 ${(editableProducts[product.id]?.additionalSpecs || []).length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`mt-2 self-end ${(editableProducts[product.id]?.additionalSpecs || []).length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
                 variant="outline"
               >
                 + Add Specs
