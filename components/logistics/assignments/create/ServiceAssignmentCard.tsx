@@ -333,31 +333,43 @@ export function ServiceAssignmentCard({
   return (
     <Card className="w-[90%] aspect-square bg-white border-3 border-dashed border-[#00D0FF] text-center">
       <CardContent className="flex flex-col lg:flex-row gap-4 p-4">
-        <div className="flex flex-col gap-4 w-full lg:w-2/5">
+        <div className="flex flex-col gap-4 w-full lg:w-1/4">
           {/* Products card */}
-          <Card className="aspect-square bg-[#E2E2E2] text-black p-4 flex flex-col justify-center items-center">
-            <div className="flex flex-col items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
+          <Card className="aspect-square bg-[#E2E2E2] text-black p-4 flex flex-col justify-center items-center relative overflow-hidden">
+            {productId && products.find(p => p.id === productId) ? (
+              <img
+                src={
+                  products.find(p => p.id === productId)?.imageUrl ||
+                  products.find(p => p.id === productId)?.media?.find(m => !m.isVideo)?.url ||
+                  "https://via.placeholder.com/150?text=No+Image"
+                }
+                alt={products.find(p => p.id === productId)?.name || "Site Image"}
+                className="absolute inset-0 w-full h-full object-cover rounded-md cursor-pointer"
                 onClick={onOpenProductSelection}
-                className="rounded-full"
-              >
-                {productId ? "Change Site" : "Select Site"}
-              </Button>
-            </div>
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenProductSelection}
+                  className="rounded-full"
+                >
+                  Select Site
+                </Button>
+              </div>
+            )}
           </Card>
-          {/* Site Name */}
-          <div className="flex items-center">
-            <span className="flex-1 text-left">
+          {/* Site Name and Location */}
+          <div className="flex flex-col">
+            <span className="text-left">
               {products.find(p => p.id === productId)?.name || "Select Project Site"}
             </span>
-          </div>
-          {/* Site Location */}
-          <div className="flex items-center">
-            <span className="flex-1 text-left">
-              {products.find(p => p.id === productId)?.site_code || "-"}
-            </span>
+            {productId && (products.find(p => p.id === productId)?.specs_rental?.location || products.find(p => p.id === productId)?.location) && (
+              <span className="text-left text-sm text-gray-500">
+                {products.find(p => p.id === productId)?.specs_rental?.location || products.find(p => p.id === productId)?.location}
+              </span>
+            )}
           </div>
           {/* Remarks */}
           <div className="flex items-center">
@@ -370,7 +382,7 @@ export function ServiceAssignmentCard({
             />
           </div>
         </div>
-        <div className="flex flex-col gap-4 w-full lg:w-3/5">
+        <div className="flex flex-col gap-4 w-full lg:w-3/4">
           <div className="flex justify-between items-start mb-4">
             <div className="flex flex-col text-sm">
               <p>SA#: {saNumber}</p>
