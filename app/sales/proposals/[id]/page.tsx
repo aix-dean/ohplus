@@ -2544,7 +2544,7 @@ export default function ProposalDetailsPage() {
                   </>
                 ) : (
                   <>
-                    <p className="font-normal text-[18px] mr-2 text-gray-600">{spec.specs}</p>
+                    <p className="font-bold text-[18px] mr-2 text-black">{spec.specs}</p>
                     <p className="font-normal text-[18px] text-gray-600">{spec.data}</p>
                   </>
                 )}
