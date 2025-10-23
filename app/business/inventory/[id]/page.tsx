@@ -48,10 +48,10 @@ import {
 } from "lucide-react"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { useRef, useState, useEffect, use } from "react"
-import { Document, Page, pdfjs } from "react-pdf"
+import dynamic from "next/dynamic"
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
+const PDFDocument = dynamic(() => import("react-pdf").then(mod => mod.Document), { ssr: false })
+const PDFPage = dynamic(() => import("react-pdf").then(mod => mod.Page), { ssr: false })
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -436,6 +436,11 @@ export default function BusinessProductDetailPage({ params }: Props) {
   // Edit Personnel dialog states
   const [editingPersonnelIndex, setEditingPersonnelIndex] = useState<number | null>(null)
   const [editPersonnelDialogOpen, setEditPersonnelDialogOpen] = useState(false)
+
+  // Site Calendar Modal states
+  const [siteCalendarModalOpen, setSiteCalendarModalOpen] = useState(false)
+  const [calendarBookings, setCalendarBookings] = useState<Booking[]>([])
+  const [calendarLoading, setCalendarLoading] = useState(false)
   const [editPersonnelForm, setEditPersonnelForm] = useState({
     name: '',
     position: '',
@@ -466,6 +471,15 @@ export default function BusinessProductDetailPage({ params }: Props) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showDatePicker, showEditStartDatePicker, showEditEndDatePicker])
+
+  // Initialize PDF.js worker on client side
+  useEffect(() => {
+    (async () => {
+      const pdfjsLib = await import("pdfjs-dist/build/pdf")
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
+      console.log("PDF.js initialized successfully!")
+    })()
+  }, [])
 
   const { toast } = useToast()
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -668,6 +682,34 @@ export default function BusinessProductDetailPage({ params }: Props) {
 
   const handleCreateServiceAssignment = () => {
     router.push(`/logistics/assignments/create?projectSite=${id}`)
+  }
+
+  const handleSiteCalendarClick = async () => {
+    setSiteCalendarModalOpen(true)
+    setCalendarLoading(true)
+    try {
+      // Reuse the existing booking fetching logic
+      const bookingsQuery = query(
+        collection(db, "booking"),
+        where("product_id", "==", id),
+        orderBy("created", "desc")
+      )
+      const bookingsSnapshot = await getDocs(bookingsQuery)
+      const bookingsData: Booking[] = []
+
+      bookingsSnapshot.forEach((doc) => {
+        bookingsData.push({
+          id: doc.id,
+          ...doc.data(),
+        } as Booking)
+      })
+
+      setCalendarBookings(bookingsData)
+    } catch (error) {
+      console.error("Error fetching bookings for calendar:", error)
+    } finally {
+      setCalendarLoading(false)
+    }
   }
 
   const handleBlueprintFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1425,7 +1467,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
               <Button
                 variant="outline"
                 className="mt-2 w-[440px] h-[47px]"
-                onClick={() => router.push(`/business/planner?site=${id}&view=bookings`)}
+                onClick={handleSiteCalendarClick}
               >
                 <Calendar className="mr-2 h-4 w-4" />
                 Site Calendar
@@ -2481,7 +2523,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
               <div className="w-full h-32 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
                 {selectedBlueprintFile?.type === 'application/pdf' ? (
                   <div className="w-full h-full">
-                    <Document
+                    <PDFDocument
                       file={blueprintPreviewUrl}
                       onLoadSuccess={onPdfLoadSuccess}
                       onLoadError={onPdfLoadError}
@@ -2491,11 +2533,11 @@ export default function BusinessProductDetailPage({ params }: Props) {
                         </div>
                       }
                     >
-                      <Page
+                      <PDFPage
                         pageNumber={pdfPageNumber}
                         width={200}
                       />
-                    </Document>
+                    </PDFDocument>
                   </div>
                 ) : (
                   <img
@@ -2548,7 +2590,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
                       >
                         {isPdfFile(blueprint.blueprint) ? (
                           <div className="w-full h-full">
-                            <Document
+                            <PDFDocument
                               file={blueprint.blueprint}
                               loading={
                                 <div className="flex items-center justify-center h-full">
@@ -2556,12 +2598,12 @@ export default function BusinessProductDetailPage({ params }: Props) {
                                 </div>
                               }
                             >
-                              <Page
+                              <PDFPage
                                 pageNumber={1}
                                 width={80}
                                 height={80}
                               />
-                            </Document>
+                            </PDFDocument>
                           </div>
                         ) : (
                           <img
@@ -2707,7 +2749,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
               <div className="w-full h-full min-h-[60vh] bg-gray-100 rounded-lg overflow-hidden">
                 {isPdfFile(fullscreenBlueprint.blueprint) ? (
                   <div className="w-full h-full relative">
-                    <Document
+                    <PDFDocument
                       file={fullscreenBlueprint.blueprint}
                       onLoadSuccess={onFullscreenPdfLoadSuccess}
                       loading={
@@ -2716,12 +2758,12 @@ export default function BusinessProductDetailPage({ params }: Props) {
                         </div>
                       }
                     >
-                      <Page
+                      <PDFPage
                         pageNumber={fullscreenPdfPageNumber}
                         width={800}
                         className="mx-auto"
                       />
-                    </Document>
+                    </PDFDocument>
                     {fullscreenPdfNumPages && fullscreenPdfNumPages > 1 && (
                       <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-75 text-white px-4 py-2 rounded flex items-center gap-2">
                         <Button
@@ -3990,6 +4032,98 @@ export default function BusinessProductDetailPage({ params }: Props) {
           >
             OK
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Site Calendar Modal */}
+    <Dialog open={siteCalendarModalOpen} onOpenChange={setSiteCalendarModalOpen}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Site Calendar - {product?.name || "Site"}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 overflow-auto">
+          {calendarLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <span className="ml-2 text-gray-600">Loading calendar...</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Legend */}
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-red-200 rounded"></div>
+                  <span>Booked Dates</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-200 rounded"></div>
+                  <span>Available Dates</span>
+                </div>
+              </div>
+
+              {/* Calendar */}
+              <div className="flex justify-center">
+                <DayPicker
+                  mode="default"
+                  className="rounded-md border p-3"
+                  modifiers={{
+                    booked: (date) => {
+                      return calendarBookings.some((booking) => {
+                        if (!booking.start_date || !booking.end_date) return false
+                        const startDate = booking.start_date.toDate()
+                        const endDate = booking.end_date.toDate()
+                        return date >= startDate && date <= endDate
+                      })
+                    }
+                  }}
+                  modifiersStyles={{
+                    booked: {
+                      backgroundColor: '#fecaca', // red-200
+                      color: '#dc2626', // red-600
+                      fontWeight: 'bold'
+                    }
+                  }}
+                  aria-label="Site booking calendar"
+                />
+              </div>
+
+              {/* Bookings List */}
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-semibold mb-3">Current Bookings</h3>
+                {calendarBookings.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">No bookings found for this site.</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {calendarBookings.map((booking) => (
+                      <div key={booking.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <div className="font-medium">{booking.project_name || booking.product_name || "Unnamed Project"}</div>
+                          <div className="text-sm text-gray-600">
+                            {booking.start_date ? formatFirebaseDate(booking.start_date) : "N/A"} - {booking.end_date ? formatFirebaseDate(booking.end_date) : "N/A"}
+                          </div>
+                          <div className="text-sm text-gray-600">{booking.client?.name || "Unknown Client"}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-sm font-medium px-2 py-1 rounded ${
+                            booking.status === "COMPLETED" ? "bg-green-100 text-green-800" :
+                            booking.status === "RESERVED" ? "bg-red-100 text-red-800" :
+                            "bg-gray-100 text-gray-800"
+                          }`}>
+                            {booking.status || "Unknown"}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

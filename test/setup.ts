@@ -42,9 +42,41 @@ vi.mock('@/lib/cost-estimate-service', () => ({
 // Mock firebase service
 const mockGetProductById = vi.fn()
 const mockGetProductBookings = vi.fn()
+const mockUploadFileToFirebaseStorage = vi.fn()
+const mockUpdateProduct = vi.fn()
+const mockGetServiceAssignmentsByProductId = vi.fn()
+const mockSoftDeleteProduct = vi.fn()
+
 vi.mock('@/lib/firebase-service', () => ({
   getProductById: mockGetProductById,
   getProductBookings: mockGetProductBookings,
+  uploadFileToFirebaseStorage: mockUploadFileToFirebaseStorage,
+  updateProduct: mockUpdateProduct,
+  getServiceAssignmentsByProductId: mockGetServiceAssignmentsByProductId,
+  softDeleteProduct: mockSoftDeleteProduct,
+}))
+
+// Mock Firebase Firestore functions used in the component
+const mockCollection = vi.fn()
+const mockQuery = vi.fn()
+const mockWhere = vi.fn()
+const mockOrderBy = vi.fn()
+const mockGetDocs = vi.fn()
+const mockDoc = vi.fn()
+const mockUpdateDoc = vi.fn()
+const mockServerTimestamp = vi.fn(() => new Date())
+const mockGetFirestore = vi.fn(() => ({}))
+
+vi.mock('firebase/firestore', () => ({
+  collection: mockCollection,
+  query: mockQuery,
+  where: mockWhere,
+  orderBy: mockOrderBy,
+  getDocs: mockGetDocs,
+  doc: mockDoc,
+  updateDoc: mockUpdateDoc,
+  serverTimestamp: mockServerTimestamp,
+  getFirestore: mockGetFirestore,
 }))
 
 // Mock client service
@@ -59,6 +91,21 @@ vi.mock('@/lib/client-service', () => ({
 ;(globalThis as any).mockGetProductById = mockGetProductById
 ;(globalThis as any).mockGetProductBookings = mockGetProductBookings
 ;(globalThis as any).mockGetClientById = mockGetClientById
+;(globalThis as any).mockUploadFileToFirebaseStorage = mockUploadFileToFirebaseStorage
+;(globalThis as any).mockUpdateProduct = mockUpdateProduct
+;(globalThis as any).mockGetServiceAssignmentsByProductId = mockGetServiceAssignmentsByProductId
+;(globalThis as any).mockSoftDeleteProduct = mockSoftDeleteProduct
+
+// Export Firebase mocks
+;(globalThis as any).mockCollection = mockCollection
+;(globalThis as any).mockQuery = mockQuery
+;(globalThis as any).mockWhere = mockWhere
+;(globalThis as any).mockOrderBy = mockOrderBy
+;(globalThis as any).mockGetDocs = mockGetDocs
+;(globalThis as any).mockDoc = mockDoc
+;(globalThis as any).mockUpdateDoc = mockUpdateDoc
+;(globalThis as any).mockServerTimestamp = mockServerTimestamp
+;(globalThis as any).mockGetFirestore = mockGetFirestore
 
 // Mock UI components
 vi.mock('@/components/ui/button', () => ({
@@ -77,4 +124,19 @@ vi.mock('@/components/ui/skeleton', () => ({
 vi.mock('lucide-react', () => ({
   CalendarIcon: () => React.createElement('div', { 'data-testid': 'calendar-icon' }),
   Loader2: () => React.createElement('div', { 'data-testid': 'loader-icon' }),
+}))
+
+// Mock PDF.js to avoid DOMMatrix errors
+vi.mock('pdfjs-dist/build/pdf', () => ({
+  GlobalWorkerOptions: { workerSrc: '' },
+  version: '3.11.174',
+  getDocument: vi.fn(() => ({
+    promise: Promise.resolve({
+      getPage: vi.fn(() => Promise.resolve({
+        getViewport: vi.fn(() => ({ width: 100, height: 100 })),
+        render: vi.fn(() => ({ promise: Promise.resolve() }))
+      })),
+      numPages: 1
+    })
+  }))
 }))
