@@ -2416,7 +2416,7 @@ export default function ProposalDetailsPage() {
         {/* Site Details - Right Side - scaled */}
         <div className="absolute font-bold text-[#333333] text-[18px] left-[358px] top-[191px] w-[434px] leading-[1.2]">
           {/* Site Name */}
-          <div className="mb-2 text-[35px]">
+          <div className="mb-2 text-[35px] ml-2">
             {isEditMode ? (
               <input
                 value={editableProducts[product.id]?.name || product.name}
@@ -2428,99 +2428,119 @@ export default function ProposalDetailsPage() {
             )}
           </div>
 
-          <div className="ml-2 flex flex-col items-start">
-            {/* Location */}
+          <div className="ml-2">
+            {/* Location Row */}
             {isEditMode || fieldVisibility[product.id]?.location !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">Location:</p>
-                {isEditMode ? (
-                  <input
-                    value={editableProducts[product.id]?.location || product.location || 'N/A'}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: e.target.value } }))}
-                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
-                  />
-                ) : (
-                  <p className="font-normal text-[18px] truncate" title={product.location || 'N/A'}>{product.location || 'N/A'}</p>
-                )}
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Location:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.location || product.location || 'N/A'}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">{product.location || 'N/A'}</p>
+                  )}
+                </div>
               </div>
             ) : null}
 
-            {/* Dimension */}
+            {/* Dimension Row */}
             {isEditMode || fieldVisibility[product.id]?.dimension !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">Dimension:</p>
-                {isEditMode ? (
-                  <input
-                    value={editableProducts[product.id]?.dimension || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], dimension: e.target.value } }))}
-                    className="font-normal text-[18px] mb-0 border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
-                  />
-                ) : (
-                  <p className="font-normal text-[18px] mb-0">
-                    {product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}
-                    {product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}
-                    {product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}
-                    {!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}
-                  </p>
-                )}
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Dimension:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.dimension || ''}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], dimension: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">
+                      {product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}
+                      {product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}
+                      {product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}
+                      {!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}
+                    </p>
+                  )}
+                </div>
               </div>
             ) : null}
 
-            {/* Type */}
+            {/* Type Row */}
             {isEditMode || fieldVisibility[product.id]?.type !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">Type:</p>
-                {isEditMode ? (
-                  <input
-                    value={editableProducts[product.id]?.type || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], type: e.target.value } }))}
-                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
-                  />
-                ) : (
-                  <p className="font-normal text-[18px]">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
-                )}
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Type:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.type || ''}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], type: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
+                  )}
+                </div>
               </div>
             ) : null}
 
-            {/* Average Daily Traffic Count */}
+            {/* Average Monthly Traffic Count Row */}
             {isEditMode || fieldVisibility[product.id]?.traffic !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">Average Monthly Traffic Count:</p>
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Average Monthly Traffic Count:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.traffic || ''}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], traffic: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">
+                      {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* SRP Row */}
+            <div className="flex mb-2">
+              <div className="w-[200px] pr-4 text-left">
+                <p className="font-bold text-[18px]">SRP:</p>
+              </div>
+              <div className="flex-1">
                 {isEditMode ? (
                   <input
-                    value={editableProducts[product.id]?.traffic || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], traffic: e.target.value } }))}
-                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
+                    value={editableProducts[product.id]?.srp || ''}
+                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
+                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                   />
                 ) : (
-                  <p className="font-normal text-[18px]">
-                    {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
+                  <p className="font-normal text-[18px] break-words">
+                    {product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'}
                   </p>
                 )}
               </div>
-            ) : null}
-
-            {/* SRP */}
-            <div className="mb-2">
-              <p className="mb-0">SRP:</p>
-              {isEditMode ? (
-                <input
-                  value={editableProducts[product.id]?.srp || ''}
-                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
-                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                />
-              ) : (
-                <p className="font-normal text-[18px]">
-                  {product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'}
-                </p>
-              )}
             </div>
 
-            {/* Additional Specs */}
+            {/* Additional Specs Rows */}
             {(editableProducts[product.id]?.additionalSpecs || []).map((spec: {specs: string, data: string}, index: number) => (
-              <div key={index} className="mb-2 flex items-center">
-                {isEditMode ? (
-                  <>
+              <div key={index} className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  {isEditMode ? (
                     <input
                       value={spec.specs}
                       onChange={(e) => {
@@ -2528,9 +2548,15 @@ export default function ProposalDetailsPage() {
                         newSpecs[index].specs = e.target.value
                         setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
                       }}
-                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1 mr-2"
+                      className="font-bold text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                       placeholder="Add specs"
                     />
+                  ) : (
+                    <p className="font-bold text-[18px] break-words">{spec.specs}</p>
+                  )}
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
                     <input
                       value={spec.data}
                       onChange={(e) => {
@@ -2538,71 +2564,80 @@ export default function ProposalDetailsPage() {
                         newSpecs[index].data = e.target.value
                         setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
                       }}
-                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                       placeholder="Add data"
                     />
-                  </>
-                ) : (
-                  <>
-                    <p className="font-bold text-[18px] mr-2 text-black">{spec.specs}</p>
-                    <p className="font-normal text-[18px] text-gray-600">{spec.data}</p>
-                  </>
-                )}
+                  ) : (
+                    <p className="font-normal text-[18px] text-gray-600 break-words">{spec.data}</p>
+                  )}
+                </div>
               </div>
             ))}
+
+            {/* Add Specs Button */}
             {isEditMode && (
-              <Button
-                onClick={() => {
-                  const current = editableProducts[product.id]?.additionalSpecs || []
-                  if (current.length < 3) {
-                    setEditableProducts(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        additionalSpecs: [...current, { specs: '', data: '' }]
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left"></div>
+                <div className="flex-1">
+                  <Button
+                    onClick={() => {
+                      const current = editableProducts[product.id]?.additionalSpecs || []
+                      if (current.length < 3) {
+                        setEditableProducts(prev => ({
+                          ...prev,
+                          [product.id]: {
+                            ...prev[product.id],
+                            additionalSpecs: [...current, { specs: '', data: '' }]
+                          }
+                        }))
                       }
-                    }))
-                  }
-                }}
-                disabled={(editableProducts[product.id]?.additionalSpecs || []).length >= 3}
-                className={`mt-2 self-end ${(editableProducts[product.id]?.additionalSpecs || []).length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                variant="outline"
-              >
-                + Add Specs
-              </Button>
+                    }}
+                    disabled={(editableProducts[product.id]?.additionalSpecs || []).length >= 3}
+                    className={`self-start ${(editableProducts[product.id]?.additionalSpecs || []).length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    variant="outline"
+                  >
+                    + Add Specs
+                  </Button>
+                </div>
+              </div>
             )}
 
-            {/* Additional Message */}
-            {isEditMode || fieldVisibility[product.id]?.additionalMessage !== false ? (
-              <div className="mb-2 flex items-center">
-                {isEditMode ? (
-                  <input
-                    value={editableProducts[product.id]?.additionalMessage || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
-                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
-                    placeholder="Additional message..."
-                  />
-                ) : (
-                  <p className="font-normal text-[18px]">{product.additionalMessage}</p>
-                )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        additionalMessage: !prev[product.id]?.additionalMessage
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.additionalMessage !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.additionalMessage !== false ? "Hide Additional Message field" : "Show Additional Message field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            ) : null}
-          </div>
+            </div>
+
+           {/* Additional Message - Outside the column layout */}
+           {isEditMode || fieldVisibility[product.id]?.additionalMessage !== false ? (
+             <div className="mt-4 ml-2">
+               <div className="flex items-center gap-2">
+                 <div className="flex-1">
+                   {isEditMode ? (
+                     <textarea
+                       value={editableProducts[product.id]?.additionalMessage || ''}
+                       onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
+                       className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full min-h-[80px] resize-vertical"
+                       placeholder="Additional message..."
+                     />
+                   ) : (
+                     <p className="font-normal text-[18px] break-words">{product.additionalMessage}</p>
+                   )}
+                 </div>
+                 {isEditMode && (
+                   <button
+                     onClick={() => setFieldVisibility(prev => ({
+                       ...prev,
+                       [product.id]: {
+                         ...prev[product.id],
+                         additionalMessage: !prev[product.id]?.additionalMessage
+                       }
+                     }))}
+                     className={`transition-colors ${fieldVisibility[product.id]?.additionalMessage !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
+                     title={fieldVisibility[product.id]?.additionalMessage !== false ? "Hide Additional Message field" : "Show Additional Message field"}
+                   >
+                     <X className="h-4 w-4" />
+                   </button>
+                 )}
+               </div>
+             </div>
+           ) : null}
         </div>
 
         {/* Bottom Logo */}
