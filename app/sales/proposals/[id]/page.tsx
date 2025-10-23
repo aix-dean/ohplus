@@ -404,6 +404,7 @@ export default function ProposalDetailsPage() {
   const [editablePreparedByName, setEditablePreparedByName] = useState("")
   const [editablePreparedByCompany, setEditablePreparedByCompany] = useState("")
   const [editableProducts, setEditableProducts] = useState<{ [key: string]: any }>({})
+  const [originalEditableProducts, setOriginalEditableProducts] = useState<{ [key: string]: any }>({})
   const [savingEdit, setSavingEdit] = useState(false)
   const [editableLogo, setEditableLogo] = useState<string>("")
   const [pendingSiteImages, setPendingSiteImages] = useState<{[productId: string]: string}>({})
@@ -538,7 +539,7 @@ export default function ProposalDetailsPage() {
         const proposalData = await getProposalById(params.id as string)
         if (proposalData) {
           setProposal(proposalData)
-          setSelectedClientId(proposalData.client.id || "")
+          setSelectedClientId(proposalData.client?.id || "")
           const currentPageContent = getPageContent(1, proposalData.templateLayout || "1")
           const currentPagePrice = getPagePrice(currentPageContent)
           setEditablePrice(currentPagePrice.toString())
@@ -585,8 +586,8 @@ export default function ProposalDetailsPage() {
           })
           setFieldVisibility(productFieldVisibility)
           setEditableCompanyName(proposalData.companyName || "")
-          setEditableClientContact(proposalData.client.contactPerson || "")
-          setEditableClientCompany(proposalData.client.company || "")
+          setEditableClientContact(proposalData.client?.contactPerson || "")
+          setEditableClientCompany(proposalData.client?.company || "")
           setEditablePreparedByName(proposalData.preparedByName || `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim())
           setEditablePreparedByCompany(proposalData.preparedByCompany || proposalData.companyName || "")
           setLogoDimensions({
@@ -614,7 +615,8 @@ export default function ProposalDetailsPage() {
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
               srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A',
-              additionalMessage: product.additionalMessage || ''
+              additionalMessage: product.additionalMessage || '',
+              additionalSpecs: (product as any).additionalSpecs || []
             }
           })
           setEditableProducts(products)
@@ -1150,6 +1152,12 @@ export default function ProposalDetailsPage() {
             }
             updatedProduct.categories[0] = editable.type
           }
+          if (editable.additionalSpecs) {
+            const filteredSpecs = editable.additionalSpecs.filter((spec: {specs: string, data: string}) => spec.specs.trim() || spec.data.trim())
+            ;(updatedProduct as any).additionalSpecs = filteredSpecs
+            // Also update editableProducts to remove empty specs
+            editable.additionalSpecs = filteredSpecs
+          }
           return updatedProduct
         }
         return product
@@ -1266,6 +1274,7 @@ export default function ProposalDetailsPage() {
       setOriginalLogoDimensions({ ...logoDimensions })
       setOriginalLogoPosition({ ...logoPosition })
       setOriginalDominantColor(dominantColor)
+      setOriginalEditableProducts(JSON.parse(JSON.stringify(editableProducts))) // Deep copy
     } else {
       // Exiting edit mode - reset cursor
       document.body.style.cursor = ''
@@ -1275,10 +1284,11 @@ export default function ProposalDetailsPage() {
   }
 
   const handleCancelEdit = () => {
-    // Restore original logo dimensions and position
+    // Restore original values
     setLogoDimensions({ ...originalLogoDimensions })
     setLogoPosition({ ...originalLogoPosition })
     setDominantColor(originalDominantColor)
+    setEditableProducts(JSON.parse(JSON.stringify(originalEditableProducts))) // Restore original editable products
     // Clear pending changes
     setEditableLogo("")
     setPendingSiteImages({})
@@ -1659,7 +1669,8 @@ export default function ProposalDetailsPage() {
           type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
           traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
           srp: product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A',
-          additionalMessage: (product as any).additionalMessage || ''
+          additionalMessage: (product as any).additionalMessage || '',
+          additionalSpecs: []
         }
       })
       setEditableProducts(prev => ({ ...prev, ...newEditableProducts }))
@@ -2217,7 +2228,7 @@ export default function ProposalDetailsPage() {
         ) : (
           <div className="absolute text-[#333333] text-[18px] left-[100px] top-[386px] w-[645px] leading-[1.2]">
             <p className="font-bold mb-0">Prepared for:</p>
-            <p>{proposal?.client.contactPerson} - {proposal?.client.company}</p>
+            <p>{proposal?.client?.contactPerson} - {proposal?.client?.company}</p>
           </div>
         )}
 
@@ -2504,6 +2515,62 @@ export default function ProposalDetailsPage() {
                 </p>
               )}
             </div>
+
+            {/* Additional Specs */}
+            {(editableProducts[product.id]?.additionalSpecs || []).map((spec: {specs: string, data: string}, index: number) => (
+              <div key={index} className="mb-2 flex items-center">
+                {isEditMode ? (
+                  <>
+                    <input
+                      value={spec.specs}
+                      onChange={(e) => {
+                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                        newSpecs[index].specs = e.target.value
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                      }}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1 mr-2"
+                      placeholder="Add specs"
+                    />
+                    <input
+                      value={spec.data}
+                      onChange={(e) => {
+                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                        newSpecs[index].data = e.target.value
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                      }}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
+                      placeholder="Add data"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <p className="font-normal text-[18px] mr-2 text-gray-600">{spec.specs}</p>
+                    <p className="font-normal text-[18px] text-gray-600">{spec.data}</p>
+                  </>
+                )}
+              </div>
+            ))}
+            {isEditMode && (
+              <Button
+                onClick={() => {
+                  const current = editableProducts[product.id]?.additionalSpecs || []
+                  if (current.length < 3) {
+                    setEditableProducts(prev => ({
+                      ...prev,
+                      [product.id]: {
+                        ...prev[product.id],
+                        additionalSpecs: [...current, { specs: '', data: '' }]
+                      }
+                    }))
+                  }
+                }}
+                disabled={(editableProducts[product.id]?.additionalSpecs || []).length >= 3}
+                className={`mt-2 ${(editableProducts[product.id]?.additionalSpecs || []).length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                variant="outline"
+              >
+                + Add Specs
+              </Button>
+            )}
 
             {/* Additional Message */}
             {isEditMode || fieldVisibility[product.id]?.additionalMessage !== false ? (
@@ -2951,7 +3018,7 @@ export default function ProposalDetailsPage() {
             <h3 className="text-lg font-semibold">
               Proposal History
               {proposal && (
-                <span className="text-sm font-normal text-gray-500 block">for {proposal.client.company}</span>
+                <span className="text-sm font-normal text-gray-500 block">for {proposal.client?.company}</span>
               )}
             </h3>
           </div>
@@ -2960,9 +3027,9 @@ export default function ProposalDetailsPage() {
               selectedClient={
                 proposal
                   ? {
-                      id: proposal.client.id || "",
-                      company: proposal.client.company,
-                      contactPerson: proposal.client.contactPerson,
+                      id: proposal.client?.id || "",
+                      company: proposal.client?.company,
+                      contactPerson: proposal.client?.contactPerson,
                     }
                   : null
               }
