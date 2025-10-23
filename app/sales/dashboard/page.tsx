@@ -62,6 +62,12 @@ import { RouteProtection } from "@/components/route-protection"
 import { CheckCircle } from "lucide-react"
 import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+// CSS for static gradient border
+const gradientBorderStyles = `
+.gradient-border {
+  background: linear-gradient(45deg, #ff0000, #ffff00, #00ff00, #0000ff, #8B00FF);
+}
+`
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 15
@@ -142,8 +148,7 @@ function SalesDashboardContent() {
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
 
-  // Display type selection for proposal creation
-  const [selectedDisplayType, setSelectedDisplayType] = useState<"static" | "digital" | null>("static")
+  
 
   // Search sites state
   const [siteSearchTerm, setSiteSearchTerm] = useState("")
@@ -811,7 +816,7 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("") // Clear client search term
     setSelectedProducts([]) // Clear any previously selected products
     setSelectedSites([]) // Clear any previously selected sites
-    setSelectedDisplayType("static") // Reset display type to default
+    
   }
 
   const handleClientSelectOnDashboard = (client: Client) => {
@@ -843,7 +848,7 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("")
     setDashboardClientSearchResults([])
     setSelectedProducts([])
-    setSelectedDisplayType(null)
+    
   }
 
   const handleProductSelect = (product: Product) => {
@@ -1342,34 +1347,13 @@ function SalesDashboardContent() {
     setSelectedSites([])
     setSelectedClientForProposal(null)
     setDashboardClientSearchTerm("")
-    setSelectedDisplayType(null)
+    
   }
 
-  // Display type selection handlers
-  const handleSelectStatic = () => {
-    setSelectedDisplayType("static")
-  }
+  
 
-  const handleSelectDigital = () => {
-    setSelectedDisplayType("digital")
-  }
-
-  // Filter products based on selected display type and search term
+  // Filter products based on search term
   const filteredProducts = products.filter(product => {
-    // Display type filter
-    if (selectedDisplayType) {
-      // Assume digital products have content_type containing "digital" or "led"
-      // Static products are everything else
-      const contentType = product.content_type?.toLowerCase() || ""
-      const isDigital = contentType.includes("digital") || contentType.includes("led") || contentType.includes("screen") || contentType.includes("dynamic")  
-
-      if (selectedDisplayType === "digital") {
-        if (!isDigital) return false
-      } else {
-        if (isDigital) return false
-      }
-    }
-
     // Search filter
     if (siteSearchTerm.trim()) {
       const searchLower = siteSearchTerm.toLowerCase()
@@ -1387,6 +1371,8 @@ function SalesDashboardContent() {
 
   return (
     <div className="h-screen flex flex-col">
+      {/* Inject CSS for gradient border */}
+      <style dangerouslySetInnerHTML={{ __html: gradientBorderStyles }} />
       {/* Main content area */}
       <div className="flex-1 overflow-hidden">
         {loading ? (
@@ -1649,74 +1635,7 @@ function SalesDashboardContent() {
                 </div>
               )}
 
-              {/* Display Type Selection - Enhanced UX */}
-              {(proposalCreationMode || ceQuoteMode) && (
-                <div className="mb-2">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-700">Display Type</span>
-                      <div className="h-px bg-gray-200 flex-1"></div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Button
-                          variant={selectedDisplayType === "static" ? "default" : "outline"}
-                          className={selectedDisplayType === "static"
-                            ? "bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-105"
-                            : "border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-6 py-3 rounded-lg font-medium transition-all duration-200"
-                          }
-                          onClick={handleSelectStatic}
-                          aria-label="Select static display type"
-                          aria-pressed={selectedDisplayType === "static"}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${selectedDisplayType === "static" ? "bg-white" : "bg-gray-400 opacity-50"}`}></div>
-                            Static
-                          </div>
-                        </Button>
-                        <Button
-                          variant={selectedDisplayType === "digital" ? "default" : "outline"}
-                          className={selectedDisplayType === "digital"
-                            ? "bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-105"
-                            : "border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-6 py-3 rounded-lg font-medium transition-all duration-200"
-                          }
-                          onClick={handleSelectDigital}
-                          aria-label="Select digital display type"
-                          aria-pressed={selectedDisplayType === "digital"}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${selectedDisplayType === "digital" ? "bg-white" : "bg-gray-400 opacity-50"}`}></div>
-                            Digital
-                          </div>
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className={`bg-white border-[#d9d9d9] hover:bg-gray-50 ${viewMode === "grid" ? "bg-gray-100" : ""}`}
-                          onClick={() => setViewMode("grid")}
-                          aria-label="Switch to grid view"
-                        >
-                          <Grid3X3 className="w-4 h-4 text-[#b7b7b7]" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className={`bg-white border-[#d9d9d9] hover:bg-gray-50 ${viewMode === "list" ? "bg-gray-100" : ""}`}
-                          onClick={() => setViewMode("list")}
-                          aria-label="Switch to list view"
-                        >
-                          <List className="w-4 h-4 text-[#b7b7b7]" />
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Choose the type of display for your campaign sites
-                    </p>
-                  </div>
-                </div>
-              )}
+              
 
               {/* Search Results View */}
               {isSearching && (
@@ -2311,7 +2230,58 @@ function ProductCard({
     }
   }
 
-  return (
+  const isDynamicSite = product.content_type === "Dynamic" || product.content_type === "dynamic";
+
+  return isDynamicSite ? (
+    <div className="p-[4px] rounded-[16px] gradient-border">
+      <div
+        className={cn(
+          "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border",
+          isSelected ? "border-green-500" : "border-gray-200",
+          selectionMode ? "hover:border-green-300" : "",
+        )}
+        onClick={handleClick}
+      >
+      <div className="h-[218px] bg-gray-300 relative rounded-t-2xl">
+        <Image
+          src={thumbnailUrl || "/placeholder.svg"}
+          alt={product.name || "Product image"}
+          fill
+          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/abstract-geometric-sculpture.png"
+            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
+          }}
+        />
+
+        {/* Selection indicator */}
+        {selectionMode && (
+          <div className="absolute top-3 left-3 z-10">
+            <div
+              className={cn(
+                "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
+              )}
+            >
+              {isSelected && <CheckCircle2 size={16} className="text-white" />}
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      <div className="p-4">
+        <div className="space-y-2">
+          <div className="text-sm text-gray-500 font-medium">{siteCode || "N/A"}</div>
+          <div className="text-sm text-black font-medium">{product.name}</div>
+          <div className="text-sm text-black font-medium truncate">{location}</div>
+          <div className="text-sm text-black font-medium">{formattedPrice}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+) : (
     <div
       className={cn(
         "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border",
