@@ -141,7 +141,7 @@ export function TopNavigation() {
   const isTreasurySection = pathname.startsWith("/treasury")
   const isAccountingSection = pathname.startsWith("/accounting")
   const isBusinessSection = pathname.startsWith("/business")
-  const isAccountPage = pathname === "/account" || "/account/change-password" || "/account/signature"
+  const isAccountPage = pathname.startsWith("/account")
 
   const navBgColor = isSalesSection
     ? "bg-department-sales-red"
