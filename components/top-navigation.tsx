@@ -54,6 +54,8 @@ export function TopNavigation() {
     if (path === "/admin/dashboard") return "Admin - Dashboard"
     if (path === "/ai-assistant") return "AI Assistant"
     if (path === "/account") return "Account Settings"
+    if (path === "/account/change-password") return "Account Settings"
+    if (path === "/account/signature") return "Account Settings"
     if (path === "/settings") return "Settings"
     if (path === "/settings/subscription") return "Settings - Subscription"
     if (path === "/help") return "Help & Support"
@@ -139,7 +141,7 @@ export function TopNavigation() {
   const isTreasurySection = pathname.startsWith("/treasury")
   const isAccountingSection = pathname.startsWith("/accounting")
   const isBusinessSection = pathname.startsWith("/business")
-  const isAccountPage = pathname === "/account" // New check for account page
+  const isAccountPage = pathname === "/account" || "/account/change-password" || "/account/signature"
 
   const navBgColor = isSalesSection
     ? "bg-department-sales-red"
@@ -159,7 +161,8 @@ export function TopNavigation() {
                   ? "bg-[#4169e1]"
                   : isLogisticsSection
                     ? "bg-[#48a7fa]"
-                    : "bg-[#48a7fa]"
+                    : "bg-[#A1A1A1]"
+                    
 
   const diagonalBgColor = isSalesSection
     ? "bg-card-content-sales"
@@ -216,7 +219,7 @@ export function TopNavigation() {
             isFinanceSection ? '#04933480' :
             isBusinessSection ? '#a0b4f0' :
             isAccountingSection ? '#2A31B480' :
-            '#98d3fd'
+            '#CFCFCF'
           }
         />
       </svg>
