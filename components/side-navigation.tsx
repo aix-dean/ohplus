@@ -257,7 +257,7 @@ export function SideNavigation() {
     if (section === 'it') return 'bg-[#80bfbf]'
     if (section === 'business') return 'bg-[#a0b4f0]'
     if (section === 'cms') return 'bg-[#fed7aa]'
-    if (section === 'account') return 'bg-[#38b6ff]'
+    if (section === 'account') return 'bg-[#CFCFCF]'
     return 'bg-[#38b6ff]'
   }
 
@@ -1464,7 +1464,7 @@ export function SideNavigation() {
             <div className="bg-white/55 backdrop-blur-sm border border-white/30 rounded-[20px] shadow-sm">
               <div className="p-1">
                 {[
-                  { title: "Account Details", href: "/account", icon: User, isBold: true },
+                  { title: "Account Details", href: "/account", icon: User, isBold: false },
                   { title: "Change Password", href: "/account/change-password", icon: Settings },
                   { title: "Signature", href: "/account/signature", icon: FileText },
                 ].map((item) => {
