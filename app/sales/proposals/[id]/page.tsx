@@ -2651,14 +2651,14 @@ export default function ProposalDetailsPage() {
                        onChange={(e) => {
                          const value = e.target.value
                          const lineBreaks = (value.match(/\n/g) || []).length
-                         if (lineBreaks <= 3) {
+                         if (lineBreaks <= 1) {
                            setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: value } }))
                          }
                        }}
                        className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full resize-none"
                        placeholder="Additional message..."
-                       rows={4}
-                       maxLength={150}
+                       rows={2}
+                       maxLength={130}
                        style={{ width: '105%', whiteSpace: 'pre-wrap' }}
                      />
                    ) : (
@@ -2666,8 +2666,8 @@ export default function ProposalDetailsPage() {
                        value={product.additionalMessage || ''}
                        readOnly
                        className="font-normal text-[18px] border-none outline-none w-full bg-transparent resize-none"
-                       rows={4}
-                       style={{ width: '100%', whiteSpace: 'pre-wrap', minHeight: '80px' }}
+                       rows={2}
+                       style={{ width: '100%', whiteSpace: 'pre-wrap', minHeight: '40px' }}
                      />
                    )}
                  </div>
