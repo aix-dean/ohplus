@@ -190,12 +190,12 @@ export default function ChangePasswordPage() {
   return (
     <div className="relative size-full">
       {/* Title */}
-      <div className="w-96 h-6 left-[251px] top-[83px] absolute justify-start text-black text-base font-bold font-['Inter'] leading-none">
+      <div className="w-96 h-6  top-[59px] absolute justify-start text-black text-base font-bold font-['Inter'] leading-none">
         Change Password
       </div>
 
       {/* White rounded container */}
-      <div className="w-[1002px] h-64 left-[251px] top-[119px] absolute bg-white rounded-[20px]">
+      <div className="w-[1002px] h-64  top-[97px] absolute bg-white rounded-[20px]">
         {/* Current Password Row */}
         <div className="w-full h-6 left-[29px] top-[26px] absolute flex items-start">
           <div className="w-[250px] h-3.5 justify-start text-black text-xs font-bold font-['Inter'] leading-3 mt-1">

@@ -24,7 +24,7 @@ export default function SignaturePage() {
   }, [userData]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-neutral-50 p-8">
+    <div className="flex flex-col min-h-screen bg-neutral-50 pt-16">
       <div className="flex justify-start mb-4">
         <h1 className="text-LIGHTER-BLACK text-base font-bold font-['Inter'] leading-none">Signature</h1>
       </div>
