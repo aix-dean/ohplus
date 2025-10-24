@@ -1299,7 +1299,7 @@ export default function BusinessProductDetailPage({ params }: Props) {
       setSelectedAudience(product.specs_rental?.audience_types || [])
       setDailyTraffic(product.specs_rental?.traffic_count?.toString() || "")
       setTrafficUnit("monthly") // Default
-      setPrice(product.price?.toString() || "")
+      setPrice(product.price ? formatPriceOnBlur(String(product.price)) : "0")
       setPriceUnit(currentSiteType === "static" ? "per month" : "per spot")
       setUploadedFiles([])
       setCurrentImageIndex(0)
@@ -4582,7 +4582,8 @@ export default function BusinessProductDetailPage({ params }: Props) {
                     type="number"
                     className="flex-1 border-[#c4c4c4]"
                     value={price}
-                    onChange={(e) => setPrice(e.target.value)}
+                    onChange={(e) => handlePriceChange(e, setPrice)}
+                    onBlur={(e) => handlePriceBlur(e, setPrice)}
                   />
                   <Select value={priceUnit} disabled>
                     <SelectTrigger className="w-28 border-[#c4c4c4] bg-gray-50">

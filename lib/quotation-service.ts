@@ -301,10 +301,10 @@ const formatDate = (date: any) => {
 }
 
 // Helper to safely convert to string for PDF
-const safeString = (value: any): string => {
+export const safeString = (value: any): string => {
   if (value === null || value === undefined) return "N/A"
   if (typeof value === "string") return value
-  if (typeof value === "number") return value.toLocaleString()
+  if (typeof value === "number") return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   if (typeof value === "boolean") return value.toString()
   if (value && typeof value === "object") {
     if (value.id) return value.id.toString()
@@ -1165,7 +1165,7 @@ export async function createDirectQuotation(
         name: site.name || "",
         location: site.location || "",
         price: site.price || 0,
-        type: site.type || "",
+        type: site.content_type ? site.content_type.charAt(0).toUpperCase() + site.content_type.slice(1) : "",
         duration_days: durationDays,
         item_total_amount: totalAmount,
         media_url: site.image || "",
@@ -1258,7 +1258,7 @@ export async function createMultipleQuotations(
           name: site.name || "",
           location: site.location || "",
           price: site.price || 0,
-          type: site.type || "",
+          type: site.content_type ? site.content_type.charAt(0).toUpperCase() + site.content_type.slice(1) : "",
           duration_days: durationDays,
           item_total_amount: totalAmount,
           media_url: site.image || "",

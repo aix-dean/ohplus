@@ -50,9 +50,10 @@ interface SendReportDialogProps {
   onClose: () => void
   report: ReportData
   onSelectOption: (option: "email" | "whatsapp" | "viber" | "messenger") => void
+  companyLogo?: string
 }
 
-export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: SendReportDialogProps) {
+export function SendReportDialog({ isOpen, onClose, report, onSelectOption, companyLogo }: SendReportDialogProps) {
     const { toast } = useToast()
     const router = useRouter()
     const pathname = usePathname()
@@ -120,12 +121,13 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption }: Se
       // Store PDF in IndexedDB
       await storePDFFromIndexedDB(pdfKey, pdfFile, pdfFile.name)
 
-      // Close dialog and navigate to compose page with pdfKey
+      // Close dialog and navigate to compose page with pdfKey and logo
       onClose()
       const department = pathname.includes('/admin') ? 'admin' : 'sales'
+      const logoParam = companyLogo && companyLogo !== '/ohplus-new-logo.png' ? `&logo=${encodeURIComponent(companyLogo)}` : ''
       const queryParams = report.client_email
-        ? `?to=${encodeURIComponent(report.client_email)}&pdfKey=${encodeURIComponent(pdfKey)}`
-        : `?pdfKey=${encodeURIComponent(pdfKey)}`
+        ? `?to=${encodeURIComponent(report.client_email)}&pdfKey=${encodeURIComponent(pdfKey)}${logoParam}`
+        : `?pdfKey=${encodeURIComponent(pdfKey)}${logoParam}`
       router.push(`/${department}/reports/compose/${report.id}${queryParams}`)
     } catch (error) {
       console.error("Error generating PDF for email:", error)

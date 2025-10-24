@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import puppeteer from 'puppeteer'
+import puppeteer from 'puppeteer-core'
+import chromium from '@sparticuz/chromium'
 import type { Quotation } from '@/lib/types/quotation'
 
 const formatDate = (date: any) => {
@@ -135,11 +136,19 @@ export async function POST(request: NextRequest) {
     // Generate HTML content
     const htmlContent = generateQuotationHTML(quotation, companyData, userData)
 
-    // Launch puppeteer
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    })
+    // Launch puppeteer with @sparticuz/chromium for serverless or local chromium for development
+    const browser = await puppeteer.launch(
+      process.env.NODE_ENV === 'production' || process.env.VERCEL
+        ? {
+            headless: true,
+            args: chromium.args,
+            executablePath: await chromium.executablePath()
+          }
+        : {
+            headless: true,
+            executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+          }
+    )
 
     const page = await browser.newPage()
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' })
@@ -176,6 +185,14 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error(`Error generating ${format}:`, error)
+
+    // Check for specific Puppeteer/Chrome errors
+    if (error instanceof Error && error.message.includes('Could not find Chrome')) {
+      return NextResponse.json({
+        error: 'PDF generation failed: Chrome browser not found. Please ensure Chrome is installed or run: npx puppeteer browsers install chrome'
+      }, { status: 500 })
+    }
+
     return NextResponse.json({ error: `Failed to generate ${format}` }, { status: 500 })
   }
 }
@@ -433,7 +450,7 @@ function generateQuotationHTML(
      <li>
       <div class="details-row">
         <div class="details-label">Lease rate per month:</div>
-        <div class="details-value">PHP ${item?.price ? item.price.toLocaleString() : "0"} (Exclusive of VAT)</div>
+        <div class="details-value">PHP ${item?.price ? item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0"} (Exclusive of VAT)</div>
       </div>
     </li>
   </ul>
@@ -447,7 +464,7 @@ function generateQuotationHTML(
     <div class="price-breakdown">
       <div class="price-row">
         <span>Lease rate per month</span>
-        <span>PHP ${(item?.price || 0).toLocaleString()}</span>
+        <span>PHP ${(item?.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row">
         <span>Contract duration</span>
@@ -459,7 +476,7 @@ function generateQuotationHTML(
       item?.price || 0,
       getDateObject(startDate) || new Date(),
       getDateObject(endDate) || new Date()
-    ).toLocaleString()}</span>
+    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row">
         <span>Add: VAT</span>
@@ -467,7 +484,7 @@ function generateQuotationHTML(
       item?.price || 0,
       getDateObject(startDate) || new Date(),
       getDateObject(endDate) || new Date()
-    ) * 0.12).toLocaleString()}</span>
+    ) * 0.12).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row price-total">
         <span>Total</span>
@@ -477,7 +494,7 @@ function generateQuotationHTML(
         getDateObject(startDate) || new Date(),
         getDateObject(endDate) || new Date()
       ) * 1.12
-    ).toLocaleString()}</span>
+    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
     </div>
 

@@ -61,6 +61,32 @@ const DIGITAL_CATEGORIES = [
   "LED Poster",
   "Digital Transit Ads"
 ]
+// Price validation functions
+const validatePriceInput = (value: string): boolean => {
+  // Allow empty string, numbers, and decimal point
+  const regex = /^(\d*\.?\d{0,2}|\d+\.)$/;
+  return regex.test(value);
+};
+
+const formatPriceOnBlur = (value: string): string => {
+  if (!value || value === '') return '0';
+  const num = parseFloat(value);
+  if (isNaN(num)) return '0';
+  return num.toFixed(2);
+};
+
+const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>, setPrice: (value: string) => void) => {
+  const value = e.target.value;
+  if (validatePriceInput(value)) {
+    setPrice(value);
+  }
+};
+
+const handlePriceBlur = (e: React.FocusEvent<HTMLInputElement>, setPrice: (value: string) => void) => {
+  const value = e.target.value;
+  const formatted = formatPriceOnBlur(value);
+  setPrice(formatted);
+};
 
 export default function BusinessInventoryPage() {
    const router = useRouter()
@@ -1599,7 +1625,8 @@ export default function BusinessInventoryPage() {
                     placeholder="e.g., 15000"
                     className="flex-1 border-[#c4c4c4]"
                     value={price}
-                    onChange={(e) => setPrice(e.target.value)}
+                    onChange={(e) => handlePriceChange(e, setPrice)}
+                     onBlur={(e) => handlePriceBlur(e, setPrice)}
                   />
                   <Select value={priceUnit} disabled>
                     <SelectTrigger className="w-28 border-[#c4c4c4] bg-gray-50">

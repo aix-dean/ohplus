@@ -1498,7 +1498,7 @@ try {
         pdf.setFontSize(14)
         pdf.setFillColor(34, 197, 94) // green-500
         pdf.setTextColor(255, 255, 255)
-        const priceText = `₱${pagePrice.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
+        const priceText = `₱${pagePrice.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
         const priceWidth = pdf.getTextWidth(priceText) + 8
         const priceHeight = 8
         const priceX = titleX - priceWidth
@@ -1618,7 +1618,7 @@ try {
           pdf.setFillColor(34, 197, 94) // green-500
           pdf.setTextColor(255, 255, 255)
           pdf.setFontSize(8)
-          const priceText = `₱${(product.price || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
+          const priceText = `₱${(product.price || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           const priceWidth = pdf.getTextWidth(priceText) + 6
           const priceHeight = 6
           const priceX = productX + productWidth - priceWidth

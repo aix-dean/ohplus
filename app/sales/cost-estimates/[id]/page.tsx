@@ -1752,7 +1752,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
               <span className="font-medium text-gray-700 w-1/4">Type:</span>
-              <span className="text-gray-700">{siteLineItems[0]?.content_type || "Rental"}</span>
+              <span className="text-gray-700">{siteLineItems[0]?.content_type || ""}</span>
             </div>
 
             <div className="flex items-center">
@@ -1852,9 +1852,18 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                   <Input
                     type="number"
                     value={tempValues.unitPrice || ""}
-                    onChange={(e) => updateTempValues("unitPrice", Number.parseFloat(e.target.value) || 0)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const parsed = Number.parseFloat(value);
+                      if (!isNaN(parsed)) {
+                        updateTempValues("unitPrice", Number(parsed.toFixed(2)));
+                      } else if (value === "") {
+                        updateTempValues("unitPrice", 0);
+                      }
+                    }}
                     className="w-32 h-6 text-sm"
                     placeholder={monthlyRate?.toString() || "0.00"}
+                    step="0.01"
                     onBlur={() => setEditingField(null)}
                   />
                   <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
@@ -2278,7 +2287,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                       {historyItem.costEstimateNumber || historyItem.id.slice(-8)}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {historyItem.totalAmount.toLocaleString()}/month
+                      PHP {historyItem.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month
                     </div>
                     <div className="flex justify-end">
                       <span
@@ -2356,7 +2365,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             {currentPageIndex === relatedCostEstimates.length - 1 ? (
               <Button
                 onClick={handleSendWithPDFGeneration}
-                disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
+                disabled={generatingPDFsForSend}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium"
               >
                 {generatingPDFsForSend ? (
@@ -2386,7 +2395,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           <div className="flex items-center gap-3 px-6 py-3 bg-white border border-gray-200 rounded-full shadow-lg">
             <Button
               onClick={handleSendWithPDFGeneration}
-              disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
+              disabled={generatingPDFsForSend}
               className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
             >
               {generatingPDFsForSend ? (
@@ -2422,7 +2431,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             {currentProductIndex === Object.keys(siteGroups).length - 1 ? (
               <Button
                 onClick={handleSendWithPDFGeneration}
-                disabled={costEstimate?.status !== "draft" || generatingPDFsForSend}
+                disabled={generatingPDFsForSend}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
               >
                 {generatingPDFsForSend ? (
@@ -2654,7 +2663,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                         </div>
                         <div className="text-xs text-gray-500">
                           Total: ₱
-                          {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString()}
+                          {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                       </div>
                     </div>

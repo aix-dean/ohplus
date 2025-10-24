@@ -88,16 +88,24 @@ export default function ComposeEmailPage() {
         let logoDataUrl: string | null = null
         if (companyDataParam?.logo) {
           try {
+            console.log("[v0] Fetching company logo from:", companyDataParam.logo)
             const response = await fetch(companyDataParam.logo)
-            const blob = await response.blob()
-            logoDataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result as string)
-              reader.readAsDataURL(blob)
-            })
+            if (response.ok) {
+              const blob = await response.blob()
+              logoDataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.readAsDataURL(blob)
+              })
+              console.log("[v0] Company logo loaded successfully")
+            } else {
+              console.error("[v0] Failed to fetch company logo:", response.status, response.statusText)
+            }
           } catch (error) {
-            console.error('Error loading company logo:', error)
+            console.error("[v0] Error loading company logo:", error)
           }
+        } else {
+          console.log("[v0] No company logo available in company data")
         }
 
         // Helper function to fetch PDF from URL and convert to base64
@@ -162,6 +170,13 @@ export default function ComposeEmailPage() {
             }
           } else {
             // Generate PDF as before
+            console.log("[v0] Main PDF generation request:", {
+              hasLogoDataUrl: !!logoDataUrl,
+              logoDataUrlLength: logoDataUrl?.length || 0,
+              hasCompanyData: !!companyDataParam,
+              hasCompanyLogo: !!companyDataParam?.logo,
+            })
+
             const response = await fetch('/api/generate-cost-estimate-pdf', {
               method: 'POST',
               headers: {
@@ -266,6 +281,13 @@ export default function ComposeEmailPage() {
                 costEstimateNumber: uniqueCostEstimateNumber,
               }
 
+              console.log(`[v0] Related PDF ${i + 1} generation request:`, {
+                hasLogoDataUrl: !!logoDataUrl,
+                logoDataUrlLength: logoDataUrl?.length || 0,
+                hasCompanyData: !!companyDataParam,
+                hasCompanyLogo: !!companyDataParam?.logo,
+              })
+
               const response = await fetch('/api/generate-cost-estimate-pdf', {
                 method: 'POST',
                 headers: {
@@ -359,7 +381,23 @@ export default function ComposeEmailPage() {
         try {
           const companyDoc = await getDoc(doc(db, "companies", costEstimate.company_id))
           if (companyDoc.exists()) {
-            fetchedCompanyData = companyDoc.data()
+            const companyData = companyDoc.data()
+            fetchedCompanyData = {
+              id: companyDoc.id,
+              name: companyData.name,
+              company_location: companyData.company_location || companyData.address,
+              address: companyData.address,
+              company_website: companyData.company_website || companyData.website,
+              logo: companyData.logo, // Ensure logo field is properly included
+              contact_person: companyData.contact_person,
+              email: companyData.email,
+              phone: companyData.phone,
+              social_media: companyData.social_media || {},
+              created_by: companyData.created_by,
+              created: companyData.created?.toDate ? companyData.created.toDate() : companyData.created_at?.toDate(),
+              updated: companyData.updated?.toDate ? companyData.updated.toDate() : companyData.updated_at?.toDate(),
+            }
+            console.log("[v0] Company data fetched with logo:", !!fetchedCompanyData.logo)
           }
         } catch (error) {
           console.error("Error fetching company data:", error)
@@ -670,7 +708,7 @@ export default function ComposeEmailPage() {
             last_name: userData.last_name || user?.displayName?.split(" ").slice(1).join(" ") || "",
             email: userData.email || user?.email || "",
             company_id: userData.company_id,
-            phone_number: userData.phone_number || userData.phone || "",
+            phone_number: userData.phone_number || "",
           }
         : undefined
 

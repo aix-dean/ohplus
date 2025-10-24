@@ -1087,7 +1087,21 @@ function PriceListingContent() {
                   type="number"
                   placeholder="Enter new price"
                   value={newPrice}
-                  onChange={(e) => setNewPrice(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Allow only numbers and one decimal point with up to 2 decimal places
+                    const regex = /^\d*\.?\d{0,2}$/;
+                    if (regex.test(value) || value === "") {
+                      setNewPrice(value);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value;
+                    if (value && !isNaN(Number.parseFloat(value))) {
+                      const parsed = Number.parseFloat(value);
+                      setNewPrice(parsed.toFixed(2));
+                    }
+                  }}
                   className="w-full"
                   min="0"
                   step="0.01"
