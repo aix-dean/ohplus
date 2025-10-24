@@ -2443,10 +2443,18 @@ export default function ProposalDetailsPage() {
                 </div>
                 <div className="flex-1">
                   {isEditMode ? (
-                    <input
+                    <textarea
                       value={editableProducts[product.id]?.location || product.location || 'N/A'}
-                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: e.target.value } }))}
-                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                      onChange={(e) => {
+                        const value = e.target.value
+                        const lineBreaks = (value.match(/\n/g) || []).length
+                        if (lineBreaks <= 1) {
+                          setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: value } }))
+                        }
+                      }}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none"
+                      rows={2}
+                      placeholder="Location"
                     />
                   ) : (
                     <p className="font-normal text-[18px] break-words">{product.location || 'N/A'}</p>
@@ -2561,7 +2569,7 @@ export default function ProposalDetailsPage() {
                       className="font-bold text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none"
                       placeholder="Add specs"
                       rows={2}
-                      maxLength={30}
+                      maxLength={24}
                     />
                   ) : (
                     <textarea
@@ -2621,7 +2629,7 @@ export default function ProposalDetailsPage() {
                     }}
                     disabled={(editableProducts[product.id]?.additionalSpecs || []).length >= 3}
                     className={`self-start ${(editableProducts[product.id]?.additionalSpecs || []).length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    style={{ transform: 'translateX(470px)' }}
+                    style={{ transform: 'translateX(475px)' }}
                     variant="outline"
                   >
                     + Add Specs
@@ -2640,18 +2648,26 @@ export default function ProposalDetailsPage() {
                    {isEditMode ? (
                      <textarea
                        value={editableProducts[product.id]?.additionalMessage || ''}
-                       onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
-                       className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full"
+                       onChange={(e) => {
+                         const value = e.target.value
+                         const lineBreaks = (value.match(/\n/g) || []).length
+                         if (lineBreaks <= 3) {
+                           setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: value } }))
+                         }
+                       }}
+                       className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full resize-none"
                        placeholder="Additional message..."
-                       rows={3}
+                       rows={4}
                        maxLength={150}
+                       style={{ width: '105%', whiteSpace: 'pre-wrap' }}
                      />
                    ) : (
                      <textarea
                        value={product.additionalMessage || ''}
                        readOnly
                        className="font-normal text-[18px] border-none outline-none w-full bg-transparent resize-none"
-                       rows={3}
+                       rows={4}
+                       style={{ width: '100%', whiteSpace: 'pre-wrap', minHeight: '80px' }}
                      />
                    )}
                  </div>
@@ -2665,6 +2681,7 @@ export default function ProposalDetailsPage() {
                        }
                      }))}
                      className={`transition-colors ${fieldVisibility[product.id]?.additionalMessage !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
+                     style={{ transform: 'translateX(24px)' }}
                      title={fieldVisibility[product.id]?.additionalMessage !== false ? "Hide Additional Message field" : "Show Additional Message field"}
                    >
                      <X className="h-4 w-4" />
@@ -3039,7 +3056,7 @@ export default function ProposalDetailsPage() {
               <div key={pageNumber} className={`${getPageContainerClass(selectedSize, "Landscape")} ${index > 0 ? 'mt-[-65px]' : ''}`} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
                 {pageNumber === 1 ? renderIntroPage(pageNumber) : pageNumber === getTotalPages(selectedLayout) ? renderOutroPage(pageNumber) : renderSitePage(pageNumber)}
                 {/* Add blank page button between pages */}
-                {isEditMode && pageNumber < getTotalPages(selectedLayout) && (
+                {isEditMode && pageNumber === 1 && (
                   <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 z-20">
                     <Button
                       onClick={() => handleAddBlankPage(pageNumber)}
