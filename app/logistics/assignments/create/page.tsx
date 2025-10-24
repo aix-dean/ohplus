@@ -933,6 +933,7 @@ export default function CreateServiceAssignmentPage() {
         onOpenProductSelection={() => setIsProductSelectionDialogOpen(true)}
         onIdentifyJO={handleIdentifyJO}
         onChangeJobOrder={handleChangeJobOrder}
+        onOpenJobOrderDialog={() => setIsJobOrderSelectionDialogOpen(true)}
       />
 
 

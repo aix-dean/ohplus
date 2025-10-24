@@ -534,47 +534,63 @@ export function ServiceAssignmentCard({
             <div className="flex-1">
               {formData.serviceType === "Change Material" ? (
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <div className="relative">
-                      {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
-                        <img
-                          src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
-                          alt="Old Material"
-                          className="rounded-md h-32 w-32 object-cover"
-                        />
-                      ) : (
-                        <img src="https://via.placeholder.com/150" alt="Old Material" className="rounded-md h-32 w-32 object-cover" />
-                      )}
-                      <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
+                  <div className="space-y-1">
+                    <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
+                      <div className="relative">
+                        {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
+                          <img
+                            src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
+                            alt="Old Material"
+                            className="rounded-md h-6 w-6 object-cover"
+                          />
+                        ) : (
+                          <img src="/logistics-sa-create-dl.png" alt="Old Material" className="rounded-md h-6 w-6 object-cover" />
+                        )}
+                        <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
+                      </div>
+                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
                     </div>
                   </div>
                   <div className="flex items-center justify-center">
                     <ArrowRight className="h-8 w-8" />
                   </div>
-                  <div className="space-y-2">
-                    <div className="relative">
-                      {(selectedJobOrder?.attachments as any)?.url ? (
-                        <img
-                          src={(selectedJobOrder?.attachments as any).url}
-                          alt="New Material"
-                          className="rounded-md h-32 w-32 object-cover"
-                        />
-                      ) : (
-                        <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-32 object-cover" />
-                      )}
-                      <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
+                  <div className="space-y-1">
+                    <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
+                      <div className="relative">
+                        {(selectedJobOrder?.attachments as any)?.url ? (
+                          <img
+                            src={(selectedJobOrder?.attachments as any).url}
+                            alt="New Material"
+                            className="rounded-md h-6 w-6 object-cover"
+                          />
+                        ) : (
+                          <img src="/logistics-sa-create-dl.png" alt="New Material" className="rounded-md h-6 w-6 object-cover" />
+                        )}
+                        <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
+                      </div>
+                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
                     </div>
                   </div>
                 </div>
               ) : (
                 selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
-                  <img
-                    src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
-                    alt="Site Image"
-                    className="rounded-md h-32 w-32 object-cover"
-                  />
+                  <div className="space-y-1">
+                    <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
+                      <img
+                        src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
+                        alt="Site Image"
+                        className="rounded-md h-6 w-6 object-cover"
+                      />
+                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
+                    </div>
+                  </div>
                 ) : (
-                  <img src="https://via.placeholder.com/150" alt="Attachment" className="rounded-md h-32 w-32 object-cover" />
+                  <div className="space-y-1">
+                    <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
+                      <img src="/logistics-sa-create-dl.png" alt="Attachment" className="rounded-md h-6 w-6 object-cover" />
+                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
+                    </div>
+                  </div>
                 )
               )}
             </div>

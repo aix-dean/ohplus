@@ -124,9 +124,14 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
               <p className="font-medium">Perforated Sticker</p>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label>Attachment:</Label>
-              <img src="https://via.placeholder.com/150" alt="Attachment" className="rounded-md h-32 w-32 object-cover" />
+              <div className="space-y-1">
+                <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
+                  <img src="/logistics-sa-create-dl.png" alt="Attachment" className="rounded-md h-6 w-6 object-cover" />
+                  <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">

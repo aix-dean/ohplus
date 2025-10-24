@@ -1,23 +1,29 @@
+"use client"
+
 import { ServiceAssignmentCard } from './ServiceAssignmentCard';
 import { ServiceExpenseCard } from './ServiceExpenseCard';
 import { ActionButtons } from './ActionButtons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Search, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog';
+import { Search, X, MoreVertical } from 'lucide-react';
 import { format } from "date-fns";
 import type { Timestamp } from "firebase/firestore";
 import type { Product } from "@/lib/firebase-service";
 import type { Team } from "@/lib/types/team";
 import type { JobOrder } from "@/lib/types/job-order";
+import { useState } from 'react';
 
 // Job Order Details Card Component
 function JobOrderDetailsCard({
   jobOrder,
-  onChange
+  onChange,
+  onOpenDialog
 }: {
   jobOrder: JobOrder;
   onChange: () => void;
+  onOpenDialog?: () => void;
 }) {
   // Helper function to format date
   const formatDate = (date: string | Date | Timestamp | undefined) => {
@@ -30,69 +36,71 @@ function JobOrderDetailsCard({
     }
   };
 
+  const fieldLabelClass = "text-[#333] font-['Inter'] text-[12px] font-bold leading-[1.2]";
+  const fieldValueClass = "text-[#333] font-['Inter'] text-[12px] font-normal leading-[1.2]";
+
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   return (
-    <Card className="w-full">
+    <>
+    <Card className="w-full bg-[#E6F5FF] border-[3px] border-dashed border-[#00D0FF]">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span className="text-2xl font-bold">JOB ORDER</span>
-          <Button variant="ghost" size="sm" onClick={onChange}>
-            <X className="h-5 w-5" />
+          <span className="text-[#333] font-['Inter'] text-[12px] font-[700] leading-[100%]">Tagged JO:</span>
+          <Button variant="ghost" size="sm" onClick={onOpenDialog}>
+            <MoreVertical className="h-5 w-5" />
           </Button>
         </CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-4">
+      <CardContent className="grid gap-2">
         <div className="flex justify-between items-center">
-          <p className="text-blue-600 font-medium">JO#: {jobOrder.joNumber}</p>
-          <p className="text-sm text-gray-500">{formatDate(jobOrder.created)}</p>
+          <p className="text-[#333] font-['Inter'] text-[20px] font-[700] leading-[100%]">JO#: {jobOrder.joNumber}</p>
         </div>
         <div className="flex items-center">
-          <Label className="w-1/2">JO Type:</Label>
-          <p className="w-1/2 font-medium m-0 p-0">{jobOrder.joType}</p>
+          <Label className={`${fieldLabelClass} w-1/2`}>JO Type:</Label>
+          <p className={`w-1/2 ${fieldValueClass} m-0 p-0`}>{jobOrder.joType}</p>
         </div>
         <div className="flex items-center">
-          <Label className="w-1/2">Site Name:</Label>
-          <p className="w-1/2 font-medium m-0 p-0">{jobOrder.siteName}</p>
+          <Label className={`${fieldLabelClass} w-1/2`}>Campaign Name:</Label>
+          <p className={`w-1/2 ${fieldValueClass} m-0 p-0`}>{jobOrder.siteName}</p>
         </div>
         <div className="flex items-center">
-          <Label className="w-1/2">Deadline:</Label>
-          <p className="w-1/2 font-medium m-0 p-0">{formatDate(jobOrder.deadline)}</p>
+          <Label className={`${fieldLabelClass} w-1/2`}>Deadline:</Label>
+          <p className={`w-1/2 ${fieldValueClass} m-0 p-0`}>{formatDate(jobOrder.deadline)}</p>
         </div>
-        <div className="space-y-2">
-          <Label>Attachments:</Label>
-          {jobOrder.siteImageUrl ? (
-            <img
-              src={jobOrder.siteImageUrl}
-              alt="Site Image"
-              className="rounded-md h-32 w-32 object-cover"
-            />
-          ) : jobOrder.attachments && jobOrder.attachments.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2">
-              {jobOrder.attachments.slice(0, 4).map((attachment, index) => (
-                <img
-                  key={index}
-                  src={attachment.url}
-                  alt={attachment.name}
-                  className="rounded-md h-16 w-16 object-cover"
-                />
-              ))}
-            </div>
+        <div className="flex items-center">
+          <Label className={`${fieldLabelClass} w-1/2`}>Material Specs:</Label>
+          <p className={`w-1/2 ${fieldValueClass} m-0 p-0`}>{jobOrder.materialSpec || "N/A"}</p>
+        </div>
+        <div className="flex items-center">
+          <Label className={`${fieldLabelClass} w-1/2`}>Attachment:</Label>
+          {jobOrder.siteImageUrl || (jobOrder.attachments && jobOrder.attachments.length > 0) ? (
+            <span className={`w-1/2 ${fieldValueClass} m-0 p-0 text-blue-500 underline font-bold cursor-pointer`} onClick={() => setIsDialogOpen(true)}>View Attachment</span>
           ) : (
-            <p className="text-gray-500">No attachments</p>
+            <p className={`w-1/2 ${fieldValueClass} m-0 p-0 text-gray-500`}>No attachments</p>
           )}
         </div>
         <div className="flex items-center">
-          <Label className="w-1/2">Remarks:</Label>
-          <p className="w-1/2 font-medium m-0 p-0">{jobOrder.remarks || "N/A"}</p>
+          <Label className={`${fieldLabelClass} w-1/2`}>Remarks:</Label>
+          <p className={`w-1/2 ${fieldValueClass} m-0 p-0`}>{jobOrder.remarks || "N/A"}</p>
         </div>
         <div className="flex items-center">
-          <Label className="w-1/2">Requested by:</Label>
-          <p className="w-1/2 font-medium m-0 p-0">{jobOrder.requestedBy}</p>
-        </div>
-        <div className="flex justify-end">
-          <Button variant="link" size="sm" onClick={onChange}>Change</Button>
+          <Label className={`${fieldLabelClass} w-1/2`}>Requested by:</Label>
+          <p className={`w-1/2 ${fieldValueClass} m-0 p-0`}>{jobOrder.requestedBy}</p>
         </div>
       </CardContent>
     </Card>
+    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <DialogContent className="max-w-4xl">
+        <img src={jobOrder.siteImageUrl || ''} alt="Attachment" className="mx-auto max-w-full h-auto" />
+        <DialogClose asChild>
+          <Button variant="ghost" size="sm" className="absolute top-2 right-2">
+            <X className="h-4 w-4" />
+          </Button>
+        </DialogClose>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }
 
@@ -146,6 +154,7 @@ export function CreateServiceAssignmentForm({
   onOpenProductSelection,
   onIdentifyJO,
   onChangeJobOrder,
+  onOpenJobOrderDialog,
 }: {
   onSaveAsDraft: () => Promise<void>;
   onSubmit: () => Promise<void>;
@@ -165,6 +174,7 @@ export function CreateServiceAssignmentForm({
   onOpenProductSelection: () => void;
   onIdentifyJO?: () => void;
   onChangeJobOrder?: () => void;
+  onOpenJobOrderDialog?: () => void;
 }) {
   return (
     <div className="flex flex-col lg:flex-row  p-4">
@@ -186,6 +196,7 @@ export function CreateServiceAssignmentForm({
           <JobOrderDetailsCard
             jobOrder={jobOrderData}
             onChange={onChangeJobOrder || (() => {})}
+            onOpenDialog={onOpenJobOrderDialog}
           />
         ) : (
           onIdentifyJO && (
