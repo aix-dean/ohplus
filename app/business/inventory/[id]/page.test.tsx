@@ -1,17 +1,3 @@
-// Mock React's 'use' hook to handle async params BEFORE importing React
-vi.mock('react', async () => {
-  const actualReact = await vi.importActual('react')
-  return {
-    ...actualReact,
-    use: vi.fn((value: any) => {
-      // If it's a promise, resolve it synchronously for testing
-      if (value && typeof value.then === 'function') {
-        return { id: 'test-product-id' }
-      }
-      return value
-    }),
-  }
-})
 
 // Mock useParams to return synchronous value
 vi.mock('next/navigation', () => ({
@@ -26,7 +12,7 @@ vi.mock('next/navigation', () => ({
 
 import React, { Suspense } from 'react'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { act } from 'react'
 import BusinessProductDetailPage from './page'
@@ -242,6 +228,17 @@ const mockBookings = [
   },
 ]
 
+const mockBookingsSnapshot = {
+  forEach: vi.fn((callback) => {
+    mockBookings.forEach((booking, index) => {
+      callback({
+        id: booking.id,
+        data: () => booking
+      })
+    })
+  })
+}
+
 // Test wrapper component that provides synchronous params
 const TestWrapper = () => {
   return <BusinessProductDetailPage params={Promise.resolve({ id: 'test-product-id' })} />
@@ -256,17 +253,6 @@ describe('BusinessProductDetailPage - Site Calendar Modal', () => {
     ;(globalThis as any).mockGetProductBookings.mockResolvedValue(mockBookings)
 
     // Mock Firebase Firestore calls used in the component
-    const mockBookingsSnapshot = {
-      forEach: vi.fn((callback) => {
-        mockBookings.forEach((booking, index) => {
-          callback({
-            id: booking.id,
-            data: () => booking
-          })
-        })
-      })
-    }
-
     ;(globalThis as any).mockCollection.mockReturnValue('bookings-collection')
     ;(globalThis as any).mockQuery.mockReturnValue('bookings-query')
     ;(globalThis as any).mockWhere.mockReturnValue('bookings-query')
@@ -343,13 +329,22 @@ describe('BusinessProductDetailPage - Site Calendar Modal', () => {
       })
 
       const calendarButton = screen.getByText('Site Calendar')
-
+    
+      // Make the fetch async to test loading state
+      ;(globalThis as any).mockGetDocs.mockImplementation(() => new Promise(resolve => {
+        setTimeout(() => resolve(mockBookingsSnapshot), 0)
+      }))
+    
       // Click and check for loading state
-      await act(async () => {
-        await user.click(calendarButton)
+      await act(() => {
+        fireEvent.click(calendarButton)
       })
-
-      expect(screen.getByText('Loading calendar...')).toBeInTheDocument()
+    
+      // Wait for modal to open and loading state
+      await waitFor(() => {
+        expect(screen.getByTestId('dialog')).toBeInTheDocument()
+        expect(screen.getByText('Loading calendar...')).toBeInTheDocument()
+      })
     })
 
     it('displays calendar with booked dates after loading', async () => {
@@ -385,11 +380,13 @@ describe('BusinessProductDetailPage - Site Calendar Modal', () => {
         expect(screen.getByText('Current Bookings')).toBeInTheDocument()
       })
 
+      const modal = screen.getByTestId('dialog')
+
       // Check that bookings are displayed
-      expect(screen.getByText('Test Project 1')).toBeInTheDocument()
-      expect(screen.getByText('Test Client 1')).toBeInTheDocument()
-      expect(screen.getByText('Test Project 2')).toBeInTheDocument()
-      expect(screen.getByText('Test Client 2')).toBeInTheDocument()
+      expect(within(modal).getByText('Test Project 1')).toBeInTheDocument()
+      expect(within(modal).getByText('Test Client 1')).toBeInTheDocument()
+      expect(within(modal).getByText('Test Project 2')).toBeInTheDocument()
+      expect(within(modal).getByText('Test Client 2')).toBeInTheDocument()
     })
 
     it('displays legend with booked and available date indicators', async () => {
