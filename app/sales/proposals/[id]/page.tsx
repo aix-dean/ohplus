@@ -2414,7 +2414,13 @@ export default function ProposalDetailsPage() {
         </div>
 
         {/* Site Details - Right Side - scaled */}
-        <div className="absolute font-bold text-[#333333] text-[18px] left-[358px] top-[191px] w-[434px] leading-[1.2]">
+        <div
+          className="absolute font-bold text-[#333333] text-[18px] left-[358px] w-[600px] leading-[1.2]"
+          style={{
+            top: ((editableProducts[product.id]?.additionalSpecs?.length || 0) > 0 ||
+                  fieldVisibility[product.id]?.additionalMessage !== false) ? '120px' : '191px'
+          }}
+        >
           {/* Site Name */}
           <div className="mb-2 text-[35px] ml-2">
             {isEditMode ? (
@@ -2541,34 +2547,56 @@ export default function ProposalDetailsPage() {
               <div key={index} className="flex mb-2">
                 <div className="w-[200px] pr-4 text-left">
                   {isEditMode ? (
-                    <input
+                    <textarea
                       value={spec.specs}
                       onChange={(e) => {
-                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
-                        newSpecs[index].specs = e.target.value
-                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        const value = e.target.value
+                        const lineBreaks = (value.match(/\n/g) || []).length
+                        if (lineBreaks <= 1) {
+                          const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                          newSpecs[index].specs = value
+                          setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        }
                       }}
-                      className="font-bold text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                      className="font-bold text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none"
                       placeholder="Add specs"
+                      rows={2}
+                      maxLength={30}
                     />
                   ) : (
-                    <p className="font-bold text-[18px] break-words">{spec.specs}</p>
+                    <textarea
+                      value={spec.specs || ''}
+                      readOnly
+                      className="font-bold text-[18px] border-none outline-none w-full bg-transparent resize-none"
+                      rows={2}
+                    />
                   )}
                 </div>
                 <div className="flex-1">
                   {isEditMode ? (
-                    <input
+                    <textarea
                       value={spec.data}
                       onChange={(e) => {
-                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
-                        newSpecs[index].data = e.target.value
-                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        const value = e.target.value
+                        const lineBreaks = (value.match(/\n/g) || []).length
+                        if (lineBreaks <= 1) {
+                          const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                          newSpecs[index].data = value
+                          setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        }
                       }}
-                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none"
                       placeholder="Add data"
+                      rows={2}
+                      maxLength={74}
                     />
                   ) : (
-                    <p className="font-normal text-[18px] text-gray-600 break-words">{spec.data}</p>
+                    <textarea
+                      value={spec.data || ''}
+                      readOnly
+                      className="font-normal text-[18px] border-none outline-none w-full bg-transparent resize-none"
+                      rows={2}
+                    />
                   )}
                 </div>
               </div>
@@ -2576,8 +2604,7 @@ export default function ProposalDetailsPage() {
 
             {/* Add Specs Button */}
             {isEditMode && (
-              <div className="flex mb-2">
-                <div className="w-[200px] pr-4 text-left"></div>
+              <div className="flex mb-2 justify-end">
                 <div className="flex-1">
                   <Button
                     onClick={() => {
@@ -2594,6 +2621,7 @@ export default function ProposalDetailsPage() {
                     }}
                     disabled={(editableProducts[product.id]?.additionalSpecs || []).length >= 3}
                     className={`self-start ${(editableProducts[product.id]?.additionalSpecs || []).length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    style={{ transform: 'translateX(470px)' }}
                     variant="outline"
                   >
                     + Add Specs
@@ -2613,11 +2641,18 @@ export default function ProposalDetailsPage() {
                      <textarea
                        value={editableProducts[product.id]?.additionalMessage || ''}
                        onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: e.target.value } }))}
-                       className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full min-h-[80px] resize-vertical"
+                       className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full"
                        placeholder="Additional message..."
+                       rows={3}
+                       maxLength={150}
                      />
                    ) : (
-                     <p className="font-normal text-[18px] break-words">{product.additionalMessage}</p>
+                     <textarea
+                       value={product.additionalMessage || ''}
+                       readOnly
+                       className="font-normal text-[18px] border-none outline-none w-full bg-transparent resize-none"
+                       rows={3}
+                     />
                    )}
                  </div>
                  {isEditMode && (
