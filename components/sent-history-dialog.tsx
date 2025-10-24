@@ -2,30 +2,32 @@
 
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { getSentEmailsForProposal } from "@/lib/proposal-service"
-import { getSentEmailsForReport } from "@/lib/report-service"
 import { format } from "date-fns"
-import { X } from "lucide-react"
+import { ArrowLeft, X } from "lucide-react"
+import { emailService } from "@/lib/email-service"
 
 interface SentHistoryDialogProps {
-    open: boolean
-    onOpenChange: (open: boolean) => void
-    proposalId?: string
-    reportId?: string
-    emailType?: "proposal" | "cost_estimate" | "quotation" | "report"
-  }
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  proposalId?: string
+  reportId?: string
+  companyId?: string
+  emailType?: "proposal" | "cost_estimate" | "quotation" | "report"
+  emailToShow?: EmailRecord
+}
 
 interface EmailRecord {
   id: string
-  sentAt: Date
+  created: Date
   subject: string
   to: string[]
   cc?: string[]
   body: string
   attachments: any[]
+  from?: string
 }
 
-export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, emailType = "proposal" }: SentHistoryDialogProps) {
+export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, companyId, emailType, emailToShow }: SentHistoryDialogProps) {
   const [emails, setEmails] = useState<EmailRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedEmail, setSelectedEmail] = useState<EmailRecord | null>(null)
@@ -34,22 +36,50 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, em
   const [selectedAttachment, setSelectedAttachment] = useState<any>(null)
 
   useEffect(() => {
-    if (open && (proposalId || reportId)) {
+    if (open && emailToShow) {
+      setSelectedEmail(emailToShow)
+      setCurrentView('detail')
+    } else if (open && (proposalId || reportId)) {
+      // Fetch emails for the specific item
       fetchEmails()
       setCurrentView('list')
-      setSelectedEmail(null)
     }
-  }, [open, proposalId, reportId])
+  }, [open, emailToShow, proposalId, reportId])
 
-  const handleEmailClick = (email: EmailRecord) => {
-    setSelectedEmail(email)
-    setCurrentView('detail')
+  useEffect(() => {
+    if (!open) {
+      setEmails([])
+      setSelectedEmail(null)
+      setCurrentView('list')
+      setLoading(false)
+    }
+  }, [open])
+
+  const fetchEmails = async () => {
+    if (!companyId) return
+
+    setLoading(true)
+    try {
+      const firebaseEmails = await emailService.getEmailsByFilters(companyId, reportId, emailType)
+      // Map Firebase results to EmailRecord format
+      const emailRecords: EmailRecord[] = firebaseEmails.map(email => ({
+        id: email.id || '',
+        created: email.created ? email.created.toDate() : new Date(),
+        subject: email.subject,
+        to: email.to,
+        cc: email.cc,
+        body: email.body,
+        attachments: email.attachments || []
+      }))
+      setEmails(emailRecords)
+    } catch (error) {
+      console.error("Error fetching emails:", error)
+      setEmails([])
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleBackToList = () => {
-    setCurrentView('list')
-    setSelectedEmail(null)
-  }
 
   const handleAttachmentClick = (attachment: any) => {
     setSelectedAttachment(attachment)
@@ -61,184 +91,148 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, em
     setSelectedAttachment(null)
   }
 
-  const fetchEmails = async () => {
-    setLoading(true)
-    try {
-      let emailData
-      if (emailType === "report") {
-        emailData = await getSentEmailsForReport(reportId!)
-      } else {
-        emailData = await getSentEmailsForProposal(proposalId!, emailType)
-      }
-      setEmails(emailData as EmailRecord[])
-    } catch (error) {
-      console.error("Error fetching emails:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[1012px] h-[544px] max-w-[95vw] max-h-[90vh] bg-white rounded-[20px] p-0 border-0 shadow-lg">
-        <DialogTitle className="sr-only">Sent History</DialogTitle>
-        <div className="relative">
+      <DialogTitle className="sr-only p-0 gap-0 m-0">Email</DialogTitle>
+      <DialogContent className="w-[900px] min-h-[500px] max-h-[500px] flex flex-col bg-white rounded-md p-0 border-0 shadow-xl">
+        
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-2">
+          <button
+            onClick={() => {
+              if (currentView === 'detail') {
+                setCurrentView('list')
+                setSelectedEmail(null)
+              } else {
+                onOpenChange(false)
+              }
+            }}
+            className="flex items-center text-gray-700 hover:text-gray-900"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm font-bold">
+              Email
+            </span>
+          </button>
+
           <button
             onClick={() => onOpenChange(false)}
-            className="absolute top-4 right-4 z-10 p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="hover:bg-gray-100 rounded-full transition-colors"
             aria-label="Close dialog"
           >
             <X className="h-5 w-5 text-gray-500" />
           </button>
-        <div className="p-6">
-          {currentView === 'list' ? (
-            <>
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Sent History</h2>
+        </div>
 
-              {/* Headers */}
-              <div className="flex justify-between items-center mb-4">
-                <span className="font-bold text-base text-gray-800 w-28">Date</span>
-                <span className="font-bold text-base text-gray-800 w-20">Time</span>
-                <span className="font-bold text-base text-gray-800 w-48">Subject</span>
-                <span className="font-bold text-base text-gray-800 w-72">To</span>
+        {/* Body */}
+        <div className="px-6 text-sm text-gray-800 overflow-y-auto flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className="ml-2">Loading sent history...</span>
+            </div>
+          ) : currentView === 'list' ? (
+            <>
+              {/* Table Headers */}
+              <div className="bg-white pb-4 border-b border-gray-300">
+                <div className="grid grid-cols-4 gap-4 text-xs font-semibold text-gray-900">
+                  <div>Date</div>
+                  <div>Time</div>
+                  <div>Subject</div>
+                  <div>To</div>
+                </div>
               </div>
 
-              <hr className="mb-4" />
-
-              {/* Loading state */}
-              {loading && (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">Loading sent history...</p>
+              {emails.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No emails found for this report.
                 </div>
-              )}
-
-              {/* No emails */}
-              {!loading && emails.length === 0 && (
-                <div className="text-center py-8">
-                  <p className="text-gray-600">No sent emails found for this proposal.</p>
-                </div>
-              )}
-
-              {/* Email entries */}
-              {!loading && emails.length > 0 && (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+              ) : (
+                <div className="space-y-3 pt-4">
                   {emails.map((email) => (
                     <div
                       key={email.id}
-                      className="bg-cyan-50 border-2 border-cyan-300 rounded-[15px] p-4 hover:bg-cyan-100 transition-colors cursor-pointer"
-                      onClick={() => handleEmailClick(email)}
+                      className="bg-[#f6f9ff] border-2 border-[#b8d9ff] rounded-[10px] p-4 cursor-pointer hover:bg-[#e8f0ff] transition-colors"
+                      onClick={() => {
+                        setSelectedEmail(email)
+                        setCurrentView('detail')
+                      }}
                     >
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-base text-gray-800 w-28">
-                          {format(email.sentAt, "MMM d, yyyy")}
-                        </span>
-                        <span className="text-base text-gray-800 w-20">
-                          {format(email.sentAt, "h:mm a")}
-                        </span>
-                        <span className="text-base text-gray-800 w-48 truncate" title={email.subject}>
+                      <div className="grid grid-cols-4 gap-4 items-center text-xs">
+                        <div className="text-gray-900">
+                          {format(email.created, 'MMM d, yyyy')}
+                        </div>
+                        <div className="text-gray-900">
+                          {format(email.created, 'h:mm a')}
+                        </div>
+                        <div className="text-gray-900 truncate" title={email.subject}>
                           {email.subject}
-                        </span>
-                        <span className="text-base text-gray-800 w-72 truncate" title={email.to.join(", ")}>
-                          {email.to.join(", ")}
-                        </span>
+                        </div>
+                        <div className="text-gray-900 truncate" title={email.to.join(', ')}>
+                          {email.to.join(', ')}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </>
-          ) : (
-            selectedEmail && (
-              <>
-                <button
-                  onClick={handleBackToList}
-                  className="text-xl font-bold text-gray-800 mb-4 hover:text-gray-600 transition-colors"
-                >
-                  ← Email
-                </button>
-
-                <div className="flex flex-col h-full">
-                  {/* Header Info - Fixed at top */}
-                  <div className="flex-shrink-0">
-                    <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 mb-4">
-                      {/* Labels Column */}
-                      <div className="flex-shrink-0 lg:w-32 space-y-4">
-                        <div className="font-bold text-base text-gray-800">Date:</div>
-                        <div className="font-bold text-base text-gray-800">To:</div>
-                        <div className="font-bold text-base text-gray-800">Cc:</div>
-                        <div className="font-bold text-base text-gray-800">Subject:</div>
-                      </div>
-
-                      {/* Content Column */}
-                      <div className="flex-1 space-y-4 min-h-0">
-                        <div className="text-base text-gray-800 break-words">
-                          {format(selectedEmail.sentAt, "MMM d, yyyy")}
-                        </div>
-
-                        <div className="text-base text-gray-800 break-words">
-                          {selectedEmail.to.join(", ")}
-                        </div>
-
-                        <div className="text-base text-gray-800 break-words">
-                          {selectedEmail.cc ? selectedEmail.cc.join(", ") : "N/A"}
-                        </div>
-
-                        <div className="text-base text-gray-800 break-words">
-                          {selectedEmail.subject}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Message Area - Scrollable middle section */}
-                  <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 min-h-0">
-                    {/* Message Label */}
-                    <div className="flex-shrink-0 lg:w-32">
-                      <div className="font-bold text-base text-gray-800">Message:</div>
-                    </div>
-
-                    {/* Message Content - Scrollable */}
-                    <div className="flex-1 min-h-0">
-                      <div className="text-base text-gray-800 whitespace-pre-line break-words h-60 overflow-y-auto bg-gray-50 p-3 rounded">
-                        {selectedEmail.body}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Attachments - Fixed at bottom */}
-                  {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-                    <div className="flex-shrink-0 flex flex-col lg:flex-row gap-4 lg:gap-6 mt-auto">
-                      {/* Attachments Label */}
-                      <div className="flex-shrink-0 lg:w-32">
-                        <div className="font-bold text-base text-gray-800">Attachments:</div>
-                      </div>
-
-                      {/* Attachments Content */}
-                      <div className="flex-1 space-y-2">
-                        {selectedEmail.attachments.map((attachment, index) => (
-                          <div key={index} className="break-words">
-                            <button
-                              onClick={() => handleAttachmentClick(attachment)}
-                              className="text-base text-blue-600 underline hover:text-blue-800 break-all cursor-pointer bg-transparent border-none p-0"
-                            >
-                              {attachment.fileName}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+          ) : selectedEmail ? (
+            <>
+              {/* Metadata grid */}
+              <div className="flex gap-8">
+                {/* Labels */}
+                <div className="font-bold text-gray-800 space-y-2">
+                  <div className="text-xs font-semibold">Date:</div>
+                  <div className="text-xs font-semibold">To:</div>
+                  <div className="text-xs font-semibold">Cc:</div>
+                  <div className="text-xs font-semibold">Subject:</div>
+                  <div className="text-xs font-semibold">Message:</div>
                 </div>
-              </>
-            )
+                {/* Values */}
+                <div className="text-gray-800 text-xs space-y-2">
+                  <div>{format(selectedEmail.created, 'MMM d, yyyy')}</div>
+                  <div className="break-words">{selectedEmail.to.join(', ')}</div>
+                  <div className="break-words">
+                    {selectedEmail.cc?.join(', ') || 'N/A'}
+                  </div>
+                  <div>{selectedEmail.subject}</div>
+                  <div className="whitespace-pre-line">{selectedEmail.body}</div>
+                </div>
+              </div>
+
+              {/* Attachments */}
+              {selectedEmail.attachments?.length > 0 && (
+                <div className="mb-4 mt-2">
+                  <div className="flex items-start gap-2">
+                    <div className="font-semibold text-xs text-gray-800">Attachments:</div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedEmail.attachments.map((attachment, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleAttachmentClick(attachment)}
+                          className="text-blue-600 hover:text-blue-800 underline text-sm bg-transparent text-xs font-semibold border-none cursor-pointer p-0"
+                        >
+                          {attachment.fileName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No email selected.
+            </div>
           )}
-        </div>
         </div>
       </DialogContent>
 
       {/* File Viewer Dialog */}
       <Dialog open={fileViewerOpen} onOpenChange={setFileViewerOpen}>
-        <DialogContent className="w-[90vw] h-[90vh] max-w-none max-h-none bg-white rounded-[20px] p-0 border-0 shadow-lg">
+        <DialogContent className="w-[900px] min-h-[60vh] max-h-[95vh] bg-white rounded-md p-0 border-0 shadow-xl">
           <DialogTitle className="sr-only">File Viewer</DialogTitle>
           <div className="relative h-full">
             <button
@@ -249,16 +243,14 @@ export function SentHistoryDialog({ open, onOpenChange, proposalId, reportId, em
               <X className="h-5 w-5 text-gray-500" />
             </button>
             <div className="p-6 h-full">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">
+              <h2 className="text-base font-semibold text-gray-800 mb-4">
                 {selectedAttachment?.fileName || 'File Viewer'}
               </h2>
-              <div className="h-[calc(100%-4rem)]">
-                <iframe
-                  src={selectedAttachment?.fileUrl}
-                  className="w-full h-full border rounded-lg"
-                  title={selectedAttachment?.fileName || 'File Viewer'}
-                />
-              </div>
+              <iframe
+                src={selectedAttachment?.fileUrl}
+                className="w-full h-[calc(100%-2rem)] border rounded-md"
+                title={selectedAttachment?.fileName || 'File Viewer'}
+              />
             </div>
           </div>
         </DialogContent>
