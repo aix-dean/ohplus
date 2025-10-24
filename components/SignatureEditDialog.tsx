@@ -4,7 +4,7 @@ import { X, Loader2 } from 'lucide-react';
 interface SignatureEditDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (signature: { type: 'text' | 'png', data: string }) => void;
+  onSave: (signature: { data: string }) => void;
 }
 
 const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClose, onSave }) => {
@@ -243,19 +243,27 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
           ></canvas>
         )}
         {activeTab === 'type' && (
-          <div className="w-72 h-44 border border-gray-300 mb-4 flex items-center justify-center">
+          <div className="w-72 h-44 border border-gray-300 mb-4 flex items-center justify-center relative">
             <input
               type="text"
               value={typedSignature}
               onChange={(e) => setTypedSignature(e.target.value)}
               placeholder="Type your signature"
+              maxLength={12}
               className="w-full h-full text-center text-2xl font-signature border-none outline-none bg-transparent"
               style={{ fontFamily: 'cursive' }}
             />
+            {typedSignature.trim() && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <span className="text-2xl font-signature" style={{ fontFamily: 'cursive', color: selectedColor }}>
+                  {typedSignature}
+                </span>
+              </div>
+            )}
           </div>
         )}
         {activeTab === 'upload' && (
-          <div className="w-72 h-44 border-2 border-dashed border-gray-300 mb-4 flex flex-col items-start justify-start relative">
+          <div className="w-72 h-44 border-2 border-dashed border-gray-300 mb-4 flex flex-col items-center justify-start relative">
             {previewUrl ? (
               <img
                 src={previewUrl}
@@ -265,7 +273,7 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
             ) : (
               <>
                 <div
-                  className="w-full h-full flex flex-col items-start justify-start cursor-pointer"
+                  className="w-full h-full flex flex-col items-center justify-center cursor-pointer"
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
@@ -274,7 +282,7 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
                   <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
-                  <span className="text-gray-500 text-sm text-left">
+                  <span className="text-gray-500 text-sm text-left text-center">
                     Drag & drop an image here<br />or click to select
                   </span>
                 </div>
@@ -290,8 +298,8 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
           </div>
         )}
 
-        {/* Color selection dots - only show for Draw tab */}
-        {activeTab === 'draw' && (
+        {/* Color selection dots - show for Draw and Type tabs */}
+        {(activeTab === 'draw' || activeTab === 'type') && (
           <div className="flex space-x-2 mb-4 justify-start">
             <button
               onClick={() => setSelectedColor('#000000')}
@@ -322,12 +330,23 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
           onClick={async () => {
             setIsSaving(true);
             try {
-              let signatureData: { type: 'text' | 'png', data: string } | null = null;
+              let signatureData: { data: string } | null = null;
               if (activeTab === 'draw' && canvasRef.current) {
-                signatureData = { type: 'png', data: canvasRef.current.toDataURL('image/png') };
-              } else if (activeTab === 'type' && typedSignature) {
-                // Save typed signature as text directly
-                signatureData = { type: 'text', data: typedSignature };
+                signatureData = { data: canvasRef.current.toDataURL('image/png') };
+              } else if (activeTab === 'type' && typedSignature.trim()) {
+                // Generate PNG from typed text
+                const canvas = document.createElement('canvas');
+                canvas.width = 288;
+                canvas.height = 176;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  ctx.font = '24px cursive';
+                  ctx.fillStyle = selectedColor;
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'middle';
+                  ctx.fillText(typedSignature, canvas.width / 2, canvas.height / 2);
+                  signatureData = { data: canvas.toDataURL('image/png') };
+                }
               } else if (activeTab === 'upload' && previewUrl) {
                 // Convert uploaded image to PNG
                 const img = new Image();
@@ -335,12 +354,12 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
                 await new Promise<void>((resolve, reject) => {
                   img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    canvas.width = 288;
-                    canvas.height = 176;
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
                     const ctx = canvas.getContext('2d');
                     if (ctx) {
-                      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                      signatureData = { type: 'png', data: canvas.toDataURL('image/png') };
+                      ctx.drawImage(img, 0, 0);
+                      signatureData = { data: canvas.toDataURL('image/png') };
                       resolve();
                     } else {
                       reject(new Error('Could not get canvas context'));

@@ -11,12 +11,12 @@ export default function SignaturePage() {
   const { userData, updateUserData } = useAuth()
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentSignature, setCurrentSignature] = useState<string | null>(null);
-  const [isImageLoading, setIsImageLoading] = useState(true);
+  const [isImageLoading, setIsImageLoading] = useState(false);
 
   useEffect(() => {
     if (userData?.signature?.url) {
       setCurrentSignature(userData.signature.url);
-      setIsImageLoading(userData.signature.type === 'png');
+      setIsImageLoading(true);
     } else {
       setCurrentSignature(null);
       setIsImageLoading(false);
@@ -37,20 +37,12 @@ export default function SignaturePage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                 </div>
               )}
-              {userData?.signature?.type === 'text' ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-2xl font-signature" style={{ fontFamily: 'cursive' }}>
-                    {currentSignature}
-                  </span>
-                </div>
-              ) : (
-                <img
-                  className={`w-full h-full object-contain ${isImageLoading ? 'hidden' : ''}`}
-                  src={currentSignature || "https://placehold.co/256x256"}
-                  onLoad={() => setIsImageLoading(false)}
-                  onError={() => setIsImageLoading(false)}
-                />
-              )}
+              <img
+                className={`w-full h-full object-contain ${isImageLoading ? 'hidden' : ''}`}
+                src={currentSignature || "https://placehold.co/256x256"}
+                onLoad={() => setIsImageLoading(false)}
+                onError={() => setIsImageLoading(false)}
+              />
             </div>
             <button
               className="mt-2 p-1 hover:bg-gray-100 rounded"
@@ -80,26 +72,15 @@ export default function SignaturePage() {
           onClose={() => setIsDialogOpen(false)}
           onSave={async (signatureData) => {
             try {
-              let signatureValue: string;
-              let signatureType: 'text' | 'png';
-
-              if (signatureData.type === 'text') {
-                // For typed signatures, save the text directly without uploading
-                signatureValue = signatureData.data;
-                signatureType = 'text';
-              } else {
-                // For PNG signatures (draw/upload), upload to storage
-                const downloadURL = await uploadSignature(signatureData.data, userData!.uid);
-                signatureValue = downloadURL;
-                signatureType = 'png';
-              }
+              // All signatures are now PNG, so always upload to storage
+              const downloadURL = await uploadSignature(signatureData.data, userData!.uid);
+              const signatureValue = downloadURL;
 
               setCurrentSignature(signatureValue);
               setIsDialogOpen(false);
               await updateUserData({
                 signature: {
                   url: signatureValue,
-                  type: signatureType,
                   updated: new Date(),
                 },
               });
