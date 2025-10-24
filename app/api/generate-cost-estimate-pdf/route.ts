@@ -472,9 +472,7 @@ function generateCostEstimateHTML(
       .signature-line {
         font-weight: bold;
         border-bottom: 1px solid #000;
-        margin-top: 10px;
-        padding-top: 20px;
-        max-width: 200px; /* 👈 shorten the line */
+        max-width: 100px; /* 👈 shorten the line */
         margin-right: 0; 
       }
     </style>
