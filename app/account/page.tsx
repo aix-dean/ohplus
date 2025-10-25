@@ -484,7 +484,7 @@ export default function AccountPage() {
   return (
     <div className="relative size-full" data-name="ACCOUNT SETTING" data-node-id="7174:4241">
       <div className="absolute bg-neutral-50 h-[661px] left-0 top-[59px] w-[1280px]" data-node-id="7174:4819" />
-      <div className="absolute bg-white left-[31px] rounded-[20px] top-[59px] w-[1002px] px-4 py-8 relative" data-node-id="7174:4779" style={{height: '364px'}} />
+      <div className="absolute bg-white left-[31px] rounded-[20px] top-[59px] w-[1002px] px-4 py-8 relative" data-node-id="7174:4779" style={{height: '344px'}} />
       <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[24px] leading-none left-[51px] not-italic text-[16px] text-[var(--lighter-black,#333333)] top-[79px] w-[315px]" data-node-id="7174:4755">
         Account Details
       </p>
@@ -494,7 +494,7 @@ export default function AccountPage() {
             type="text"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
-            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[182px] w-[190px] px-2 text-sm"
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[157px] w-[190px] px-2 text-sm"
             placeholder="First Name"
             maxLength={50}
           />
@@ -502,7 +502,7 @@ export default function AccountPage() {
             type="text"
             value={middleName}
             onChange={(e) => setMiddleName(e.target.value)}
-            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[215px] w-[190px] px-2 text-sm"
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[190px] w-[190px] px-2 text-sm"
             placeholder="Middle Name"
             maxLength={50}
           />
@@ -510,20 +510,20 @@ export default function AccountPage() {
             type="text"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
-            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[248px] w-[190px] px-2 text-sm"
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[223px] w-[190px] px-2 text-sm"
             placeholder="Last Name"
             maxLength={50}
           />
           <select
             value={gender}
             onChange={(e) => setGender(e.target.value)}
-            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[281px] w-[190px] px-2 text-sm"
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[256px] w-[190px] px-2 text-sm"
           >
             <option value="">Select Gender</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
           </select>
-          <div className="absolute left-[371px] top-[314px] flex items-center">
+          <div className="absolute left-[371px] top-[289px] flex items-center">
             <span className="bg-gray-100 border border-gray-400 h-[24px] px-2 rounded-l-[6px] text-sm text-gray-600">+63</span>
             <input
               type="text"
@@ -540,17 +540,17 @@ export default function AccountPage() {
           <input
             type="email"
             value={userData?.email || ""}
-            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[347px] w-[190px] px-2 text-sm"
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[322px] w-[190px] px-2 text-sm"
             disabled
             placeholder="Email (read-only)"
           />
           <button
             onClick={handlePhotoClick}
-            className="absolute bg-white border border-gray-400 h-[24px] left-[93px] rounded-[6px] top-[262px] w-[108px] text-sm text-gray-700 hover:bg-gray-50 z-10"
+            className="absolute bg-white border border-gray-400 h-[24px] left-[93px] rounded-[6px] top-[237px] w-[108px] text-sm text-gray-700 hover:bg-gray-50 z-10"
           >
             Choose Avatar
           </button>
-          <div className="absolute left-[695px] top-[364px] flex gap-2">
+          <div className="absolute left-[695px] top-[339px] flex gap-2">
             <button
               onClick={() => setIsEditingPersonal(false)}
               className="bg-white border-2 border-gray-400 h-[27px] rounded-[10px] w-[149px] text-gray-700 hover:bg-gray-50"
@@ -568,45 +568,45 @@ export default function AccountPage() {
         </>
       ) : (
         <>
-          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[182.05px] w-[94.74px]" data-node-id="7174:4758">
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[157.05px] w-[94.74px]" data-node-id="7174:4758">
             {userData?.first_name || "-"}
           </p>
-          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[215.05px] w-[94.74px]" data-node-id="7174:4762">
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[190.05px] w-[94.74px]" data-node-id="7174:4762">
             {userData?.middle_name || "-"}
           </p>
-          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[248.05px] w-[94.74px]" data-node-id="7174:4765">
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[223.05px] w-[94.74px]" data-node-id="7174:4765">
             {userData?.last_name || "-"}
           </p>
-          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[281.05px] w-[94.74px]" data-node-id="7174:4771">
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[256.05px] w-[94.74px]" data-node-id="7174:4771">
             {userData?.gender || "-"}
           </p>
-          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[314.05px] w-[94.74px]" data-node-id="7174:4774">
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[289.05px] w-[94.74px]" data-node-id="7174:4774">
             {userData?.phone_number || "-"}
           </p>
-          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15px] leading-none left-[371px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[347px] w-[143px]" data-node-id="7174:4777">
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15px] leading-none left-[371px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[322px] w-[143px]" data-node-id="7174:4777">
             {userData?.email || "-"}
           </p>
         </>
       )}
-      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[182px] w-[84px]" data-node-id="7174:4759">
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[157px] w-[84px]" data-node-id="7174:4759">
         First Name:
       </p>
-      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[215px] w-[84px]" data-node-id="7174:4763">
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[190px] w-[84px]" data-node-id="7174:4763">
         Middle Name:
       </p>
-      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[248px] w-[84px]" data-node-id="7174:4766">
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[223px] w-[84px]" data-node-id="7174:4766">
         Last Name:
       </p>
-      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[281px] w-[94px]" data-node-id="7174:4772">
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[256px] w-[94px]" data-node-id="7174:4772">
         Gender:
       </p>
-      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[314px] w-[94px]" data-node-id="7174:4775">
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[289px] w-[94px]" data-node-id="7174:4775">
         Phone No.:
       </p>
-      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[347px] w-[94px]" data-node-id="7174:4778">
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[322px] w-[94px]" data-node-id="7174:4778">
         Email:
       </p>
-      <div className="absolute left-[66px] size-[162px] top-[193px] rounded-full border-2 border-gray-400 overflow-hidden" data-node-id="7174:4830">
+      <div className="absolute left-[66px] size-[162px] top-[168px] rounded-full border-2 border-gray-400 overflow-hidden" data-node-id="7174:4830">
         {isUploading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 size={48} className="animate-spin text-primary" />
@@ -623,7 +623,7 @@ export default function AccountPage() {
           </div>
         )}
       </div>
-      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[20px] leading-none left-[147px] not-italic text-[20px] text-[var(--lighter-black,#333333)] text-center top-[367px] translate-x-[-50%] w-[90px]" data-node-id="7174:4831">
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[20px] leading-none left-[147px] not-italic text-[20px] text-[var(--lighter-black,#333333)] text-center top-[342px] translate-x-[-50%] w-[90px]" data-node-id="7174:4831">
         {userData?.first_name || "Noemi"}
       </p>
       <button
@@ -649,15 +649,12 @@ export default function AccountPage() {
         onChange={handlePhotoChange}
         disabled={isUploading}
       />
-      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[24px] leading-none left-[53px] not-italic text-[16px] text-[var(--lighter-black,#333333)] top-[135px] w-[315px]" data-node-id="7174:4939">
-        Personal Information
-      </p>
-      <div className="absolute bg-white left-[31px] rounded-[20px] top-[440px] w-[1002px] px-4 py-8" data-node-id="7174:4943" style={{height: '151px'}} />
-      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[24px] leading-none left-[51px] not-italic text-[16px] text-[var(--lighter-black,#333333)] top-[456px] w-[315px]" data-node-id="7174:4944">
+      <div className="absolute bg-white left-[31px] rounded-[20px] top-[410px] w-[1002px] px-4 py-8" data-node-id="7174:4943" style={{height: '151px'}} />
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[24px] leading-none left-[51px] not-italic text-[16px] text-[var(--lighter-black,#333333)] top-[426px] w-[315px]" data-node-id="7174:4944">
         Department and Roles
       </p>
       {userData?.roles && userData.roles.length > 0 && (
-        <div className="absolute left-[51px] top-[485px] flex flex-wrap gap-2">
+        <div className="absolute left-[51px] top-[455px] flex flex-wrap gap-2">
           {userData.roles.map((role: RoleType) => {
             const department = departmentMapping[role]
             return department ? (
@@ -670,7 +667,7 @@ export default function AccountPage() {
           })}
         </div>
       )}
-      <div className="absolute left-[994px] top-[456px]" data-name="dots" data-node-id="7174:4951">
+      <div className="absolute left-[994px] top-[426px]" data-name="dots" data-node-id="7174:4951">
         <MoreVertical size={24} className="text-black" />
       </div>
     </div>
