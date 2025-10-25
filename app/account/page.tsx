@@ -496,6 +496,7 @@ export default function AccountPage() {
             onChange={(e) => setFirstName(e.target.value)}
             className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[182px] w-[190px] px-2 text-sm"
             placeholder="First Name"
+            maxLength={50}
           />
           <input
             type="text"
@@ -503,6 +504,7 @@ export default function AccountPage() {
             onChange={(e) => setMiddleName(e.target.value)}
             className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[215px] w-[190px] px-2 text-sm"
             placeholder="Middle Name"
+            maxLength={50}
           />
           <input
             type="text"
@@ -510,21 +512,31 @@ export default function AccountPage() {
             onChange={(e) => setLastName(e.target.value)}
             className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[248px] w-[190px] px-2 text-sm"
             placeholder="Last Name"
+            maxLength={50}
           />
-          <input
-            type="text"
+          <select
             value={gender}
             onChange={(e) => setGender(e.target.value)}
             className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[281px] w-[190px] px-2 text-sm"
-            placeholder="Gender"
-          />
-          <input
-            type="text"
-            value={phoneNumber}
-            onChange={(e) => setPhoneNumber(e.target.value)}
-            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[314px] w-[190px] px-2 text-sm"
-            placeholder="Phone Number"
-          />
+          >
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+          <div className="absolute left-[371px] top-[314px] flex items-center">
+            <span className="bg-gray-100 border border-gray-400 h-[24px] px-2 rounded-l-[6px] text-sm text-gray-600">+63</span>
+            <input
+              type="text"
+              value={phoneNumber.replace(/^\+63/, '')}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                setPhoneNumber(value);
+              }}
+              className="bg-white border border-gray-400 border-l-0 h-[24px] rounded-r-[6px] w-[150px] px-2 text-sm"
+              placeholder="Phone Number"
+              maxLength={10}
+            />
+          </div>
           <input
             type="email"
             value={userData?.email || ""}
@@ -615,7 +627,7 @@ export default function AccountPage() {
         {userData?.first_name || "Noemi"}
       </p>
       <button
-        className="absolute left-[937px] top-[364px] bg-white border-2 border-gray-400 h-[27px] rounded-[10px] w-[80px] text-gray-700 hover:bg-gray-50"
+        className="absolute right-4 top-4 bg-white border-2 border-gray-400 h-[27px] rounded-[10px] w-[80px] text-gray-700 hover:bg-gray-50"
         onClick={handleLogout}
       >
         Logout
@@ -653,7 +665,6 @@ export default function AccountPage() {
                 <div className={`h-[46px] rounded-[20px] px-4 flex items-center justify-center ${department.color} text-white`}>
                   <span className="font-bold text-[16px]">{department.name}</span>
                 </div>
-                <span className="text-[12px] text-gray-600 mt-1 capitalize">{role} Role</span>
               </div>
             ) : null
           })}
