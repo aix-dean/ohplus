@@ -1173,6 +1173,7 @@ export async function createDirectQuotation(
         width: site.width || 0,
         content_type: site.content_type || "",
         specs: site.specs_rental,
+        cms: site.cms,
       },
       projectCompliance: {
         signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
@@ -1266,6 +1267,7 @@ export async function createMultipleQuotations(
           width: site.width || 0,
           content_type: site.content_type || "",
           specs: site.specs_rental,
+          cms: site.cms,
         },
         projectCompliance: {
           signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },

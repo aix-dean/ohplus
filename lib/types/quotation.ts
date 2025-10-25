@@ -42,6 +42,7 @@ export interface QuotationProduct {
   site_notes?: string
   price_notes?: string
   illumination?: string
+  cms?: any // Added cms field for product CMS data
 }
 
 export interface ClientComplianceItem {

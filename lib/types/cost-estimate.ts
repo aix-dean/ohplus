@@ -16,6 +16,7 @@ export interface CostEstimateLineItem {
   image?: string // Added optional image field for product images
   specs?: SpecsRental // Added specs field to match quotation structure
   content_type?: string // Added content_type field to match quotation structure
+  cms?: any // Added cms field for product CMS data
 }
 
 export interface CostEstimate {

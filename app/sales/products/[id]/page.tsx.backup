@@ -409,22 +409,16 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
     // Sample client names for demonstration
     const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
+    const occupiedCount = Math.floor(totalSpots * 0.72) // 72% occupied as in Figma
 
     for (let i = 1; i <= totalSpots; i++) {
-      // Check if this spot has scheduled content
-      const hasScheduledContent = screenSchedules.some(
-        (schedule) => schedule.spot_number === i && schedule.active,
-      )
-
-      const isOccupied = hasScheduledContent
-      const schedule = screenSchedules.find(s => s.spot_number === i && s.active)
-
+      const isOccupied = i <= occupiedCount
       spots.push({
         id: `spot-${i}`,
         number: i,
         status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
-        clientName: isOccupied ? (schedule?.title || clientNames[(i - 1) % clientNames.length]) : undefined,
-        imageUrl: isOccupied ? (schedule?.media || "/placeholder.svg") : undefined,
+        clientName: isOccupied ? clientNames[(i - 1) % clientNames.length] : undefined,
+        imageUrl: isOccupied ? "/placeholder.svg" : undefined, // Placeholder for now
       })
     }
 
@@ -433,7 +427,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
   const calculateOccupiedSpots = (cms: any) => {
     const totalSpots = cms.loops_per_day || 18
-    return screenSchedules.filter(schedule => schedule.active).length
+    return Math.floor(totalSpots * 0.72) // 72% occupied as in Figma
   }
 
   const calculateVacantSpots = (cms: any) => {
@@ -474,7 +468,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [calendarDialogOpen, setCalendarDialogOpen] = useState(false)
   const [bookedDates, setBookedDates] = useState<Date[]>([])
   const [calendarLoading, setCalendarLoading] = useState(false)
-  const [screenSchedules, setScreenSchedules] = useState<any[]>([])
 
   const [notification, setNotification] = useState<{
     show: boolean
@@ -753,32 +746,6 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
     fetchReports()
   }, [params.id, reportsPage, activeTab])
-
-  // Fetch screen schedules for spots content status
-  useEffect(() => {
-    const fetchScreenSchedules = async () => {
-      if (!params.id || params.id === "new") return
-
-      try {
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
-        const q = query(
-          collection(db, "screen_schedule"),
-          where("product_id", "==", productId),
-          where("deleted", "==", false),
-        )
-        const querySnapshot = await getDocs(q)
-        const schedules = querySnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
-        setScreenSchedules(schedules)
-      } catch (error) {
-        console.error("Error fetching screen schedules:", error)
-      }
-    }
-
-    fetchScreenSchedules()
-  }, [params.id])
 
   const handleBack = () => {
     router.back()
@@ -1420,17 +1387,13 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 totalSpots={product.cms.loops_per_day || 18}
                 occupiedCount={calculateOccupiedSpots(product.cms)}
                 vacantCount={calculateVacantSpots(product.cms)}
-                productId={params.id}
               />
-             </div>
-           )}
-            
-            
+            </div>
+          )}
 
             <div className="text-sm text-gray-600 mb-4 text-right">Total: {getTabCount(activeTab)}</div>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="mb-4">
-                <TabsList className="grid w-fit grid-cols-5">
+            <div className="mb-4">
+              <TabsList className="grid w-fit grid-cols-5">
                 <TabsTrigger value="booking-summary">Booking Summary</TabsTrigger>
                 <TabsTrigger value="ce">CE</TabsTrigger>
                 <TabsTrigger value="quote">Quote</TabsTrigger>
