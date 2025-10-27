@@ -493,7 +493,7 @@ function generateCostEstimateHTML(
       </div>
     </div>
 
-    <div class="title">${isMultipleSites ? `${primarySite}` : `${costEstimate.lineItems[0].description} Cost Estimate` || "Cost Estimate"}</div>
+    <div class="title">${isMultipleSitles ? `${primarySite}` : `${costEstimate.lineItems[0].description} Cost Estimate` || "Cost Estimate"}</div>
 
     <div class="salutation">
       Dear ${costEstimate?.template?.salutation ||  "Mr."} ${costEstimate.client?.name?.split(" ").pop() || "Client"},

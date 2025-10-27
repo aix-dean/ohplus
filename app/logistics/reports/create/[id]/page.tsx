@@ -9,7 +9,7 @@ import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { createReport, ReportData } from "@/lib/report-service"
 import { Timestamp } from "firebase/firestore"
-import { ArrowLeft, Loader2 } from "lucide-react"
+import { ArrowLeft, Loader2, Upload } from "lucide-react"
 
 export default function CreateReportPage() {
   const params = useParams()
@@ -22,11 +22,23 @@ export default function CreateReportPage() {
   const [error, setError] = useState<string | null>(null)
   const [creatingReport, setCreatingReport] = useState(false)
   const [reportCreated, setReportCreated] = useState(false)
+  const [beforePhotos, setBeforePhotos] = useState<File[]>([])
+  const [afterPhotos, setAfterPhotos] = useState<File[]>([])
 
 
   const onCreateAReportClick = useCallback(() => {
     router.back()
   }, [router])
+
+  const handleBeforePhotosChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    setBeforePhotos(prev => [...prev, ...files])
+  }, [])
+
+  const handleAfterPhotosChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    setAfterPhotos(prev => [...prev, ...files])
+  }, [])
 
   const createReportFromAssignment = useCallback(async () => {
     if (!assignmentData || !user) return
@@ -196,9 +208,10 @@ export default function CreateReportPage() {
   }
 
   return (
-    <div className="max-w-full bg-gray-50">
-      <div className="p-6">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-gray-50">
+      <div className="w-full max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
           <button
             onClick={onCreateAReportClick}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -208,240 +221,347 @@ export default function CreateReportPage() {
           </button>
           <h1 className="text-2xl font-bold text-gray-900">Create a Report</h1>
         </div>
-        {/* Header Section */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4 h-[60px]">
-          {/* Metadata Row */}
-          <div className="flex justify-between items-start w-full">
+
+        {/* Metadata Header */}
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-sm">
             <div>
-              <p className="text-sm font-semibold">SA ID</p>
-              <p className="text-xs">{assignmentData?.saNumber || 'N/A'}</p>
+              <p className="font-semibold">SA I.D.</p>
+              <p>{assignmentData?.saNumber || 'SA000582'}</p>
             </div>
             <div>
-              <p className="text-sm font-semibold">Type</p>
-              <p className="text-xs">{assignmentData?.serviceType || 'N/A'}</p>
+              <p className="font-semibold">Type</p>
+              <p>{assignmentData?.serviceType || 'Roll Up'}</p>
             </div>
             <div>
-              <p className="text-sm font-semibold">Site</p>
-              <p className="text-xs">{assignmentData?.projectSiteName || 'N/A'}</p>
+              <p className="font-semibold">Site</p>
+              <p className="text-blue-600 font-medium">{assignmentData?.projectSiteName || 'Petplans Tower'}</p>
             </div>
             <div>
-              <p className="text-sm font-semibold">Campaign</p>
-              <p className="text-xs">{assignmentData?.campaignName || 'N/A'}</p>
+              <p className="font-semibold">Campaign Name</p>
+              <p>{assignmentData?.campaignName || 'Mcdonald\'s'}</p>
             </div>
             <div>
-              <p className="text-sm font-semibold">Crew</p>
-              <p className="text-xs">{assignmentData?.assignedTo || 'N/A'}</p>
+              <p className="font-semibold">Crew</p>
+              <p>{assignmentData?.assignedTo || 'Production- Jonathan Dela Cruz'}</p>
             </div>
             <div>
-              <p className="text-sm font-semibold">Deadline</p>
-              <p className="text-xs">
-                {assignmentData?.coveredDateEnd?.toDate?.()?.toLocaleDateString() || 'N/A'}
-              </p>
+              <p className="font-semibold">Deadline</p>
+              <p>{assignmentData?.coveredDateEnd?.toDate?.()?.toLocaleDateString() || 'Oct 18, 2025'}</p>
             </div>
-            <button
-              className="w-[103px] h-[24px] relative rounded-[5px] text-xs border-[#c4c4c4] leading-[100%] font-semibold border-[2px] box-border"
-            >
-              View SA
-            </button>
+            <div className="flex justify-end items-end">
+              <button className="px-4 h-[24px] w-[103px] border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+                View SA
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* First Column - Site Image and Remarks */}
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+          <div className="flex flex-col lg:flex-row w-full gap-4">
+            {/* Left Column - Site Image and Remarks */}
             <div className="space-y-6">
               {/* Site Image */}
-              <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
-                <Image
-                  src={assignmentData?.siteImage || '/placeholder.jpg'}
-                  alt="Site"
-                  width={400}
-                  height={225}
-                  className="w-full h-full object-cover"
-                />
+              <Image
+                src={assignmentData?.siteImage || '/placeholder.jpg'}
+                alt="Site"
+                width={284} height={190}
+                className="object-cover rounded-md"
+              />
+              {/* Site Info */}
+              <div>
+                <p className="font-medium">{assignmentData?.projectSiteName || 'Petplans Tower NB'}</p>
+                <p className="text-sm text-gray-600">{assignmentData?.projectSiteLocation || 'EDSA, Guadalupe'}</p>
               </div>
 
               {/* Remarks */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Remarks
-                </label>
                 <textarea
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={4}
+                  className="w-[284px] p-3 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  rows={3}
                   placeholder="Enter remarks..."
-                  value={assignmentData?.remarks || ''}
-                  readOnly
                   aria-label="Remarks"
                 />
               </div>
             </div>
 
-            {/* Second Column - Report Details */}
-            <div className="space-y-6">
-              {/* Report Details */}
+            {/* Middle Column - Report Details */}
+            <div className="space-y-4 flex-1">
               <div className="space-y-4">
-                <div className='flex'>
-                  <label className="block text-sm font-semibold mb-1">Report Number</label>
-                  <p className="font-medium">RPT#{assignmentData?.saNumber || '000582'}</p>
+                <div className="flex items-center gap-4">
+                  <p className="text-[18px] font-medium">RPT#{assignmentData?.saNumber || '000582'}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold whitespace-nowrap">Date:</label>
-                  <input
-                    type="date"
-                    className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    defaultValue={new Date().toISOString().split('T')[0]}
-                  />
-                  <input
-                    type="time"
-                    className="flex-1 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    defaultValue="10:00"
-                  />
+                  <label className="text-sm font-semibold min-w-[120px]">Date:</label>
+                  <p className="text-sm">{new Date().toLocaleDateString()}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-1">SA No.</label>
-                  <p className="font-medium">{assignmentData?.saNumber || 'N/A'}</p>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold min-w-[120px]">SA No.:</label>
+                  <p className="text-sm">{assignmentData?.saNumber || 'SA000582'}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-1">SA Type</label>
-                  <p className="font-medium">{assignmentData?.serviceType || 'N/A'}</p>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold min-w-[120px]">SA Type:</label>
+                  <p className="text-sm">{assignmentData?.serviceType || 'Roll Up'}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-1">Report Type</label>
-                  <select className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold min-w-[120px]">Report Type:</label>
+                  <select className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs">
                     <option value="Service Report">Service Report</option>
                     <option value="Monitoring Report">Monitoring Report</option>
+                    <option value="Progress Report">Progress Report</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-1">Site</label>
-                  <p className="font-medium">{assignmentData?.projectSiteName || 'N/A'}</p>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold min-w-[120px]">Site:</label>
+                  <p className="text-sm">{assignmentData?.projectSiteName || 'Petplans Tower NB'}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-1">Campaign Name</label>
-                  <p className="font-medium">{assignmentData?.campaignName || 'N/A'}</p>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold min-w-[120px]">Campaign Name:</label>
+                  <p className="text-sm">{assignmentData?.campaignName || 'Mcdonald\'s'}</p>
                 </div>
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-semibold mb-1">Start Date</label>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold min-w-[120px]">Start:</label>
+                  <div className="flex gap-2 flex-1">
                     <input
                       type="date"
-                      className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                       defaultValue={assignmentData?.coveredDateStart?.toDate?.()?.toISOString().split('T')[0] || ''}
                     />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-semibold mb-1">Start Time</label>
                     <input
                       type="time"
-                      className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                       defaultValue="10:00"
                     />
                   </div>
                 </div>
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-semibold mb-1">End Date</label>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold min-w-[120px]">End:</label>
+                  <div className="flex gap-2 flex-1">
                     <input
                       type="date"
-                      className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                       defaultValue={assignmentData?.coveredDateEnd?.toDate?.()?.toISOString().split('T')[0] || ''}
                     />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-semibold mb-1">End Time</label>
                     <input
                       type="time"
-                      className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                       defaultValue="10:00"
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-1">Crew</label>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold min-w-[120px]">Crew:</label>
                   <input
                     type="text"
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                     defaultValue={assignmentData?.assignedTo || ''}
                     placeholder="Enter crew name"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-1">Status</label>
+                <div className="flex items-center gap-4">
+                  <label className="text-sm font-semibold min-w-[120px]">Status:</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
                       min="0"
                       max="100"
-                      className="w-20 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-20 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                       defaultValue={assignmentData?.status === "Completed" ? 100 : 50}
                     />
-                    <span className="text-sm text-gray-600">%</span>
+                    <span className="text-sm text-gray-600">of 100%</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Third Column - Photo Uploads */}
-            <div className="space-y-6">
+            {/* Right Column - Photo Uploads */}
+            <div className="space-y-6 flex-1">
               {/* Before SA Photos */}
               <div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">Before SA Photos</h4>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center mb-4">
-                  <div className="text-gray-500 mb-2">No photos uploaded</div>
-                  <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
-                    Upload Photos
-                  </button>
+                <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">Before SA Photos:</h4>
+                <div className="bg-gray-100 rounded-lg p-6">
+                  <div className="mb-4">
+                    {beforePhotos.length > 0 ? (
+                      <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
+                        {/* Image Previews */}
+                        <div className="flex gap-2 flex-shrink-0">
+                          {beforePhotos.map((file, index) => (
+                            <div key={index} className="relative flex-shrink-0">
+                              <Image
+                                src={URL.createObjectURL(file)}
+                                alt={`Before photo ${index + 1}`}
+                                width={96}
+                                height={96}
+                                className="w-24 h-24 object-cover rounded border"
+                              />
+                              <button
+                                onClick={() => setBeforePhotos(prev => prev.filter((_, i) => i !== index))}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                                aria-label="Remove photo"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            id="before-photos"
+                            onChange={handleBeforePhotosChange}
+                            aria-label="Upload before SA photos"
+                          />
+                          <label
+                            htmlFor="before-photos"
+                            className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
+                          >
+                            <Upload className="w-8 h-8 text-gray-400 mb-1" />
+                            <div className="text-gray-500 text-xs text-center">Upload</div>
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          id="before-photos"
+                          onChange={handleBeforePhotosChange}
+                          aria-label="Upload before SA photos"
+                        />
+                        <label
+                          htmlFor="before-photos"
+                          className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
+                        >
+                          <Upload className="w-8 h-8 text-gray-400 mb-1" />
+                          <div className="text-gray-500 text-xs text-center">Upload</div>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
+                  <textarea
+                    className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                    rows={1}
+                    placeholder="Add note..."
+                    aria-label="Before SA Photos Note"
+                  />
                 </div>
-                <textarea
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={3}
-                  placeholder="Add note..."
-                  aria-label="Before SA Photos Note"
-                />
               </div>
 
               {/* After SA Photos */}
               <div>
-                <h4 className="text-lg font-semibold text-gray-900 mb-3">After SA Photos</h4>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center mb-4">
-                  <div className="text-gray-500 mb-2">No photos uploaded</div>
-                  <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
-                    Upload Photos
-                  </button>
+                <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">After SA Photos:</h4>
+                <div className="bg-gray-100 rounded-lg p-6">
+                  <div className="mb-4">
+                    {afterPhotos.length > 0 ? (
+                      <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
+                        {/* Image Previews */}
+                        <div className="flex gap-2 flex-shrink-0">
+                          {afterPhotos.map((file, index) => (
+                            <div key={index} className="relative flex-shrink-0">
+                              <Image
+                                src={URL.createObjectURL(file)}
+                                alt={`After photo ${index + 1}`}
+                                width={96}
+                                height={96}
+                                className="w-24 h-24 object-cover rounded border"
+                              />
+                              <button
+                                onClick={() => setAfterPhotos(prev => prev.filter((_, i) => i !== index))}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                                aria-label="Remove photo"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            id="after-photos"
+                            onChange={handleAfterPhotosChange}
+                            aria-label="Upload after SA photos"
+                          />
+                          <label
+                            htmlFor="after-photos"
+                            className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
+                          >
+                            <Upload className="w-8 h-8 text-gray-400 mb-1" />
+                            <div className="text-gray-500 text-xs text-center">Upload</div>
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          id="after-photos"
+                          onChange={handleAfterPhotosChange}
+                          aria-label="Upload after SA photos"
+                        />
+                        <label
+                          htmlFor="after-photos"
+                          className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
+                        >
+                          <Upload className="w-8 h-8 text-gray-400 mb-1" />
+                          <div className="text-gray-500 text-xs text-center">Upload</div>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+
+                  <textarea
+                    className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                    rows={1}
+                    placeholder="Add note..."
+                    aria-label="After SA Photos Note"
+                  />
                 </div>
-                <textarea
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  rows={3}
-                  placeholder="Add note..."
-                  aria-label="After SA Photos Note"
-                />
               </div>
             </div>
           </div>
         </div>
 
         {/* Footer Buttons */}
-        <div className="flex flex-col sm:flex-row justify-end gap-4 mt-6">
-          <button className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-            Save as Draft
-          </button>
-          <button
-            onClick={createReportFromAssignment}
-            disabled={creatingReport}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Generate Report"
-          >
-            {creatingReport ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Generating...
-              </>
-            ) : (
-              'Generate Report'
-            )}
-          </button>
+        <div className="flex justify-center align-center">
+          <div className="rounded-[50px] shadow-md p-2 bg-white h-[67px] flex items-center justify-center w-[346px]">
+            <div className="flex gap-2 align-center">
+              <button className="px-4 text-gray-700 rounded-lg underline hover:bg-gray-50 font-semibold transition-colors text-sm">
+                Save as Draft
+              </button>
+              <button
+                onClick={createReportFromAssignment}
+                disabled={creatingReport}
+                className="bg-[#1d0beb] h-[27px] w-[159px] text-xs text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                aria-label="Generate Report"
+              >
+                {creatingReport ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Generating...
+                  </>
+                ) : (
+                  'Generate Report'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
