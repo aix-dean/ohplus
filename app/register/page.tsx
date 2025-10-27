@@ -887,7 +887,6 @@ export default function AccountCreationPage() {
                     </div>
                   </DialogContent>
                 </Dialog>{" "}
-                set by CoVPay.
               </Label>
             </div>
 
