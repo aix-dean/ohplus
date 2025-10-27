@@ -1,6 +1,7 @@
+import React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import SalesDashboardPage from './page'
+import SalesDashboardPage, { ProductCard } from './page'
 
 // Mock all external dependencies
 vi.mock('@/contexts/auth-context', () => ({
@@ -128,40 +129,76 @@ vi.mock('next/image', () => ({
   )
 }))
 
-describe('SalesDashboardPage - NO IMAGE Fallback', () => {
-  it('displays "NO IMAGE" text for products without media in grid view', async () => {
-    render(<SalesDashboardPage />)
+describe('ProductCard - NO IMAGE Fallback', () => {
+  const mockProductWithImage = {
+    id: 'product-1',
+    name: 'Test Product 1',
+    type: 'rental' as const,
+    price: 1000,
+    media: [{ url: 'test-image.jpg' }],
+    specs_rental: { location: 'Test Location' },
+    site_code: 'SC001',
+    description: 'Test description',
+    active: true,
+    deleted: false,
+    seller_id: 'seller-1',
+    seller_name: 'Seller 1',
+    company_id: 'company-1',
+    position: 1,
+    created_at: new Date(),
+    updated_at: new Date()
+  }
 
-    // Wait for the products to load and check for NO IMAGE text
-    // Since the mock returns one product with media and one without,
-    // we should see "NO IMAGE" text for the product without media
-    expect(await screen.findByText('NO IMAGE')).toBeInTheDocument()
+  const mockProductWithoutImage = {
+    id: 'product-2',
+    name: 'Test Product Without Image',
+    type: 'rental' as const,
+    price: 2000,
+    media: [], // No media for testing NO IMAGE fallback
+    specs_rental: { location: 'Test Location 2' },
+    site_code: 'SC002',
+    description: 'Test description 2',
+    active: true,
+    deleted: false,
+    seller_id: 'seller-2',
+    seller_name: 'Seller 2',
+    company_id: 'company-2',
+    position: 2,
+    created_at: new Date(),
+    updated_at: new Date()
+  }
+
+  const mockProps = {
+    hasOngoingBooking: false,
+    onView: vi.fn(),
+    onEdit: vi.fn(),
+    onDelete: vi.fn(),
+    onCreateReport: vi.fn(),
+    isSelected: false,
+    onSelect: vi.fn(),
+    selectionMode: false
+  }
+
+  it('displays "NO IMAGE" text for products without media', () => {
+    render(<ProductCard product={mockProductWithoutImage as any} {...mockProps} />)
+
+    expect(screen.getByText('NO IMAGE')).toBeInTheDocument()
   })
 
-  it('displays "NO IMAGE" text for products without media in list view', async () => {
-    render(<SalesDashboardPage />)
+  it('renders products with images normally', () => {
+    render(<ProductCard product={mockProductWithImage as any} {...mockProps} />)
 
-    // The list view also shows "NO IMAGE" for products without media
-    expect(await screen.findByText('NO IMAGE')).toBeInTheDocument()
+    const image = screen.getByRole('img')
+    expect(image).toBeInTheDocument()
+    expect(image).toHaveAttribute('src', 'test-image.jpg')
   })
 
-  it('renders products with images normally', async () => {
-    render(<SalesDashboardPage />)
+  it('displays product information correctly', () => {
+    render(<ProductCard product={mockProductWithImage as any} {...mockProps} />)
 
-    // Should find images for products that have media
-    const images = await screen.findAllByRole('img')
-    expect(images.length).toBeGreaterThan(0)
-  })
-
-  it('displays product information correctly', async () => {
-    render(<SalesDashboardPage />)
-
-    // Check that product names are displayed
-    expect(await screen.findByText('Test Product 1')).toBeInTheDocument()
-    expect(screen.getByText('Test Product Without Image')).toBeInTheDocument()
-
-    // Check site codes
     expect(screen.getByText('SC001')).toBeInTheDocument()
-    expect(screen.getByText('SC002')).toBeInTheDocument()
+    expect(screen.getByText('Test Product 1')).toBeInTheDocument()
+    expect(screen.getByText('Test Location')).toBeInTheDocument()
+    expect(screen.getByText('₱1,000/month')).toBeInTheDocument()
   })
 })

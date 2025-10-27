@@ -2275,7 +2275,7 @@ export default function SalesDashboardPage() {
 }
 
 // Product Card Component for Grid View
-function ProductCard({
+export function ProductCard({
   product,
   hasOngoingBooking,
   onView,
