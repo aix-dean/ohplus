@@ -70,8 +70,8 @@ const SelectServiceAssignmentPage = () => {
 
   const handleAssignmentClick = (assignment: ServiceAssignment) => {
     if (assignment.serviceType.toLowerCase() === "monitoring") {
-      // For monitoring assignments, navigate directly to monitoring report
-      router.push(`/logistics/reports/monitoring/${assignment.id}`)
+      // For monitoring assignments, navigate directly to create report
+      router.push(`/logistics/reports/create/${assignment.id}`)
     } else {
       // For other types, show the report type selection dialog
       setSelectedAssignment(assignment)
@@ -121,12 +121,12 @@ const SelectServiceAssignmentPage = () => {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search service assignments..."
+              placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64 h-6 px-4 py-2 rounded-full bg-white border border-gray-300 text-gray-500 text-sm"
+              className="w-64 h-6 pl-8 pr-2 py-2 rounded-full bg-white border border-gray-300 text-gray-500 text-sm"
             />
-            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           </div>
         </div>
 

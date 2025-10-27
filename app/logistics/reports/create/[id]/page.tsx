@@ -22,8 +22,10 @@ export default function CreateReportPage() {
   const [error, setError] = useState<string | null>(null)
   const [creatingReport, setCreatingReport] = useState(false)
   const [reportCreated, setReportCreated] = useState(false)
+  const [createdReportId, setCreatedReportId] = useState<string | null>(null)
   const [beforePhotos, setBeforePhotos] = useState<File[]>([])
   const [afterPhotos, setAfterPhotos] = useState<File[]>([])
+  const [reportType, setReportType] = useState<string>("")
 
 
   const onCreateAReportClick = useCallback(() => {
@@ -63,8 +65,8 @@ export default function CreateReportPage() {
         },
         breakdate: assignmentData.coveredDateStart || Timestamp.now(),
         sales: assignmentData.requestedBy?.name || "",
-        reportType: assignmentData.serviceType === "Monitoring" ? "Monitoring Report" : "Service Report",
-        date: new Date().toISOString().split('T')[0],
+        reportType: reportType,
+        date: new Date().toISOString(),
         attachments: assignmentData.attachments?.map((att: any) => ({
           note: att.name || "",
           fileName: att.name || "attachment",
@@ -98,11 +100,12 @@ export default function CreateReportPage() {
       const reportId = await createReport(reportData)
       console.log("Report created successfully with ID:", reportId)
 
+      setCreatedReportId(reportId)
       setReportCreated(true)
 
-      // Navigate to the created report or back to reports list
+      // Navigate to the created report page
       setTimeout(() => {
-        router.push("/logistics/reports")
+        router.push(`/logistics/reports/${reportId}`)
       }, 2000)
 
     } catch (err) {
@@ -121,6 +124,16 @@ export default function CreateReportPage() {
       setLoading(false)
     }
   }, [assignmentId])
+
+  useEffect(() => {
+    if (assignmentData?.serviceType) {
+      if (assignmentData.serviceType === "Monitoring") {
+        setReportType("Monitoring Report")
+      } else {
+        setReportType("Progress Report")
+      }
+    }
+  }, [assignmentData])
 
   const fetchAssignmentData = useCallback(async () => {
     if (!assignmentId) return
@@ -179,12 +192,12 @@ export default function CreateReportPage() {
           <div className="text-green-600 text-lg font-medium mb-4">
             ✓ Report created successfully!
           </div>
-          <p className="text-gray-600 mb-4">Redirecting to reports list...</p>
+          <p className="text-gray-600 mb-4">Redirecting to report page...</p>
           <button
-            onClick={() => router.push("/logistics/reports")}
+            onClick={() => router.push(`/logistics/reports/${createdReportId}`)}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
-            Go to Reports
+            Go to Report
           </button>
         </div>
       </div>
@@ -272,7 +285,11 @@ export default function CreateReportPage() {
               {/* Site Info */}
               <div>
                 <p className="font-medium">{assignmentData?.projectSiteName || 'Petplans Tower NB'}</p>
-                <p className="text-sm text-gray-600">{assignmentData?.projectSiteLocation || 'EDSA, Guadalupe'}</p>
+                <div className="text-sm text-gray-600">
+                   {(assignmentData?.projectSiteLocation || 'EDSA, Guadalupe').split(',').map((part: string, index: number) => (
+                     <div key={index}>{part.trim()}</div>
+                   ))}
+                 </div>
               </div>
 
               {/* Remarks */}
@@ -306,10 +323,15 @@ export default function CreateReportPage() {
                 </div>
                 <div className="flex items-center gap-4">
                   <label className="text-sm font-semibold min-w-[120px]">Report Type:</label>
-                  <select className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs">
-                    <option value="Service Report">Service Report</option>
-                    <option value="Monitoring Report">Monitoring Report</option>
-                    <option value="Progress Report">Progress Report</option>
+                  <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs">
+                    {assignmentData?.serviceType === "Monitoring" ? (
+                      <option value="Monitoring Report">Monitoring Report</option>
+                    ) : (
+                      <>
+                        <option value="Progress Report">Progress Report</option>
+                        <option value="Completion Report">Completion Report</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div className="flex items-center gap-4">
@@ -326,7 +348,7 @@ export default function CreateReportPage() {
                     <input
                       type="date"
                       className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                      defaultValue={assignmentData?.coveredDateStart?.toDate?.()?.toISOString().split('T')[0] || ''}
+                      defaultValue={new Date().toISOString().split('T')[0]}
                     />
                     <input
                       type="time"
@@ -341,7 +363,7 @@ export default function CreateReportPage() {
                     <input
                       type="date"
                       className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                      defaultValue={assignmentData?.coveredDateEnd?.toDate?.()?.toISOString().split('T')[0] || ''}
+                      defaultValue={new Date().toISOString().split('T')[0]}
                     />
                     <input
                       type="time"
@@ -359,181 +381,266 @@ export default function CreateReportPage() {
                     placeholder="Enter crew name"
                   />
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">Status:</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      className="w-20 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                      defaultValue={assignmentData?.status === "Completed" ? 100 : 50}
-                    />
-                    <span className="text-sm text-gray-600">of 100%</span>
+                {reportType !== "Monitoring Report" && (
+                  <div className="flex items-center gap-4">
+                    <label className="text-sm font-semibold min-w-[120px]">Status:</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        className="w-20 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+                        defaultValue={assignmentData?.status === "Completed" ? 100 : 50}
+                      />
+                      <span className="text-sm text-gray-600">of 100%</span>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
             {/* Right Column - Photo Uploads */}
             <div className="space-y-6 flex-1">
-              {/* Before SA Photos */}
-              <div>
-                <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">Before SA Photos:</h4>
-                <div className="bg-gray-100 rounded-lg p-6">
-                  <div className="mb-4">
-                    {beforePhotos.length > 0 ? (
-                      <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
-                        {/* Image Previews */}
-                        <div className="flex gap-2 flex-shrink-0">
-                          {beforePhotos.map((file, index) => (
-                            <div key={index} className="relative flex-shrink-0">
-                              <Image
-                                src={URL.createObjectURL(file)}
-                                alt={`Before photo ${index + 1}`}
-                                width={96}
-                                height={96}
-                                className="w-24 h-24 object-cover rounded border"
-                              />
-                              <button
-                                onClick={() => setBeforePhotos(prev => prev.filter((_, i) => i !== index))}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                                aria-label="Remove photo"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+              {assignmentData?.serviceType === "Monitoring" ? (
+                /* Photos for Monitoring */
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">Photos:</h4>
+                  <div className="bg-gray-100 rounded-lg p-6">
+                    <div className="mb-4">
+                      {beforePhotos.length > 0 ? (
+                        <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
+                          {/* Image Previews */}
+                          <div className="flex gap-2 flex-shrink-0">
+                            {beforePhotos.map((file, index) => (
+                              <div key={index} className="relative flex-shrink-0">
+                                <Image
+                                  src={URL.createObjectURL(file)}
+                                  alt={`Photo ${index + 1}`}
+                                  width={96}
+                                  height={96}
+                                  className="w-24 h-24 object-cover rounded border"
+                                />
+                                <button
+                                  onClick={() => setBeforePhotos(prev => prev.filter((_, i) => i !== index))}
+                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                                  aria-label="Remove photo"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
 
-                        <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
+                          <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              id="photos"
+                              onChange={handleBeforePhotosChange}
+                              aria-label="Upload photos"
+                            />
+                            <label
+                              htmlFor="photos"
+                              className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
+                            >
+                              <Upload className="w-8 h-8 text-gray-400 mb-1" />
+                              <div className="text-gray-500 text-xs text-center">Upload</div>
+                            </label>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
                           <input
                             type="file"
                             accept="image/*"
                             multiple
                             className="hidden"
-                            id="before-photos"
+                            id="photos"
                             onChange={handleBeforePhotosChange}
-                            aria-label="Upload before SA photos"
+                            aria-label="Upload photos"
                           />
                           <label
-                            htmlFor="before-photos"
+                            htmlFor="photos"
                             className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
                           >
                             <Upload className="w-8 h-8 text-gray-400 mb-1" />
                             <div className="text-gray-500 text-xs text-center">Upload</div>
                           </label>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          id="before-photos"
-                          onChange={handleBeforePhotosChange}
-                          aria-label="Upload before SA photos"
-                        />
-                        <label
-                          htmlFor="before-photos"
-                          className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
-                        >
-                          <Upload className="w-8 h-8 text-gray-400 mb-1" />
-                          <div className="text-gray-500 text-xs text-center">Upload</div>
-                        </label>
-                      </div>
-                    )}
+                      )}
+                    </div>
+
+                    <textarea
+                      className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                      rows={1}
+                      placeholder="Add note..."
+                      aria-label="Photos Note"
+                    />
                   </div>
-
-                  <textarea
-                    className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
-                    rows={1}
-                    placeholder="Add note..."
-                    aria-label="Before SA Photos Note"
-                  />
                 </div>
-              </div>
-
-              {/* After SA Photos */}
-              <div>
-                <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">After SA Photos:</h4>
-                <div className="bg-gray-100 rounded-lg p-6">
-                  <div className="mb-4">
-                    {afterPhotos.length > 0 ? (
-                      <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
-                        {/* Image Previews */}
-                        <div className="flex gap-2 flex-shrink-0">
-                          {afterPhotos.map((file, index) => (
-                            <div key={index} className="relative flex-shrink-0">
-                              <Image
-                                src={URL.createObjectURL(file)}
-                                alt={`After photo ${index + 1}`}
-                                width={96}
-                                height={96}
-                                className="w-24 h-24 object-cover rounded border"
-                              />
-                              <button
-                                onClick={() => setAfterPhotos(prev => prev.filter((_, i) => i !== index))}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                                aria-label="Remove photo"
-                              >
-                                ×
-                              </button>
+              ) : (
+                <>
+                  {/* Before SA Photos */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">Before SA Photos:</h4>
+                    <div className="bg-gray-100 rounded-lg p-6">
+                      <div className="mb-4">
+                        {beforePhotos.length > 0 ? (
+                          <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
+                            {/* Image Previews */}
+                            <div className="flex gap-2 flex-shrink-0">
+                              {beforePhotos.map((file, index) => (
+                                <div key={index} className="relative flex-shrink-0">
+                                  <Image
+                                    src={URL.createObjectURL(file)}
+                                    alt={`Before photo ${index + 1}`}
+                                    width={96}
+                                    height={96}
+                                    className="w-24 h-24 object-cover rounded border"
+                                  />
+                                  <button
+                                    onClick={() => setBeforePhotos(prev => prev.filter((_, i) => i !== index))}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                                    aria-label="Remove photo"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
 
-                        <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            className="hidden"
-                            id="after-photos"
-                            onChange={handleAfterPhotosChange}
-                            aria-label="Upload after SA photos"
-                          />
-                          <label
-                            htmlFor="after-photos"
-                            className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
-                          >
-                            <Upload className="w-8 h-8 text-gray-400 mb-1" />
-                            <div className="text-gray-500 text-xs text-center">Upload</div>
-                          </label>
-                        </div>
+                            <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                id="before-photos"
+                                onChange={handleBeforePhotosChange}
+                                aria-label="Upload before SA photos"
+                              />
+                              <label
+                                htmlFor="before-photos"
+                                className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
+                              >
+                                <Upload className="w-8 h-8 text-gray-400 mb-1" />
+                                <div className="text-gray-500 text-xs text-center">Upload</div>
+                              </label>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              id="before-photos"
+                              onChange={handleBeforePhotosChange}
+                              aria-label="Upload before SA photos"
+                            />
+                            <label
+                              htmlFor="before-photos"
+                              className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
+                            >
+                              <Upload className="w-8 h-8 text-gray-400 mb-1" />
+                              <div className="text-gray-500 text-xs text-center">Upload</div>
+                            </label>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          id="after-photos"
-                          onChange={handleAfterPhotosChange}
-                          aria-label="Upload after SA photos"
-                        />
-                        <label
-                          htmlFor="after-photos"
-                          className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
-                        >
-                          <Upload className="w-8 h-8 text-gray-400 mb-1" />
-                          <div className="text-gray-500 text-xs text-center">Upload</div>
-                        </label>
-                      </div>
-                    )}
+
+                      <textarea
+                        className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                        rows={1}
+                        placeholder="Add note..."
+                        aria-label="Before SA Photos Note"
+                      />
+                    </div>
                   </div>
 
-                  <textarea
-                    className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
-                    rows={1}
-                    placeholder="Add note..."
-                    aria-label="After SA Photos Note"
-                  />
-                </div>
-              </div>
+                  {/* After SA Photos */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">After SA Photos:</h4>
+                    <div className="bg-gray-100 rounded-lg p-6">
+                      <div className="mb-4">
+                        {afterPhotos.length > 0 ? (
+                          <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
+                            {/* Image Previews */}
+                            <div className="flex gap-2 flex-shrink-0">
+                              {afterPhotos.map((file, index) => (
+                                <div key={index} className="relative flex-shrink-0">
+                                  <Image
+                                    src={URL.createObjectURL(file)}
+                                    alt={`After photo ${index + 1}`}
+                                    width={96}
+                                    height={96}
+                                    className="w-24 h-24 object-cover rounded border"
+                                  />
+                                  <button
+                                    onClick={() => setAfterPhotos(prev => prev.filter((_, i) => i !== index))}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                                    aria-label="Remove photo"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                id="after-photos"
+                                onChange={handleAfterPhotosChange}
+                                aria-label="Upload after SA photos"
+                              />
+                              <label
+                                htmlFor="after-photos"
+                                className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
+                              >
+                                <Upload className="w-8 h-8 text-gray-400 mb-1" />
+                                <div className="text-gray-500 text-xs text-center">Upload</div>
+                              </label>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              id="after-photos"
+                              onChange={handleAfterPhotosChange}
+                              aria-label="Upload after SA photos"
+                            />
+                            <label
+                              htmlFor="after-photos"
+                              className="cursor-pointer flex flex-col items-center justify-center w-full h-full p-2"
+                            >
+                              <Upload className="w-8 h-8 text-gray-400 mb-1" />
+                              <div className="text-gray-500 text-xs text-center">Upload</div>
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      <textarea
+                        className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                        rows={1}
+                        placeholder="Add note..."
+                        aria-label="After SA Photos Note"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -553,7 +660,7 @@ export default function CreateReportPage() {
               >
                 {creatingReport ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Generating...
                   </>
                 ) : (
