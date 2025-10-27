@@ -1084,27 +1084,25 @@ function PriceListingContent() {
                 </Label>
                 <Input
                   id="price"
-                  type="number"
+                  type="text"
                   placeholder="Enter new price"
-                  value={newPrice}
+                  value={newPrice ? Number(newPrice).toLocaleString('en-US') : ''}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    const rawValue = e.target.value.replace(/,/g, '');
                     // Allow only numbers and one decimal point with up to 2 decimal places
                     const regex = /^\d*\.?\d{0,2}$/;
-                    if (regex.test(value) || value === "") {
-                      setNewPrice(value);
+                    if (regex.test(rawValue) || rawValue === "") {
+                      setNewPrice(rawValue);
                     }
                   }}
                   onBlur={(e) => {
-                    const value = e.target.value;
-                    if (value && !isNaN(Number.parseFloat(value))) {
-                      const parsed = Number.parseFloat(value);
+                    const rawValue = e.target.value.replace(/,/g, '');
+                    if (rawValue && !isNaN(Number.parseFloat(rawValue))) {
+                      const parsed = Number.parseFloat(rawValue);
                       setNewPrice(parsed.toFixed(2));
                     }
                   }}
                   className="w-full"
-                  min="0"
-                  step="0.01"
                 />
               </div>
             </div>

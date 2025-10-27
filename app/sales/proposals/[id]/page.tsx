@@ -2551,8 +2551,23 @@ export default function ProposalDetailsPage() {
               <p className="mb-0">SRP:</p>
               {isEditMode ? (
                 <input
-                  value={editableProducts[product.id]?.srp || ''}
-                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
+                  type="text"
+                  value={editableProducts[product.id]?.srp ? Number(editableProducts[product.id].srp.replace(/[^\d.]/g, '')).toLocaleString('en-US') : ''}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/,/g, '');
+                    // Allow only numbers and one decimal point with up to 2 decimal places
+                    const regex = /^\d*\.?\d{0,2}$/;
+                    if (regex.test(rawValue) || rawValue === "") {
+                      setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: rawValue } }));
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const rawValue = editableProducts[product.id]?.srp || '';
+                    if (rawValue && !isNaN(Number.parseFloat(rawValue))) {
+                      const parsed = Number.parseFloat(rawValue);
+                      setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: parsed.toFixed(2) } }));
+                    }
+                  }}
                   className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                 />
               ) : (

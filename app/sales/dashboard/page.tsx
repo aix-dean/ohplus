@@ -1762,18 +1762,24 @@ function SalesDashboardContent() {
                               className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
                               onClick={() => handleSearchResultClick(result)}
                             >
-                              <div className="h-52 bg-gray-200 relative">
-                                <Image
-                                  src={result.image_url || "/abstract-geometric-sculpture.png"}
-                                  alt={result.name || "Search result"}
-                                  fill
-                                  className="object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement
-                                    target.src = "/abstract-geometric-sculpture.png"
-                                    target.className = "opacity-50 object-contain"
-                                  }}
-                                />
+                              <div className="h-52 bg-gray-100 relative">
+                                {result.image_url ? (
+                                  <Image
+                                    src={result.image_url}
+                                    alt={result.name || "Search result"}
+                                    fill
+                                    className="object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement
+                                      target.src = "/abstract-geometric-sculpture.png"
+                                      target.className = "opacity-50 object-contain"
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center text-gray-500 font-medium">
+                                    NO IMAGE
+                                  </div>
+                                )}
                               </div>
 
                               <CardContent className="p-4">
@@ -1825,7 +1831,7 @@ function SalesDashboardContent() {
                                       onClick={() => handleSearchResultClick(result)}
                                     >
                                       <TableCell>
-                                        <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                        <div className="h-12 w-12 bg-gray-100 rounded overflow-hidden relative">
                                           {result.image_url ? (
                                             <Image
                                               src={result.image_url || "/placeholder.svg"}
@@ -1840,8 +1846,8 @@ function SalesDashboardContent() {
                                               }}
                                             />
                                           ) : (
-                                            <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                                              <MapPin size={16} className="text-gray-400" />
+                                            <div className="h-full w-full flex items-center justify-center text-gray-500 font-medium text-xs">
+                                              NO IMAGE
                                             </div>
                                           )}
                                         </div>
@@ -1972,7 +1978,7 @@ function SalesDashboardContent() {
                                   }}
                                 >
                                   <TableCell>
-                                    <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                    <div className="h-12 w-12 bg-gray-100 rounded overflow-hidden relative">
                                       {product.media && product.media.length > 0 ? (
                                         <>
                                           <Image
@@ -1989,8 +1995,8 @@ function SalesDashboardContent() {
                                           />
                                         </>
                                       ) : (
-                                        <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                                          <MapPin size={16} className="text-gray-400" />
+                                        <div className="h-full w-full flex items-center justify-center text-gray-500 font-medium text-xs">
+                                          NO IMAGE
                                         </div>
                                       )}
                                     </div>
@@ -2269,7 +2275,7 @@ export default function SalesDashboardPage() {
 }
 
 // Product Card Component for Grid View
-function ProductCard({
+export function ProductCard({
   product,
   hasOngoingBooking,
   onView,
@@ -2290,10 +2296,6 @@ function ProductCard({
   onSelect?: () => void
   selectionMode?: boolean
 }) {
-  // Get the first media item for the thumbnail
-  const thumbnailUrl =
-    product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
-
   // Determine location based on product type
   const location = product.specs_rental?.location || product.light?.location || "Unknown location"
 
@@ -2320,18 +2322,24 @@ function ProductCard({
       )}
       onClick={handleClick}
     >
-      <div className="h-[218px] bg-gray-300 relative rounded-t-2xl">
-        <Image
-          src={thumbnailUrl || "/placeholder.svg"}
-          alt={product.name || "Product image"}
-          fill
-          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.src = "/abstract-geometric-sculpture.png"
-            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
-          }}
-        />
+      <div className="h-[218px] bg-gray-100 relative rounded-t-2xl">
+        {product.media && product.media.length > 0 ? (
+          <Image
+            src={product.media[0].url}
+            alt={product.name || "Product image"}
+            fill
+            className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
+            onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.src = "/abstract-geometric-sculpture.png"
+              target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
+            }}
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-gray-500 font-medium">
+            NO IMAGE
+          </div>
+        )}
 
         {/* Selection indicator */}
         {selectionMode && (
