@@ -202,7 +202,7 @@ export function CreateServiceAssignmentForm({
           onIdentifyJO && (
             <Card className="w-full aspect-square bg-[#E6F5FF] border-[3px] border-dashed border-[#00D0FF]">
               <CardContent className="flex justify-center items-center h-full p-4">
-                <Button variant="outline" className="bg-white text-gray-700 border-gray-300" onClick={onIdentifyJO}>
+                <Button variant="outline" className="bg-white text-gray-700 border-gray-300" onClick={onIdentifyJO} style={{ borderRadius: '20px', border: '2px solid #A1A1A1', background: '#FFF', boxShadow: '0 4px 4px 0 rgba(0, 0, 0, 0.25)', width: '98px', height: '27px', flexShrink: 0 }}>
                   <Search className="h-4 w-4 mr-2" />
                   Identify JO
                 </Button>

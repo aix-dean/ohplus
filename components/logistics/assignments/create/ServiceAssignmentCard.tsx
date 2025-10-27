@@ -353,7 +353,23 @@ export function ServiceAssignmentCard({
                   variant="outline"
                   size="sm"
                   onClick={onOpenProductSelection}
-                  className="rounded-full"
+                  className=""
+                  style={{
+                    borderRadius: '10.681px',
+                    border: '1.068px solid var(--DARK-GRAY, #A1A1A1)',
+                    background: '#FFF',
+                    boxShadow: '0 2.136px 2.136px 0 rgba(0, 0, 0, 0.25)',
+                    width: '86.518px',
+                    height: '17.09px',
+                    flexShrink: 0,
+                    color: 'var(--LIGHTER-BLACK, #333)',
+                    textAlign: 'center',
+                    fontFamily: 'Inter',
+                    fontSize: '8.541px',
+                    fontStyle: 'normal',
+                    fontWeight: 500,
+                    lineHeight: '100%'
+                  }}
                 >
                   Select Site
                 </Button>
@@ -362,7 +378,14 @@ export function ServiceAssignmentCard({
           </Card>
           {/* Site Name and Location */}
           <div className="flex flex-col">
-            <span className="text-left">
+            <span className="text-left" style={{
+              color: 'var(--LIGHTER-BLACK, #333)',
+              fontFamily: 'Inter',
+              fontSize: '16.022px',
+              fontStyle: 'normal',
+              fontWeight: 700,
+              lineHeight: '100%'
+            }}>
               {products.find(p => p.id === productId)?.name || "Select Project Site"}
             </span>
             {productId && (products.find(p => p.id === productId)?.specs_rental?.location || products.find(p => p.id === productId)?.location) && (
@@ -379,6 +402,7 @@ export function ServiceAssignmentCard({
               value={formData.remarks}
               onChange={(e) => handleInputChange("remarks", e.target.value)}
               className="flex-1 aspect-square resize-none"
+              style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}
             />
           </div>
         </div>
@@ -392,20 +416,25 @@ export function ServiceAssignmentCard({
             </div>
             <p className="text-sm">{currentTime}</p>
           </div>
+          {/* Date Label */}
+          <div className="flex items-center space-x-4">
+            <Label className="w-32 pl-14 flex-shrink-0 text-center">     Date:</Label>
+            <span className="flex-1 text-start" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>{currentTime}</span>
+          </div>
           {/* Service Type */}
           <div className="flex items-center space-x-4">
             <Label htmlFor="serviceType" className="w-32 flex-shrink-0">Service Type:</Label>
             <Select value={formData.serviceType} onValueChange={(value) => handleInputChange("serviceType", value)}>
-              <SelectTrigger id="serviceType" className="flex-1">
+              <SelectTrigger id="serviceType" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>
                 <SelectValue placeholder="Select service type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Roll Up">Roll Up</SelectItem>
-                <SelectItem value="Roll Down">Roll Down</SelectItem>
-                <SelectItem value="Monitoring">Monitoring</SelectItem>
-                <SelectItem value="Change Material">Change Material</SelectItem>
-                <SelectItem value="Maintenance">Maintenance</SelectItem>
-                <SelectItem value="Repair">Repair</SelectItem>
+                <SelectItem value="Roll Up" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Roll Up</SelectItem>
+                <SelectItem value="Roll Down" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Roll Down</SelectItem>
+                <SelectItem value="Monitoring" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Monitoring</SelectItem>
+                <SelectItem value="Change Material" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Change Material</SelectItem>
+                <SelectItem value="Maintenance" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Maintenance</SelectItem>
+                <SelectItem value="Repair" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Repair</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -421,6 +450,7 @@ export function ServiceAssignmentCard({
                 value={formData.campaignName || ""}
                 onChange={(e) => handleInputChange("campaignName", e.target.value)}
                 className="flex-1"
+                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}
                 required
               />
             </div>
@@ -444,7 +474,7 @@ export function ServiceAssignmentCard({
                     {formData.startDate ? (
                       format(formData.startDate, "PPP")
                     ) : (
-                      <span>Choose Date</span>
+                      <span style={{ fontSize: '10.681px' }}>Select Date</span>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -477,7 +507,7 @@ export function ServiceAssignmentCard({
                     {formData.endDate ? (
                       format(formData.endDate, "PPP")
                     ) : (
-                      <span>Choose Date</span>
+                      <span style={{ fontSize: '10.681px' }}>Select Date</span>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -504,6 +534,7 @@ export function ServiceAssignmentCard({
                 value={formData.serviceDuration || ""}
                 onChange={(e) => handleInputChange("serviceDuration", parseInt(e.target.value) || 0)}
                 className="flex-1"
+                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}
                 min="0"
               />
               <span className="text-sm text-gray-600 whitespace-nowrap">days</span>
@@ -516,14 +547,14 @@ export function ServiceAssignmentCard({
                 Material Specs: <span className="text-red-500">*</span>
               </Label>
               <Select value={formData.materialSpecs} onValueChange={(value) => handleInputChange("materialSpecs", value)}>
-                <SelectTrigger id="materialSpecs" className="flex-1">
+                <SelectTrigger id="materialSpecs" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>
                   <SelectValue placeholder="Select material" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Tarpaulin">Tarpaulin</SelectItem>
-                  <SelectItem value="Sticker">Sticker</SelectItem>
-                  <SelectItem value="Digital File">Digital File</SelectItem>
-                  <SelectItem value="Others">Others</SelectItem>
+                  <SelectItem value="Tarpaulin" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Tarpaulin</SelectItem>
+                  <SelectItem value="Sticker" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Sticker</SelectItem>
+                  <SelectItem value="Digital File" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Digital File</SelectItem>
+                  <SelectItem value="Others" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Others</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -608,16 +639,16 @@ export function ServiceAssignmentCard({
                 handleInputChange("assignedTo", value);
               }
             }}>
-              <SelectTrigger id="crew" className="flex-1">
+              <SelectTrigger id="crew" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>
                 <SelectValue placeholder="Choose a Crew" />
               </SelectTrigger>
               <SelectContent>
                 {teams.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
+                  <SelectItem key={team.id} value={team.id} style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>
                     {team.name}
                   </SelectItem>
                 ))}
-                <SelectItem value="add-new-team">+ Add New Team</SelectItem>
+                <SelectItem value="add-new-team" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>+ Add New Team</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -626,12 +657,12 @@ export function ServiceAssignmentCard({
             <div className="flex items-center space-x-4">
               <Label className="w-32 flex-shrink-0">Gondola:</Label>
               <Select value={formData.gondola} onValueChange={(value) => handleInputChange("gondola", value)}>
-                <SelectTrigger className="flex-1">
+                <SelectTrigger className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>
                   <SelectValue placeholder="Select Yes or No" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
+                  <SelectItem value="Yes" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Yes</SelectItem>
+                  <SelectItem value="No" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>No</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -645,6 +676,7 @@ export function ServiceAssignmentCard({
                 value={formData.sales}
                 onChange={(e) => handleInputChange("sales", e.target.value)}
                 className="flex-1"
+                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}
               />
             </div>
           )}

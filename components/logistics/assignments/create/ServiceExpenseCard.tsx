@@ -25,9 +25,11 @@ export function ServiceExpenseCard({
   calculateTotal,
 }: ServiceExpenseCardProps) {
   return (
-    <Card className="w-full">
+    <Card className="w-full" style={{ borderRadius: '20px', background: '#FFF', boxShadow: '-2px 4px 10.5px -2px rgba(0, 0, 0, 0.25)' }}>
       <CardHeader>
-        <CardTitle>SERVICE EXPENSE (Optional)</CardTitle>
+        <CardTitle style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', lineHeight: '100%' }}>
+          <span style={{ fontWeight: 600 }}>Service Expense</span> <span style={{ fontWeight: 400 }}>(Optional)</span>
+        </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">
         {expenses.map((expense, index) => (
@@ -52,10 +54,11 @@ export function ServiceExpenseCard({
 
         <Button variant="outline" className="w-full" onClick={addExpense}>+ Add Expense</Button>
 
-        <div className="flex justify-between items-center mt-4">
-          <span className="text-lg font-bold">Total: P {calculateTotal().toFixed(2)}</span>
-          <span className="text-sm text-gray-500">You can edit this later on!</span>
-        </div>
+        {calculateTotal() > 0 && (
+          <div className="flex justify-between items-center mt-4">
+            <span className="text-lg font-bold">Total: P {calculateTotal().toFixed(2)}</span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

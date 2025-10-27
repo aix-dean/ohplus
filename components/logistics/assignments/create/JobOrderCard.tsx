@@ -76,7 +76,7 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
 
         {!selectedJobOrder && !showJobOrderList && !isLoading && !error && (
           <div className="w-full flex justify-center items-center py-4">
-            <Button variant="outline" size="sm" onClick={handleIdentifyJobOrderClick}>Identify JO</Button>
+            <Button variant="outline" size="sm" onClick={handleIdentifyJobOrderClick}><span style={{ color: 'var(--LIGHTER-BLACK, #333)', textAlign: 'center', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Identify JO</span></Button>
           </div>
         )}
 
