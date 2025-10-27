@@ -92,3 +92,52 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Hide video controls and overlays for clean interface */
+video {
+  position: relative;
+}
+
+video::-webkit-media-controls-panel,
+video::-webkit-media-controls,
+video::-webkit-media-controls-panel *,
+video::-webkit-media-controls *,
+video::-webkit-media-controls-start-play-button,
+video::-webkit-media-controls-volume-slider,
+video::-webkit-media-controls-mute-button,
+video::-webkit-media-controls-timeline,
+video::-webkit-media-controls-current-time-display,
+video::-webkit-media-controls-time-remaining-display,
+video::-webkit-media-controls-fullscreen-button,
+video::-webkit-media-controls-play-button,
+video::-webkit-media-controls-pause-button {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+/* Hide any overlay elements that might appear on videos */
+video + div,
+video ~ div,
+video ~ button,
+video ~ .overlay,
+video ~ [class*="overlay"],
+video ~ [class*="control"] {
+  display: none !important;
+}
+
+/* Hide any positioned elements that might be overlays */
+video::after,
+video::before {
+  display: none !important;
+}
+
+/* Ensure no controls appear on hover */
+video:hover::-webkit-media-controls-panel,
+video:hover::-webkit-media-controls {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}

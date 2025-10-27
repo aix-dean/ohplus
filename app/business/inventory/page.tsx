@@ -36,6 +36,7 @@ import {
 import { subscriptionService } from "@/lib/subscription-service"
 import { RouteProtection } from "@/components/route-protection"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
+import { MediaPlayer } from "@/components/media-player"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -715,7 +716,7 @@ export default function BusinessInventoryPage() {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (files) {
-      setUploadedFiles(prev => [...prev, ...Array.from(files)])
+      setUploadedFiles(prev => [...prev, ...Array.from(files) as File[]])
     }
   }
 
@@ -975,21 +976,34 @@ export default function BusinessInventoryPage() {
                       onClick={() => product.id && handleViewDetails(product.id)}
                     >
                       <div className="h-48 bg-gray-200 relative">
-                        <Image
-                          src={
-                            product.media && product.media.length > 0
-                              ? product.media[0].url
-                              : "/abstract-geometric-sculpture.png"
-                          }
-                          alt={product.name || "Product image"}
-                          fill
-                          className="object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/abstract-geometric-sculpture.png"
-                            target.className = "opacity-50"
-                          }}
-                        />
+                        {product.media && product.media.length > 0 && product.media[0].isVideo ? (
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <MediaPlayer
+                              src={product.media[0].url}
+                              className="w-full h-full"
+                              showCustomControls={false}
+                              showControlsOnHover={false}
+                              controls={false}
+                              muted={true}
+                            />
+                          </div>
+                        ) : (
+                          <Image
+                            src={
+                              product.media && product.media.length > 0
+                                ? product.media[0].url
+                                : "/abstract-geometric-sculpture.png"
+                            }
+                            alt={product.name || "Product image"}
+                            fill
+                            className="object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = "/abstract-geometric-sculpture.png"
+                              target.className = "opacity-50"
+                            }}
+                          />
+                        )}
                       </div>
 
                       <CardContent className="p-4">
@@ -1055,22 +1069,35 @@ export default function BusinessInventoryPage() {
                           {/* Site Details */}
                           <div className="col-span-4 flex items-center space-x-3">
                             <div className="w-12 h-12 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-                              <Image
-                                src={
-                                  product.media && product.media.length > 0
-                                    ? product.media[0].url
-                                    : "/abstract-geometric-sculpture.png"
-                                }
-                                alt={product.name || "Product image"}
-                                width={48}
-                                height={48}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement
-                                  target.src = "/abstract-geometric-sculpture.png"
-                                  target.className = "opacity-50"
-                                }}
-                              />
+                              {product.media && product.media.length > 0 && product.media[0].isVideo ? (
+                                <div onClick={(e) => e.stopPropagation()}>
+                                  <MediaPlayer
+                                    src={product.media[0].url}
+                                    className="w-full h-full"
+                                    showCustomControls={false}
+                                    showControlsOnHover={false}
+                                    controls={false}
+                                    muted={true}
+                                  />
+                                </div>
+                              ) : (
+                                <Image
+                                  src={
+                                    product.media && product.media.length > 0
+                                      ? product.media[0].url
+                                      : "/abstract-geometric-sculpture.png"
+                                  }
+                                  alt={product.name || "Product image"}
+                                  width={48}
+                                  height={48}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.src = "/abstract-geometric-sculpture.png"
+                                    target.className = "opacity-50"
+                                  }}
+                                />
+                              )}
                             </div>
                             <div>
                               <h3 className="font-medium text-gray-900 line-clamp-1">{product.name}</h3>
@@ -1469,23 +1496,31 @@ export default function BusinessInventoryPage() {
                 />
               </div>
 
-              {/* Photo Upload */}
+              {/* Media Upload */}
               <div>
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">
-                  Photo: <span className="text-[#c4c4c4]">(can upload multiple)</span>
+                  Media: <span className="text-[#c4c4c4]">(can upload multiple)</span>
                 </Label>
 
                 {/* Image Preview/Carousel */}
                 {uploadedFiles.length > 0 && (
                   <div className="mb-4">
                     <div className="relative bg-gray-100 rounded-lg overflow-hidden">
-                      {/* Main Image Display */}
+                      {/* Main Media Display */}
                       <div className="aspect-video relative">
-                        <img
-                          src={URL.createObjectURL(uploadedFiles[currentImageIndex])}
-                          alt={`Preview ${currentImageIndex + 1}`}
-                          className="w-full h-full object-cover"
-                        />
+                        {uploadedFiles[currentImageIndex].type.startsWith('video/') ? (
+                          <MediaPlayer
+                            src={URL.createObjectURL(uploadedFiles[currentImageIndex])}
+                            className="w-full h-full"
+                            showCustomControls={true}
+                          />
+                        ) : (
+                          <img
+                            src={URL.createObjectURL(uploadedFiles[currentImageIndex])}
+                            alt={`Preview ${currentImageIndex + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
 
                         {/* Remove Button */}
                         <Button
@@ -1537,11 +1572,19 @@ export default function BusinessInventoryPage() {
                             }`}
                             onClick={() => setCurrentImageIndex(index)}
                           >
-                            <img
-                              src={URL.createObjectURL(file)}
-                              alt={`Thumbnail ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
+                            {file.type.startsWith('video/') ? (
+                              <video
+                                src={URL.createObjectURL(file)}
+                                className="w-full h-full object-cover"
+                                preload="metadata"
+                              />
+                            ) : (
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt={`Thumbnail ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            )}
                           </button>
                         ))}
                       </div>
@@ -1565,7 +1608,7 @@ export default function BusinessInventoryPage() {
                   </label>
                   {uploadedFiles.length === 0 && (
                     <p className="text-sm text-gray-600 mt-2">
-                      Click to select images
+                      Click to select images and videos
                     </p>
                   )}
                 </div>

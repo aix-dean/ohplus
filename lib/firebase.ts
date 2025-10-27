@@ -19,7 +19,7 @@ export const TENANT_ID = "ohplus-07hsi"
 
 const app = initializeApp(firebaseConfig)
 let analytics;
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "test") {
   analytics = getAnalytics(app);
 }
 
