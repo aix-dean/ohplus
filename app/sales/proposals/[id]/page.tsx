@@ -211,20 +211,6 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; on
     fetchCompanyData()
   }, [userData?.company_id, proposal?.companyName, proposal?.companyLogo])
 
-  useEffect(() => {
-    if (companyLogo && onColorExtracted) {
-      Vibrant.from(companyLogo).getPalette().then(palette => {
-        const vibrant = palette.Vibrant
-        if (vibrant) {
-          const hex = vibrant.hex
-          onColorExtracted(hex)
-        }
-      }).catch(error => {
-        console.error('Error extracting color:', error)
-        onColorExtracted('#f8c102')
-      })
-    }
-  }, [companyLogo, onColorExtracted])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -377,7 +363,6 @@ export default function ProposalDetailsPage() {
   const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
   const [printLoading, setPrintLoading] = useState(false)
   const [dominantColor, setDominantColor] = useState<string | null>(null)
-  const [originalDominantColor, setOriginalDominantColor] = useState<string | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>("")
   const [isAddSiteDialogOpen, setIsAddSiteDialogOpen] = useState(false)
@@ -390,9 +375,9 @@ export default function ProposalDetailsPage() {
   const [downloading, setDownloading] = useState(false)
   const [editableTitle, setEditableTitle] = useState("Site Proposals")
   const [editableProposalTitle, setEditableProposalTitle] = useState("Site Proposals")
-  const [editableProposalMessage, setEditableProposalMessage] = useState("Thank You")
+  const [editableProposalMessage, setEditableProposalMessage] = useState("Thank You!")
   const [editableContactInfo, setEditableContactInfo] = useState({
-    heading: "contact us!",
+    heading: "contact us:",
     name: "",
     role: "Sales",
     phone: "",
@@ -564,9 +549,9 @@ export default function ProposalDetailsPage() {
           // Set editable states
           setEditableTitle(proposalData.title || "Site Proposals")
           setEditableProposalTitle(proposalData.proposalTitle || "Site Proposals")
-          setEditableProposalMessage(proposalData.proposalMessage || "Thank You")
-          setEditableContactInfo(proposalData.contactInfo || {
-            heading: "contact us!",
+          setEditableProposalMessage("Thank You!")
+          setEditableContactInfo({
+            heading: "contact us:",
             name: `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim() || userData?.email || 'Sales Rep',
             role: 'Sales',
             phone: userData?.phone_number || '',
@@ -722,21 +707,23 @@ export default function ProposalDetailsPage() {
     }
   }, [proposal, loading])
 
-  // Extract color from editable logo when it changes
+  // Extract color from current logo (editable or proposal)
   useEffect(() => {
-    if (editableLogo) {
-      Vibrant.from(editableLogo).getPalette().then(palette => {
+    const currentLogo = editableLogo || proposal?.companyLogo || ''
+    if (currentLogo) {
+      Vibrant.from(currentLogo).getPalette().then(palette => {
         const vibrant = palette.Vibrant
         if (vibrant) {
-          const hex = vibrant.hex
-          setDominantColor(hex)
+          setDominantColor(vibrant.hex)
         }
       }).catch(error => {
-        console.error('Error extracting color from editable logo:', error)
+        console.error('Error extracting color:', error)
         setDominantColor('#f8c102')
       })
+    } else {
+      setDominantColor('#f8c102') // default color
     }
-  }, [editableLogo])
+  }, [editableLogo, proposal?.companyLogo])
 
   const fetchTemplates = async () => {
     if (!userData?.company_id) {
@@ -1273,7 +1260,6 @@ export default function ProposalDetailsPage() {
       // Entering edit mode - store original values
       setOriginalLogoDimensions({ ...logoDimensions })
       setOriginalLogoPosition({ ...logoPosition })
-      setOriginalDominantColor(dominantColor)
       setOriginalEditableProducts(JSON.parse(JSON.stringify(editableProducts))) // Deep copy
     } else {
       // Exiting edit mode - reset cursor
@@ -1287,7 +1273,6 @@ export default function ProposalDetailsPage() {
     // Restore original values
     setLogoDimensions({ ...originalLogoDimensions })
     setLogoPosition({ ...originalLogoPosition })
-    setDominantColor(originalDominantColor)
     setEditableProducts(JSON.parse(JSON.stringify(originalEditableProducts))) // Restore original editable products
     // Clear pending changes
     setEditableLogo("")
@@ -2627,8 +2612,8 @@ export default function ProposalDetailsPage() {
                         }))
                       }
                     }}
-                    disabled={(editableProducts[product.id]?.additionalSpecs || []).length >= 3}
-                    className={`self-start ${(editableProducts[product.id]?.additionalSpecs || []).length >= 3 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    
+                    className="self-start"
                     style={{ transform: 'translateX(475px)' }}
                     variant="outline"
                   >
@@ -2854,7 +2839,7 @@ export default function ProposalDetailsPage() {
           />
         ) : (
           <div className="absolute font-bold text-[#333333] text-[71px] left-[73px] top-[307px] whitespace-nowrap">
-            {proposal?.proposalMessage || 'Thank You'}
+            Thank You!
           </div>
         )}
 
@@ -2868,7 +2853,7 @@ export default function ProposalDetailsPage() {
               placeholder="Contact Heading"
             />
           ) : (
-            <p className="font-bold mb-0 text-[20px]">{proposal?.contactInfo?.heading || 'contact us!'}</p>
+            <p className="font-bold mb-0 text-[20px]">contact us:</p>
           )}
           {isEditMode ? (
             <>
