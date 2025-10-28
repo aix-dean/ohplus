@@ -591,9 +591,9 @@ export function ServiceAssignmentCard({
                   <div className="space-y-1">
                     <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
                       <div className="relative">
-                        {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
+                        {selectedJobOrder?.siteImageUrl ? (
                           <img
-                            src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
+                            src={selectedJobOrder.siteImageUrl}
                             alt="Old Material"
                             className="rounded-md h-6 w-6 object-cover"
                           />
@@ -611,9 +611,9 @@ export function ServiceAssignmentCard({
                   <div className="space-y-1">
                     <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
                       <div className="relative">
-                        {(selectedJobOrder?.attachments as any)?.url ? (
+                        {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
                           <img
-                            src={(selectedJobOrder?.attachments as any).url}
+                            src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
                             alt="New Material"
                             className="rounded-md h-6 w-6 object-cover"
                           />
