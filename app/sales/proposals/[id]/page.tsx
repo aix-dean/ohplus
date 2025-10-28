@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useLayoutEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -511,6 +511,20 @@ export default function ProposalDetailsPage() {
   useEffect(() => {
     fetchClients()
   }, [userData?.company_id])
+
+  // Auto-resize textareas when entering edit mode or when content changes
+  useLayoutEffect(() => {
+    if (isEditMode) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        const textareas = document.querySelectorAll('textarea[placeholder="Add specs"], textarea[placeholder="Add data"]') as NodeListOf<HTMLTextAreaElement>
+        textareas.forEach((ta) => {
+          ta.style.height = 'auto'
+          ta.style.height = ta.scrollHeight + 'px'
+        })
+      }, 0)
+    }
+  }, [isEditMode, editableProducts])
 
   useEffect(() => {
     // Reset field visibility to defaults when proposal changes
@@ -1185,13 +1199,16 @@ export default function ProposalDetailsPage() {
       if (Object.keys(editableProducts).length > 0) {
         const productsWithMessages = updatedProducts.map(product => {
           const editable = editableProducts[product.id]
-          if (editable?.additionalMessage) {
+          if (editable?.additionalMessage && editable.additionalMessage.trim() !== '') {
             return {
               ...product,
-              additionalMessage: editable.additionalMessage
+              additionalMessage: editable.additionalMessage.trim()
             }
+          } else {
+            // Remove additionalMessage if it's empty or whitespace-only
+            const { additionalMessage, ...productWithoutMessage } = product as any
+            return productWithoutMessage
           }
-          return product
         })
         updateData.products = productsWithMessages
       }
@@ -2403,7 +2420,7 @@ export default function ProposalDetailsPage() {
           className="absolute font-bold text-[#333333] text-[18px] left-[358px] w-[600px] leading-[1.2]"
           style={{
             top: ((editableProducts[product.id]?.additionalSpecs?.length || 0) > 0 ||
-                  fieldVisibility[product.id]?.additionalMessage !== false) ? '120px' : '191px'
+                  (isEditMode || (fieldVisibility[product.id]?.additionalMessage !== false && (product.additionalMessage || '').trim() !== ''))) ? '120px' : '191px'
           }}
         >
           {/* Site Name */}
@@ -2426,7 +2443,7 @@ export default function ProposalDetailsPage() {
                 <div className="w-[200px] pr-4 text-left">
                   <p className="font-bold text-[18px]">Location:</p>
                 </div>
-                <div className="flex-1">
+                <div className="flex-1" style={{ minWidth: 0 }}>
                   {isEditMode ? (
                     <textarea
                       value={editableProducts[product.id]?.location || product.location || 'N/A'}
@@ -2538,58 +2555,54 @@ export default function ProposalDetailsPage() {
             {/* Additional Specs Rows */}
             {(editableProducts[product.id]?.additionalSpecs || []).map((spec: {specs: string, data: string}, index: number) => (
               <div key={index} className="flex mb-2">
-                <div className="w-[200px] pr-4 text-left">
+                <div className="w-[200px] pr-4 text-left" style={{ minWidth: 0 }}>
                   {isEditMode ? (
                     <textarea
                       value={spec.specs}
                       onChange={(e) => {
-                        const value = e.target.value
-                        const lineBreaks = (value.match(/\n/g) || []).length
-                        if (lineBreaks <= 1) {
-                          const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
-                          newSpecs[index].specs = value
-                          setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
-                        }
+                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                        newSpecs[index].specs = e.target.value
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        e.target.style.height = 'auto'
+                        e.target.style.height = e.target.scrollHeight + 'px'
                       }}
-                      className="font-bold text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none"
+                      className="font-bold text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none overflow-hidden"
                       placeholder="Add specs"
-                      rows={2}
-                      maxLength={24}
+                      rows={1}
+                      style={{ minHeight: '40px' }}
                     />
                   ) : (
-                    <textarea
-                      value={spec.specs || ''}
-                      readOnly
-                      className="font-bold text-[18px] border-none outline-none w-full bg-transparent resize-none"
-                      rows={2}
-                    />
+                    <div
+                      className="font-bold text-[18px] border-none outline-none w-full bg-transparent"
+                      style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', overflow: 'visible' }}
+                    >
+                      {spec.specs || ''}
+                    </div>
                   )}
                 </div>
-                <div className="flex-1">
+                <div className="flex-1" style={{ minWidth: 0 }}>
                   {isEditMode ? (
                     <textarea
                       value={spec.data}
                       onChange={(e) => {
-                        const value = e.target.value
-                        const lineBreaks = (value.match(/\n/g) || []).length
-                        if (lineBreaks <= 1) {
-                          const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
-                          newSpecs[index].data = value
-                          setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
-                        }
+                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                        newSpecs[index].data = e.target.value
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        e.target.style.height = 'auto'
+                        e.target.style.height = e.target.scrollHeight + 'px'
                       }}
-                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none"
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none overflow-hidden"
                       placeholder="Add data"
-                      rows={2}
-                      maxLength={74}
+                      rows={1}
+                      style={{ minHeight: '40px' }}
                     />
                   ) : (
-                    <textarea
-                      value={spec.data || ''}
-                      readOnly
-                      className="font-normal text-[18px] border-none outline-none w-full bg-transparent resize-none"
-                      rows={2}
-                    />
+                    <div
+                      className="font-normal text-[18px] border-none outline-none w-full bg-transparent"
+                      style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', overflow: 'visible' }}
+                    >
+                      {spec.data || ''}
+                    </div>
                   )}
                 </div>
               </div>
@@ -2626,10 +2639,10 @@ export default function ProposalDetailsPage() {
             </div>
 
            {/* Additional Message - Outside the column layout */}
-           {isEditMode || fieldVisibility[product.id]?.additionalMessage !== false ? (
+           {isEditMode || (fieldVisibility[product.id]?.additionalMessage !== false && (product.additionalMessage || '').trim() !== '') ? (
              <div className="mt-4 ml-2">
                <div className="flex items-center gap-2">
-                 <div className="flex-1">
+                 <div className="flex-1" style={{ minWidth: 0 }}>
                    {isEditMode ? (
                      <textarea
                        value={editableProducts[product.id]?.additionalMessage || ''}
@@ -2647,13 +2660,12 @@ export default function ProposalDetailsPage() {
                        style={{ width: '105%', whiteSpace: 'pre-wrap' }}
                      />
                    ) : (
-                     <textarea
-                       value={product.additionalMessage || ''}
-                       readOnly
-                       className="font-normal text-[18px] border-none outline-none w-full bg-transparent resize-none"
-                       rows={2}
-                       style={{ width: '100%', whiteSpace: 'pre-wrap', minHeight: '40px' }}
-                     />
+                     <div
+                       className="font-normal text-[18px] border-none outline-none w-full bg-transparent"
+                       style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', overflow: 'visible' }}
+                     >
+                       {product.additionalMessage || ''}
+                     </div>
                    )}
                  </div>
                  {isEditMode && (
