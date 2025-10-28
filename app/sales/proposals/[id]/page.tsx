@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useLayoutEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -211,20 +211,6 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; on
     fetchCompanyData()
   }, [userData?.company_id, proposal?.companyName, proposal?.companyLogo])
 
-  useEffect(() => {
-    if (companyLogo && onColorExtracted) {
-      Vibrant.from(companyLogo).getPalette().then(palette => {
-        const vibrant = palette.Vibrant
-        if (vibrant) {
-          const hex = vibrant.hex
-          onColorExtracted(hex)
-        }
-      }).catch(error => {
-        console.error('Error extracting color:', error)
-        onColorExtracted('#f8c102')
-      })
-    }
-  }, [companyLogo, onColorExtracted])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -377,7 +363,6 @@ export default function ProposalDetailsPage() {
   const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
   const [printLoading, setPrintLoading] = useState(false)
   const [dominantColor, setDominantColor] = useState<string | null>(null)
-  const [originalDominantColor, setOriginalDominantColor] = useState<string | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>("")
   const [isAddSiteDialogOpen, setIsAddSiteDialogOpen] = useState(false)
@@ -390,9 +375,9 @@ export default function ProposalDetailsPage() {
   const [downloading, setDownloading] = useState(false)
   const [editableTitle, setEditableTitle] = useState("Site Proposals")
   const [editableProposalTitle, setEditableProposalTitle] = useState("Site Proposals")
-  const [editableProposalMessage, setEditableProposalMessage] = useState("Thank You")
+  const [editableProposalMessage, setEditableProposalMessage] = useState("Thank You!")
   const [editableContactInfo, setEditableContactInfo] = useState({
-    heading: "contact us!",
+    heading: "contact us:",
     name: "",
     role: "Sales",
     phone: "",
@@ -404,6 +389,7 @@ export default function ProposalDetailsPage() {
   const [editablePreparedByName, setEditablePreparedByName] = useState("")
   const [editablePreparedByCompany, setEditablePreparedByCompany] = useState("")
   const [editableProducts, setEditableProducts] = useState<{ [key: string]: any }>({})
+  const [originalEditableProducts, setOriginalEditableProducts] = useState<{ [key: string]: any }>({})
   const [savingEdit, setSavingEdit] = useState(false)
   const [editableLogo, setEditableLogo] = useState<string>("")
   const [pendingSiteImages, setPendingSiteImages] = useState<{[productId: string]: string}>({})
@@ -427,6 +413,7 @@ export default function ProposalDetailsPage() {
     type: boolean
     traffic: boolean
     srp: boolean
+    additionalMessage: boolean
   }}>({})
 
   const fetchClients = async () => {
@@ -525,6 +512,20 @@ export default function ProposalDetailsPage() {
     fetchClients()
   }, [userData?.company_id])
 
+  // Auto-resize textareas when entering edit mode or when content changes
+  useLayoutEffect(() => {
+    if (isEditMode) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        const textareas = document.querySelectorAll('textarea[placeholder="Add specs"], textarea[placeholder="Add data"]') as NodeListOf<HTMLTextAreaElement>
+        textareas.forEach((ta) => {
+          ta.style.height = 'auto'
+          ta.style.height = ta.scrollHeight + 'px'
+        })
+      }, 0)
+    }
+  }, [isEditMode, editableProducts])
+
   useEffect(() => {
     // Reset field visibility to defaults when proposal changes
     setFieldVisibility({})
@@ -537,7 +538,7 @@ export default function ProposalDetailsPage() {
         const proposalData = await getProposalById(params.id as string)
         if (proposalData) {
           setProposal(proposalData)
-          setSelectedClientId(proposalData.client.id || "")
+          setSelectedClientId(proposalData.client?.id || "")
           const currentPageContent = getPageContent(1, proposalData.templateLayout || "1")
           const currentPagePrice = getPagePrice(currentPageContent)
           setEditablePrice(currentPagePrice.toString())
@@ -562,9 +563,9 @@ export default function ProposalDetailsPage() {
           // Set editable states
           setEditableTitle(proposalData.title || "Site Proposals")
           setEditableProposalTitle(proposalData.proposalTitle || "Site Proposals")
-          setEditableProposalMessage(proposalData.proposalMessage || "Thank You")
-          setEditableContactInfo(proposalData.contactInfo || {
-            heading: "contact us!",
+          setEditableProposalMessage("Thank You!")
+          setEditableContactInfo({
+            heading: "contact us:",
             name: `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim() || userData?.email || 'Sales Rep',
             role: 'Sales',
             phone: userData?.phone_number || '',
@@ -579,12 +580,13 @@ export default function ProposalDetailsPage() {
               type: proposalData.fieldVisibility?.[product.id]?.type ?? true,
               traffic: proposalData.fieldVisibility?.[product.id]?.traffic ?? true,
               srp: proposalData.fieldVisibility?.[product.id]?.srp ?? true,
+              additionalMessage: proposalData.fieldVisibility?.[product.id]?.additionalMessage ?? true,
             }
           })
           setFieldVisibility(productFieldVisibility)
           setEditableCompanyName(proposalData.companyName || "")
-          setEditableClientContact(proposalData.client.contactPerson || "")
-          setEditableClientCompany(proposalData.client.company || "")
+          setEditableClientContact(proposalData.client?.contactPerson || "")
+          setEditableClientCompany(proposalData.client?.company || "")
           setEditablePreparedByName(proposalData.preparedByName || `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim())
           setEditablePreparedByCompany(proposalData.preparedByCompany || proposalData.companyName || "")
           setLogoDimensions({
@@ -611,7 +613,9 @@ export default function ProposalDetailsPage() {
               dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
-              srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'
+              srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A',
+              additionalMessage: product.additionalMessage || '',
+              additionalSpecs: (product as any).additionalSpecs || []
             }
           })
           setEditableProducts(products)
@@ -717,21 +721,23 @@ export default function ProposalDetailsPage() {
     }
   }, [proposal, loading])
 
-  // Extract color from editable logo when it changes
+  // Extract color from current logo (editable or proposal)
   useEffect(() => {
-    if (editableLogo) {
-      Vibrant.from(editableLogo).getPalette().then(palette => {
+    const currentLogo = editableLogo || proposal?.companyLogo || ''
+    if (currentLogo) {
+      Vibrant.from(currentLogo).getPalette().then(palette => {
         const vibrant = palette.Vibrant
         if (vibrant) {
-          const hex = vibrant.hex
-          setDominantColor(hex)
+          setDominantColor(vibrant.hex)
         }
       }).catch(error => {
-        console.error('Error extracting color from editable logo:', error)
+        console.error('Error extracting color:', error)
         setDominantColor('#f8c102')
       })
+    } else {
+      setDominantColor('#f8c102') // default color
     }
-  }, [editableLogo])
+  }, [editableLogo, proposal?.companyLogo])
 
   const fetchTemplates = async () => {
     if (!userData?.company_id) {
@@ -1147,6 +1153,12 @@ export default function ProposalDetailsPage() {
             }
             updatedProduct.categories[0] = editable.type
           }
+          if (editable.additionalSpecs) {
+            const filteredSpecs = editable.additionalSpecs.filter((spec: {specs: string, data: string}) => spec.specs.trim() || spec.data.trim())
+            ;(updatedProduct as any).additionalSpecs = filteredSpecs
+            // Also update editableProducts to remove empty specs
+            editable.additionalSpecs = filteredSpecs
+          }
           return updatedProduct
         }
         return product
@@ -1187,13 +1199,16 @@ export default function ProposalDetailsPage() {
       if (Object.keys(editableProducts).length > 0) {
         const productsWithMessages = updatedProducts.map(product => {
           const editable = editableProducts[product.id]
-          if (editable?.additionalMessage) {
+          if (editable?.additionalMessage && editable.additionalMessage.trim() !== '') {
             return {
               ...product,
-              additionalMessage: editable.additionalMessage
+              additionalMessage: editable.additionalMessage.trim()
             }
+          } else {
+            // Remove additionalMessage if it's empty or whitespace-only
+            const { additionalMessage, ...productWithoutMessage } = product as any
+            return productWithoutMessage
           }
-          return product
         })
         updateData.products = productsWithMessages
       }
@@ -1262,7 +1277,7 @@ export default function ProposalDetailsPage() {
       // Entering edit mode - store original values
       setOriginalLogoDimensions({ ...logoDimensions })
       setOriginalLogoPosition({ ...logoPosition })
-      setOriginalDominantColor(dominantColor)
+      setOriginalEditableProducts(JSON.parse(JSON.stringify(editableProducts))) // Deep copy
     } else {
       // Exiting edit mode - reset cursor
       document.body.style.cursor = ''
@@ -1272,10 +1287,10 @@ export default function ProposalDetailsPage() {
   }
 
   const handleCancelEdit = () => {
-    // Restore original logo dimensions and position
+    // Restore original values
     setLogoDimensions({ ...originalLogoDimensions })
     setLogoPosition({ ...originalLogoPosition })
-    setDominantColor(originalDominantColor)
+    setEditableProducts(JSON.parse(JSON.stringify(originalEditableProducts))) // Restore original editable products
     // Clear pending changes
     setEditableLogo("")
     setPendingSiteImages({})
@@ -1656,7 +1671,8 @@ export default function ProposalDetailsPage() {
           type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
           traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
           srp: product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A',
-          additionalMessage: (product as any).additionalMessage || ''
+          additionalMessage: (product as any).additionalMessage || '',
+          additionalSpecs: []
         }
       })
       setEditableProducts(prev => ({ ...prev, ...newEditableProducts }))
@@ -2214,7 +2230,7 @@ export default function ProposalDetailsPage() {
         ) : (
           <div className="absolute text-[#333333] text-[18px] left-[100px] top-[386px] w-[645px] leading-[1.2]">
             <p className="font-bold mb-0">Prepared for:</p>
-            <p>{proposal?.client.contactPerson} - {proposal?.client.company}</p>
+            <p>{proposal?.client?.contactPerson} - {proposal?.client?.company}</p>
           </div>
         )}
 
@@ -2400,9 +2416,15 @@ export default function ProposalDetailsPage() {
         </div>
 
         {/* Site Details - Right Side - scaled */}
-        <div className="absolute font-bold text-[#333333] text-[18px] left-[358px] top-[191px] w-[434px] leading-[1.2]">
+        <div
+          className="absolute font-bold text-[#333333] text-[18px] left-[358px] w-[600px] leading-[1.2]"
+          style={{
+            top: ((editableProducts[product.id]?.additionalSpecs?.length || 0) > 0 ||
+                  (isEditMode || (fieldVisibility[product.id]?.additionalMessage !== false && (product.additionalMessage || '').trim() !== ''))) ? '120px' : '191px'
+          }}
+        >
           {/* Site Name */}
-          <div className="mb-2 text-[35px]">
+          <div className="mb-2 text-[35px] ml-2">
             {isEditMode ? (
               <input
                 value={editableProducts[product.id]?.name || product.name}
@@ -2415,153 +2437,256 @@ export default function ProposalDetailsPage() {
           </div>
 
           <div className="ml-2">
-            {/* Location */}
+            {/* Location Row */}
             {isEditMode || fieldVisibility[product.id]?.location !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">Location:</p>
-                {isEditMode ? (
-                  <input
-                    value={editableProducts[product.id]?.location || product.location || 'N/A'}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: e.target.value } }))}
-                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
-                  />
-                ) : (
-                  <p className="font-normal text-[18px] truncate" title={product.location || 'N/A'}>{product.location || 'N/A'}</p>
-                )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        location: !prev[product.id]?.location
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.location !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.location !== false ? "Hide Location field" : "Show Location field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Location:</p>
+                </div>
+                <div className="flex-1" style={{ minWidth: 0 }}>
+                  {isEditMode ? (
+                    <textarea
+                      value={editableProducts[product.id]?.location || product.location || 'N/A'}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        const lineBreaks = (value.match(/\n/g) || []).length
+                        if (lineBreaks <= 1) {
+                          setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: value } }))
+                        }
+                      }}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none"
+                      rows={2}
+                      placeholder="Location"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">{product.location || 'N/A'}</p>
+                  )}
+                </div>
               </div>
             ) : null}
 
-            {/* Dimension */}
+            {/* Dimension Row */}
             {isEditMode || fieldVisibility[product.id]?.dimension !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">Dimension:</p>
-                {isEditMode ? (
-                  <input
-                    value={editableProducts[product.id]?.dimension || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], dimension: e.target.value } }))}
-                    className="font-normal text-[18px] mb-0 border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
-                  />
-                ) : (
-                  <p className="font-normal text-[18px] mb-0">
-                    {product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}
-                    {product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}
-                    {product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}
-                    {!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}
-                  </p>
-                )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        dimension: !prev[product.id]?.dimension
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.dimension !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.dimension !== false ? "Hide Dimension field" : "Show Dimension field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Dimension:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.dimension || ''}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], dimension: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">
+                      {product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}
+                      {product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}
+                      {product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}
+                      {!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}
+                    </p>
+                  )}
+                </div>
               </div>
             ) : null}
 
-            {/* Type */}
+            {/* Type Row */}
             {isEditMode || fieldVisibility[product.id]?.type !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">Type:</p>
-                {isEditMode ? (
-                  <input
-                    value={editableProducts[product.id]?.type || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], type: e.target.value } }))}
-                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
-                  />
-                ) : (
-                  <p className="font-normal text-[18px]">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
-                )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        type: !prev[product.id]?.type
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.type !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.type !== false ? "Hide Type field" : "Show Type field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Type:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.type || ''}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], type: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
+                  )}
+                </div>
               </div>
             ) : null}
 
-            {/* Average Daily Traffic Count */}
+            {/* Average Monthly Traffic Count Row */}
             {isEditMode || fieldVisibility[product.id]?.traffic !== false ? (
-              <div className="mb-2 flex items-center">
-                <p className="mb-0 mr-2 flex-shrink-0">Average Monthly Traffic Count:</p>
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Average Monthly Traffic Count:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.traffic || ''}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], traffic: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">
+                      {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* SRP Row */}
+            <div className="flex mb-2">
+              <div className="w-[200px] pr-4 text-left">
+                <p className="font-bold text-[18px]">SRP:</p>
+              </div>
+              <div className="flex-1">
                 {isEditMode ? (
                   <input
-                    value={editableProducts[product.id]?.traffic || ''}
-                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], traffic: e.target.value } }))}
-                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none flex-1"
+                    value={editableProducts[product.id]?.srp || ''}
+                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
+                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                   />
                 ) : (
-                  <p className="font-normal text-[18px]">
-                    {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
+                  <p className="font-normal text-[18px] break-words">
+                    {product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'}
                   </p>
                 )}
-                {isEditMode && (
-                  <button
-                    onClick={() => setFieldVisibility(prev => ({
-                      ...prev,
-                      [product.id]: {
-                        ...prev[product.id],
-                        traffic: !prev[product.id]?.traffic
-                      }
-                    }))}
-                    className={`ml-2 transition-colors ${fieldVisibility[product.id]?.traffic !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
-                    title={fieldVisibility[product.id]?.traffic !== false ? "Hide Traffic Count field" : "Show Traffic Count field"}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
               </div>
-            ) : null}
-
-            {/* SRP */}
-            <div className="mb-2">
-              <p className="mb-0">SRP:</p>
-              {isEditMode ? (
-                <input
-                  value={editableProducts[product.id]?.srp || ''}
-                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
-                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                />
-              ) : (
-                <p className="font-normal text-[18px]">
-                  {product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'}
-                </p>
-              )}
             </div>
-          </div>
+
+            {/* Additional Specs Rows */}
+            {(editableProducts[product.id]?.additionalSpecs || []).map((spec: {specs: string, data: string}, index: number) => (
+              <div key={index} className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left" style={{ minWidth: 0 }}>
+                  {isEditMode ? (
+                    <textarea
+                      value={spec.specs}
+                      onChange={(e) => {
+                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                        newSpecs[index].specs = e.target.value
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        e.target.style.height = 'auto'
+                        e.target.style.height = e.target.scrollHeight + 'px'
+                      }}
+                      className="font-bold text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none overflow-hidden"
+                      placeholder="Add specs"
+                      rows={1}
+                      style={{ minHeight: '40px' }}
+                    />
+                  ) : (
+                    <div
+                      className="font-bold text-[18px] border-none outline-none w-full bg-transparent"
+                      style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', overflow: 'visible' }}
+                    >
+                      {spec.specs || ''}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1" style={{ minWidth: 0 }}>
+                  {isEditMode ? (
+                    <textarea
+                      value={spec.data}
+                      onChange={(e) => {
+                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                        newSpecs[index].data = e.target.value
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        e.target.style.height = 'auto'
+                        e.target.style.height = e.target.scrollHeight + 'px'
+                      }}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none overflow-hidden"
+                      placeholder="Add data"
+                      rows={1}
+                      style={{ minHeight: '40px' }}
+                    />
+                  ) : (
+                    <div
+                      className="font-normal text-[18px] border-none outline-none w-full bg-transparent"
+                      style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', overflow: 'visible' }}
+                    >
+                      {spec.data || ''}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Add Specs Button */}
+            {isEditMode && (
+              <div className="flex mb-2 justify-end">
+                <div className="flex-1">
+                  <Button
+                    onClick={() => {
+                      const current = editableProducts[product.id]?.additionalSpecs || []
+                      if (current.length < 3) {
+                        setEditableProducts(prev => ({
+                          ...prev,
+                          [product.id]: {
+                            ...prev[product.id],
+                            additionalSpecs: [...current, { specs: '', data: '' }]
+                          }
+                        }))
+                      }
+                    }}
+                    
+                    className="self-start"
+                    style={{ transform: 'translateX(475px)' }}
+                    variant="outline"
+                  >
+                    + Add Specs
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            </div>
+
+           {/* Additional Message - Outside the column layout */}
+           {isEditMode || (fieldVisibility[product.id]?.additionalMessage !== false && (product.additionalMessage || '').trim() !== '') ? (
+             <div className="mt-4 ml-2">
+               <div className="flex items-center gap-2">
+                 <div className="flex-1" style={{ minWidth: 0 }}>
+                   {isEditMode ? (
+                     <textarea
+                       value={editableProducts[product.id]?.additionalMessage || ''}
+                       onChange={(e) => {
+                         const value = e.target.value
+                         const lineBreaks = (value.match(/\n/g) || []).length
+                         if (lineBreaks <= 1) {
+                           setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: value } }))
+                         }
+                       }}
+                       className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full resize-none"
+                       placeholder="Additional message..."
+                       rows={2}
+                       maxLength={130}
+                       style={{ width: '105%', whiteSpace: 'pre-wrap' }}
+                     />
+                   ) : (
+                     <div
+                       className="font-normal text-[18px] border-none outline-none w-full bg-transparent"
+                       style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', overflow: 'visible' }}
+                     >
+                       {product.additionalMessage || ''}
+                     </div>
+                   )}
+                 </div>
+                 {isEditMode && (
+                   <button
+                     onClick={() => setFieldVisibility(prev => ({
+                       ...prev,
+                       [product.id]: {
+                         ...prev[product.id],
+                         additionalMessage: !prev[product.id]?.additionalMessage
+                       }
+                     }))}
+                     className={`transition-colors ${fieldVisibility[product.id]?.additionalMessage !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
+                     style={{ transform: 'translateX(24px)' }}
+                     title={fieldVisibility[product.id]?.additionalMessage !== false ? "Hide Additional Message field" : "Show Additional Message field"}
+                   >
+                     <X className="h-4 w-4" />
+                   </button>
+                 )}
+               </div>
+             </div>
+           ) : null}
         </div>
 
         {/* Bottom Logo */}
@@ -2726,7 +2851,7 @@ export default function ProposalDetailsPage() {
           />
         ) : (
           <div className="absolute font-bold text-[#333333] text-[71px] left-[73px] top-[307px] whitespace-nowrap">
-            {proposal?.proposalMessage || 'Thank You'}
+            Thank You!
           </div>
         )}
 
@@ -2740,7 +2865,7 @@ export default function ProposalDetailsPage() {
               placeholder="Contact Heading"
             />
           ) : (
-            <p className="font-bold mb-0 text-[20px]">{proposal?.contactInfo?.heading || 'contact us!'}</p>
+            <p className="font-bold mb-0 text-[20px]">contact us:</p>
           )}
           {isEditMode ? (
             <>
@@ -2928,7 +3053,7 @@ export default function ProposalDetailsPage() {
               <div key={pageNumber} className={`${getPageContainerClass(selectedSize, "Landscape")} ${index > 0 ? 'mt-[-65px]' : ''}`} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
                 {pageNumber === 1 ? renderIntroPage(pageNumber) : pageNumber === getTotalPages(selectedLayout) ? renderOutroPage(pageNumber) : renderSitePage(pageNumber)}
                 {/* Add blank page button between pages */}
-                {isEditMode && pageNumber < getTotalPages(selectedLayout) && (
+                {isEditMode && pageNumber === 1 && (
                   <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 z-20">
                     <Button
                       onClick={() => handleAddBlankPage(pageNumber)}
@@ -2977,7 +3102,7 @@ export default function ProposalDetailsPage() {
             <h3 className="text-lg font-semibold">
               Proposal History
               {proposal && (
-                <span className="text-sm font-normal text-gray-500 block">for {proposal.client.company}</span>
+                <span className="text-sm font-normal text-gray-500 block">for {proposal.client?.company}</span>
               )}
             </h3>
           </div>
@@ -2986,9 +3111,9 @@ export default function ProposalDetailsPage() {
               selectedClient={
                 proposal
                   ? {
-                      id: proposal.client.id || "",
-                      company: proposal.client.company,
-                      contactPerson: proposal.client.contactPerson,
+                      id: proposal.client?.id || "",
+                      company: proposal.client?.company,
+                      contactPerson: proposal.client?.contactPerson,
                     }
                   : null
               }

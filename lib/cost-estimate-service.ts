@@ -1059,14 +1059,53 @@ export async function generateAndUploadCostEstimatePDF(
   costEstimate: CostEstimate,
   userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
   companyData?: {name: string, address?: any, phone?: string, email?: string, website?: string},
+  userSignatureDataUrl?: string | null,
 ): Promise<{ pdfUrl: string; password: string }> {
   console.log('[PDF_GENERATE] Starting PDF generation and upload for cost estimate:', costEstimate.id)
   try {
     // Always fetch fresh company data and logo to ensure consistency
     let logoDataUrl = null
+    let finalUserSignatureDataUrl: string | null = userSignatureDataUrl || null
     let finalCompanyData = companyData
 
     console.log('[PDF_GENERATE] Company ID from userData or costEstimate:', userData?.company_id || costEstimate.company_id)
+    console.log('[PDF_GENERATE] User signature data URL provided:', !!userSignatureDataUrl)
+
+    // Fetch user signature if not provided and available
+    if (!finalUserSignatureDataUrl && costEstimate.createdBy) {
+      try {
+        console.log('[PDF_GENERATE] Fetching user signature for createdBy:', costEstimate.createdBy)
+        const userDocRef = doc(db, "iboard_users", costEstimate.createdBy)
+        const userDoc = await getDoc(userDocRef)
+
+        if (userDoc.exists()) {
+          const userDataFetched = userDoc.data()
+          if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+            const signatureUrl = userDataFetched.signature.url
+            console.log('[PDF_GENERATE] Found user signature URL:', signatureUrl)
+
+            // Convert signature image to base64 data URL like logoDataUrl
+            try {
+              const response = await fetch(signatureUrl)
+              if (response.ok) {
+                const blob = await response.blob()
+                const arrayBuffer = await blob.arrayBuffer()
+                const base64 = Buffer.from(arrayBuffer).toString('base64')
+                const mimeType = blob.type || 'image/png'
+                finalUserSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                console.log('[PDF_GENERATE] Converted signature to base64 data URL')
+              } else {
+                console.warn('[PDF_GENERATE] Failed to fetch signature image:', response.status)
+              }
+            } catch (fetchError) {
+              console.error('[PDF_GENERATE] Error converting signature to base64:', fetchError)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[PDF_GENERATE] Error fetching user signature:', error)
+      }
+    }
 
     // Always try to fetch company data and logo from database
     const companyId = userData?.company_id || costEstimate.company_id
@@ -1139,6 +1178,7 @@ export async function generateAndUploadCostEstimatePDF(
         costEstimate,
         companyData: finalCompanyData,
         logoDataUrl,
+        userSignatureDataUrl: finalUserSignatureDataUrl,
         format: 'pdf',
         userData
       }),
