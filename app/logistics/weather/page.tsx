@@ -172,7 +172,7 @@ export default function LogisticsWeatherPage() {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-4">
+    <main className="flex-1 overflow-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">News and Weather</h1>
       </div>
@@ -288,7 +288,7 @@ export default function LogisticsWeatherPage() {
                 {weatherData?.forecast.slice(0, 5).map((item, index) => (
                   <>
                     <div key={index} className="text-center min-w-[80px] flex-shrink-0">
-                      <div className="text-sm font-medium text-gray-600 mb-2">{item.dayOfWeek}</div>
+                      <div className="text-sm font-medium text-gray-600 mb-2">{format(new Date(item.date), 'MMM d')} - {item.dayOfWeek}</div>
                       <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center">
                         <img
                           src={getWeatherIcon(item.icon)}
@@ -330,6 +330,7 @@ export default function LogisticsWeatherPage() {
                   loop
                   src={videoUrl}
                   poster=""
+                  data-testid="video-element"
                   onLoadStart={() => console.log('Weather page: Video load started')}
                   onCanPlay={() => console.log('Weather page: Video can play')}
                   onPlay={() => console.log('Weather page: Video started playing (autoplay working)')}
@@ -412,6 +413,6 @@ export default function LogisticsWeatherPage() {
       )}
 
 
-    </div>
+    </main>
   )
 }
