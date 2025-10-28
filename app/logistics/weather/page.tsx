@@ -7,6 +7,7 @@ import type { WeatherForecast } from "@/lib/weather-service"
 import { getLatestVideoByCategory, getNewsItemsByCategory, type ContentMedia } from "@/lib/firebase-service"
 import { ChevronDown } from "lucide-react"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { ComingSoonModal } from "@/components/coming-soon-dialog"
 
 export default function LogisticsWeatherPage() {
   const [weatherData, setWeatherData] = useState<WeatherForecast | null>(null)
@@ -30,6 +31,7 @@ export default function LogisticsWeatherPage() {
   })
 
   const [showDatePicker, setShowDatePicker] = useState(false)
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false)
 
 
   useEffect(() => {
@@ -220,7 +222,8 @@ export default function LogisticsWeatherPage() {
               <h2 className="text-[15.006px] font-semibold text-[#333] leading-none font-['Inter'] text-center">Weekly Weather Forecast</h2>
               <div className="relative">
                 <div
-                  className="flex items-center gap-2 px-2 py-1 rounded"
+                  className="flex items-center gap-2 px-2 py-1 rounded cursor-pointer"
+                  onClick={() => setShowComingSoonModal(true)}
                 >
                   <span className="text-sm text-gray-600">
                     {dateRange?.from && dateRange?.to
@@ -376,6 +379,16 @@ export default function LogisticsWeatherPage() {
           </div>
         </div>
       </div>
+
+      {showComingSoonModal && (
+        <ComingSoonModal
+          onClose={() => setShowComingSoonModal(false)}
+          onNotify={() => {
+            // Handle notify logic here if needed
+            setShowComingSoonModal(false)
+          }}
+        />
+      )}
 
     </div>
   )
