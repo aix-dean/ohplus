@@ -1,4 +1,5 @@
 import jsPDF from "jspdf"
+import { format } from "date-fns"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
@@ -2124,6 +2125,127 @@ export async function generateCostEstimatePDF(
   } catch (error) {
     console.error("Error generating Cost Estimate PDF:", error)
     throw new Error("Failed to generate Cost Estimate PDF")
+  }
+}
+
+export async function generateServiceAssignmentSummaryPDF(
+  assignmentData: any,
+  jobOrderData: any,
+  products: any[],
+  teams: any[],
+  returnBase64 = false,
+): Promise<string | void> {
+  try {
+    const pdf = new jsPDF("p", "mm", "a4")
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
+    let yPosition = margin
+
+    // Helper function to add text with word wrapping
+    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+      pdf.setFontSize(fontSize)
+      const lines = pdf.splitTextToSize(text, maxWidth)
+      pdf.text(lines, x, y)
+      return y + lines.length * fontSize * 0.3
+    }
+
+    // Helper function to safely parse and validate dates
+    const parseDateSafely = (dateValue: any): Date | null => {
+      if (!dateValue) return null
+
+      try {
+        let date: Date
+
+        if (dateValue instanceof Date) {
+          date = dateValue
+        } else if (typeof dateValue === 'string') {
+          date = new Date(dateValue)
+          if (isNaN(date.getTime())) {
+            return null
+          }
+        } else if (typeof dateValue === 'number') {
+          date = new Date(dateValue * 1000)
+        } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+          date = new Date(dateValue.seconds * 1000)
+        } else {
+          return null
+        }
+
+        if (isNaN(date.getTime())) {
+          return null
+        }
+
+        return date
+      } catch (error) {
+        console.warn('Error parsing date:', dateValue, error)
+        return null
+      }
+    }
+
+    // Get site information - prioritize assignment data, then fall back to product lookup
+    const selectedProduct = products.find(p => p.id === assignmentData.projectSiteId)
+    const selectedTeam = teams.find(t => t.id === assignmentData.crew)
+    const siteCode = selectedProduct?.site_code || assignmentData.projectSiteId?.substring(0, 8) || "-"
+    const siteName = assignmentData.projectSiteName || selectedProduct?.name || "-"
+
+    // Header
+    pdf.setFontSize(20)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("SERVICE ASSIGNMENT SUMMARY", margin, yPosition)
+    yPosition += 20
+
+    // Tagged JO and Recipient info
+    pdf.setFontSize(12)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(`Tagged JO: ${jobOrderData?.joNumber || "AAX-0123"}`, margin, yPosition)
+    yPosition += 8
+    pdf.text(`Recipient: Jonathan Dela Cruz, Production`, margin, yPosition)
+    yPosition += 8
+    pdf.text(`SA#: ${assignmentData.saNumber || "305704"}`, margin, yPosition)
+    yPosition += 8
+    pdf.text(`Issued on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`, margin, yPosition)
+    yPosition += 20
+
+    // Service Assignment Information Section
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("Service Assignment Information:", margin, yPosition)
+    yPosition += 12
+
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "normal")
+
+    const serviceInfo = [
+      { label: "Site Name:", value: siteName },
+      { label: "Site Address:", value: assignmentData.siteAddress || "444 EDSA, Guadalupe Viejo, Makati City" },
+      { label: "Campaign Name:", value: assignmentData.campaignName || "Ad material roll up" },
+      { label: "Service Type:", value: assignmentData.serviceType || "Roll Up" },
+      { label: "Material Specs:", value: assignmentData.materialSpecs || "Digital File" },
+      { label: "Service Start Date:", value: assignmentData.coveredDateStart ? format(parseDateSafely(assignmentData.coveredDateStart)!, "MMMM d, yyyy") : "October 27, 2025" },
+      { label: "Service End Date:", value: assignmentData.coveredDateEnd ? format(parseDateSafely(assignmentData.coveredDateEnd)!, "MMMM d, yyyy") : "October 27, 2025" },
+      { label: "Crew:", value: selectedTeam?.name || assignmentData.assignedTo || "Team" },
+      { label: "Remarks:", value: assignmentData.remarks || "ASAP" },
+    ]
+
+    serviceInfo.forEach((item) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(item.label, margin, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(item.value, margin + 50, yPosition)
+      yPosition += 8
+    })
+
+    if (returnBase64) {
+      return pdf.output("datauristring").split(",")[1]
+    } else {
+      const fileName = `service-assignment-summary-${assignmentData.saNumber || "unknown"}-${Date.now()}.pdf`
+      pdf.save(fileName)
+    }
+  } catch (error) {
+    console.error("Error generating Service Assignment Summary PDF:", error)
+    throw new Error("Failed to generate Service Assignment Summary PDF")
   }
 }
 

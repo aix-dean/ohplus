@@ -95,26 +95,113 @@ export function ServiceAssignmentViewForm({
   teams: Team[];
   jobOrderData: JobOrder | null;
 }) {
+  // Helper function to safely parse and validate dates
+  const parseDateSafely = (dateValue: any): Date | null => {
+    if (!dateValue) return null
+
+    try {
+      let date: Date
+
+      if (dateValue instanceof Date) {
+        date = dateValue
+      } else if (typeof dateValue === 'string') {
+        date = new Date(dateValue)
+        if (isNaN(date.getTime())) {
+          return null
+        }
+      } else if (typeof dateValue === 'number') {
+        date = new Date(dateValue * 1000)
+      } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+        date = new Date(dateValue.seconds * 1000)
+      } else {
+        return null
+      }
+
+      if (isNaN(date.getTime())) {
+        return null
+      }
+
+      return date
+    } catch (error) {
+      console.warn('Error parsing date:', dateValue, error)
+      return null
+    }
+  }
+
+  // Get site information - prioritize assignment data, then fall back to product lookup
+  const selectedProduct = products.find(p => p.id === assignmentData.projectSiteId)
+  const selectedTeam = teams.find(t => t.id === assignmentData.crew)
+  const siteCode = selectedProduct?.site_code || assignmentData.projectSiteId?.substring(0, 8) || "-"
+  const siteName = assignmentData.projectSiteName || selectedProduct?.name || "-"
+
   return (
-    <div className="flex flex-col lg:flex-row p-4">
-      <div className="flex flex-col gap-6 w-full lg:w-[60%]">
-        <ServiceAssignmentViewCard
-          assignmentData={assignmentData}
-          products={products}
-          teams={teams}
-          jobOrderData={jobOrderData}
-        />
+    <>
+      <ServiceAssignmentViewCard
+        assignmentData={assignmentData}
+        products={products}
+        teams={teams}
+        jobOrderData={jobOrderData}
+      />
+
+      {/* Service Assignment Information Display */}
+      <div className="relative isolate bg-card text-card-foreground max-w-full min-w-0 overflow-x-auto md:overflow-visible break-words hyphens-auto p-0 shadow-lg border-2 border-[#565656]">
+        <div className="p-6">
+          <h2 className="text-2xl font-bold mb-6">sdsSERVICE ASSIGNMENT SUMMARY</h2>
+
+          <div className="mb-6">
+            <p className="text-blue-600 font-medium">Tagged JO: {jobOrderData?.joNumber || "N/A"}</p>
+            <p className="text-sm text-gray-500">Recipient: Production Team</p>
+            <p className="text-sm text-gray-500">SA#: {assignmentData.saNumber || "N/A"}</p>
+            <p className="text-sm text-gray-500">Issued on {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+          </div>
+
+          <div className="mb-6">
+            <h3 className="text-xl font-bold mb-4">Service Assignment Information:</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="font-medium">Site Name:</span>
+                  <span>{siteName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Site Address:</span>
+                  <span>{assignmentData.siteAddress || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Campaign Name:</span>
+                  <span>{assignmentData.campaignName || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Service Type:</span>
+                  <span>{assignmentData.serviceType || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Material Specs:</span>
+                  <span>{assignmentData.materialSpecs || "N/A"}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="font-medium">Service Start Date:</span>
+                  <span>{assignmentData.coveredDateStart ? format(parseDateSafely(assignmentData.coveredDateStart)!, "MMMM d, yyyy") : "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Service End Date:</span>
+                  <span>{assignmentData.coveredDateEnd ? format(parseDateSafely(assignmentData.coveredDateEnd)!, "MMMM d, yyyy") : "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Crew:</span>
+                  <span>{selectedTeam?.name || assignmentData.assignedTo || "N/A"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Remarks:</span>
+                  <span>{assignmentData.remarks || "N/A"}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="flex flex-col gap-6 w-full lg:w-[40%]">
-        {jobOrderData && (
-          <JobOrderDetailsCard
-            jobOrder={jobOrderData}
-          />
-        )}
-        <ServiceExpenseViewCard
-          expenses={assignmentData.serviceExpenses || []}
-        />
-      </div>
-    </div>
+    </>
   );
 }

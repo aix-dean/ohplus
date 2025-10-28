@@ -26,6 +26,7 @@ import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
 import { ServiceAssignmentViewForm } from '@/components/logistics/assignments/view/ServiceAssignmentViewForm';
+import { ServiceAssignmentSummaryBar } from '@/components/logistics/assignments/view/ServiceAssignmentSummaryBar';
 
 export default function ViewServiceAssignmentPage() {
   const { user, userData } = useAuth()
@@ -143,27 +144,35 @@ export default function ViewServiceAssignmentPage() {
   }
 
   return (
-    <section className="p-8 bg-white">
-      {/* Header */}
-      <div className="flex items-center gap-2">
+    <div className="p-6">
+      {/* Page Header */}
+      <div className="flex items-center gap-2 mb-5">
         <button
           onClick={() => router.back()}
           className="inline-flex items-center text-gray-600 hover:text-gray-800"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="text-xl font-semibold text-gray-800">
-          View Service Assignment
-        </h1>
+        <h1 className="text-lg font-bold text-gray-800">View Service Assignment</h1>
       </div>
 
-      {/* Form Card */}
+      {/* Service Assignment Info Header */}
+      <ServiceAssignmentSummaryBar
+        assignmentData={assignmentData}
+        products={products}
+        teams={teams}
+      />
+
+      {/* Control Bar */}
+      <div className="bg-[#565656] text-white px-4 py-1.5 text-xs font-medium">Control Bar</div>
+
+      {/* Service Assignment Card */}
       <ServiceAssignmentViewForm
         assignmentData={assignmentData}
         products={products}
         teams={teams}
         jobOrderData={jobOrderData}
       />
-    </section>
+    </div>
   )
 }
