@@ -8,6 +8,7 @@ import { getLatestVideoByCategory, getNewsItemsByCategory, type ContentMedia } f
 import { ChevronDown } from "lucide-react"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { ComingSoonModal } from "@/components/coming-soon-dialog"
+import { Button } from "@/components/ui/button"
 
 export default function LogisticsWeatherPage() {
   const [weatherData, setWeatherData] = useState<WeatherForecast | null>(null)
@@ -188,13 +189,33 @@ export default function LogisticsWeatherPage() {
               <text x="10" y="10" text-anchor="middle" dominant-baseline="middle" fill="var(--LIGHTER-BLACK, #333)" font-family="Inter" font-size="15.006" font-weight="400">?</text>
             </svg>
           </div>
-          <div className="flex items-center mb-4">
+          {/* <div className="flex items-center mb-4">
             <img src="/login-image-5.png" alt="Oscar" className="w-9 h-9 mr-3" />
             <span className="text-lg text-gray-600">Oscar</span>
+          </div> */}
+          {/* <div className="text-6xl font-bold text-green-500 text-center mb-6">No</div> */}
+          <div className="flex justify-center mt-20 mb-6">
+            <div className="flex flex-col gap-4 items-center py-5">
+              {/* Illustration */}
+              <div className="flex-shrink-0">
+                <img
+                  src="/coming-soon-oscar.png"
+                  alt="Coming soon illustration"
+                  className="h-56 w-56 object-contain"
+                />
+              </div>
+
+              {/* Text content */}
+              <div className="flex flex-col justify-center text-center">
+                <h2 className="mb-2 text-[#333] font-inter text-[24px] font-bold leading-none">Coming soon!</h2>
+                <p className="text-[#333] font-inter text-[16px] font-light leading-none">
+                  We are working hard to make this feature available to you as soon as possible!
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="text-6xl font-bold text-green-500 text-center mb-6">No</div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">Rolldown Parameters</h3>
-          <div className="space-y-4">
+          {/* <h3 className="text-xl font-semibold text-gray-800 mb-4">Rolldown Parameters</h3> */}
+          {/* <div className="space-y-4">
             {[
               { title: 'Typhoon Strength', desc: 'Stronger than 65 kph' },
               { title: 'City Ordinance', desc: 'On cities that covers my sites' },
@@ -207,7 +228,7 @@ export default function LogisticsWeatherPage() {
                 <p className="text-sm text-gray-600">{param.desc}</p>
               </div>
             ))}
-          </div>
+          </div> */}
           <div className="flex justify-center mt-4">
             <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
               Create Service Assignment
@@ -389,6 +410,7 @@ export default function LogisticsWeatherPage() {
           }}
         />
       )}
+
 
     </div>
   )
