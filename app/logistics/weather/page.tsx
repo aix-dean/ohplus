@@ -1,9 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { addDays, format } from "date-fns"
+import type { DateRange } from "react-day-picker"
 import type { WeatherForecast } from "@/lib/weather-service"
 import { getLatestVideoByCategory, getNewsItemsByCategory, type ContentMedia } from "@/lib/firebase-service"
+import { ChevronDown } from "lucide-react"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
 
 export default function LogisticsWeatherPage() {
   const [weatherData, setWeatherData] = useState<WeatherForecast | null>(null)
@@ -18,13 +21,36 @@ export default function LogisticsWeatherPage() {
   const [newsLoading, setNewsLoading] = useState(true)
   const [newsError, setNewsError] = useState<string | null>(null)
 
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const today = new Date()
+    return {
+      from: today,
+      to: addDays(today, 4)
+    }
+  })
+
+  const [showDatePicker, setShowDatePicker] = useState(false)
+
+
   useEffect(() => {
     const fetchWeatherData = async () => {
       try {
         console.log('Weather page: Starting weather data fetch from /api/weather/accuweather')
         setLoading(true)
         setError(null)
-        const response = await fetch('/api/weather/accuweather?locationKey=264885')
+
+        // Build query parameters
+        const params = new URLSearchParams()
+        params.append('locationKey', '264885')
+
+        if (dateRange?.from) {
+          params.append('startDate', dateRange.from.toISOString().split('T')[0])
+        }
+        if (dateRange?.to) {
+          params.append('endDate', dateRange.to.toISOString().split('T')[0])
+        }
+
+        const response = await fetch(`/api/weather/accuweather?${params.toString()}`)
         console.log('Weather page: Fetch response status:', response.status)
         if (!response.ok) {
           throw new Error('Failed to fetch weather data')
@@ -42,7 +68,7 @@ export default function LogisticsWeatherPage() {
     }
 
     fetchWeatherData()
-  }, [])
+  }, [dateRange])
 
   useEffect(() => {
     const fetchVideo = async () => {
@@ -104,20 +130,20 @@ export default function LogisticsWeatherPage() {
     fetchNewsItems()
   }, [])
 
-  // Helper function to map icon strings to emojis
+  // Helper function to map icon strings to SVG paths
   const getWeatherIcon = (icon: string) => {
     const iconMap: { [key: string]: string } = {
-      sun: "☀️",
-      "cloud-sun": "⛅",
-      cloud: "☁️",
-      "cloud-fog": "🌫️",
-      "cloud-rain": "🌧️",
-      "cloud-lightning": "⛈️",
-      "cloud-snow": "❄️",
-      wind: "💨",
-      moon: "🌙",
+      sun: "/weather-icons/clear-day.svg",
+      "cloud-sun": "/weather-icons/cloudy.svg",
+      cloud: "/weather-icons/cloudy.svg",
+      "cloud-fog": "/weather-icons/haze.svg",
+      "cloud-rain": "/weather-icons/rain.svg",
+      "cloud-lightning": "/weather-icons/thunderstorms-rain.svg",
+      "cloud-snow": "/weather-icons/snowflake.svg",
+      wind: "/weather-icons/wind.svg",
+      moon: "/weather-icons/clear-day.svg",
     }
-    return iconMap[icon] || "☁️"
+    return iconMap[icon] || "/weather-icons/cloudy.svg"
   }
 
   // Handler for news item clicks
@@ -146,9 +172,6 @@ export default function LogisticsWeatherPage() {
     <div className="flex-1 overflow-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">News and Weather</h1>
-        <div>
-          <DateRangePicker placeholder="Select date range" />
-        </div>
       </div>
 
 
@@ -156,9 +179,15 @@ export default function LogisticsWeatherPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         {/* Do I need to roll down today? */}
         <div className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-1">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Do I need to roll down today?</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Do I need to roll down today?</h2>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="10" cy="10" r="9" stroke="var(--LIGHTER-BLACK, #333)" stroke-width="1.501"/>
+              <text x="10" y="10" text-anchor="middle" dominant-baseline="middle" fill="var(--LIGHTER-BLACK, #333)" font-family="Inter" font-size="15.006" font-weight="400">?</text>
+            </svg>
+          </div>
           <div className="flex items-center mb-4">
-            <div className="w-9 h-9 bg-gray-200 rounded-full mr-3"></div>
+            <img src="/login-image-5.png" alt="Oscar" className="w-9 h-9 mr-3" />
             <span className="text-lg text-gray-600">Oscar</span>
           </div>
           <div className="text-6xl font-bold text-green-500 text-center mb-6">No</div>
@@ -186,11 +215,42 @@ export default function LogisticsWeatherPage() {
 
         {/* Second Column Container */}
         <div className="space-y-6 lg:col-span-2">
-          {/* Weekly Weather Forecast */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="bg-white rounded-2xl p-6 border-0">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-[15.006px] font-semibold text-[#333] leading-none font-['Inter'] text-center">Weekly Weather Forecast</h2>
+              <div className="relative">
+                <div
+                  className="flex items-center gap-2 px-2 py-1 rounded"
+                >
+                  <span className="text-sm text-gray-600">
+                    {dateRange?.from && dateRange?.to
+                      ? `${format(dateRange.from, 'MMM d')} - ${format(dateRange.to, 'MMM d, yyyy')}`
+                      : 'Select dates'
+                    }
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                </div>
+                {showDatePicker && (
+                  <div className="absolute top-full mt-2 right-0 z-10">
+                    <DateRangePicker
+                      value={dateRange}
+                      onChange={(range) => {
+                        setDateRange(range)
+                        setShowDatePicker(false)
+                      }}
+                      placeholder="Select date range"
+                      className="w-64"
+                      maxDays={7}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <div className="text-gray-600">Loading weather data...</div>
+                <div className="text-gray-600">
+                  Loading weather data...
+                </div>
               </div>
             ) : error ? (
               <div className="flex items-center justify-center py-8">
@@ -200,15 +260,22 @@ export default function LogisticsWeatherPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-7 gap-4 overflow-x-auto">
-                {weatherData?.forecast.slice(0, 7).map((item, index) => (
-                  <div key={index} className="text-center min-w-[80px]">
-                    <div className="text-sm font-medium text-gray-600 mb-2">{item.dayOfWeek}</div>
-                    <div className="w-16 h-16 bg-gray-200 rounded-lg mx-auto mb-2 flex items-center justify-center">
-                      <span className="text-2xl">{getWeatherIcon(item.icon)}</span>
+              <div className="flex justify-around">
+                {weatherData?.forecast.slice(0, 5).map((item, index) => (
+                  <>
+                    <div key={index} className="text-center min-w-[80px] flex-shrink-0">
+                      <div className="text-sm font-medium text-gray-600 mb-2">{item.dayOfWeek}</div>
+                      <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center">
+                        <img
+                          src={getWeatherIcon(item.icon)}
+                          alt={`${item.icon} weather icon`}
+                          className="w-[51px] h-[51px] flex-shrink-0 aspect-square"
+                        />
+                      </div>
+                      <div className="text-[15.006px] font-semibold text-[#333] text-center leading-none font-['Inter']">{item.temperature.max}°</div>
                     </div>
-                    <div className="text-lg font-semibold text-gray-800">{item.temperature.max}°</div>
-                  </div>
+                    {index < 4 && <div className="flex-shrink-0 self-center" style={{background: 'rgba(0, 0, 0, 0.25)', width: '1.501px', height: '125.802px'}}></div>}
+                  </>
                 ))}
               </div>
             )}
