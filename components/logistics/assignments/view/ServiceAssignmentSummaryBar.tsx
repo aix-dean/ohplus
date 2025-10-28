@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Edit, Printer, Bell, ChevronDown } from "lucide-react";
+import { MoreHorizontal, Edit, Printer, Bell, ChevronDown, FileText, Share, X, Download } from "lucide-react";
 
 interface ServiceAssignmentSummaryBarProps {
   assignmentData: any;
@@ -18,6 +18,10 @@ interface ServiceAssignmentSummaryBarProps {
   onEdit?: () => void;
   onPrint?: () => void;
   onSetAlarm?: () => void;
+  onCreateReport?: () => void;
+  onShare?: () => void;
+  onCancelSA?: () => void;
+  onDownload?: () => void;
 }
 
 export function ServiceAssignmentSummaryBar({
@@ -27,6 +31,10 @@ export function ServiceAssignmentSummaryBar({
   onEdit,
   onPrint,
   onSetAlarm,
+  onCreateReport,
+  onShare,
+  onCancelSA,
+  onDownload,
 }: ServiceAssignmentSummaryBarProps) {
   // Helper function to safely parse and validate dates
   const parseDateSafely = (dateValue: any): Date | null => {
@@ -101,9 +109,35 @@ export function ServiceAssignmentSummaryBar({
           <div className="font-semibold text-gray-900">{formattedIssuedDate}</div>
         </div>
       </div>
-      <Button variant="outline" size="sm" className="text-xs h-7 border-gray-300 bg-transparent">
-        Actions <ChevronDown className="w-3 h-3 ml-1" />
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="text-xs h-7 border-gray-300 bg-transparent">
+            Actions <ChevronDown className="w-3 h-3 ml-1" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onCreateReport}>
+            <FileText className="w-4 h-4 mr-2" />
+            Create Report
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onPrint}>
+            <Printer className="w-4 h-4 mr-2" />
+            Print
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onShare}>
+            <Share className="w-4 h-4 mr-2" />
+            Share
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onCancelSA}>
+            <X className="w-4 h-4 mr-2" />
+            Cancel SA
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onDownload}>
+            <Download className="w-4 h-4 mr-2" />
+            Download
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
