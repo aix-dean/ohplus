@@ -17,6 +17,12 @@ export default function SignaturePage() {
     if (userData?.signature?.url) {
       setCurrentSignature(userData.signature.url);
       setIsImageLoading(true);
+      // Set a timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        setIsImageLoading(false);
+      }, 5000); // 5 second timeout
+
+      return () => clearTimeout(timeout);
     } else {
       setCurrentSignature(null);
       setIsImageLoading(false);
@@ -82,6 +88,7 @@ export default function SignaturePage() {
                 signature: {
                   url: signatureValue,
                   updated: new Date(),
+                  type: "png",
                 },
               });
             } catch (error) {
