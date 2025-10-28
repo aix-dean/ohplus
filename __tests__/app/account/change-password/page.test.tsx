@@ -1,3 +1,4 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -26,6 +27,13 @@ vi.mock('firebase/auth', () => ({
   EmailAuthProvider: {
     credential: vi.fn(),
   },
+}))
+
+// Mock lucide-react icons
+vi.mock('lucide-react', () => ({
+  Eye: vi.fn((props) => React.createElement('div', { 'data-testid': 'eye-icon', ...props })),
+  EyeOff: vi.fn((props) => React.createElement('div', { 'data-testid': 'eye-off-icon', ...props })),
+  Loader2: vi.fn((props) => React.createElement('div', { 'data-testid': 'loader-icon', ...props })),
 }))
 
 vi.mock('@/lib/firebase', () => ({
