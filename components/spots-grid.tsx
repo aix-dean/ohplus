@@ -52,14 +52,11 @@ export function SpotsGrid({ spots, totalSpots, occupiedCount, vacantCount, produ
         )}
 
         {/* Image Section */}
-        <div className="absolute inset-0 opacity-50">
+        <div className="absolute inset-0">
           {spot.imageUrl ? (
-            <Image
-              src={spot.imageUrl}
-              alt={`Spot ${spot.number}`}
-              fill
-              className="object-cover"
-            />
+            <div className="w-full h-full bg-white flex items-center justify-center">
+              <span className="text-gray-400 text-xs">Image</span>
+            </div>
           ) : (
             <div className="w-full h-full bg-white flex items-center justify-center">
               <span className="text-gray-400 text-xs">No image</span>

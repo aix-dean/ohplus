@@ -448,77 +448,110 @@ function CostEstimatesPageContent() {
 
       // Check if cost estimate has start and end dates
       if (!costEstimate.startDate || !costEstimate.endDate) {
-        // Extract site IDs from line items
-        const siteIds = costEstimate.lineItems.map(item => item.id)
+        // Extract site IDs from line items - handle spot IDs by extracting product ID
+        const siteIds = costEstimate.lineItems.map(item => {
+          // If the ID contains '-', extract the product ID (format: productId-spotNumber)
+          if (item.id.includes('-')) {
+            return item.id.split('-')[0]
+          }
+          return item.id
+        })
         const sitesParam = encodeURIComponent(JSON.stringify(siteIds))
         const clientId = costEstimate.client?.id
 
+        // Extract CMS and spot number data from line items
+        const cmsData: Record<string, any> = {}
+        const spotNumbersData: Record<string, string> = {}
+
+        costEstimate.lineItems.forEach(item => {
+          // Use the product ID as the key (extract from spot IDs if needed)
+          const productId = item.id.includes('-') ? item.id.split('-')[0] : item.id
+          if (item.cms) {
+            cmsData[productId] = item.cms
+          }
+          if (item.spot_number) {
+            spotNumbersData[productId] = item.spot_number
+          }
+        })
+
+        // Build URL parameters
+        let url = `/sales/quotations/select-dates?sites=${sitesParam}&clientId=${clientId}`
+
+        if (Object.keys(cmsData).length > 0) {
+          url += `&cmsData=${encodeURIComponent(JSON.stringify(cmsData))}`
+        }
+
+        if (Object.keys(spotNumbersData).length > 0) {
+          url += `&spotNumbersData=${encodeURIComponent(JSON.stringify(spotNumbersData))}`
+        }
+
         // Redirect to quotations select-dates page
-        router.push(`/sales/quotations/select-dates?sites=${sitesParam}&clientId=${clientId}`)
+        router.push(url)
         return
       }
 
       // Import required functions
-      const { createQuotation, generateQuotationNumber } = await import("@/lib/quotation-service")
+      const { createDirectQuotation, createMultipleQuotations, generateQuotationNumber } = await import("@/lib/quotation-service")
       const { Timestamp } = await import("firebase/firestore")
 
-      // Create quotation data
-      const quotationData = {
-        quotation_number: generateQuotationNumber(),
-        client_name: costEstimate.client.name || "",
-        client_email: costEstimate.client.email || "",
-        client_id: costEstimate.client.id || "",
-        client_company_name: costEstimate.client.company || "",
-        client_phone: costEstimate.client.phone || "",
-        client_address: costEstimate.client.address || "",
-        client_designation: costEstimate.client.designation || "",
-        client_company_id: costEstimate.client.company_id || "",
-        status: "draft" as const,
-        created: Timestamp.now(),
-        created_by: user?.uid || "",
-        seller_id: user?.uid || "",
-        company_id: userData?.company_id || "",
-        created_by_first_name: userData?.first_name || "",
-        created_by_last_name: userData?.last_name || "",
-        start_date: costEstimate.startDate ? Timestamp.fromDate(costEstimate.startDate) : null,
-        end_date: costEstimate.endDate ? Timestamp.fromDate(costEstimate.endDate) : null,
-        duration_days: costEstimate.durationDays || 0,
-        total_amount: costEstimate.totalAmount,
-        valid_until: Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
-        costEstimateNumber: costEstimate.costEstimateNumber || costEstimate.id,
-        items: {
-          product_id: costEstimate.lineItems[0]?.id || "",
-          name: costEstimate.lineItems[0]?.description || "",
-          location: costEstimate.lineItems[0]?.specs?.location || "",
-          price: costEstimate.lineItems[0]?.unitPrice || 0,
-          type: costEstimate.lineItems[0]?.category?.replace(" Rental", "") || "",
-          duration_days: costEstimate.durationDays || 0,
-          item_total_amount: costEstimate.lineItems[0]?.total || 0,
-          media_url: costEstimate.lineItems[0]?.image || "",
-          height: costEstimate.lineItems[0]?.specs?.height || 0,
-          width: costEstimate.lineItems[0]?.specs?.width || 0,
-          content_type: costEstimate.lineItems[0]?.content_type || "",
-          specs: costEstimate.lineItems[0]?.specs,
-        },
-        projectCompliance: {
-          signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-          signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-          irrevocablePo: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-          finalArtwork: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-          paymentAsDeposit: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
-        },
+      // Prepare client data
+      const clientData = {
+        id: costEstimate.client.id || "",
+        name: costEstimate.client.name || "",
+        email: costEstimate.client.email || "",
+        company: costEstimate.client.company || "",
+        phone: costEstimate.client.phone || "",
+        address: costEstimate.client.address || "",
+        designation: costEstimate.client.designation || "",
+        industry: costEstimate.client.industry || "",
+        company_id: costEstimate.client.company_id || "",
       }
 
-      // Create the quotation
-      const quotationId = await createQuotation(quotationData)
+      // Prepare sites data
+      const sitesData = costEstimate.lineItems.map(item => ({
+        id: item.id,
+        name: item.description,
+        location: item.specs?.location || "",
+        price: item.unitPrice,
+        type: item.category.replace(" Rental", ""),
+        image: item.image,
+        content_type: item.content_type || "",
+        specs_rental: item.specs,
+        cms: item.cms,
+        spot_number: item.spot_number,
+      }))
 
-      toast({
-        title: "Quotation Created",
-        description: "Quotation has been created successfully from cost estimate.",
-      })
+      const options = {
+        startDate: costEstimate.startDate,
+        endDate: costEstimate.endDate,
+        company_id: userData?.company_id || "",
+        client_company_id: costEstimate.client.company_id || "",
+        page_id: sitesData.length > 1 ? `PAGE-${Date.now()}` : undefined,
+        created_by_first_name: userData?.first_name || "",
+        created_by_last_name: userData?.last_name || "",
+      }
 
-      // Navigate to the created quotation
-      router.push(`/sales/quotations/${quotationId}`)
+      let quotationIds: string[]
+
+      if (sitesData.length === 1) {
+        // Single site - create direct quotation
+        const quotationId = await createDirectQuotation(clientData, sitesData, user?.uid || "", options)
+        quotationIds = [quotationId]
+        toast({
+          title: "Quotation Created",
+          description: "Quotation has been created successfully from cost estimate.",
+        })
+      } else {
+        // Multiple sites - create multiple quotations
+        quotationIds = await createMultipleQuotations(clientData, sitesData, user?.uid || "", options)
+        toast({
+          title: "Quotations Created",
+          description: `${quotationIds.length} quotations have been created successfully from cost estimate.`,
+        })
+      }
+
+      // Navigate to the first created quotation
+      router.push(`/sales/quotations/${quotationIds[0]}`)
 
     } catch (error) {
       console.error("Error creating quotation from cost estimate:", error)

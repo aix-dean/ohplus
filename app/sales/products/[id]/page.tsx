@@ -403,27 +403,35 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const { toast } = useToast()
 
   // Helper functions for spots data
-  const generateSpotsData = (cms: any) => {
+  const generateSpotsData = (cms: any, currentDayBookings: Booking[]) => {
     const totalSpots = cms.loops_per_day || 18
     const spots = []
+
+    // Get occupied spot numbers from current day bookings
+    const occupiedSpots = new Set<number>()
+    currentDayBookings.forEach(booking => {
+      if (booking.spot_numbers && Array.isArray(booking.spot_numbers)) {
+        booking.spot_numbers.forEach(spotNumber => {
+          occupiedSpots.add(spotNumber)
+        })
+      }
+    })
 
     // Sample client names for demonstration
     const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
 
     for (let i = 1; i <= totalSpots; i++) {
-      // Check if this spot has scheduled content
-      const hasScheduledContent = screenSchedules.some(
-        (schedule) => schedule.spot_number === i && schedule.active,
-      )
+      const isOccupied = occupiedSpots.has(i)
 
-      const isOccupied = hasScheduledContent
+      // Find booking for this spot to get client info
+      const booking = currentDayBookings.find(b => b.spot_numbers?.includes(i))
       const schedule = screenSchedules.find(s => s.spot_number === i && s.active)
 
       spots.push({
         id: `spot-${i}`,
         number: i,
         status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
-        clientName: isOccupied ? (schedule?.title || clientNames[(i - 1) % clientNames.length]) : undefined,
+        clientName: isOccupied ? (booking?.client?.name || schedule?.title || clientNames[(i - 1) % clientNames.length]) : undefined,
         imageUrl: isOccupied ? (schedule?.media || "/placeholder.svg") : undefined,
       })
     }
@@ -1297,17 +1305,46 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
       <header className="flex items-center justify-between mb-6">
         <div className="flex items-center">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mr-2">
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
+          <Button variant="ghost" size="sm" onClick={() => router.push("/sales/dashboard")} className="mr-2">
+            <ArrowLeft className="h-5 w-5 mr-1" />
           </Button>
           <h1 className="text-xl font-semibold">Site Information</h1>
         </div>
+
         <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-600 mr-2">Create:</span>
           <Button
-            className="bg-[#ff3333] text-white hover:bg-[#cc2929]"
+            variant="outline"
+            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
+            onClick={() => router.push(`/sales/dashboard?tab=proposals&productId=${params.id}`)}
+          >
+            Proposal
+          </Button>
+          <Button
+            variant="outline"
+            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
+            onClick={() => router.push(`/sales/dashboard?tab=ce&productId=${params.id}`)}
+          >
+            Cost Estimate
+          </Button>
+          <Button
+            variant="outline"
+            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
+            onClick={() => router.push(`/sales/dashboard?tab=quotations&productId=${params.id}`)}
+          >
+            Quotation
+          </Button>
+          <Button
+            variant="outline"
+            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
+            onClick={() => router.push(`/sales/job-orders/select-quotation?productId=${params.id}`)}
+          >
+            Job Order
+          </Button>
+          <Button
+            variant="outline"
+            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
             onClick={() => setMarketplaceDialogOpen(true)}
-            aria-label="Open marketplace dialog"
           >
             Marketplace
           </Button>
@@ -1328,63 +1365,66 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Sidebar - Site Information */}
         <aside className="lg:col-span-1">
-          <Card className="rounded-xl shadow-sm border border-gray-200">
+          <Card className="bg-transparent border-none shadow-none">
             <CardContent className="p-0">
-              {/* Site Image */}
-              <div className="relative aspect-[4/3] w-full rounded-t-xl overflow-hidden">
-                {product?.media && product.media.length > 0 ? (
-                  <>
-                    <Image
-                      src={product.media[activeImageIndex]?.url || "/placeholder.svg"}
-                      alt={product.name || "Site image"}
-                      fill
-                      className="object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement
-                        target.src = "/building-billboard.png"
-                        target.className = "object-cover opacity-50"
-                      }}
-                    />
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute top-2 right-2 h-8 w-8 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-md rounded-full"
-                      onClick={() => {
-                        setActiveImageIndex(0)
-                        setImageViewerOpen(true)
-                      }}
-                      aria-label="View image gallery"
-                    >
-                      <Maximize className="h-4 w-4" />
-                    </Button>
-                  </>
-                ) : (
-                  <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                    <Image
-                      src="/building-billboard.png"
-                      alt="Site placeholder"
-                      fill
-                      className="object-cover opacity-50"
+              {/* Site Image and Map */}
+              <div className="flex">
+                {/* Site Image */}
+                <div className="relative flex-1 aspect-square overflow-hidden">
+                  {product?.media && product.media.length > 0 ? (
+                    <>
+                      <Image
+                        src={product.media[activeImageIndex]?.url || "/placeholder.svg"}
+                        alt={product.name || "Site image"}
+                        fill
+                        className="object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/building-billboard.png"
+                          target.className = "object-cover opacity-50"
+                        }}
+                      />
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-md rounded-full"
+                        onClick={() => {
+                          setActiveImageIndex(0)
+                          setImageViewerOpen(true)
+                        }}
+                        aria-label="View image gallery"
+                      >
+                        <Maximize className="h-4 w-4" />
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                      <Image
+                        src="/building-billboard.png"
+                        alt="Site placeholder"
+                        fill
+                        className="object-cover opacity-50"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Map View */}
+                {(product?.type?.toLowerCase() === "rental" ? product.specs_rental?.location : product.light?.location) && (
+                  <div className="flex-1 aspect-square overflow-hidden">
+                    <GoogleMap
+                      location={product?.type?.toLowerCase() === "rental" ? product.specs_rental.location : product.light.location}
+                      className="w-full h-full"
                     />
                   </div>
                 )}
               </div>
 
-              {/* Site Code and Name */}
-              <div className="p-4 border-b border-gray-100">
-                <div className="text-lg font-bold text-gray-900 mb-1">
-                  {product?.name || "Unknown Site"}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {product?.site_code || product?.specs_rental?.site_code || "No Site Code"}
-                </div>
-              </div>
-
               {/* Site Calendar Button */}
-              <div className="p-4 border-b border-gray-100">
+              <div className="mt-2">
                 <Button
                   variant="outline"
-                  className="w-full bg-transparent"
+                  className="w-full border-solid"
                   onClick={handleCalendarOpen}
                 >
                   <Calendar className="h-4 w-4 mr-2" />
@@ -1392,95 +1432,64 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 </Button>
               </div>
 
+
+
               {/* Site Details */}
               <div className="p-4 space-y-3">
+                {/* Site Name */}
                 <div>
-                  <span className="text-sm font-medium text-gray-900">Type: </span>
-                  <span className="text-sm text-gray-600">{product?.type || "Unknown"}</span>
+                  <div className="text-sm text-gray-900 mb-1">Site</div>
+                  <div className="text-lg font-bold text-gray-900">
+                    {product?.name || "Unknown Site"}
+                  </div>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-gray-900">Dimension: </span>
-                  <span className="text-sm text-gray-600">{product?.specs_rental?.dimensions || "Not specified"}</span>
+                  <div className="text-sm text-gray-900">Type</div>
+                  <div className="text-base font-bold text-gray-800">{product?.type || "Unknown"}</div>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-gray-900">Traffic Count: </span>
-                  <span className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-900">Dimension</div>
+                  <div className="text-base font-bold text-gray-800">{product?.specs_rental?.dimensions || "Not specified"}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-900">Traffic Count</div>
+                  <div className="text-base font-bold text-gray-800">
                     {product?.specs_rental?.traffic_count || "Not specified"}
-                  </span>
+                  </div>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-gray-900">Location: </span>
-                  <span className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-900">Location</div>
+                  <div className="text-base font-bold text-gray-800">
                     {product?.type?.toLowerCase() === "rental"
                       ? product.specs_rental?.location || "Unknown"
                       : product.light?.location || "Unknown"}
-                  </span>
+                  </div>
                 </div>
                 {product?.specs_rental?.geopoint && (
                   <div>
-                    <span className="text-sm font-medium text-gray-900">Geopoint: </span>
-                    <span className="text-sm text-gray-600">
+                    <div className="text-sm text-gray-900">Geopoint</div>
+                    <div className="text-base font-bold text-gray-800">
                       {product.specs_rental.geopoint[0]}, {product.specs_rental.geopoint[1]}
-                    </span>
+                    </div>
                   </div>
                 )}
                 <div>
-                  <span className="text-sm font-medium text-gray-900">Site Orientation: </span>
-                  <span className="text-sm text-gray-600">{product?.specs_rental?.orientation || "Not specified"}</span>
+                  <div className="text-sm text-gray-900">Site Orientation</div>
+                  <div className="text-base font-bold text-gray-800">{product?.specs_rental?.orientation || "Not specified"}</div>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-gray-900">Site Owner: </span>
-                  <span className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-900">Site Owner</div>
+                  <div className="text-base font-bold text-gray-800">
                     {product?.owner_name || product?.seller_name || "Unknown"}
-                  </span>
+                  </div>
                 </div>
                 <div>
-                  <span className="text-sm font-medium text-gray-900">Land Owner: </span>
-                  <span className="text-sm text-gray-600">{product?.land_owner || "Not specified"}</span>
+                  <div className="text-sm text-gray-900">Land Owner</div>
+                  <div className="text-base font-bold text-gray-800">{product?.land_owner || "Not specified"}</div>
                 </div>
               </div>
 
-              {/* Map View */}
-              {(product?.type?.toLowerCase() === "rental" ? product.specs_rental?.location : product.light?.location) && (
-                <div className="p-4 border-t border-gray-100">
-                  <div className="aspect-[4/3] w-full rounded-lg overflow-hidden">
-                    <GoogleMap
-                      location={product?.type?.toLowerCase() === "rental" ? product.specs_rental.location : product.light.location}
-                      className="w-full h-full"
-                    />
-                  </div>
-                </div>
-              )}
 
-              {/* Action Buttons */}
-              {!product?.deleted && (
-                <div className="p-4 space-y-2 border-t border-gray-100">
-                  <Button
-                    className="w-full bg-red-500 hover:bg-red-600 text-white"
-                    onClick={() => router.push(`/sales/dashboard?tab=proposals&productId=${params.id}`)}
-                  >
-                    Propose this Site
-                  </Button>
-                  <Button
-                    className="w-full bg-red-500 hover:bg-red-600 text-white"
-                    onClick={() => router.push(`/sales/dashboard?tab=ce&productId=${params.id}`)}
-                  >
-                    Create CE
-                  </Button>
-                  <Button
-                    className="w-full bg-red-500 hover:bg-red-600 text-white"
-                    onClick={() => router.push(`/sales/dashboard?tab=quotations&productId=${params.id}`)}
-                  >
-                    Create Quote
-                  </Button>
-                  <Button
-                    className="w-full bg-red-500 hover:bg-red-600 text-white"
-                    onClick={() => router.push(`/sales/job-orders/select-quotation?productId=${params.id}`)}
-                  >
-                    Create Job Order
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
         </aside>
@@ -1491,7 +1500,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           {product && (product.content_type === "Dynamic" || product.content_type === "digital") && product.cms && (
             <div className="mb-6">
               <SpotsGrid
-                spots={generateSpotsData(product.cms)}
+                spots={generateSpotsData(product.cms, currentDayBookings)}
                 totalSpots={product.cms.loops_per_day || 18}
                 occupiedCount={calculateOccupiedSpots(product.cms)}
                 vacantCount={calculateVacantSpots(product.cms)}
@@ -1506,7 +1515,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             <div className="text-sm text-gray-600 mb-4 text-right">Total: {getTabCount(activeTab)}</div>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <div className="mb-4">
+              <div>
                 <TabsList className="grid w-fit grid-cols-5">
                 <TabsTrigger value="booking-summary">Booking Summary</TabsTrigger>
                 <TabsTrigger value="ce">CE</TabsTrigger>

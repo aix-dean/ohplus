@@ -33,12 +33,16 @@ export default function SelectDatesPage() {
   const [siteBookings, setSiteBookings] = useState<Record<string, Booking[]>>({})
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [siteIds, setSiteIds] = useState<string[]>([])
+  const [cmsData, setCmsData] = useState<Record<string, any>>({})
+  const [spotNumbersData, setSpotNumbersData] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const sitesParam = searchParams.get("sites")
     const clientIdParam = searchParams.get("clientId")
     const productIdParam = searchParams.get("productId")
     const spotNumbersParam = searchParams.get("spotNumbers")
+    const cmsDataParam = searchParams.get("cmsData")
+    const spotNumbersDataParam = searchParams.get("spotNumbersData")
 
     if (clientIdParam) {
       const fetchClient = async () => {
@@ -46,6 +50,25 @@ export default function SelectDatesPage() {
         if (client) setSelectedClient(client)
       }
       fetchClient()
+    }
+
+    // Parse CMS and spot number data from cost estimates
+    if (cmsDataParam) {
+      try {
+        const parsedCmsData = JSON.parse(decodeURIComponent(cmsDataParam))
+        setCmsData(parsedCmsData)
+      } catch (error) {
+        console.error("Error parsing cmsData:", error)
+      }
+    }
+
+    if (spotNumbersDataParam) {
+      try {
+        const parsedSpotNumbersData = JSON.parse(decodeURIComponent(spotNumbersDataParam))
+        setSpotNumbersData(parsedSpotNumbersData)
+      } catch (error) {
+        console.error("Error parsing spotNumbersData:", error)
+      }
     }
 
     // Handle spots mode (from spot selection dialog)
@@ -87,8 +110,8 @@ export default function SelectDatesPage() {
             // Convert spots to site-like objects for display
             const spotSites = selectedSpots.map(spot => ({
               ...product,
-              id: `${product.id}-spot-${spot.number}`,
-              name: `${product.name} - Spot ${spot.number}`,
+              id: `${product.id}`,
+              name: `${product.name}`,
               spotNumber: spot.number,
               spotData: spot,
             }))
@@ -175,9 +198,10 @@ export default function SelectDatesPage() {
 
       const sitesData = selectedSites.map((site) => {
         const isDynamicOrDigital = (site.content_type || "").toLowerCase() === "dynamic" || (site.content_type || "").toLowerCase() === "digital"
+        const siteId = site.id!
 
         return {
-          id: site.id!,
+          id: siteId,
           name: site.name,
           location: site.specs_rental?.location || (site as any).light?.location || "N/A",
           price: site.price || 0,
@@ -186,9 +210,10 @@ export default function SelectDatesPage() {
           content_type: site.content_type || "",
           specs_rental: site.specs_rental,
           // Include CMS map and spot number for dynamic/digital content types
+          // Use data from cost estimates if available, otherwise from site
           ...(isDynamicOrDigital && {
-            cms: site.cms,
-            spot_number: (site as any).spotNumber,
+            cms: cmsData[siteId] || site.cms,
+            spot_number: spotNumbersData[siteId] || (site as any).spotNumber,
           }),
         }
       })
@@ -267,6 +292,7 @@ export default function SelectDatesPage() {
     console.log(`🔍 DEBUG: getBookedRanges called for siteId:`, siteId)
     console.log(`🔍 DEBUG: Site object:`, site)
     console.log(`🔍 DEBUG: Site has spotNumber:`, (site as any)?.spotNumber)
+    console.log(`🔍 DEBUG: spotNumbersData for siteId:`, spotNumbersData[siteId])
     console.log(`🔍 DEBUG: All bookings for this site:`, bookings)
 
     const filteredBookings = bookings
@@ -276,9 +302,10 @@ export default function SelectDatesPage() {
         console.log(`🔍 DEBUG: Booking ${booking.id} status filter:`, statusFilter, `status:`, booking.status)
 
         // If this is a spot-specific site, filter by spot numbers
-        const spotNumber = (site as any)?.spotNumber
+        // Check both site.spotNumber and spotNumbersData[siteId]
+        const spotNumber = (site as any)?.spotNumber || (spotNumbersData[siteId] ? parseInt(spotNumbersData[siteId]) : undefined)
         if (spotNumber !== undefined) {
-          const spotFilter = booking.spot_numbers && booking.spot_numbers.includes(spotNumber)
+          const spotFilter = booking.spot_numbers && Array.isArray(booking.spot_numbers) && booking.spot_numbers.includes(spotNumber)
           console.log(`🔍 DEBUG: Booking ${booking.id} spot filter for spot ${spotNumber}:`, spotFilter, `booking.spot_numbers:`, booking.spot_numbers)
           return statusFilter && spotFilter
         }

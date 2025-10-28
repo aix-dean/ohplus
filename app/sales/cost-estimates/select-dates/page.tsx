@@ -87,8 +87,8 @@ export default function SelectDatesPage() {
                         // Convert spots to site-like objects for display
                         const spotSites = selectedSpots.map(spot => ({
                             ...product,
-                            id: `${product.id}-spot-${spot.number}`,
-                            name: `${product.name} - Spot ${spot.number}`,
+                            id: `${product.id}`,
+                            name: `${product.name}`,
                             spotNumber: spot.number,
                             spotData: spot,
                         }))
@@ -170,16 +170,25 @@ export default function SelectDatesPage() {
 
         setIsCreating(true)
         try {
-            const sitesData = selectedSites.map((site) => ({
-                id: site.id!,
-                name: site.name,
-                location: site.specs_rental?.location || (site as any).light?.location || "N/A",
-                price: site.price || 0,
-                type: site.type || "Unknown",
-                image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-                content_type: site.content_type || "",
-                specs_rental: site.specs_rental,
-            }))
+            const sitesData = selectedSites.map((site) => {
+                const isDynamicOrDigital = (site.content_type || "").toLowerCase() === "dynamic" || (site.content_type || "").toLowerCase() === "digital"
+
+                return {
+                    id: site.id!,
+                    name: site.name,
+                    location: site.specs_rental?.location || (site as any).light?.location || "N/A",
+                    price: site.price || 0,
+                    type: site.type || "Unknown",
+                    image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
+                    content_type: site.content_type || "",
+                    specs_rental: site.specs_rental,
+                    // Include CMS map and spot number for dynamic/digital content types
+                    ...(isDynamicOrDigital && {
+                        cms: site.cms,
+                        spot_number: (site as any).spotNumber,
+                    }),
+                }
+            })
 
             const clientData = {
                 id: selectedClient.id,

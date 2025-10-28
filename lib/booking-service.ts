@@ -232,10 +232,20 @@ export class BookingService {
         bookingData.product_name = quotation.items.name
       }
       // Conditionally add CMS and spot number fields for digital/dynamic types
-      const productType = (quotation.items?.content_type || "").toLowerCase()
-      if ((productType === "digital" || productType === "dynamic") && quotation.spot_numbers && quotation.spot_numbers.length > 0) {
-        bookingData.cms = quotation.items?.cms || null
-        bookingData.spot_numbers = quotation.spot_numbers
+      const productType = (quotation.items?.type || "").toLowerCase()
+      if (productType === "digital" || productType === "dynamic") {
+        // Add CMS if it exists
+        if (quotation.items?.cms) {
+          bookingData.cms = quotation.items.cms
+        }
+
+        // Add spot numbers if they exist (can be single number or array)
+        if (quotation.items?.spot_number) {
+          const spotNumber = quotation.items.spot_number
+          bookingData.spot_numbers = Array.isArray(spotNumber) ? spotNumber : [parseInt(String(spotNumber))]
+        } else if (quotation.spot_numbers && quotation.spot_numbers.length > 0) {
+          bookingData.spot_numbers = quotation.spot_numbers
+        }
       }
       console.log("[DEBUG] Booking data to be created:", bookingData)
 

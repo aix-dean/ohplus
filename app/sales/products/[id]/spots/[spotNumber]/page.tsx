@@ -18,6 +18,7 @@ import { db } from "@/lib/firebase"
 import { createDirectCostEstimate } from "@/lib/cost-estimate-service"
 import { createDirectQuotation } from "@/lib/quotation-service"
 import type { Booking } from "@/lib/booking-service"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SpotSelectionDialog } from "@/components/spot-selection-dialog"
 
 export default function SpotDetailsPage() {
@@ -35,13 +36,24 @@ export default function SpotDetailsPage() {
   const [bookedDates, setBookedDates] = useState<Date[]>([])
   const [monthOffset, setMonthOffset] = useState(0)
   const [totalBookedSpots, setTotalBookedSpots] = useState(0)
+  const [calendarSpotFilter, setCalendarSpotFilter] = useState<number>(1)
   const [spotSelectionDialogOpen, setSpotSelectionDialogOpen] = useState(false)
   const [spotSelectionType, setSpotSelectionType] = useState<"quotation" | "cost-estimate">("quotation")
+  const [currentDayBookings, setCurrentDayBookings] = useState<Booking[]>([])
+  const [currentDayBookingsLoading, setCurrentDayBookingsLoading] = useState(false)
   const calendarRef = useRef<HTMLDivElement>(null)
   const currentMonthRef = useRef<HTMLDivElement>(null)
 
   const productId = params.id as string
   const spotNumber = parseInt(params.spotNumber as string)
+
+  // Initialize carousel position based on URL spot number
+  useEffect(() => {
+    if (spotNumber && spotNumber > 0) {
+      setCurrentSpotIndex(spotNumber - 1)
+      setCalendarSpotFilter(spotNumber)
+    }
+  }, [spotNumber])
 
   // Fetch product data
   useEffect(() => {
@@ -115,18 +127,42 @@ export default function SpotDetailsPage() {
 
     fetchSpotSchedules()
   }, [productId, spotNumber])
-  // Fetch bookings for this product and current spot
+  // Debug: Check all bookings for this product
+  useEffect(() => {
+    const debugBookings = async () => {
+      if (!productId) return
+      try {
+        const allBookingsQuery = query(
+          collection(db, "booking"),
+          where("product_id", "==", productId),
+        )
+        const allBookingsSnapshot = await getDocs(allBookingsQuery)
+        console.log(`[DEBUG] Total bookings for product ${productId}: ${allBookingsSnapshot.size}`)
+
+        allBookingsSnapshot.forEach((doc) => {
+          const booking = doc.data() as Booking
+          console.log(`[DEBUG] Booking ${booking.id} has spot_numbers:`, booking.spot_numbers, 'start_date:', booking.start_date, 'end_date:', booking.end_date)
+        })
+      } catch (error) {
+        console.error("Error debugging bookings:", error)
+      }
+    }
+
+    debugBookings()
+  }, [productId])
+
+  // Fetch bookings for this product and selected calendar spot
+  // Fetch bookings for this product and selected calendar spot
   useEffect(() => {
     const fetchBookings = async () => {
       if (!productId) return
-      const currentSpotNumber = currentSpotIndex + 1
-      console.log(`[DEBUG] Fetching bookings for productId: ${productId}, spotNumber: ${currentSpotNumber}`);
+      console.log(`[DEBUG] Fetching bookings for productId: ${productId}, spotNumber: ${calendarSpotFilter}`);
 
       try {
         const bookingsQuery = query(
           collection(db, "booking"),
           where("product_id", "==", productId),
-          where("spot_numbers", "array-contains", currentSpotNumber),
+          where("spot_numbers", "array-contains", calendarSpotFilter),
         )
         const bookingsSnapshot = await getDocs(bookingsQuery)
         console.log(`[DEBUG] Found ${bookingsSnapshot.size} bookings`);
@@ -156,8 +192,14 @@ export default function SpotDetailsPage() {
     }
 
     fetchBookings()
+  }, [productId, calendarSpotFilter])
+
+  // Update calendar spot filter when carousel changes
+  useEffect(() => {
+    setCalendarSpotFilter(currentSpotIndex + 1)
+  }, [currentSpotIndex])
+
   // Fetch total booked spots for selected date
-  }, [productId, currentSpotIndex])
 
   useEffect(() => {    const fetchTotalBookedSpots = async () => {
       if (!productId || !selectedDate) {
@@ -196,6 +238,53 @@ export default function SpotDetailsPage() {
 
     fetchTotalBookedSpots()
   }, [productId, selectedDate])
+
+// Fetch current day's bookings for occupied/vacant calculation
+useEffect(() => {
+  const fetchCurrentDayBookings = async () => {
+    if (!productId) return
+
+    setCurrentDayBookingsLoading(true)
+    try {
+      const today = new Date()
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
+
+      // Query bookings where start_date <= today <= end_date and status is active
+      const bookingsQuery = query(
+        collection(db, "booking"),
+        where("product_id", "==", productId),
+        where("status", "in", ["RESERVED", "COMPLETED"])
+      )
+
+      const querySnapshot = await getDocs(bookingsQuery)
+      const currentDayBookingsData: Booking[] = []
+
+      querySnapshot.forEach((doc) => {
+        const booking = { id: doc.id, ...doc.data() } as Booking
+
+        // Check if booking covers today
+        if (booking.start_date && booking.end_date) {
+          const startDate = booking.start_date.toDate ? booking.start_date.toDate() : new Date(booking.start_date)
+          const endDate = booking.end_date.toDate ? booking.end_date.toDate() : new Date(booking.end_date)
+
+          if (startDate <= endOfDay && endDate >= startOfDay) {
+            currentDayBookingsData.push(booking)
+          }
+        }
+      })
+
+      setCurrentDayBookings(currentDayBookingsData)
+    } catch (error) {
+      console.error("Error fetching current day bookings:", error)
+    } finally {
+      setCurrentDayBookingsLoading(false)
+    }
+  }
+
+  fetchCurrentDayBookings()
+}, [productId])
+
 
   const handleBack = () => {
     router.push(`/sales/products/${productId}`)
@@ -278,7 +367,7 @@ export default function SpotDetailsPage() {
                     const date = new Date(year, monthIndex, day)
                     const booked = isDateBooked(date)
 
-                    console.log(`[DEBUG] Date ${date.toDateString()}, booked: ${booked}, bookedDates length: ${bookedDates.length}`)
+                    
                     const isSelected = selectedDate && date.toDateString() === new Date(selectedDate).toDateString()
 
                     return (
@@ -330,26 +419,25 @@ export default function SpotDetailsPage() {
   const canGoRight = false
 
   // Generate spots data for the dialog
-  const generateSpotsData = () => {
+  const generateSpotsData = (currentDayBookings: Booking[]) => {
     const spots = []
 
     // Sample client names for demonstration
     const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
 
     for (let i = 1; i <= totalSpots; i++) {
-      // Check if this spot has scheduled content
-      const hasScheduledContent = spotSchedules.some(
-        (schedule) => schedule.spot_number === i && schedule.active,
+      // Check if this spot has bookings today
+      const isOccupied = currentDayBookings.some(booking => 
+        booking.spot_numbers?.includes(i)
       )
-
-      const isOccupied = hasScheduledContent
+      const booking = currentDayBookings.find(b => b.spot_numbers?.includes(i))
       const schedule = spotSchedules.find(s => s.spot_number === i && s.active)
 
       spots.push({
-        id: `spot-${i}`,
+        id: `spot-`,
         number: i,
         status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
-        clientName: isOccupied ? (schedule?.title || clientNames[(i - 1) % clientNames.length]) : undefined,
+        clientName: isOccupied ? (booking?.client?.name || schedule?.title || clientNames[(i - 1) % clientNames.length]) : undefined,
         imageUrl: isOccupied ? (schedule?.media || "/placeholder.svg") : undefined,
       })
     }
@@ -457,6 +545,11 @@ export default function SpotDetailsPage() {
                 const startMin = Math.floor(spotStartMinutes % 60)
                 const startTimeStr = `${startHour.toString().padStart(2, "0")}:${startMin.toString().padStart(2, "0")}`
 
+                const currentSpotNumber = i + 1
+                const isOccupied = currentDayBookings.some(booking =>
+                  booking.spot_numbers?.includes(currentSpotNumber)
+                )
+                const booking = currentDayBookings.find(b => b.spot_numbers?.includes(currentSpotNumber))
                 const isCurrentSpot = i + 1 === spotNumber
                 const hasContent = spotSchedule && spotSchedule.spot_number === spotNumber
 
@@ -489,20 +582,16 @@ export default function SpotDetailsPage() {
 
                       {/* Status */}
                       <div className={`text-[11px] font-semibold ${
-                        isCurrentSpot
-                          ? "text-[#00d0ff]"
-                          : hasContent
-                            ? "text-[#00d0ff]"
-                            : "text-[#a1a1a1]"
+                        isOccupied ? "text-[#00d0ff]" : "text-[#a1a1a1]"
                       }`}>
-                        {isCurrentSpot ? "Current" : hasContent ? "Occupied" : "Vacant"}
+                        {isOccupied ? "Occupied" : "Vacant"}
                       </div>
 
                       {/* Client Name */}
                       <div className={`text-[11px] font-semibold ${
-                        isCurrentSpot || hasContent ? "text-black" : "text-[#a1a1a1]"
+                        isOccupied ? "text-black" : "text-[#a1a1a1]"
                       }`}>
-                        {hasContent ? (spotSchedule.title || "Content") : "Filler Content 1"}
+                        {isOccupied ? (booking?.client?.name || spotSchedule?.title || "Content") : "Filler Content 1"}
                       </div>
                     </div>
                   </div>
@@ -523,8 +612,12 @@ export default function SpotDetailsPage() {
         {/* Calendar Column */}
         <div className="flex-1">
           <div className="mb-4">
-            <p className="text-[#333] font-inter text-base font-bold leading-none mb-1">Select Date</p>
-            <p className="text-[#333] font-inter text-xs font-normal leading-none mb-7">Select a date to view more data</p>
+            <div className="mb-4">
+              <div>
+                <p className="text-[#333] font-inter text-base font-bold leading-none mb-1">Select Date</p>
+                <p className="text-[#333] font-inter text-xs font-normal leading-none">Select a date to view more data</p>
+              </div>
+            </div>
           </div>
           <div className="bg-[#ECECEC] rounded-lg shadow-sm border p-4">
           <div className="flex items-center justify-between">
@@ -590,7 +683,7 @@ export default function SpotDetailsPage() {
         open={spotSelectionDialogOpen}
         onOpenChange={setSpotSelectionDialogOpen}
         productId={productId}
-        spots={generateSpotsData()}
+        spots={generateSpotsData(currentDayBookings)}
         totalSpots={totalSpots}
         occupiedCount={calculateOccupiedSpots()}
         vacantCount={calculateVacantSpots()}
