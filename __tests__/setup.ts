@@ -4,6 +4,7 @@ import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 
+
 // Make React available globally for React 19 compatibility
 ;(globalThis as any).React = React
 
