@@ -171,6 +171,9 @@ export function ServiceAssignmentCard({
   const [showJobOrderSelectionDialog, setShowJobOrderSelectionDialog] = useState(false); // State for JobOrderSelectionDialog
   const { toast } = useToast(); // Use the toast hook
 
+  // Determine the current product ID to display (from job order or prop)
+  const currentProductId = selectedJobOrder?.product_id || productId;
+
   // Set current time on component mount
   useEffect(() => {
     const now = new Date();
@@ -336,14 +339,14 @@ export function ServiceAssignmentCard({
         <div className="flex flex-col gap-4 w-full lg:w-1/4">
           {/* Products card */}
           <Card className="aspect-square bg-[#E2E2E2] text-black p-4 flex flex-col justify-center items-center relative overflow-hidden">
-            {productId && products.find(p => p.id === productId) ? (
+            {currentProductId && products.find(p => p.id === currentProductId) ? (
               <img
                 src={
-                  products.find(p => p.id === productId)?.imageUrl ||
-                  products.find(p => p.id === productId)?.media?.find(m => !m.isVideo)?.url ||
+                  products.find(p => p.id === currentProductId)?.imageUrl ||
+                  products.find(p => p.id === currentProductId)?.media?.find(m => !m.isVideo)?.url ||
                   "https://via.placeholder.com/150?text=No+Image"
                 }
-                alt={products.find(p => p.id === productId)?.name || "Site Image"}
+                alt={products.find(p => p.id === currentProductId)?.name || "Site Image"}
                 className="absolute inset-0 w-full h-full object-cover rounded-md cursor-pointer"
                 onClick={onOpenProductSelection}
               />
@@ -386,12 +389,11 @@ export function ServiceAssignmentCard({
               fontWeight: 700,
               lineHeight: '100%'
             }}>
-              {products.find(p => p.id === productId)?.name || "Select Project Site"}
+              {products.find(p => p.id === currentProductId)?.name || "Select Project Site"}
             </span>
-            <span className='text-left pt-2' style={{ color: 'var(--LIGHTER-BLACK, #333)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 400, lineHeight: '100%' }}>Location</span>
-            {productId && (products.find(p => p.id === productId)?.specs_rental?.location || products.find(p => p.id === productId)?.location) && (
+            {currentProductId && (products.find(p => p.id === currentProductId)?.specs_rental?.location || products.find(p => p.id === currentProductId)?.location) && (
               <span className="text-left text-sm text-gray-500">
-                {products.find(p => p.id === productId)?.specs_rental?.location || products.find(p => p.id === productId)?.location}
+                {products.find(p => p.id === currentProductId)?.specs_rental?.location || products.find(p => p.id === currentProductId)?.location}
               </span>
             )}
           </div>
@@ -411,9 +413,7 @@ export function ServiceAssignmentCard({
           <div className="flex justify-between items-start mb-4">
             <div className="flex flex-col text-sm">
               <p style={{ color: 'var(--LIGHTER-BLACK, #333)', fontFamily: 'Inter', fontSize: '16.022px', fontStyle: 'normal', fontWeight: 700, lineHeight: '100%' }}>SA#: {saNumber}</p>
-              <p className="text-xs text-gray-500">
-                {products.find(p => p.id === productId)?.site_code || products.find(p => p.id === productId)?.id?.substring(0, 8)}
-              </p>
+
             </div>
           </div>
           {/* Date Label */}

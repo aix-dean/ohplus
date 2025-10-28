@@ -197,6 +197,53 @@ export default function CreateServiceAssignmentPage() {
     fetchTeams()
   }, [userData?.company_id])
 
+  // Helper function to set form data from job order
+  const setFormDataForJobOrder = (fetchedJobOrder: JobOrder, productId: string) => {
+    // Helper function to safely parse dates
+    const parseDateSafely = (dateValue: any): Date | null => {
+      if (!dateValue) return null;
+
+      try {
+        let date: Date;
+
+        if (dateValue instanceof Date) {
+          date = dateValue;
+        } else if (typeof dateValue === 'string') {
+          date = new Date(dateValue);
+          if (isNaN(date.getTime())) {
+            return null;
+          }
+        } else if (typeof dateValue === 'number') {
+          date = new Date(dateValue * 1000);
+        } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+          date = new Date(dateValue.seconds * 1000);
+        } else {
+          return null;
+        }
+
+        if (isNaN(date.getTime())) {
+          return null;
+        }
+
+        return date;
+      } catch (error) {
+        console.warn('Error parsing date:', dateValue, error);
+        return null;
+      }
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      projectSite: productId,
+      serviceType: fetchedJobOrder.joType ? fetchedJobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
+      remarks: fetchedJobOrder.remarks || fetchedJobOrder.jobDescription || "",
+      campaignName: fetchedJobOrder.campaignName || "",
+      startDate: parseDateSafely(fetchedJobOrder.dateRequested),
+      endDate: parseDateSafely(fetchedJobOrder.deadline),
+      // You might want to pre-fill other fields like assignedTo, crew, etc.
+    }))
+  }
+
   // Load draft data if editing
   useEffect(() => {
     const loadDraft = async () => {
@@ -277,50 +324,37 @@ export default function CreateServiceAssignmentPage() {
             // Set the project site from the job order's product_id
             const productId = fetchedJobOrder.product_id || ""
             if (productId) {
-              // Helper function to safely parse dates
-              const parseDateSafely = (dateValue: any): Date | null => {
-                if (!dateValue) return null;
-
+              // First check if the product is already in the loaded products
+              const existingProduct = products.find(p => p.id === productId)
+              if (existingProduct) {
+                // Product exists, proceed with setting form data
+                setFormDataForJobOrder(fetchedJobOrder, productId)
+              } else {
+                // If not found in loaded products, fetch the specific product document
                 try {
-                  let date: Date;
-
-                  if (dateValue instanceof Date) {
-                    date = dateValue;
-                  } else if (typeof dateValue === 'string') {
-                    date = new Date(dateValue);
-                    if (isNaN(date.getTime())) {
-                      return null;
-                    }
-                  } else if (typeof dateValue === 'number') {
-                    date = new Date(dateValue * 1000);
-                  } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
-                    date = new Date(dateValue.seconds * 1000);
+                  const productDoc = await getDoc(doc(db, "products", productId))
+                  if (productDoc.exists()) {
+                    const productData = { id: productDoc.id, ...productDoc.data() } as Product
+                    // Add the product to the products array if it's not already there
+                    setProducts(prev => {
+                      const exists = prev.find(p => p.id === productData.id)
+                      if (!exists) {
+                        return [...prev, productData]
+                      }
+                      return prev
+                    })
+                    // Proceed with setting form data
+                    setFormDataForJobOrder(fetchedJobOrder, productId)
                   } else {
-                    return null;
+                    // Product not found, still set the form data but product won't be selectable
+                    setFormDataForJobOrder(fetchedJobOrder, productId)
                   }
-
-                  if (isNaN(date.getTime())) {
-                    return null;
-                  }
-
-                  return date;
                 } catch (error) {
-                  console.warn('Error parsing date:', dateValue, error);
-                  return null;
+                  console.error("Error fetching product for job order:", error)
+                  // Still set form data even if product fetch fails
+                  setFormDataForJobOrder(fetchedJobOrder, productId)
                 }
-              };
-
-              setFormData((prev) => ({
-                ...prev,
-                projectSite: productId,
-                serviceType: fetchedJobOrder.joType ? fetchedJobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
-                remarks: fetchedJobOrder.remarks || fetchedJobOrder.jobDescription || "",
-                campaignName: fetchedJobOrder.campaignName || "",
-                startDate: parseDateSafely(fetchedJobOrder.dateRequested),
-                endDate: parseDateSafely(fetchedJobOrder.deadline),
-                // You might want to pre-fill other fields like assignedTo, crew, etc.
-              }))
-
+              }
             }
 
             // Date inputs are now handled directly as Date objects
@@ -331,7 +365,7 @@ export default function CreateServiceAssignmentPage() {
       }
     }
     fetchJobOrder()
-  }, [jobOrderId]) // Rerun when jobOrderId changes
+  }, [jobOrderId, products]) // Added products to dependencies to check if product is already loaded
 
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {

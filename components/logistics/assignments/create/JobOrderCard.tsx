@@ -11,6 +11,7 @@ interface JobOrder {
   product_id: string;
   name: string; // Add name field
   description: string; // Add description field
+  siteImageUrl: string; // Add siteImageUrl field
 }
 
 interface JobOrderCardProps {
@@ -128,7 +129,7 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
               <Label>Attachment:</Label>
               <div className="space-y-1">
                 <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
-                  <img src="/logistics-sa-create-dl.png" alt="Attachment" className="rounded-md h-6 w-6 object-cover" />
+                  <img src={selectedJobOrder.siteImageUrl || "/logistics-sa-create-dl.png"} alt="Attachment" className="rounded-md h-6 w-6 object-cover" />
                   <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
                 </div>
               </div>
