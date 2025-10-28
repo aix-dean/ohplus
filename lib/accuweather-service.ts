@@ -120,7 +120,7 @@ export const PHILIPPINES_LOCATIONS = [
   { key: "264877", name: "Tacloban", region: "Eastern Visayas" },
 ]
 
-const ACCUWEATHER_API_KEY = process.env.ACCUWEATHER_API_KEY || "Q8kh0FSLbDrTBY9SHnr2m69v1mrFv4GR"
+const ACCUWEATHER_API_KEY = process.env.ACCUWEATHER_API_KEY || "zpka_c49dda9fcf514ce0b77eb4508c7ffa78_34b7f88c"
 const BASE_URL = "https://dataservice.accuweather.com"
 
 // Map AccuWeather icons to our icon system
@@ -327,7 +327,7 @@ export async function getPhilippinesWeatherData(locationKey = "264885"): Promise
         console.error(`[AccuWeather] Current weather API call failed for ${locationKey}:`, error)
         return null
       }),
-      getTenDayForecast(locationKey).catch((error) => {
+      getFiveDayForecast(locationKey).catch((error) => {
         console.error(`[AccuWeather] Forecast API call failed for ${locationKey}:`, error)
         return null
       }),
@@ -348,8 +348,8 @@ export async function getPhilippinesWeatherData(locationKey = "264885"): Promise
 
       const current = currentWeather[0]
 
-      // Process forecast data
-      const processedForecast = forecast.DailyForecasts.map((day) => {
+      // Process forecast data (limit to 5 days)
+      const processedForecast = forecast.DailyForecasts.slice(0, 5).map((day) => {
         const date = new Date(day.Date)
         return {
           date: day.Date,
@@ -413,24 +413,12 @@ export async function getPhilippinesWeatherData(locationKey = "264885"): Promise
 
       return result
     } else {
-      // API failed, return fallback data
-      console.warn(`[AccuWeather] API calls failed for ${location.name}, using fallback data`)
-      console.log(`[AccuWeather] Fallback data for ${location.name}:`, {
-        condition: fallbackData.current.condition,
-        temperature: fallbackData.current.temperature,
-        forecastDays: fallbackData.forecast.length,
-        source: 'Fallback Data'
-      })
-      return fallbackData
+      // API failed, throw error instead of using fallback data
+      console.error(`[AccuWeather] API calls failed for ${location.name}, throwing error`)
+      throw new Error('Failed to fetch weather data from AccuWeather API')
     }
   } catch (error) {
-    console.error(`[AccuWeather] Unexpected error in getPhilippinesWeatherData for ${location.name}, using fallback:`, error)
-    console.log(`[AccuWeather] Fallback data for ${location.name} (due to error):`, {
-      condition: fallbackData.current.condition,
-      temperature: fallbackData.current.temperature,
-      forecastDays: fallbackData.forecast.length,
-      source: 'Fallback Data (Error)'
-    })
-    return fallbackData
+    console.error(`[AccuWeather] Unexpected error in getPhilippinesWeatherData for ${location.name}:`, error)
+    throw new Error('Failed to fetch weather data from AccuWeather API')
   }
 }

@@ -1,5 +1,6 @@
 import type { WeatherForecast } from "./open-meteo-service"
 import { getPhilippinesWeatherData, PHILIPPINES_LOCATIONS } from "./accuweather-service"
+import { isSameDay } from "date-fns"
 
 // Get available regions from AccuWeather locations
 export async function getRegions(): Promise<{ id: string; name: string; region: string }[]> {
@@ -17,10 +18,75 @@ export async function getRegions(): Promise<{ id: string; name: string; region: 
 }
 
 // Get weather forecast for a specific region from AccuWeather
-export async function fetchWeatherForecast(regionId = "264885"): Promise<WeatherForecast> {
+export async function fetchWeatherForecast(regionId = "264885", startDate?: string, endDate?: string): Promise<WeatherForecast> {
   try {
     // Get AccuWeather data
     const accuWeatherData = await getPhilippinesWeatherData(regionId)
+
+    // If date range is specified, filter the forecast data
+    let filteredForecast = accuWeatherData.forecast
+
+    if (startDate && endDate) {
+      const start = new Date(startDate)
+      const end = new Date(endDate)
+      const today = new Date()
+
+      // Always include today's forecast using current weather data if start date includes today
+      if (isSameDay(start, today)) {
+        const firstForecastDate = new Date(accuWeatherData.forecast[0].date)
+        if (isSameDay(firstForecastDate, today)) {
+          // API already includes today, use forecast as is
+          filteredForecast = accuWeatherData.forecast.slice(0, 5)
+        } else {
+          // API starts from tomorrow, prepend today's entry using current weather data
+          const todayEntry = {
+            date: today.toISOString(),
+            dayOfWeek: today.toLocaleDateString("en-US", { weekday: "long" }),
+            temperature: {
+              min: Math.max(accuWeatherData.current.temperature - 3, 22), // Estimate min temp
+              max: accuWeatherData.current.temperature,
+            },
+            day: {
+              condition: accuWeatherData.current.condition,
+              icon: accuWeatherData.current.icon,
+              precipitation: false, // Current weather doesn't indicate daily precipitation
+            },
+            night: {
+              condition: "Clear",
+              icon: "moon",
+              precipitation: false,
+            },
+          }
+          // Prepend today's entry and take next 4 days to ensure exactly 5 days total starting with today
+          filteredForecast = [todayEntry, ...accuWeatherData.forecast.slice(0, 4)]
+        }
+      } else {
+        // Filter forecast to only include dates within the selected range
+        filteredForecast = accuWeatherData.forecast.filter(day => {
+          const dayDate = new Date(day.date)
+          return dayDate >= start && dayDate <= end
+        })
+
+        // If not starting from today, ensure we have up to 5 days
+        filteredForecast = filteredForecast.slice(0, 5)
+
+        // If no forecast data matches the range, generate mock data for the range
+        if (filteredForecast.length === 0) {
+          const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+          filteredForecast = Array.from({ length: Math.min(daysDiff, 5) }, (_, i) => {
+            const date = new Date(start)
+            date.setDate(start.getDate() + i)
+            return {
+              date: date.toISOString(),
+              dayOfWeek: date.toLocaleDateString("en-US", { weekday: "long" }),
+              temperature: { min: 25, max: 32 }, // Default values
+              day: { condition: "Partly Cloudy", icon: "cloud-sun", precipitation: false },
+              night: { condition: "Clear", icon: "moon", precipitation: false },
+            }
+          })
+        }
+      }
+    }
 
     // Transform AccuWeather data to WeatherForecast format
     const forecast: WeatherForecast = {
@@ -46,7 +112,7 @@ export async function fetchWeatherForecast(regionId = "264885"): Promise<Weather
         description: alert.description,
         issuedAt: new Date().toISOString(),
       })),
-      forecast: accuWeatherData.forecast.slice(0, 7).map((day, index) => {
+      forecast: filteredForecast.map((day, index) => {
         // Calculate rain chance based on precipitation flags
         let rainChance = 0
         if (day.day.precipitation || day.night.precipitation) {
@@ -68,19 +134,6 @@ export async function fetchWeatherForecast(regionId = "264885"): Promise<Weather
         }
       }),
       source: "AccuWeather",
-    }
-
-    // Ensure we have at least 7 days, duplicating the last day if necessary
-    while (forecast.forecast.length < 7 && forecast.forecast.length > 0) {
-      const lastDay = forecast.forecast[forecast.forecast.length - 1]
-      const nextDate = new Date(lastDay.date)
-      nextDate.setDate(nextDate.getDate() + 1)
-
-      forecast.forecast.push({
-        ...lastDay,
-        date: nextDate.toISOString(),
-        dayOfWeek: nextDate.toLocaleDateString("en-US", { weekday: "short" }),
-      })
     }
 
     return forecast
