@@ -57,39 +57,51 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption, comp
     const { toast } = useToast()
     const router = useRouter()
     const pathname = usePathname()
-    const [reportUrl] = useState(`${window.location.origin}/public/reports/${report.id}`)
+    const [reportUrl, setReportUrl] = useState<string>("")
     const [productImageUrl, setProductImageUrl] = useState<string>("")
     const [isLoadingImage, setIsLoadingImage] = useState<boolean>(false)
     const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false)
 
+    useEffect(() => {
+      if (isOpen && report?.id) {
+        setReportUrl(`${window.location.origin}/public/reports/${report.id}`)
+      }
+    }, [isOpen, report?.id])
+
    useEffect(() => {
-     const fetchProductImage = async () => {
-       if (!isOpen || !report?.product?.id) {
-         setProductImageUrl("")
-         setIsLoadingImage(false)
-         return
-       }
+      const fetchProductImage = async () => {
+        if (!isOpen || !report?.product?.id) {
+          setProductImageUrl("")
+          setIsLoadingImage(false)
+          return
+        }
 
-       setIsLoadingImage(true)
-       try {
-         const product = await getProductById(report.product.id)
-         if (product?.media && product.media.length > 0) {
-           // Use the first media item that has a URL
-           const firstMedia = product.media.find((media: any) => media.url)
-           setProductImageUrl(firstMedia?.url || "")
-         } else {
-           setProductImageUrl("")
-         }
-       } catch (error) {
-         console.error("Error fetching product image:", error)
-         setProductImageUrl("")
-       } finally {
-         setIsLoadingImage(false)
-       }
-     }
+        setIsLoadingImage(true)
+        try {
+          const product = await getProductById(report.product.id)
+          if (product?.media && product.media.length > 0) {
+            // Use the first media item that has a URL
+            const firstMedia = product.media.find((media: any) => media.url)
+            setProductImageUrl(firstMedia?.url || "")
+          } else {
+            setProductImageUrl("")
+          }
+        } catch (error) {
+          console.error("Error fetching product image:", error)
+          setProductImageUrl("")
+        } finally {
+          setIsLoadingImage(false)
+        }
+      }
 
-     fetchProductImage()
-   }, [isOpen, report?.product?.id])
+      fetchProductImage()
+    }, [isOpen, report?.product?.id])
+
+    useEffect(() => {
+      if (isOpen && report?.id) {
+        setReportUrl(`${window.location.origin}/public/reports/${report.id}`)
+      }
+    }, [isOpen, report?.id])
 
 
    const handleCopyLink = async () => {
@@ -108,37 +120,13 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption, comp
     }
   }
 
-  const handleEmailShare = async () => {
-    setIsGeneratingPDF(true)
-    try {
-      // Generate PDF first
-      const siteName = report.siteName || report.client || 'Unknown'
-      const pdfFile = await generateReportPDF(report.id || 'unknown', siteName)
-
-      // Generate unique key for IndexedDB
-      const pdfKey = `report-pdf-${report.id}-${Date.now()}`
-
-      // Store PDF in IndexedDB
-      await storePDFFromIndexedDB(pdfKey, pdfFile, pdfFile.name)
-
-      // Close dialog and navigate to compose page with pdfKey and logo
-      onClose()
-      const department = pathname.includes('/admin') ? 'admin' : 'sales'
-      const logoParam = companyLogo && companyLogo !== '/ohplus-new-logo.png' ? `&logo=${encodeURIComponent(companyLogo)}` : ''
-      const queryParams = report.client_email
-        ? `?to=${encodeURIComponent(report.client_email)}&pdfKey=${encodeURIComponent(pdfKey)}${logoParam}`
-        : `?pdfKey=${encodeURIComponent(pdfKey)}${logoParam}`
-      router.push(`/${department}/reports/compose/${report.id}${queryParams}`)
-    } catch (error) {
-      console.error("Error generating PDF for email:", error)
-      toast({
-        title: "Error",
-        description: "Failed to generate PDF. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsGeneratingPDF(false)
-    }
+  const handleEmailShare = () => {
+    // Close dialog and navigate to compose page
+    onClose()
+    const queryParams = report?.client_email
+      ? `?to=${encodeURIComponent(report.client_email)}`
+      : ''
+    router.push(`/sales/reports/compose/${report?.id}${queryParams}`)
   }
 
   const handleWhatsAppShare = () => {
@@ -164,7 +152,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption, comp
       .join(" ")
   }
 
-  const reportFileName = `${report.siteName.replace(/\s+/g, "_")}.pdf`
+  const reportFileName = report?.siteName ? `${report.siteName.replace(/\s+/g, "_")}.pdf` : "report.pdf"
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -195,7 +183,7 @@ export function SendReportDialog({ isOpen, onClose, report, onSelectOption, comp
               ) : null)}
             </div>
             <div className="flex-1">
-              <div className="text-xs font-medium text-gray-400 mb-1">{report.id?.slice(0, 8) || "N/A"}...</div>
+              <div className="text-xs font-medium text-gray-400 mb-1">{report?.id?.slice(0, 8) || "N/A"}...</div>
               <div className="text-sm font-medium text-gray-500 break-words max-w-full">{reportFileName}</div>
             </div>
           </div>

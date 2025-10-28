@@ -3,6 +3,8 @@ import { PDFDocument, rgb } from 'pdf-lib'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import type { CostEstimate } from '@/lib/types/cost-estimate'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
 
 
 // Helper functions from quotation PDF
@@ -142,33 +144,54 @@ const getDateObject = (date: any): Date | undefined => {
 
 export async function POST(request: NextRequest) {
   console.log('[API_PDF] Received PDF generation request')
-  const { costEstimate, companyData, logoDataUrl, format = 'pdf', userData }: { costEstimate: CostEstimate; companyData: any; logoDataUrl: string | null; format?: 'pdf' | 'image'; userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string } } = await request.json()
+  const { costEstimate, companyData, logoDataUrl, userSignatureDataUrl, format = 'pdf', userData }: { costEstimate: CostEstimate; companyData: any; logoDataUrl: string | null; userSignatureDataUrl?: string | null; format?: 'pdf' | 'image'; userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string } } = await request.json()
   console.log('[API_PDF] Cost estimate ID:', costEstimate?.id)
   console.log('[API_PDF] Company data:', companyData?.name)
   console.log('[API_PDF] Logo data URL provided:', !!logoDataUrl)
+  console.log('[API_PDF] User signature data URL provided:', !!userSignatureDataUrl)
   console.log('[API_PDF] User data:', userData?.first_name)
   console.log('[API_PDF] Format:', format)
 
   try {
     // Generate HTML content
     console.log('[API_PDF] Generating HTML content...')
-    const htmlContent = generateCostEstimateHTML(costEstimate, companyData, userData)
+    const htmlContent = generateCostEstimateHTML(costEstimate, companyData, userData, userSignatureDataUrl)
     console.log('[API_PDF] HTML content generated, length:', htmlContent.length)
 
     // Launch puppeteer with @sparticuz/chromium for serverless or local chromium for development
     console.log('[API_PDF] Launching Puppeteer browser...')
-    const browser = await puppeteer.launch(
-      process.env.NODE_ENV === 'production' || process.env.VERCEL
-        ? {
-            headless: true,
-            args: chromium.args,
-            executablePath: await chromium.executablePath()
-          }
-        : {
-            headless: true,
-            executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-          }
-    )
+    let browser
+    try {
+      browser = await puppeteer.launch(
+        process.env.NODE_ENV === 'production' || process.env.VERCEL
+          ? {
+              headless: true,
+              args: chromium.args,
+              executablePath: await chromium.executablePath()
+            }
+          : {
+              headless: true,
+              executablePath: process.platform === 'win32'
+                ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+                : process.platform === 'darwin'
+                  ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                  : '/usr/bin/google-chrome' // Linux fallback
+            }
+      )
+    } catch (browserError) {
+      console.error('[API_PDF] Failed to launch browser with executable path:', browserError)
+      // Try launching without executable path (let Puppeteer find it automatically)
+      try {
+        browser = await puppeteer.launch({
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        })
+        console.log('[API_PDF] Browser launched successfully with auto-detection')
+      } catch (fallbackError) {
+        console.error('[API_PDF] Fallback browser launch also failed:', fallbackError)
+        throw new Error('PDF generation failed: Unable to launch browser. Please ensure Chrome or Chromium is installed.')
+      }
+    }
     console.log('[API_PDF] Browser launched successfully')
 
     const page = await browser.newPage()
@@ -231,7 +254,8 @@ export async function POST(request: NextRequest) {
 function generateCostEstimateHTML(
   costEstimate: CostEstimate,
   companyData: any,
-  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string }
+  userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
+  userSignatureDataUrl?: string | null
 ): string {
   // Group line items by site
   const groupLineItemsBySite = (lineItems: any[]) => {
@@ -448,9 +472,7 @@ function generateCostEstimateHTML(
       .signature-line {
         font-weight: bold;
         border-bottom: 1px solid #000;
-        margin-top: 10px;
-        padding-top: 20px;
-        max-width: 200px; /* 👈 shorten the line */
+        max-width: 100px; /* 👈 shorten the line */
         margin-right: 0; 
       }
     </style>
@@ -580,7 +602,8 @@ function generateCostEstimateHTML(
     <div class="signatures">
       <div class="signature-section">
         <div>Very truly yours,</div>
-        <div class="signature-line"></div>
+       ${userSignatureDataUrl ? `<img src="${userSignatureDataUrl}" alt="Signature" style="max-width: 200px; max-height: 60px; margin: 10px 0;" /><div class="signature-line"></div>` : '<div class="signature-line"></div>'}
+
         <div>${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : companyData?.company_name || "Golden Touch Imaging Specialist"}</div>
         <div>${costEstimate.signature_position || "Sale Manager"}</div>
       </div>

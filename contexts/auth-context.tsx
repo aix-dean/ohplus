@@ -35,6 +35,11 @@ interface UserData {
   created?: Date
   updated?: Date
   onboarding?: boolean
+  signature?: {
+    url: string
+    updated: Date | Timestamp
+    type: 'text' | 'png'
+  }
 }
 
 interface ProjectData {
@@ -183,6 +188,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             updated: data.updated?.toDate(),
             company_id: data.company_id || null,
             onboarding: data.onboarding || false,
+            signature: data.signature_data ? {
+              url: data.signature_data,
+              updated: data.signature_updated?.toDate() || new Date(),
+              type: (data.signature_type === 'text' ? 'text' : 'png') as 'text' | 'png'
+            } : undefined,
             ...data,
           }
         } else {
@@ -204,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             roles: userRoles,
             permissions: [],
             onboarding: false, // Skip onboarding for new users
+            signature: undefined,
           }
 
           // Create the user document with uid field
