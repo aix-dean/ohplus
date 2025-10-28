@@ -8,22 +8,29 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog';
 import { Search, X, MoreVertical } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { format } from "date-fns";
 import type { Timestamp } from "firebase/firestore";
 import type { Product } from "@/lib/firebase-service";
 import type { Team } from "@/lib/types/team";
 import type { JobOrder } from "@/lib/types/job-order";
 import { useState } from 'react';
+import { JobOrderSelectionDialog } from './JobOrderSelectionDialog';
+import { useToast } from "@/hooks/use-toast";
 
 // Job Order Details Card Component
 function JobOrderDetailsCard({
   jobOrder,
   onChange,
-  onOpenDialog
+  onOpenDialog,
+  onReplaceJO,
+  setShowJobOrderSelectionDialog
 }: {
   jobOrder: JobOrder;
   onChange: () => void;
   onOpenDialog?: () => void;
+  onReplaceJO?: () => void;
+  setShowJobOrderSelectionDialog: (value: boolean) => void;
 }) {
   // Helper function to format date
   const formatDate = (date: string | Date | Timestamp | undefined) => {
@@ -47,9 +54,21 @@ function JobOrderDetailsCard({
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
           <span className="text-[#333] font-['Inter'] text-[12px] font-[700] leading-[100%]">Tagged JO:</span>
-          <Button variant="ghost" size="sm" onClick={onOpenDialog}>
-            <MoreVertical className="h-5 w-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowJobOrderSelectionDialog(true)}>
+                Replace JO
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onChange}>
+                Clear JO
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-2">
@@ -104,6 +123,7 @@ function JobOrderDetailsCard({
   );
 }
 
+
 interface FormData {
   projectSite: string;
   serviceType: string;
@@ -156,6 +176,7 @@ export function CreateServiceAssignmentForm({
   onChangeJobOrder,
   onOpenJobOrderDialog,
   onClearJobOrder,
+  onReplaceJobOrder,
 }: {
   onSaveAsDraft: () => Promise<void>;
   onSubmit: () => Promise<void>;
@@ -177,7 +198,11 @@ export function CreateServiceAssignmentForm({
   onChangeJobOrder?: () => void;
   onOpenJobOrderDialog?: () => void;
   onClearJobOrder?: () => void;
+  onReplaceJobOrder?: (jobOrder: JobOrder) => void;
 }) {
+  const [showJobOrderSelectionDialog, setShowJobOrderSelectionDialog] = useState(false);
+  const { toast } = useToast();
+
   return (
     <div className="flex flex-col lg:flex-row  p-4">
       <div className="flex flex-col gap-6 w-full lg:w-[75%]">
@@ -200,6 +225,8 @@ export function CreateServiceAssignmentForm({
             jobOrder={jobOrderData}
             onChange={onChangeJobOrder || (() => {})}
             onOpenDialog={onOpenJobOrderDialog}
+            onReplaceJO={() => setShowJobOrderSelectionDialog(true)}
+            setShowJobOrderSelectionDialog={setShowJobOrderSelectionDialog}
           />
         ) : (
           onIdentifyJO && (
@@ -222,6 +249,25 @@ export function CreateServiceAssignmentForm({
         />
         <ActionButtons onSaveAsDraft={onSaveAsDraft} onSubmit={onSubmit} loading={loading} />
       </div>
+
+      <JobOrderSelectionDialog
+        open={showJobOrderSelectionDialog}
+        onOpenChange={setShowJobOrderSelectionDialog}
+        productId={productId}
+        companyId={companyId || ""}
+        onSelectJobOrder={(jobOrder) => {
+          // Handle job order replacement
+          setShowJobOrderSelectionDialog(false);
+          if (onReplaceJobOrder) {
+            onReplaceJobOrder(jobOrder);
+            toast({
+              title: "Job Order Replaced",
+              description: `Successfully replaced with JO#: ${jobOrder.joNumber}`,
+            });
+          }
+        }}
+        selectedJobOrderId={jobOrderData?.id}
+      />
     </div>
   );
 }

@@ -589,63 +589,61 @@ export function ServiceAssignmentCard({
               {formData.serviceType === "Change Material" ? (
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
-                      <div className="relative">
-                        {selectedJobOrder?.siteImageUrl ? (
-                          <img
-                            src={selectedJobOrder.siteImageUrl}
-                            alt="Old Material"
-                            className="rounded-md h-6 w-6 object-cover"
-                          />
-                        ) : (
-                          <img src="/logistics-sa-create-dl.png" alt="Old Material" className="rounded-md h-6 w-6 object-cover" />
-                        )}
-                        <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
-                      </div>
-                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
-                    </div>
+                    {(() => {
+                      const imgSrc = selectedJobOrder?.siteImageUrl || "/logistics-sa-create-dl.png";
+                      return (
+                        <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
+                          <div className="relative">
+                            <img
+                              src={imgSrc}
+                              alt="Old Material"
+                              className={`rounded-md object-cover ${imgSrc === '/logistics-sa-create-dl.png' ? 'w-[24.33px] h-[24.33px]' : 'w-[69.962px] h-[69.962px]'}`}
+                            />
+                            <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
+                          </div>
+                          {imgSrc === '/logistics-sa-create-dl.png' && <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8' }}>Upload</p>}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="flex items-center justify-center">
                     <ArrowRight className="h-8 w-8" />
                   </div>
                   <div className="space-y-1">
-                    <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
-                      <div className="relative">
-                        {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
-                          <img
-                            src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
-                            alt="New Material"
-                            className="rounded-md h-6 w-6 object-cover"
-                          />
-                        ) : (
-                          <img src="/logistics-sa-create-dl.png" alt="New Material" className="rounded-md h-6 w-6 object-cover" />
-                        )}
-                        <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
-                      </div>
-                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
-                    </div>
+                    {(() => {
+                      const imgSrc = selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl || "/logistics-sa-create-dl.png";
+                      return (
+                        <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
+                          <div className="relative">
+                            <img
+                              src={imgSrc}
+                              alt="New Material"
+                              className={`rounded-md object-cover ${imgSrc === '/logistics-sa-create-dl.png' ? 'w-[24.33px] h-[24.33px]' : 'w-[69.962px] h-[69.962px]'}`}
+                            />
+                            <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
+                          </div>
+                          {imgSrc === '/logistics-sa-create-dl.png' && <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8' }}>Upload</p>}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ) : (
-                selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
-                  <div className="space-y-1">
-                    <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
-                      <img
-                        src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
-                        alt="Site Image"
-                        className="rounded-md h-6 w-6 object-cover"
-                      />
-                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
-                      <img src="/logistics-sa-create-dl.png" alt="Attachment" className="rounded-md h-6 w-6 object-cover" />
-                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
-                    </div>
-                  </div>
-                )
+                <div className="space-y-1">
+                  {(() => {
+                    const imgSrc = selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl || "/logistics-sa-create-dl.png";
+                    return (
+                      <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
+                        <img
+                          src={imgSrc}
+                          alt="Attachment"
+                          className={`rounded-md object-cover ${imgSrc === '/logistics-sa-create-dl.png' ? 'w-[24.33px] h-[24.33px]' : 'w-[69.962px] h-[69.962px]'}`}
+                        />
+                        {imgSrc === '/logistics-sa-create-dl.png' && <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8' }}>Upload</p>}
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
             </div>
           </div>

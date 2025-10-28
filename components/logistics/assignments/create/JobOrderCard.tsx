@@ -3,6 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area'; // Import ScrollArea
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreVertical } from 'lucide-react';
+import { JobOrderSelectionDialog } from './JobOrderSelectionDialog';
+import type { JobOrder } from '@/lib/types/job-order';
 
 interface JobOrder {
   id: string;
@@ -26,6 +30,7 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
   const [selectedJobOrder, setSelectedJobOrder] = useState<JobOrder | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showJobOrderSelectionDialog, setShowJobOrderSelectionDialog] = useState(false);
 
   const handleIdentifyJobOrderClick = async () => {
     setIsLoading(true);
@@ -59,6 +64,11 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
     setAvailableJobOrders([]);
   };
 
+  const handleReplaceJobOrder = (jobOrder: any) => {
+    setSelectedJobOrder(jobOrder);
+    setShowJobOrderSelectionDialog(false);
+  };
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -67,7 +77,21 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
             <span className="text-2xl font-bold">JOB ORDER</span>
           </div>
           {selectedJobOrder && (
-            <Button variant="ghost" size="sm" onClick={handleClearJobOrder}>X</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setShowJobOrderSelectionDialog(true)}>
+                  Replace JO
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleClearJobOrder}>
+                  Clear JO
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </CardTitle>
       </CardHeader>
@@ -150,6 +174,14 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
           </>
         )}
       </CardContent>
+
+      <JobOrderSelectionDialog
+        open={showJobOrderSelectionDialog}
+        onOpenChange={setShowJobOrderSelectionDialog}
+        productId={product_id}
+        companyId={company_id}
+        onSelectJobOrder={handleReplaceJobOrder}
+      />
     </Card>
   );
 }
