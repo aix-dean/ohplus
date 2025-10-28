@@ -5,6 +5,37 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function formatTimeAgo(date: Date | any): string {
+  if (!date) return "Unknown"
+
+  const now = new Date()
+  const timestamp = date instanceof Date ? date : (date.toDate ? date.toDate() : new Date(date))
+  const diffInMs = now.getTime() - timestamp.getTime()
+  const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
+  const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
+
+  if (diffInMinutes < 1) return "Just now"
+  if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`
+  if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
+  if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
+
+  return timestamp.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: timestamp.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+  })
+}
+
+export function formatDateShort(date: Date | any): string {
+  if (!date) return "Unknown"
+
+  const timestamp = date instanceof Date ? date : (date.toDate ? date.toDate() : new Date(date))
+  const day = timestamp.getDate()
+  const month = timestamp.toLocaleDateString('en-US', { month: 'short' })
+  return `${day}, ${month}`
+}
+
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",

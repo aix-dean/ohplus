@@ -28,6 +28,7 @@ export interface ReportData {
   client_email?: string
   joNumber?: string
   joType?: string
+  reservation_id?: string
   bookingDates: {
     start: Timestamp
     end: Timestamp
@@ -141,6 +142,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
       client_email: reportData.client_email,
       joNumber: reportData.joNumber,
       joType: reportData.joType,
+      reservation_id: reportData.reservation_id,
       bookingDates: {
         start: reportData.bookingDates.start,
         end: reportData.bookingDates.end,
@@ -568,6 +570,34 @@ export async function postReport(reportData: ReportData): Promise<string> {
     return reportId
   } catch (error) {
     console.error("Error posting report:", error)
+    throw error
+  }
+}
+
+export async function getLatestReportsPerBooking(companyId: string): Promise<{ [reservationId: string]: ReportData }> {
+  try {
+    const q = query(collection(db, "reports"), where("companyId", "==", companyId), orderBy("created", "desc"))
+    const querySnapshot = await getDocs(q)
+
+    const reportsByBooking: { [reservationId: string]: ReportData } = {}
+
+    querySnapshot.docs.forEach((doc) => {
+      const data = doc.data()
+      const report: ReportData = {
+        id: doc.id,
+        ...data,
+        attachments: Array.isArray(data.attachments) ? data.attachments : [],
+      } as ReportData
+
+      // Only keep the latest report for each reservation_id
+      if (report.reservation_id && !reportsByBooking[report.reservation_id]) {
+        reportsByBooking[report.reservation_id] = report
+      }
+    })
+
+    return reportsByBooking
+  } catch (error) {
+    console.error("Error fetching latest reports per booking:", error)
     throw error
   }
 }
