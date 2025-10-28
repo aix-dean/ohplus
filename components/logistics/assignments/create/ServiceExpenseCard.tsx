@@ -28,7 +28,8 @@ export function ServiceExpenseCard({
     <Card className="w-full" style={{ borderRadius: '20px', background: '#FFF', boxShadow: '-2px 4px 10.5px -2px rgba(0, 0, 0, 0.25)' }}>
       <CardHeader>
         <CardTitle style={{ color: '#000', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', lineHeight: '100%' }}>
-          <span style={{ fontWeight: 600 }}>Service Expense</span> <span style={{ fontWeight: 400 }}>(Optional)</span>
+          <div style={{ fontWeight: 600 }}>Service Expense</div>
+          <div style={{ fontWeight: 400, fontSize: '14px', marginTop: '4px' }}>(Optional)</div>
         </CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4">

@@ -73,7 +73,7 @@ function JobOrderDetailsCard({
           <p className={`w-1/2 ${fieldValueClass} m-0 p-0`}>{jobOrder.materialSpec || "N/A"}</p>
         </div>
         <div className="flex items-center">
-          <Label className={`${fieldLabelClass} w-1/2`}>Attachment:</Label>
+          <Label className={`${fieldLabelClass} w-1/2`} style={{ textAlign: 'left' }}>Attachment:</Label>
           {jobOrder.siteImageUrl || (jobOrder.attachments && jobOrder.attachments.length > 0) ? (
             <span className={`w-1/2 ${fieldValueClass} m-0 p-0 text-blue-500 underline font-bold cursor-pointer`} onClick={() => setIsDialogOpen(true)}>View Attachment</span>
           ) : (

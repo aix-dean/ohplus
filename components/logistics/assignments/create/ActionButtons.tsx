@@ -27,7 +27,7 @@ export function ActionButtons({
         boxShadow: '-2px 4px 10.5px -2px rgba(0, 0, 0, 0.25)',
       }}
     >
-      <div className="flex justify-center items-center">
+      <div className="flex justify-center items-center" style={{ width: '100%', gap: '10px' }}>
         <Button variant="ghost" onClick={onSaveAsDraft} disabled={loading} style={{  height: '27px', color: 'var(--Standard-Font-Color, #333)', textAlign: 'center', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: 700, lineHeight: '100%', textDecorationLine: 'underline', textDecorationStyle: 'solid', textDecorationSkipInk: 'auto', textDecorationThickness: 'auto', textUnderlineOffset: 'auto', textUnderlinePosition: 'from-font', padding: 0 }}>
           Save as Draft
         </Button>

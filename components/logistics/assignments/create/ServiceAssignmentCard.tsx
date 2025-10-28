@@ -331,7 +331,7 @@ export function ServiceAssignmentCard({
   };
 
   return (
-    <Card className="w-[90%] aspect-square bg-white border-3 border-dashed border-[#00D0FF] text-center">
+    <Card className="w-[90%] aspect-square bg-white border-3 border-dashed border-[#00D0FF] text-center" style={{ borderRadius: '20px', background: '#FFF', boxShadow: '-1.068px 2.136px 4.166px 0 rgba(0, 0, 0, 0.25)' }}>
       <CardContent className="flex flex-col lg:flex-row gap-4 p-4">
         <div className="flex flex-col gap-4 w-full lg:w-1/4">
           {/* Products card */}
@@ -378,7 +378,7 @@ export function ServiceAssignmentCard({
           </Card>
           {/* Site Name and Location */}
           <div className="flex flex-col">
-            <span className="text-left" style={{
+            <span className="text-left " style={{
               color: 'var(--LIGHTER-BLACK, #333)',
               fontFamily: 'Inter',
               fontSize: '16.022px',
@@ -388,6 +388,7 @@ export function ServiceAssignmentCard({
             }}>
               {products.find(p => p.id === productId)?.name || "Select Project Site"}
             </span>
+            <span className='text-left pt-2' style={{ color: 'var(--LIGHTER-BLACK, #333)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 400, lineHeight: '100%' }}>Location</span>
             {productId && (products.find(p => p.id === productId)?.specs_rental?.location || products.find(p => p.id === productId)?.location) && (
               <span className="text-left text-sm text-gray-500">
                 {products.find(p => p.id === productId)?.specs_rental?.location || products.find(p => p.id === productId)?.location}
@@ -398,7 +399,7 @@ export function ServiceAssignmentCard({
           <div className="flex items-center">
             <Textarea
               id="remarks"
-              placeholder="Add any remarks here"
+              placeholder="Remarks"
               value={formData.remarks}
               onChange={(e) => handleInputChange("remarks", e.target.value)}
               className="flex-1 aspect-square resize-none"
@@ -409,23 +410,22 @@ export function ServiceAssignmentCard({
         <div className="flex flex-col gap-4 w-full lg:w-3/4">
           <div className="flex justify-between items-start mb-4">
             <div className="flex flex-col text-sm">
-              <p>SA#: {saNumber}</p>
+              <p style={{ color: 'var(--LIGHTER-BLACK, #333)', fontFamily: 'Inter', fontSize: '16.022px', fontStyle: 'normal', fontWeight: 700, lineHeight: '100%' }}>SA#: {saNumber}</p>
               <p className="text-xs text-gray-500">
-                {products.find(p => p.id === productId)?.site_code || products.find(p => p.id === productId)?.id?.substring(0, 8) || "-"}
+                {products.find(p => p.id === productId)?.site_code || products.find(p => p.id === productId)?.id?.substring(0, 8)}
               </p>
             </div>
-            <p className="text-sm">{currentTime}</p>
           </div>
           {/* Date Label */}
           <div className="flex items-center space-x-4">
-            <Label className="w-32 pl-14 flex-shrink-0 text-center">     Date:</Label>
+            <Label className="w-32 flex-shrink-0 text-center" style={{ textAlign: 'left' }}>     Date:</Label>
             <span className="flex-1 text-start" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>{currentTime}</span>
           </div>
           {/* Service Type */}
           <div className="flex items-center space-x-4">
-            <Label htmlFor="serviceType" className="w-32 flex-shrink-0">Service Type:</Label>
+            <Label htmlFor="serviceType" className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>Service Type:</Label>
             <Select value={formData.serviceType} onValueChange={(value) => handleInputChange("serviceType", value)}>
-              <SelectTrigger id="serviceType" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>
+              <SelectTrigger id="serviceType" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}>
                 <SelectValue placeholder="Select service type" />
               </SelectTrigger>
               <SelectContent>
@@ -441,7 +441,7 @@ export function ServiceAssignmentCard({
           {/* Campaign Name */}
           {formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair" && (
             <div className="flex items-center space-x-4">
-              <Label htmlFor="campaignName" className="w-32 flex-shrink-0">
+              <Label htmlFor="campaignName" className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>
                 Campaign Name: <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -450,14 +450,14 @@ export function ServiceAssignmentCard({
                 value={formData.campaignName || ""}
                 onChange={(e) => handleInputChange("campaignName", e.target.value)}
                 className="flex-1"
-                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}
+                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}
                 required
               />
             </div>
           )}
           {/* Service Start Date */}
           <div className="flex items-center space-x-4">
-            <Label className="w-32 flex-shrink-0">
+            <Label className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>
               {["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) ? "Service Date:" : "Service Start Date:"}
             </Label>
             <div className="flex-1">
@@ -492,7 +492,7 @@ export function ServiceAssignmentCard({
           </div>
           {/* Service End Date */}
           <div className="flex items-center space-x-4">
-            <Label className="w-32 flex-shrink-0">Service End Date:</Label>
+            <Label className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>Service End Date:</Label>
             <div className="flex-1">
               <Popover>
                 <PopoverTrigger asChild>
@@ -525,7 +525,7 @@ export function ServiceAssignmentCard({
           </div>
           {/* Service Duration */}
           <div className="flex items-center space-x-4">
-            <Label htmlFor="serviceDuration" className="w-32 flex-shrink-0">Service Duration:</Label>
+            <Label htmlFor="serviceDuration" className="w-32 flex-shrink-0 text-start">Service Duration:</Label>
             <div className="flex-1 flex items-center space-x-2">
               <Input
                 id="serviceDuration"
@@ -534,7 +534,7 @@ export function ServiceAssignmentCard({
                 value={formData.serviceDuration || ""}
                 onChange={(e) => handleInputChange("serviceDuration", parseInt(e.target.value) || 0)}
                 className="flex-1"
-                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}
+                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}
                 min="0"
               />
               <span className="text-sm text-gray-600 whitespace-nowrap">days</span>
@@ -543,11 +543,11 @@ export function ServiceAssignmentCard({
           {/* Material Specs */}
           {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
             <div className="flex items-center space-x-4">
-              <Label htmlFor="materialSpecs" className="w-32 flex-shrink-0">
+              <Label htmlFor="materialSpecs" className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>
                 Material Specs: <span className="text-red-500">*</span>
               </Label>
               <Select value={formData.materialSpecs} onValueChange={(value) => handleInputChange("materialSpecs", value)}>
-                <SelectTrigger id="materialSpecs" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>
+                <SelectTrigger id="materialSpecs" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}>
                   <SelectValue placeholder="Select material" />
                 </SelectTrigger>
                 <SelectContent>
@@ -561,7 +561,7 @@ export function ServiceAssignmentCard({
           )}
           {/* Attachment */}
           <div className="flex items-start space-x-4">
-            <Label htmlFor="attachment" className="w-32 flex-shrink-0 pt-2">Attachment:</Label>
+            <Label htmlFor="attachment" className="w-32 flex-shrink-0 pt-2" style={{ textAlign: 'left' }}>Attachment:</Label>
             <div className="flex-1">
               {formData.serviceType === "Change Material" ? (
                 <div className="grid grid-cols-3 gap-4">
@@ -628,7 +628,7 @@ export function ServiceAssignmentCard({
           </div>
           {/* Crew */}
           <div className="flex items-center space-x-4">
-            <Label htmlFor="crew" className="w-32 flex-shrink-0">
+            <Label htmlFor="crew" className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>
               Crew: <span className="text-red-500">*</span>
             </Label>
             <Select value={formData.crew} onValueChange={(value) => {
@@ -639,7 +639,7 @@ export function ServiceAssignmentCard({
                 handleInputChange("assignedTo", value);
               }
             }}>
-              <SelectTrigger id="crew" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>
+              <SelectTrigger id="crew" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}>
                 <SelectValue placeholder="Choose a Crew" />
               </SelectTrigger>
               <SelectContent>
@@ -655,9 +655,9 @@ export function ServiceAssignmentCard({
           {/* Gondola */}
           {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
             <div className="flex items-center space-x-4">
-              <Label className="w-32 flex-shrink-0">Gondola:</Label>
+              <Label className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>Gondola:</Label>
               <Select value={formData.gondola} onValueChange={(value) => handleInputChange("gondola", value)}>
-                <SelectTrigger className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>
+                <SelectTrigger className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}>
                   <SelectValue placeholder="Select Yes or No" />
                 </SelectTrigger>
                 <SelectContent>
@@ -670,13 +670,13 @@ export function ServiceAssignmentCard({
           {/* Logistics */}
           {!["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) && (
             <div className="flex items-center space-x-4">
-              <Label className="w-32 flex-shrink-0">Logistics:</Label>
+              <Label className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>Logistics:</Label>
               <Input
                 placeholder="Enter logistics details"
                 value={formData.sales}
                 onChange={(e) => handleInputChange("sales", e.target.value)}
                 className="flex-1"
-                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}
+                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}
               />
             </div>
           )}
