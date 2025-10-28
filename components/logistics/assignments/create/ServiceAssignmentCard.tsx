@@ -347,18 +347,24 @@ export function ServiceAssignmentCard({
         <div className="flex flex-col gap-4 w-full lg:w-1/4">
           {/* Products card */}
           <Card className="aspect-square bg-[#E2E2E2] text-black p-4 flex flex-col justify-center items-center relative overflow-hidden">
-            {currentProductId && products.find(p => p.id === currentProductId) ? (
-              <img
-                src={
-                  products.find(p => p.id === currentProductId)?.imageUrl ||
-                  products.find(p => p.id === currentProductId)?.media?.find(m => !m.isVideo)?.url ||
-                  "https://via.placeholder.com/150?text=No+Image"
-                }
-                alt={products.find(p => p.id === currentProductId)?.name || "Site Image"}
-                className="absolute inset-0 w-full h-full object-cover rounded-md cursor-pointer"
-                onClick={onOpenProductSelection}
-              />
-            ) : (
+            {currentProductId && products.find(p => p.id === currentProductId) ? (() => {
+              const foundProduct = products.find(p => p.id === currentProductId);
+              // Use same image logic as ProductSelectionDialog
+              const image =
+                foundProduct?.media && foundProduct.media.length > 0
+                  ? foundProduct.media[0].url
+                  : foundProduct?.content_type === "dynamic"
+                    ? "/led-billboard-1.png"
+                    : "/roadside-billboard.png";
+              return (
+                <img
+                  src={image}
+                  alt={foundProduct?.name || "Site Image"}
+                  className="absolute inset-0 w-full h-full object-cover rounded-md cursor-pointer"
+                  onClick={onOpenProductSelection}
+                />
+              );
+            })() : (
               <div className="flex flex-col items-center gap-2">
                 <Button
                   variant="outline"

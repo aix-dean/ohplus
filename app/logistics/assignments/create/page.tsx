@@ -63,6 +63,7 @@ export default function CreateServiceAssignmentPage() {
   const [draftId, setDraftId] = useState<string | null>(null)
   const [isJobOrderSelectionDialogOpen, setIsJobOrderSelectionDialogOpen] = useState(false) // State for JobOrderSelectionDialog
   const [jobOrderData, setJobOrderData] = useState<JobOrder | null>(null) // State to store fetched job order
+  const [hasManualSelection, setHasManualSelection] = useState(false) // Flag to prevent job order pre-filling after manual selection
 
   const [teams, setTeams] = useState<Team[]>([])
   const [isProductSelectionDialogOpen, setIsProductSelectionDialogOpen] = useState(false) // State for ProductSelectionDialog
@@ -308,7 +309,7 @@ export default function CreateServiceAssignmentPage() {
   // Fetch job order data if jobOrderId is present
   useEffect(() => {
     const fetchJobOrder = async () => {
-      if (jobOrderId) {
+      if (jobOrderId && !hasManualSelection) {
         try {
           const jobOrderDoc = await getDoc(doc(db, "job_orders", jobOrderId))
           if (jobOrderDoc.exists()) {
@@ -324,6 +325,11 @@ export default function CreateServiceAssignmentPage() {
             // Set the project site from the job order's product_id
             const productId = fetchedJobOrder.product_id || ""
             if (productId) {
+              // Guard: Prevent pre-fill if user has manually selected a different product
+              if (formData.projectSite && formData.projectSite !== productId) {
+                // Skip pre-fill logic to preserve manual selection
+                return
+              }
               // First check if the product is already in the loaded products
               const existingProduct = products.find(p => p.id === productId)
               if (existingProduct) {
@@ -365,7 +371,7 @@ export default function CreateServiceAssignmentPage() {
       }
     }
     fetchJobOrder()
-  }, [jobOrderId, products]) // Added products to dependencies to check if product is already loaded
+  }, [jobOrderId, products, hasManualSelection]) // Added products to dependencies to check if product is already loaded
 
   // Prevent job order data from overriding manual product selection
   useEffect(() => {
@@ -375,6 +381,11 @@ export default function CreateServiceAssignmentPage() {
       setJobOrderData(null)
     }
   }, [formData.projectSite, jobOrderData])
+
+  // Reset manual selection flag when jobOrderId changes
+  useEffect(() => {
+    setHasManualSelection(false)
+  }, [jobOrderId])
 
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {
@@ -873,6 +884,8 @@ export default function CreateServiceAssignmentPage() {
     handleInputChange("projectSite", product.id || "")
     // Clear job order data when manually selecting a product to allow the new selection to take precedence
     setJobOrderData(null)
+    // Set flag to prevent job order pre-filling
+    setHasManualSelection(true)
     // Replace the product in the products array with the selected product data
     setProducts(prev => {
       const filtered = prev.filter(p => p.id !== product.id)
