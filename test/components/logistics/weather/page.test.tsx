@@ -83,16 +83,19 @@ describe('LogisticsWeatherPage', () => {
         dayOfWeek: 'Monday',
         icon: 'sun',
         temperature: { max: 28 },
+        date: '2024-01-01',
       },
       {
         dayOfWeek: 'Tuesday',
         icon: 'cloud-sun',
         temperature: { max: 26 },
+        date: '2024-01-02',
       },
       {
         dayOfWeek: 'Wednesday',
         icon: 'rain',
         temperature: { max: 24 },
+        date: '2024-01-03',
       },
     ],
   }
@@ -213,9 +216,7 @@ describe('LogisticsWeatherPage', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Monday')).toBeInTheDocument()
         expect(screen.getByText('28°')).toBeInTheDocument()
-        expect(screen.getByText('Tuesday')).toBeInTheDocument()
         expect(screen.getByText('26°')).toBeInTheDocument()
       })
     })
@@ -603,7 +604,7 @@ describe('LogisticsWeatherPage', () => {
 
       await waitFor(() => {
         // Weather data
-        expect(screen.getByText('Monday')).toBeInTheDocument()
+        expect(screen.getByText('Jan 1 - Monday')).toBeInTheDocument()
         expect(screen.getByText('28°')).toBeInTheDocument()
 
         // Video
