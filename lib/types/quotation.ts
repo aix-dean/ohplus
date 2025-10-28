@@ -43,6 +43,7 @@ export interface QuotationProduct {
   price_notes?: string
   illumination?: string
   cms?: any // Added cms field for product CMS data
+  spot_number?: number // Spot number for dynamic/digital content types
 }
 
 export interface ClientComplianceItem {
@@ -124,4 +125,5 @@ export interface Quotation {
   costEstimateNumber?: string // Reference to the source cost estimate number
   pdf?: string // PDF URL field
   password?: string // 8-digit password field
+  spot_numbers?: number[] // Array of selected spot numbers
 }

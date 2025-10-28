@@ -257,6 +257,7 @@ export interface Booking {
   updated: string | Timestamp
   notes?: string
   booking_reference?: string
+  spot_numbers?: number[]
 }
 
 // User interface

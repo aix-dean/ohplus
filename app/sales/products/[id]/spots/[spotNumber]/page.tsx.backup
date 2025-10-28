@@ -18,7 +18,6 @@ import { db } from "@/lib/firebase"
 import { createDirectCostEstimate } from "@/lib/cost-estimate-service"
 import { createDirectQuotation } from "@/lib/quotation-service"
 import type { Booking } from "@/lib/booking-service"
-import { SpotSelectionDialog } from "@/components/spot-selection-dialog"
 
 export default function SpotDetailsPage() {
   const params = useParams()
@@ -35,8 +34,6 @@ export default function SpotDetailsPage() {
   const [bookedDates, setBookedDates] = useState<Date[]>([])
   const [monthOffset, setMonthOffset] = useState(0)
   const [totalBookedSpots, setTotalBookedSpots] = useState(0)
-  const [spotSelectionDialogOpen, setSpotSelectionDialogOpen] = useState(false)
-  const [spotSelectionType, setSpotSelectionType] = useState<"quotation" | "cost-estimate">("quotation")
   const calendarRef = useRef<HTMLDivElement>(null)
   const currentMonthRef = useRef<HTMLDivElement>(null)
 
@@ -329,50 +326,6 @@ export default function SpotDetailsPage() {
   const canGoLeft = false
   const canGoRight = false
 
-  // Generate spots data for the dialog
-  const generateSpotsData = () => {
-    const spots = []
-
-    // Sample client names for demonstration
-    const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
-
-    for (let i = 1; i <= totalSpots; i++) {
-      // Check if this spot has scheduled content
-      const hasScheduledContent = spotSchedules.some(
-        (schedule) => schedule.spot_number === i && schedule.active,
-      )
-
-      const isOccupied = hasScheduledContent
-      const schedule = spotSchedules.find(s => s.spot_number === i && s.active)
-
-      spots.push({
-        id: `spot-${i}`,
-        number: i,
-        status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
-        clientName: isOccupied ? (schedule?.title || clientNames[(i - 1) % clientNames.length]) : undefined,
-        imageUrl: isOccupied ? (schedule?.media || "/placeholder.svg") : undefined,
-      })
-    }
-
-    return spots
-  }
-
-  const calculateOccupiedSpots = () => {
-    // Count unique spot numbers from current day's bookings
-    const occupiedSpots = new Set()
-    // For simplicity, we'll use the spot schedules to determine occupied spots
-    spotSchedules.forEach(schedule => {
-      if (schedule.active) {
-        occupiedSpots.add(schedule.spot_number)
-      }
-    })
-    return occupiedSpots.size
-  }
-
-  const calculateVacantSpots = () => {
-    return totalSpots - calculateOccupiedSpots()
-  }
-
   if (loading) {
     return (
       <div className="flex-1 p-4">
@@ -407,18 +360,143 @@ export default function SpotDetailsPage() {
           <p className="text-sm text-gray-600">Create:</p>
           <Button
             variant="outline"
-            onClick={() => {
-              setSpotSelectionType("cost-estimate")
-              setSpotSelectionDialogOpen(true)
+            onClick={async () => {
+              if (!selectedDate) {
+                toast({
+                  title: "Error",
+                  description: "Please select a date",
+                  variant: "destructive",
+                })
+                return
+              }
+              if (!userData) {
+                toast({
+                  title: "Error",
+                  description: "User not authenticated",
+                  variant: "destructive",
+                })
+                return
+              }
+              try {
+                const clientData = {
+                  id: userData.uid,
+                  name: `${userData.first_name || ""} ${userData.last_name || ""}`.trim() || "User",
+                  email: userData.email || "",
+                  company: "Company", // Default since no company_name in UserData
+                  phone: userData.phone_number || "",
+                  address: "",
+                  designation: "",
+                  industry: "",
+                }
+                const sitesData = [{
+                  id: product.id!,
+                  name: product.name || "",
+                  location: product.location || "",
+                  price: product.price || 0,
+                  type: product.type || "",
+                  image: product.media?.[0]?.url || "",
+                  specs_rental: product.specs_rental,
+                  content_type: product.content_type,
+                }]
+                const customLineItems = [{
+                  id: product.id!,
+                  description: product.name || "",
+                  quantity: 1,
+                  unitPrice: product.price || 0,
+                  total: 0, // Will be calculated by the service
+                  category: product.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
+                  notes: `Location: ${product.location || ""}`,
+                  image: product.media?.[0]?.url,
+                  content_type: product.content_type,
+                  cms: product.cms,
+                }]
+                const selectedDateObj = new Date(selectedDate)
+                const costEstimateId = await createDirectCostEstimate(clientData, sitesData, userData.uid, {
+                  startDate: selectedDateObj,
+                  endDate: selectedDateObj, // Same date for single day booking
+                  company_id: userData.company_id || "",
+                  customLineItems,
+                })
+                toast({
+                  title: "Success",
+                  description: "Cost estimate created successfully",
+                })
+                router.push(`/sales/cost-estimates/${costEstimateId}`)
+              } catch (error) {
+                console.error(error)
+                toast({
+                  title: "Error",
+                  description: "Failed to create cost estimate",
+                  variant: "destructive",
+                })
+              }
             }}
           >
             Cost Estimate
           </Button>
           <Button
             variant="outline"
-            onClick={() => {
-              setSpotSelectionType("quotation")
-              setSpotSelectionDialogOpen(true)
+            onClick={async () => {
+              if (!selectedDate) {
+                toast({
+                  title: "Error",
+                  description: "Please select a date",
+                  variant: "destructive",
+                })
+                return
+              }
+              if (!userData) {
+                toast({
+                  title: "Error",
+                  description: "User not authenticated",
+                  variant: "destructive",
+                })
+                return
+              }
+              try {
+                const clientData = {
+                  id: userData!.uid,
+                  name: `${userData!.first_name || ""} ${userData!.last_name || ""}`.trim() || "User",
+                  email: userData!.email || "",
+                  company: "Company",
+                  phone: userData!.phone_number || "",
+                  address: "",
+                  designation: "",
+                  industry: "",
+                }
+                const sitesData = [{
+                  id: product.id,
+                  name: product.name,
+                  location: product.location,
+                  price: product.price,
+                  type: product.type,
+                  image: product.media?.[0]?.url || "",
+                  specs_rental: product.specs_rental,
+                  content_type: product.content_type,
+                  cms: product.cms,
+                }]
+                const selectedDateObj = new Date(selectedDate)
+                const quotationId = await createDirectQuotation(clientData, sitesData, userData.uid, {
+                  startDate: selectedDateObj,
+                  endDate: selectedDateObj, // Same date for single day booking
+                  company_id: userData.company_id || "",
+                  created_by_first_name: userData.first_name || "",
+                  created_by_last_name: userData.last_name || "",
+                   spotNumbers: [spotNumber],
+                })
+                toast({
+                  title: "Success",
+                  description: "Quotation created successfully",
+                })
+                router.push(`/sales/quotations-list`)
+              } catch (error) {
+                console.error(error)
+                toast({
+                  title: "Error",
+                  description: "Failed to create quotation",
+                  variant: "destructive",
+                })
+              }
             }}
           >
             Quotation
@@ -584,20 +662,6 @@ export default function SpotDetailsPage() {
           })()}
         </div>
       </div>
-
-      {/* Spot Selection Dialog */}
-      <SpotSelectionDialog
-        open={spotSelectionDialogOpen}
-        onOpenChange={setSpotSelectionDialogOpen}
-        productId={productId}
-        spots={generateSpotsData()}
-        totalSpots={totalSpots}
-        occupiedCount={calculateOccupiedSpots()}
-        vacantCount={calculateVacantSpots()}
-        currentDate={new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-        selectedDate={selectedDate}
-        type={spotSelectionType}
-      />
     </div>
   )
 }

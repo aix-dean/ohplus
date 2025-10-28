@@ -37,6 +37,8 @@ export default function SelectDatesPage() {
     useEffect(() => {
         const sitesParam = searchParams.get("sites")
         const clientIdParam = searchParams.get("clientId")
+        const productIdParam = searchParams.get("productId")
+        const spotNumbersParam = searchParams.get("spotNumbers")
 
         if (clientIdParam) {
             const fetchClient = async () => {
@@ -46,7 +48,72 @@ export default function SelectDatesPage() {
             fetchClient()
         }
 
-        if (sitesParam) {
+        // Handle spots mode (from spot selection dialog)
+        if (productIdParam && spotNumbersParam) {
+            try {
+                const productId = productIdParam
+                const selectedSpotNumbers = JSON.parse(decodeURIComponent(spotNumbersParam))
+                console.log(`Parsed product ID:`, productId, `Selected spot numbers:`, selectedSpotNumbers)
+
+                const fetchProductAndSpots = async () => {
+                    setIsLoadingProducts(true)
+                    const product = await getProductById(productId)
+                    if (product) {
+                        // Generate spots data like in product detail page
+                        const totalSpots = product.cms?.loops_per_day || 18
+                        const allSpots = []
+
+                        // Sample client names for demonstration
+                        const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
+
+                        for (let i = 1; i <= totalSpots; i++) {
+                            // Check if this spot has scheduled content
+                            const hasScheduledContent = false // We'll assume spots are available for now
+
+                            const isOccupied = hasScheduledContent
+
+                            allSpots.push({
+                                id: `spot-${i}`,
+                                number: i,
+                                status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
+                                clientName: isOccupied ? clientNames[(i - 1) % clientNames.length] : undefined,
+                                imageUrl: isOccupied ? "/placeholder.svg" : undefined,
+                            })
+                        }
+
+                        // Filter to selected spots
+                        const selectedSpots = allSpots.filter(spot => selectedSpotNumbers.includes(spot.number))
+
+                        // Convert spots to site-like objects for display
+                        const spotSites = selectedSpots.map(spot => ({
+                            ...product,
+                            id: `${product.id}-spot-${spot.number}`,
+                            name: `${product.name} - Spot ${spot.number}`,
+                            spotNumber: spot.number,
+                            spotData: spot,
+                        }))
+
+                        setSelectedSites(spotSites)
+                        setSiteIds(spotSites.map(site => site.id!))
+
+                        // Fetch bookings for the product
+                        const productBookings = await getProductBookings(productId)
+                        const bookingsMap: Record<string, Booking[]> = {}
+                        spotSites.forEach(site => {
+                            bookingsMap[site.id!] = productBookings
+                        })
+                        setSiteBookings(bookingsMap)
+                    }
+                    setIsLoadingProducts(false)
+                }
+                fetchProductAndSpots()
+            } catch (error) {
+                console.error("Error parsing spot parameters:", error)
+                setIsLoadingProducts(false)
+            }
+        }
+        // Handle traditional sites mode
+        else if (sitesParam) {
             try {
                 const parsedSiteIds = JSON.parse(decodeURIComponent(sitesParam))
                 console.log(`Parsed site IDs:`, parsedSiteIds)
@@ -182,18 +249,52 @@ export default function SelectDatesPage() {
 
     // Helper function to get filtered booked ranges for a site
     const getBookedRanges = (siteId: string) => {
-        const bookings = siteBookings[siteId] || []
+        const site = selectedSites.find(s => s.id === siteId)
+        console.log(`🔍 DEBUG: getBookedRanges called for siteId:`, siteId)
+        console.log(`🔍 DEBUG: Site object:`, site)
+        console.log(`🔍 DEBUG: Site has spotNumber:`, (site as any)?.spotNumber)
 
-        return bookings
-            .filter(booking => booking.status !== "COMPLETED" && booking.status !== "CANCELLED")
-            .map(booking => {
-                const start = convertToDate(booking.start_date)
-                const end = convertToDate(booking.end_date)
-                return {
-                    start: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
-                    end: new Date(end.getFullYear(), end.getMonth(), end.getDate()),
+        const bookings = siteBookings[siteId] || []
+        console.log(`🔍 DEBUG: Raw bookings for siteId ${siteId}:`, bookings)
+
+        const filteredBookings = bookings
+            .filter(booking => {
+                console.log(`🔍 DEBUG: Checking booking:`, booking.id, `status:`, booking.status)
+
+                // Skip completed/cancelled bookings
+                if (booking.status === "COMPLETED" || booking.status === "CANCELLED") {
+                    console.log(`🔍 DEBUG: Skipping booking ${booking.id} - status is ${booking.status}`)
+                    return false
                 }
+
+                // If this is a spot-specific site, check spot numbers
+                if (site && (site as any).spotNumber !== undefined) {
+                    const bookingSpotNumbers = (booking as any).spot_numbers
+                    const hasSpot = bookingSpotNumbers && Array.isArray(bookingSpotNumbers) && bookingSpotNumbers.includes((site as any).spotNumber)
+                    console.log(`🔍 DEBUG: Booking ${booking.id} spot_numbers:`, bookingSpotNumbers, `includes spot ${(site as any).spotNumber}:`, hasSpot)
+                    return hasSpot
+                }
+
+                // For regular sites, include all active bookings
+                console.log(`🔍 DEBUG: Including booking ${booking.id} for regular site`)
+                return true
             })
+
+        console.log(`🔍 DEBUG: Filtered bookings for siteId ${siteId}:`, filteredBookings)
+
+        const ranges = filteredBookings.map(booking => {
+            const start = convertToDate(booking.start_date)
+            const end = convertToDate(booking.end_date)
+            const range = {
+                start: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
+                end: new Date(end.getFullYear(), end.getMonth(), end.getDate()),
+            }
+            console.log(`🔍 DEBUG: Booking ${booking.id} range:`, range.start.toDateString(), 'to', range.end.toDateString())
+            return range
+        })
+
+        console.log(`🔍 DEBUG: Final ranges for siteId ${siteId}:`, ranges)
+        return ranges
     }
 
     const checkOverlap = (siteId: string, s: Date, e: Date) =>

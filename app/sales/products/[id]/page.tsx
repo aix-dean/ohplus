@@ -432,8 +432,32 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   }
 
   const calculateOccupiedSpots = (cms: any) => {
-    const totalSpots = cms.loops_per_day || 18
-    return screenSchedules.filter(schedule => schedule.active).length
+    console.log("🔍 DEBUG: calculateOccupiedSpots called with cms:", cms)
+    console.log("🔍 DEBUG: currentDayBookings:", currentDayBookings)
+    console.log("🔍 DEBUG: currentDayBookingsLoading:", currentDayBookingsLoading)
+
+    if (currentDayBookingsLoading) {
+      console.log("🔍 DEBUG: Still loading current day bookings, returning 0")
+      return 0
+    }
+
+    // Count unique spot numbers from current day's bookings
+    const occupiedSpots = new Set()
+    currentDayBookings.forEach(booking => {
+      if (booking.spot_numbers && Array.isArray(booking.spot_numbers)) {
+        booking.spot_numbers.forEach(spotNumber => {
+          occupiedSpots.add(spotNumber)
+          console.log("🔍 DEBUG: Adding spot number to occupied:", spotNumber, "from booking:", booking.id)
+        })
+      } else {
+        console.log("🔍 DEBUG: Booking has no spot_numbers or invalid format:", booking.id, booking.spot_numbers)
+      }
+    })
+
+    const occupiedCount = occupiedSpots.size
+    console.log("🔍 DEBUG: Total occupied spots calculated:", occupiedCount, "from", currentDayBookings.length, "bookings")
+
+    return occupiedCount
   }
 
   const calculateVacantSpots = (cms: any) => {
@@ -475,6 +499,10 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [bookedDates, setBookedDates] = useState<Date[]>([])
   const [calendarLoading, setCalendarLoading] = useState(false)
   const [screenSchedules, setScreenSchedules] = useState<any[]>([])
+  const [currentDayBookings, setCurrentDayBookings] = useState<Booking[]>([])
+  const [currentDayBookingsLoading, setCurrentDayBookingsLoading] = useState(false)
+
+  const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
   const [notification, setNotification] = useState<{
     show: boolean
@@ -778,6 +806,53 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchScreenSchedules()
+  }, [params.id])
+
+  // Fetch current day's bookings for occupied/vacant calculation
+  useEffect(() => {
+    const fetchCurrentDayBookings = async () => {
+      if (!params.id || params.id === "new") return
+
+      setCurrentDayBookingsLoading(true)
+      try {
+        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const today = new Date()
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
+
+        // Query bookings where start_date <= today <= end_date and status is active
+        const bookingsQuery = query(
+          collection(db, "booking"),
+          where("product_id", "==", productId),
+          where("status", "in", ["RESERVED", "COMPLETED"])
+        )
+
+        const querySnapshot = await getDocs(bookingsQuery)
+        const currentDayBookingsData: Booking[] = []
+
+        querySnapshot.forEach((doc) => {
+          const booking = { id: doc.id, ...doc.data() } as Booking
+
+          // Check if booking covers today
+          if (booking.start_date && booking.end_date) {
+            const startDate = booking.start_date.toDate ? booking.start_date.toDate() : new Date(booking.start_date)
+            const endDate = booking.end_date.toDate ? booking.end_date.toDate() : new Date(booking.end_date)
+
+            if (startDate <= endOfDay && endDate >= startOfDay) {
+              currentDayBookingsData.push(booking)
+            }
+          }
+        })
+
+        setCurrentDayBookings(currentDayBookingsData)
+      } catch (error) {
+        console.error("Error fetching current day bookings:", error)
+      } finally {
+        setCurrentDayBookingsLoading(false)
+      }
+    }
+
+    fetchCurrentDayBookings()
   }, [params.id])
 
   const handleBack = () => {
@@ -1421,9 +1496,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 occupiedCount={calculateOccupiedSpots(product.cms)}
                 vacantCount={calculateVacantSpots(product.cms)}
                 productId={params.id}
+                currentDate={currentDate}
+                router={router}
               />
-             </div>
-           )}
+            </div>
+          )}
             
             
 

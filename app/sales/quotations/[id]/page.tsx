@@ -123,6 +123,46 @@ const formatDate = (date: any) => {
   }
 }
 
+const formatTime = (time: any): string => {
+  if (!time) return "N/A"
+  try {
+    // If it's already a formatted time string, return as is
+    if (typeof time === "string") return time
+    // If it's a Date object, format it
+    if (time instanceof Date) {
+      return time.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false
+      })
+    }
+    return String(time)
+  } catch (error) {
+    console.error("Error formatting time:", error)
+    return "Invalid Time"
+  }
+}
+
+const calculateHours = (startTime: string, endTime: string): number => {
+  if (!startTime || !endTime || startTime === "N/A" || endTime === "N/A") return 0
+
+  try {
+    const [startHour, startMin] = startTime.split(':').map(Number)
+    const [endHour, endMin] = endTime.split(':').map(Number)
+
+    const startMinutes = startHour * 60 + startMin
+    const endMinutes = endHour * 60 + endMin
+
+    let diffMinutes = endMinutes - startMinutes
+    if (diffMinutes < 0) diffMinutes += 24 * 60 // Handle overnight operation
+
+    return Math.floor(diffMinutes / 60)
+  } catch (error) {
+    console.error("Error calculating hours:", error)
+    return 0
+  }
+}
+
 const formatDuration = (days: number, startDate?: Date | any, endDate?: Date | any) => {
   let totalDays = days
   if (startDate && endDate) {
@@ -1165,31 +1205,38 @@ The OH Plus Team`,
 
         {/* Details Section with editable fields */}
         <div className="space-y-2 mb-4">
-          <div className="flex items-center">
-            <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Type:</span>
-            <span className="text-gray-700">{item?.type || "Rental"}</span>
-          </div>
+          {!(item?.type?.toLowerCase() === "dynamic" || item?.type?.toLowerCase() === "digital") && (
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/3">Type:</span>
+              <span className="text-gray-700">{item?.type || "Rental"}</span>
+            </div>
+          )}
 
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Size:</span>
+            <span className="font-medium text-gray-700 w-1/3">
+              {(item?.type?.toLowerCase() === "billboard" || item?.type?.toLowerCase() === "dynamic") ? "Site Location:" : "Size:"}
+            </span>
             <span className="text-gray-700">
-              {item?.specs?.height ? `${item.specs.height}ft (H)` : "N/A"} x {item?.specs?.width ? `${item.specs.width}ft (W)` : "N/A"}
+              {(item?.type?.toLowerCase() === "billboard" || item?.type?.toLowerCase() === "dynamic")
+                ? (item?.specs?.location || "N/A")
+                : `${item?.specs?.height ? `${item.specs.height}ft (H)` : "N/A"} x ${item?.specs?.width ? `${item.specs.width}ft (W)` : "N/A"}`
+              }
             </span>
           </div>
 
           {item?.illumination && (
             <div className="flex items-center">
               <span className="w-4 text-center">•</span>
-              <span className="font-medium text-gray-700 w-1/4">Illumination:</span>
+              <span className="font-medium text-gray-700 w-1/3">Illumination:</span>
               <span className="text-gray-700">{item.illumination}</span>
             </div>
           )}
 
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Contract Duration:</span>
+            <span className="font-medium text-gray-700 w-1/3">Contract Duration:</span>
             {isEditing && editingField === "duration_days" ? (
               <div className="flex items-center gap-2 ml-1">
                 <Input
@@ -1219,7 +1266,7 @@ The OH Plus Team`,
 
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Contract Period:</span>
+            <span className="font-medium text-gray-700 w-1/3">Contract Period:</span>
             {isEditing && editingField === "contractPeriod" ? (
               <div className="flex items-center gap-2 ml-1">
                 <Input
@@ -1262,14 +1309,14 @@ The OH Plus Team`,
 
           <div className="flex">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Proposal to:</span>
+            <span className="font-medium text-gray-700 w-1/3">Proposal to:</span>
             <span className="text-gray-700">{currentQuotation?.client_company_name || "CLIENT COMPANY NAME"}</span>
           </div>
 
 
           <div className="flex items-center">
             <span className="w-4 text-center">•</span>
-            <span className="font-medium text-gray-700 w-1/4">Lease rate per month:</span>
+            <span className="font-medium text-gray-700 w-1/3">Lease rate per month:</span>
 
             {isEditing && editingField === "price" ? (
               <div className="flex items-center gap-2 ml-1">
@@ -1306,6 +1353,16 @@ The OH Plus Team`,
               </span>
             )}
           </div>
+          {(item?.type?.toLowerCase() === "dynamic" || item?.type?.toLowerCase() === "digital") && item?.cms && (
+            <div className="flex items-center">
+              <span className="w-4 text-center">•</span>
+              <span className="font-medium text-gray-700 w-1/3">LED Billboard Operation Time:</span>
+              <span className="text-gray-700">
+                {formatTime(item.cms.start_time)} - {formatTime(item.cms.end_time)} (Total of {calculateHours(formatTime(item.cms.start_time), formatTime(item.cms.end_time))} hours daily)
+              </span>
+            </div>
+          )}
+
 
         </div>
 
