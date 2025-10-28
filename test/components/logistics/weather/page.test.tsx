@@ -5,6 +5,14 @@ import LogisticsWeatherPage from '@/app/logistics/weather/page'
 import { addDays, format } from 'date-fns'
 import { getLatestVideoByCategory, getNewsItemsByCategory } from '@/lib/firebase-service'
 
+// Mock Next.js router
+const mockPush = vi.fn()
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}))
+
 // Mock date-fns
 vi.mock('date-fns', () => ({
   addDays: vi.fn(),
@@ -421,6 +429,17 @@ describe('LogisticsWeatherPage', () => {
       fireEvent.click(newsItem!)
 
       expect(mockWindowOpen).toHaveBeenCalledWith('https://example.com/news1', '_blank')
+    })
+
+    it('navigates to /logistics/assignments/create when Create Service Assignment button is clicked', async () => {
+      await act(async () => {
+        render(<LogisticsWeatherPage />)
+      })
+
+      const createButton = screen.getByRole('button', { name: /create service assignment/i })
+      fireEvent.click(createButton)
+
+      expect(mockPush).toHaveBeenCalledWith('/logistics/assignments/create')
     })
 
     it('shows coming soon modal when date range is clicked', async () => {

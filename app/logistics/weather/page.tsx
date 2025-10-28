@@ -9,6 +9,7 @@ import { ChevronDown } from "lucide-react"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { ComingSoonModal } from "@/components/coming-soon-dialog"
 import { Button } from "@/components/ui/button"
+import { useRouter } from 'next/navigation'
 
 export default function LogisticsWeatherPage() {
   const [weatherData, setWeatherData] = useState<WeatherForecast | null>(null)
@@ -34,6 +35,7 @@ export default function LogisticsWeatherPage() {
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [showComingSoonModal, setShowComingSoonModal] = useState(false)
 
+  const router = useRouter()
 
   useEffect(() => {
     const fetchWeatherData = async () => {
@@ -230,7 +232,7 @@ export default function LogisticsWeatherPage() {
             ))}
           </div> */}
           <div className="flex justify-center mt-4">
-            <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+            <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors" onClick={() => router.push('/logistics/assignments/create')}>
               Create Service Assignment
             </button>
           </div>
