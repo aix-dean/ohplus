@@ -155,6 +155,7 @@ export function CreateServiceAssignmentForm({
   onIdentifyJO,
   onChangeJobOrder,
   onOpenJobOrderDialog,
+  onClearJobOrder,
 }: {
   onSaveAsDraft: () => Promise<void>;
   onSubmit: () => Promise<void>;
@@ -175,6 +176,7 @@ export function CreateServiceAssignmentForm({
   onIdentifyJO?: () => void;
   onChangeJobOrder?: () => void;
   onOpenJobOrderDialog?: () => void;
+  onClearJobOrder?: () => void;
 }) {
   return (
     <div className="flex flex-col lg:flex-row  p-4">
@@ -189,6 +191,7 @@ export function CreateServiceAssignmentForm({
           saNumber={saNumber}
           jobOrderData={jobOrderData}
           onOpenProductSelection={onOpenProductSelection}
+          onClearJobOrder={onClearJobOrder}
         />
       </div>
       <div className="flex flex-col gap-6 w-full lg:w-[25%]">

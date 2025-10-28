@@ -152,6 +152,7 @@ interface ServiceAssignmentCardProps {
   saNumber: string;
   jobOrderData: JobOrder | null;
   onOpenProductSelection: () => void;
+  onClearJobOrder?: () => void;
 }
 
 export function ServiceAssignmentCard({
@@ -163,7 +164,8 @@ export function ServiceAssignmentCard({
   teams,
   saNumber,
   jobOrderData,
-  onOpenProductSelection
+  onOpenProductSelection,
+  onClearJobOrder
 }: ServiceAssignmentCardProps) {
   const [showJobOrderDetails, setShowJobOrderDetails] = useState(false); // State to manage JobOrderDetailsCard visibility
   const [selectedJobOrder, setSelectedJobOrder] = useState<JobOrder | null>(jobOrderData); // State to hold selected job order data
@@ -171,8 +173,9 @@ export function ServiceAssignmentCard({
   const [showJobOrderSelectionDialog, setShowJobOrderSelectionDialog] = useState(false); // State for JobOrderSelectionDialog
   const { toast } = useToast(); // Use the toast hook
 
-  // Determine the current product ID to display (from job order or prop)
-  const currentProductId = selectedJobOrder?.product_id || productId;
+  // Determine the current product ID to display (from form data, job order, or prop)
+  const currentProductId = formData.projectSite || selectedJobOrder?.product_id || productId;
+  console.log("ServiceAssignmentCard render - currentProductId:", currentProductId, "productId prop:", productId, "selectedJobOrder:", selectedJobOrder, "formData.projectSite:", formData.projectSite);
 
   // Set current time on component mount
   useEffect(() => {
@@ -184,13 +187,11 @@ export function ServiceAssignmentCard({
     }));
   }, []);
 
-  // Auto-show job order details when jobOrderData is present
+  // Sync selectedJobOrder with jobOrderData prop
   useEffect(() => {
-    if (jobOrderData && !showJobOrderDetails) {
-      setSelectedJobOrder(jobOrderData);
-      setShowJobOrderDetails(true);
-    }
-  }, [jobOrderData, showJobOrderDetails]);
+    setSelectedJobOrder(jobOrderData);
+    setShowJobOrderDetails(!!jobOrderData);
+  }, [jobOrderData]);
 
   // Auto-calculate service duration when dates or service type change
   useEffect(() => {
@@ -329,6 +330,13 @@ export function ServiceAssignmentCard({
   };
 
   const handleChangeJobOrder = () => {
+    // Clear job order data and reset form fields
+    setSelectedJobOrder(null);
+    setShowJobOrderDetails(false);
+    // Call the parent callback to clear job order data
+    if (onClearJobOrder) {
+      onClearJobOrder();
+    }
     // Re-open the job order selection dialog
     setShowJobOrderSelectionDialog(true);
   };
@@ -389,13 +397,22 @@ export function ServiceAssignmentCard({
               fontWeight: 700,
               lineHeight: '100%'
             }}>
-              {products.find(p => p.id === currentProductId)?.name || "Select Project Site"}
+              {(() => {
+                const foundProduct = products.find(p => p.id === currentProductId);
+                console.log("Looking for product with ID:", currentProductId, "Found:", foundProduct);
+                return foundProduct?.name || "Select Project Site";
+              })()}
             </span>
-            {currentProductId && (products.find(p => p.id === currentProductId)?.specs_rental?.location || products.find(p => p.id === currentProductId)?.location) && (
-              <span className="text-left text-sm text-gray-500">
-                {products.find(p => p.id === currentProductId)?.specs_rental?.location || products.find(p => p.id === currentProductId)?.location}
-              </span>
-            )}
+            {currentProductId && (() => {
+              const foundProduct = products.find(p => p.id === currentProductId);
+              const location = foundProduct?.specs_rental?.location || foundProduct?.location;
+              console.log("Product location:", location);
+              return location && (
+                <span className="text-left text-sm text-gray-500">
+                  {location}
+                </span>
+              );
+            })()}
           </div>
           {/* Remarks */}
           <div className="flex items-center">

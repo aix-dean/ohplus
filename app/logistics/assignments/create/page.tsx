@@ -367,6 +367,15 @@ export default function CreateServiceAssignmentPage() {
     fetchJobOrder()
   }, [jobOrderId, products]) // Added products to dependencies to check if product is already loaded
 
+  // Prevent job order data from overriding manual product selection
+  useEffect(() => {
+    if (jobOrderData && formData.projectSite && formData.projectSite !== jobOrderData.product_id) {
+      // If user has manually selected a different product, clear job order data
+      console.log("Manual product selection detected, clearing job order data")
+      setJobOrderData(null)
+    }
+  }, [formData.projectSite, jobOrderData])
+
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
@@ -859,15 +868,18 @@ export default function CreateServiceAssignmentPage() {
 
   // Handle product selection
   const handleProductSelect = (product: Product) => {
+    console.log("handleProductSelect called with product:", product)
+    console.log("Setting projectSite to:", product.id)
     handleInputChange("projectSite", product.id || "")
-    // Add the product to the products array if it's not already there
+    // Clear job order data when manually selecting a product to allow the new selection to take precedence
+    setJobOrderData(null)
+    // Replace the product in the products array with the selected product data
     setProducts(prev => {
-      const exists = prev.find(p => p.id === product.id)
-      if (!exists) {
-        return [...prev, product]
-      }
-      return prev
+      const filtered = prev.filter(p => p.id !== product.id)
+      console.log("Replacing product in products array:", product.name)
+      return [...filtered, product]
     })
+    console.log("handleProductSelect completed")
   }
 
   // Handle identify JO
@@ -968,6 +980,7 @@ export default function CreateServiceAssignmentPage() {
         onIdentifyJO={handleIdentifyJO}
         onChangeJobOrder={handleChangeJobOrder}
         onOpenJobOrderDialog={() => setIsJobOrderSelectionDialogOpen(true)}
+        onClearJobOrder={() => setJobOrderData(null)}
       />
 
 
