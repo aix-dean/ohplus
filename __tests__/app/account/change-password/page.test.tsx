@@ -31,9 +31,9 @@ vi.mock('firebase/auth', () => ({
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
-  Eye: vi.fn((props) => React.createElement('div', { 'data-testid': 'eye-icon', ...props })),
-  EyeOff: vi.fn((props) => React.createElement('div', { 'data-testid': 'eye-off-icon', ...props })),
-  Loader2: vi.fn((props) => React.createElement('div', { 'data-testid': 'loader-icon', ...props })),
+  Eye: () => <div data-testid="eye-icon" />,
+  EyeOff: () => <div data-testid="eye-off-icon" />,
+  Loader2: () => <div data-testid="loader-icon" />,
 }))
 
 vi.mock('@/lib/firebase', () => ({
@@ -79,7 +79,7 @@ describe('ChangePasswordPage', () => {
       render(<ChangePasswordPage />)
 
       // The component shows a Loader2 component (SVG), not text
-      expect(screen.getByTestId('loader')).toBeInTheDocument()
+      expect(screen.getByTestId('loader-icon')).toBeInTheDocument()
     })
 
     it('renders the change password form when user is authenticated', () => {
