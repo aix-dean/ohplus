@@ -76,7 +76,15 @@ export async function fetchWeatherForecast(regionId = "264885", startDate?: stri
           filteredForecast = []
         }
       }
+    } else {
+      // No date range specified, use default 5-day forecast
+      filteredForecast = accuWeatherData.forecast.slice(0, 5)
     }
+
+    // Remove duplicates based on date before final processing
+    filteredForecast = filteredForecast.filter((item, index, arr) =>
+      arr.findIndex(i => i.date === item.date) === index
+    )
 
     // Transform AccuWeather data to WeatherForecast format
     const forecast: WeatherForecast = {
