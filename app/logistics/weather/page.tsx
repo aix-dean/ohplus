@@ -375,7 +375,7 @@ export default function LogisticsWeatherPage() {
 
           {/* OOH News for you */}
            <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col overflow-y-auto">
-             <div className="flex flex-col min-h-0 overflow-hidden">
+             <div className="flex flex-col min-h-0">
                <h3 className="mb-4" style={{
                  color: 'var(--LIGHTER-BLACK, #333)',
                  fontFamily: 'Inter',
@@ -396,7 +396,7 @@ export default function LogisticsWeatherPage() {
                    </div>
                  </div>
                ) : (
-                 <div className="flex flex-col gap-4">
+                 <div className="flex flex-col gap-4 overflow-y-auto max-h-full">
                    {newsItems.map((item, index) => (
                      <div
                        key={item.id || index}
