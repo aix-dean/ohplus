@@ -27,20 +27,21 @@ export async function fetchWeatherForecast(regionId = "264885", startDate?: stri
     let filteredForecast = accuWeatherData.forecast
 
     if (startDate && endDate) {
-      const start = new Date(startDate)
-      const end = new Date(endDate)
+      const start = new Date(startDate + 'T00:00:00') // Ensure local timezone interpretation
+      const end = new Date(endDate + 'T23:59:59') // Ensure local timezone interpretation
       const today = new Date()
+      today.setHours(0, 0, 0, 0) // Normalize to start of day
 
       // Always include today's forecast using current weather data if start date includes today
       if (isSameDay(start, today)) {
-        const firstForecastDate = new Date(accuWeatherData.forecast[0].date)
+        const firstForecastDate = new Date(accuWeatherData.forecast[0].date + 'T00:00:00')
         if (isSameDay(firstForecastDate, today)) {
           // API already includes today, use forecast as is
           filteredForecast = accuWeatherData.forecast.slice(0, 5)
         } else {
           // API starts from tomorrow, prepend today's entry using current weather data
           const todayEntry = {
-            date: today.toISOString(),
+            date: today.toISOString().split('T')[0], // Use date-only string to avoid timezone issues
             dayOfWeek: today.toLocaleDateString("en-US", { weekday: "long" }),
             temperature: {
               min: Math.max(accuWeatherData.current.temperature - 3, 22), // Estimate min temp
@@ -63,27 +64,16 @@ export async function fetchWeatherForecast(regionId = "264885", startDate?: stri
       } else {
         // Filter forecast to only include dates within the selected range
         filteredForecast = accuWeatherData.forecast.filter(day => {
-          const dayDate = new Date(day.date)
+          const dayDate = new Date(day.date + 'T00:00:00') // Ensure consistent timezone interpretation
           return dayDate >= start && dayDate <= end
         })
 
         // If not starting from today, ensure we have up to 5 days
         filteredForecast = filteredForecast.slice(0, 5)
 
-        // If no forecast data matches the range, generate mock data for the range
+        // If no forecast data matches the range, return empty array
         if (filteredForecast.length === 0) {
-          const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
-          filteredForecast = Array.from({ length: Math.min(daysDiff, 5) }, (_, i) => {
-            const date = new Date(start)
-            date.setDate(start.getDate() + i)
-            return {
-              date: date.toISOString(),
-              dayOfWeek: date.toLocaleDateString("en-US", { weekday: "long" }),
-              temperature: { min: 25, max: 32 }, // Default values
-              day: { condition: "Partly Cloudy", icon: "cloud-sun", precipitation: false },
-              night: { condition: "Clear", icon: "moon", precipitation: false },
-            }
-          })
+          filteredForecast = []
         }
       }
     }

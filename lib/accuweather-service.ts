@@ -286,37 +286,6 @@ export async function getPhilippinesWeatherData(locationKey = "264885"): Promise
   // Get location info
   const location = PHILIPPINES_LOCATIONS.find((loc) => loc.key === locationKey) || PHILIPPINES_LOCATIONS[0]
 
-  const fallbackData: PhilippinesWeatherData = {
-    location: location.name,
-    locationKey,
-    current: {
-      temperature: 28,
-      feelsLike: 32,
-      condition: "Weather data from AccuWeather",
-      icon: "cloud",
-      humidity: 75,
-      windSpeed: 10,
-      windDirection: "E",
-      uvIndex: 6,
-      visibility: 10,
-      cloudCover: 50,
-      isDayTime: true,
-      lastUpdated: new Date().toISOString(),
-    },
-    forecast: Array.from({ length: 10 }, (_, i) => {
-      const date = new Date()
-      date.setDate(date.getDate() + i)
-      return {
-        date: date.toISOString(),
-        dayOfWeek: date.toLocaleDateString("en-US", { weekday: "long" }),
-        temperature: { min: Math.round(22 + Math.random() * 6), max: Math.round(29 + Math.random() * 7) },
-        day: { condition: "Partly Cloudy", icon: "cloud-sun", precipitation: Math.random() > 0.7 },
-        night: { condition: "Clear", icon: "moon", precipitation: false },
-      }
-    }),
-    alerts: [],
-    lastUpdated: new Date().toISOString(),
-  }
 
   try {
     console.log(`[AccuWeather] Starting API calls for location: ${locationKey} (${location.name}) using key: ${ACCUWEATHER_API_KEY.substring(0, 10)}...`)
