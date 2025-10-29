@@ -1050,12 +1050,6 @@ export function CreateReportDialog({
               <div className="text-base">
                 <span className="font-medium">Reservation:</span> {selectedServiceAssignmentDetails?.reservation_number || "N/A"}
               </div>
-              <div className="text-base">
-                <span className="font-medium">Booking ID:</span> {selectedServiceAssignmentDetails?.booking_id || "N/A"}
-              </div>
-              <div className="text-base">
-                <span className="font-medium">Assigned To:</span> {selectedServiceAssignmentDetails?.assignedTo || user?.displayName || "Unknown"}
-              </div>
             </div>
 
             {!hideJobOrderSelection && (

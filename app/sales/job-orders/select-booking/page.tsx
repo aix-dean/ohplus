@@ -114,7 +114,7 @@ export default function SelectBookingPage() {
                 <TableRow>
                   <TableHead>Reservation ID</TableHead>
                   <TableHead>Client</TableHead>
-                  <TableHead>Product</TableHead>
+                  <TableHead>Site</TableHead>
                   <TableHead>Project</TableHead>
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
