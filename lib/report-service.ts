@@ -74,6 +74,8 @@ export interface ReportData {
   // Site image URL
   siteImageUrl?: string
   logistics_report?: string
+  reservation_number?: string
+  booking_id?: string
 }
 
 // Helper function to clean data by removing undefined values recursively
@@ -203,6 +205,16 @@ export async function createReport(reportData: ReportData): Promise<string> {
     if (reportData.descriptionOfWork && reportData.descriptionOfWork.trim() !== "") {
       finalReportData.descriptionOfWork = reportData.descriptionOfWork.trim()
     }
+    // Add service assignment specific fields
+    if (reportData.reservation_number && reportData.reservation_number.trim() !== "") {
+      finalReportData.reservation_number = reportData.reservation_number.trim()
+    }
+
+    if (reportData.booking_id && reportData.booking_id.trim() !== "") {
+      finalReportData.booking_id = reportData.booking_id.trim()
+    }
+
+    console.log("Final report data to be saved:", finalReportData)
 
     console.log("Final report data to be saved:", finalReportData)
 

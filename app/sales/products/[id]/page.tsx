@@ -1329,7 +1329,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   </Button>
                   <Button
                     className="w-full bg-red-500 hover:bg-red-600 text-white"
-                    onClick={() => router.push(`/sales/job-orders/select-quotation?productId=${params.id}`)}
+                    onClick={() => router.push(`/sales/job-orders/select-booking?productId=${params.id}`)}
                   >
                     Create Job Order
                   </Button>

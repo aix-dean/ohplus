@@ -72,7 +72,9 @@ export interface Booking {
   updated: any // Firestore timestamp
   user_id: string
   quotation_id: string // Added based on context
+  quotation_number?: string // Added quotation number from original quotation
   isCollectibles?: boolean // Indicates if collectibles have been created for this booking
+  items?: any // Added items field to store quotation items
 }
 
 export interface SalesRecord {
@@ -224,6 +226,8 @@ export class BookingService {
         updated: serverTimestamp(),
         user_id: userId,
         quotation_id: quotation.id,
+        quotation_number: quotation.quotation_number,
+        items: quotation.items,
       }
 
       // Only add product_name if it exists
