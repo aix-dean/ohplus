@@ -26,6 +26,7 @@ export interface ReportData {
   client: string
   clientId: string
   client_email?: string
+  campaignName?: string
   joNumber?: string
   joType?: string
   booking_id?: string
@@ -33,6 +34,7 @@ export interface ReportData {
     start: Timestamp
     end: Timestamp
   }
+  booking_id?: string
   breakdate: Timestamp
   sales: string
   reportType: string
@@ -44,6 +46,11 @@ export interface ReportData {
     fileUrl: string
     label?: string
   }>
+  requestedBy?: {
+    department: string
+    name: string
+    id: string
+  }
   status: string
   createdBy: string
   createdByName: string
@@ -144,6 +151,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
       client: reportData.client,
       clientId: reportData.clientId,
       client_email: reportData.client_email,
+      campaignName: reportData.campaignName,
       joNumber: reportData.joNumber,
       joType: reportData.joType,
       bookingDates: {

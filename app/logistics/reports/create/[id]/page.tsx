@@ -8,8 +8,10 @@ import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
 import { createReport, ReportData } from "@/lib/report-service"
+import { getTeams } from "@/lib/teams-service"
+import { getProductById, uploadFileToFirebaseStorage, getBookingById } from "@/lib/firebase-service"
 import { Timestamp } from "firebase/firestore"
-import { ArrowLeft, Loader2, Upload } from "lucide-react"
+import { ArrowLeft, Loader2, SquarePen, Upload } from "lucide-react"
 
 export default function CreateReportPage() {
   const params = useParams()
@@ -18,6 +20,8 @@ export default function CreateReportPage() {
   const assignmentId = params.id as string
 
   const [assignmentData, setAssignmentData] = useState<any>(null)
+  const [productData, setProductData] = useState<any>(null)
+  const [bookingData, setBookingData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [creatingReport, setCreatingReport] = useState(false)
@@ -25,22 +29,76 @@ export default function CreateReportPage() {
   const [createdReportId, setCreatedReportId] = useState<string | null>(null)
   const [beforePhotos, setBeforePhotos] = useState<File[]>([])
   const [afterPhotos, setAfterPhotos] = useState<File[]>([])
+  const [beforePhotoAttachments, setBeforePhotoAttachments] = useState<Array<{note: string, fileName: string, fileType: string, fileUrl: string, label: string}>>([])
+  const [afterPhotoAttachments, setAfterPhotoAttachments] = useState<Array<{note: string, fileName: string, fileType: string, fileUrl: string, label: string}>>([])
+  const [photosAttachments, setPhotosAttachments] = useState<Array<{note: string, fileName: string, fileType: string, fileUrl: string, label: string}>>([])
+  const [beforePhotoNote, setBeforePhotoNote] = useState<string>("")
+  const [afterPhotoNote, setAfterPhotoNote] = useState<string>("")
+  const [photosNote, setPhotosNote] = useState<string>("")
   const [reportType, setReportType] = useState<string>("")
+  const [teamsMap, setTeamsMap] = useState<Record<string, string>>({})
 
 
   const onCreateAReportClick = useCallback(() => {
     router.back()
   }, [router])
 
-  const handleBeforePhotosChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBeforePhotosChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || [])
     setBeforePhotos(prev => [...prev, ...files])
-  }, [])
 
-  const handleAfterPhotosChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    // Upload photos immediately
+    const isMonitoring = assignmentData?.serviceType === "Monitoring"
+    const note = isMonitoring ? (photosNote || "Monitoring Photo") : (beforePhotoNote || "Before SA Photo")
+    const label = isMonitoring ? "Monitoring" : "Before"
+
+    for (const photo of files) {
+      try {
+        const downloadURL = await uploadFileToFirebaseStorage(photo, `reports/photos/`)
+        const attachment = {
+          note: note,
+          fileName: photo.name,
+          fileType: photo.type,
+          fileUrl: downloadURL,
+          label: label,
+        }
+        if (isMonitoring) {
+          setPhotosAttachments(prev => [...prev, attachment])
+        } else {
+          setBeforePhotoAttachments(prev => [...prev, attachment])
+        }
+      } catch (uploadError) {
+        console.error("Error uploading before photo:", uploadError)
+        // Could show error to user here
+      }
+    }
+  }, [assignmentData?.serviceType, beforePhotoNote, photosNote])
+
+  const handleAfterPhotosChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || [])
     setAfterPhotos(prev => [...prev, ...files])
-  }, [])
+
+    // Upload photos immediately
+    const note = afterPhotoNote || "After SA Photo"
+    const label = "After"
+
+    for (const photo of files) {
+      try {
+        const downloadURL = await uploadFileToFirebaseStorage(photo, `reports/photos/`)
+        const attachment = {
+          note: note,
+          fileName: photo.name,
+          fileType: photo.type,
+          fileUrl: downloadURL,
+          label: label,
+        }
+        setAfterPhotoAttachments(prev => [...prev, attachment])
+      } catch (uploadError) {
+        console.error("Error uploading after photo:", uploadError)
+        // Could show error to user here
+      }
+    }
+  }, [afterPhotoNote])
 
   const createReportFromAssignment = useCallback(async () => {
     if (!assignmentData || !user) return
@@ -49,6 +107,23 @@ export default function CreateReportPage() {
     setError(null)
 
     try {
+      // Collect all attachments
+      const uploadedAttachments = [...(assignmentData.attachments?.map((att: any) => ({
+        note: att.name || "",
+        fileName: att.name || "attachment",
+        fileType: att.type || "unknown",
+        fileUrl: "",
+        label: att.name || "",
+      })) || [])]
+
+      // Add pre-uploaded attachments
+      if (assignmentData?.serviceType === "Monitoring") {
+        uploadedAttachments.push(...photosAttachments)
+      } else {
+        uploadedAttachments.push(...beforePhotoAttachments)
+        uploadedAttachments.push(...afterPhotoAttachments)
+      }
+
       // Map service assignment data to report data
       const reportData: ReportData = {
         siteId: assignmentData.projectSiteId || "",
@@ -56,24 +131,24 @@ export default function CreateReportPage() {
         companyId: assignmentData.company_id || "",
         sellerId: user.uid,
         client: assignmentData.requestedBy?.name || "",
-        clientId: assignmentData.requestedBy?.id || "",
+        requestedBy: {
+          department: assignmentData.requestedBy?.department || "",
+          name: assignmentData.requestedBy?.name || "",
+          id: assignmentData.requestedBy?.id || "",
+        },
+        campaignName: assignmentData.campaignName || "",
         joNumber: assignmentData.saNumber || "",
         joType: assignmentData.serviceType || "",
         bookingDates: {
           start: assignmentData.coveredDateStart || Timestamp.now(),
           end: assignmentData.coveredDateEnd || Timestamp.now(),
         },
+        booking_id: assignmentData.booking_id || "",
         breakdate: assignmentData.coveredDateStart || Timestamp.now(),
-        sales: assignmentData.requestedBy?.name || "",
+        sales: assignmentData.sales || "",
         reportType: reportType,
         date: new Date().toISOString(),
-        attachments: assignmentData.attachments?.map((att: any) => ({
-          note: att.name || "",
-          fileName: att.name || "attachment",
-          fileType: att.type || "unknown",
-          fileUrl: "",
-          label: att.name || "",
-        })) || [],
+        attachments: uploadedAttachments,
         status: "draft",
         createdBy: user.uid,
         createdByName: user.email || "",
@@ -84,11 +159,6 @@ export default function CreateReportPage() {
         tags: [assignmentData.serviceType || "service"],
         assignedTo: assignmentData.assignedTo || "",
         location: assignmentData.projectSiteLocation || "",
-      }
-
-      // Add optional fields if they exist
-      if (assignmentData.campaignName) {
-        reportData.client = assignmentData.campaignName
       }
 
       if (assignmentData.remarks) {
@@ -114,7 +184,7 @@ export default function CreateReportPage() {
     } finally {
       setCreatingReport(false)
     }
-  }, [assignmentData, user, router])
+  }, [assignmentData, user, router, beforePhotoAttachments, afterPhotoAttachments, photosAttachments])
 
   useEffect(() => {
     if (assignmentId) {
@@ -135,6 +205,23 @@ export default function CreateReportPage() {
     }
   }, [assignmentData])
 
+  useEffect(() => {
+    const fetchTeams = async () => {
+      try {
+        const teams = await getTeams()
+        const teamsMapping: Record<string, string> = {}
+        teams.forEach(team => {
+          teamsMapping[team.id] = team.name
+        })
+        setTeamsMap(teamsMapping)
+      } catch (error) {
+        console.error("Error fetching teams:", error)
+      }
+    }
+
+    fetchTeams()
+  }, [])
+
   const fetchAssignmentData = useCallback(async () => {
     if (!assignmentId) return
 
@@ -147,6 +234,29 @@ export default function CreateReportPage() {
       if (assignmentDoc.exists()) {
         const data = { id: assignmentDoc.id, ...assignmentDoc.data() }
         setAssignmentData(data)
+
+        // Fetch product details using projectSiteId
+        if ((data as any).projectSiteId) {
+          try {
+            const product = await getProductById((data as any).projectSiteId)
+            setProductData(product)
+          } catch (productErr) {
+            console.error("Error fetching product:", productErr)
+            // Don't set error for product fetch failure, just log it
+          }
+        }
+
+        // Fetch booking details using booking_id
+        if ((data as any).booking_id) {
+          try {
+            const booking = await getBookingById(assignmentData.booking_id)
+            setBookingData(booking)
+            console.log(`bookings SA data: ${JSON.stringify(bookingData)}`)
+          } catch (bookingErr) {
+            console.error("Error fetching booking:", bookingErr)
+            // Don't set error for booking fetch failure, just log it
+          }
+        }
       } else {
         setError("Assignment not found")
       }
@@ -222,9 +332,9 @@ export default function CreateReportPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="w-full max-w-7xl mx-auto p-6">
+      <div className="w-full max-w-7xl p-6">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex items-center mb-6">
           <button
             onClick={onCreateAReportClick}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -237,7 +347,7 @@ export default function CreateReportPage() {
 
         {/* Metadata Header */}
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-xs">
             <div>
               <p className="font-semibold">SA I.D.</p>
               <p>{assignmentData?.saNumber || 'SA000582'}</p>
@@ -248,7 +358,7 @@ export default function CreateReportPage() {
             </div>
             <div>
               <p className="font-semibold">Site</p>
-              <p className="text-blue-600 font-medium">{assignmentData?.projectSiteName || 'Petplans Tower'}</p>
+              <p className="text-blue-600 font-semibold">{productData?.name || assignmentData?.projectSiteName || 'Petplans Tower'}</p>
             </div>
             <div>
               <p className="font-semibold">Campaign Name</p>
@@ -256,14 +366,17 @@ export default function CreateReportPage() {
             </div>
             <div>
               <p className="font-semibold">Crew</p>
-              <p>{assignmentData?.assignedTo || 'Production- Jonathan Dela Cruz'}</p>
+              <p>{(assignmentData?.crew && teamsMap[assignmentData.crew]) || (assignmentData?.assignedTo && teamsMap[assignmentData.assignedTo]) || assignmentData?.crew || assignmentData?.assignedTo || 'Production- Jonathan Dela Cruz'}</p>
             </div>
             <div>
               <p className="font-semibold">Deadline</p>
               <p>{assignmentData?.coveredDateEnd?.toDate?.()?.toLocaleDateString() || 'Oct 18, 2025'}</p>
             </div>
-            <div className="flex justify-end items-end">
-              <button className="px-4 h-[24px] w-[103px] border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+            <div className="flex justify-start items-center">
+              <button
+                onClick={() => router.push(`/logistics/assignments/${assignmentId}`)}
+                className="px-4 h-[24px] w-[103px] border border-[#c4c4c4] rounded text-xs font-medium hover:bg-gray-50"
+              >
                 View SA
               </button>
             </div>
@@ -274,30 +387,28 @@ export default function CreateReportPage() {
         <div className="bg-white rounded-xl shadow-md p-6 mb-6">
           <div className="flex flex-col lg:flex-row w-full gap-4">
             {/* Left Column - Site Image and Remarks */}
-            <div className="space-y-6">
+            <div className="w-[182px] flex-shrink-0 relative">
               {/* Site Image */}
               <Image
-                src={assignmentData?.siteImage || '/placeholder.jpg'}
+                src={productData?.media?.[0]?.url || assignmentData?.siteImage || '/placeholder.jpg'}
                 alt="Site"
-                width={284} height={190}
+                width={182} height={284}
                 className="object-cover rounded-md"
               />
               {/* Site Info */}
               <div>
-                <p className="font-medium">{assignmentData?.projectSiteName || 'Petplans Tower NB'}</p>
-                <div className="text-sm text-gray-600">
-                   {(assignmentData?.projectSiteLocation || 'EDSA, Guadalupe').split(',').map((part: string, index: number) => (
-                     <div key={index}>{part.trim()}</div>
-                   ))}
-                 </div>
+                <p className="font-bold text-[18px]">{productData?.name || assignmentData?.projectSiteName || 'Petplans Tower NB'}</p>
+                <div className="text-xs text-gray-600 break-words w-[182px]">
+                  {productData?.specs_rental?.location || assignmentData?.projectSiteLocation || 'EDSA, Guadalupe'}
+                </div>
               </div>
 
               {/* Remarks */}
-              <div>
+              <div className="mt-4">
                 <textarea
-                  className="w-[284px] p-3 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-[182px] h-[64px] p-3 text-xs text-[#c4c4c4] border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   rows={3}
-                  placeholder="Enter remarks..."
+                  placeholder="Remarks"
                   aria-label="Remarks"
                 />
               </div>
@@ -306,90 +417,101 @@ export default function CreateReportPage() {
             {/* Middle Column - Report Details */}
             <div className="space-y-4 flex-1">
               <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <p className="text-[18px] font-medium">RPT#{assignmentData?.saNumber || '000582'}</p>
+                <div className="flex items-center gap-8">
+                  <p className="text-[18px] font-bold">RPT#{assignmentData?.saNumber || '000582'}</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">Date:</label>
-                  <p className="text-sm">{new Date().toLocaleDateString()}</p>
+                <div className="flex items-center gap-8">
+                  <label className="text-xs font-semibold min-w-[120px]">Date:</label>
+                  <p className="text-xs font-medium">{new Date().toLocaleDateString()}</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">SA No.:</label>
-                  <p className="text-sm">{assignmentData?.saNumber || 'SA000582'}</p>
+                <div className="flex items-center gap-8">
+                  <label className="text-xs font-semibold min-w-[120px]">SA No.:</label>
+                  <p className="text-xs font-medium">{assignmentData?.saNumber || 'SA000582'}</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">SA Type:</label>
-                  <p className="text-sm">{assignmentData?.serviceType || 'Roll Up'}</p>
+                <div className="flex items-center gap-8">
+                  <label className="text-xs font-semibold min-w-[120px]">SA Type:</label>
+                  <p className="text-xs font-medium">{assignmentData?.serviceType || 'Roll Up'}</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">Report Type:</label>
-                  <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs">
-                    {assignmentData?.serviceType === "Monitoring" ? (
-                      <option value="Monitoring Report">Monitoring Report</option>
-                    ) : (
-                      <>
-                        <option value="Progress Report">Progress Report</option>
-                        <option value="Completion Report">Completion Report</option>
-                      </>
-                    )}
-                  </select>
+                <div className="flex items-center gap-8">
+                  <label className="text-xs font-semibold min-w-[120px]">Report Type:</label>
+                  <div className="relative flex-1">
+                    <select value={reportType} onChange={(e) => setReportType(e.target.value)} className="w-full pl-2 font-medium text-xs h-[25px] border-[1.2px] border-[#c4c4c4] rounded-[6.05px] text-[#333] focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-8 [&::-webkit-appearance]:none [-webkit-appearance]:none appearance-none">
+                      {assignmentData?.serviceType === "Monitoring" ? (
+                        <option value="Monitoring Report">Monitoring Report</option>
+                      ) : (
+                        <>
+                          <option value="Progress Report">Progress Report</option>
+                          <option value="Completion Report">Completion Report</option>
+                        </>
+                      )}
+                    </select>
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none">
+                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">Site:</label>
-                  <p className="text-sm">{assignmentData?.projectSiteName || 'Petplans Tower NB'}</p>
+                <div className="flex items-center gap-8">
+                  <label className="text-xs font-semibold min-w-[120px]">Site:</label>
+                  <p className="text-xs font-medium">{productData?.name || assignmentData?.projectSiteName || 'Petplans Tower NB'}</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">Campaign Name:</label>
-                  <p className="text-sm">{assignmentData?.campaignName || 'Mcdonald\'s'}</p>
+                <div className="flex items-center gap-8">
+                  <label className="text-xs font-semibold min-w-[120px]">Campaign Name:</label>
+                  <p className="text-xs font-medium">{assignmentData?.campaignName || 'Mcdonald\'s'}</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">Start:</label>
+                <div className="flex items-center gap-8">
+                  <label className="text-xs font-semibold min-w-[120px]">Start:</label>
                   <div className="flex gap-2 flex-1">
-                    <input
-                      type="date"
-                      className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                      defaultValue={new Date().toISOString().split('T')[0]}
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="date"
+                        className="w-full text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded-[6.05px] focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        defaultValue={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
                     <input
                       type="time"
-                      className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+                      className="flex-1 text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden [-webkit-appearance:none] [appearance:none]"
                       defaultValue="10:00"
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">End:</label>
+                <div className="flex items-center gap-8">
+                  <label className="text-xs font-semibold min-w-[120px]">End:</label>
                   <div className="flex gap-2 flex-1">
-                    <input
-                      type="date"
-                      className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                      defaultValue={new Date().toISOString().split('T')[0]}
-                    />
+                    <div className="relative flex-1">
+                      <input
+                        type="date"
+                        className="w-full text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        defaultValue={new Date().toISOString().split('T')[0]}
+                      />
+                    </div>
                     <input
                       type="time"
-                      className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+                      className="flex-1  text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden [-webkit-appearance:none] [appearance:none]"
                       defaultValue="10:00"
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <label className="text-sm font-semibold min-w-[120px]">Crew:</label>
+                <div className="flex items-center gap-8">
+                  <label className="text-xs font-semibold min-w-[120px]">Crew:</label>
                   <input
                     type="text"
-                    className="flex-1 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                    defaultValue={assignmentData?.assignedTo || ''}
-                    placeholder="Enter crew name"
+                    className="flex-1  text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent "
+                    value={(assignmentData?.crew && teamsMap[assignmentData.crew]) || (assignmentData?.assignedTo && teamsMap[assignmentData.assignedTo]) || assignmentData?.crew || assignmentData?.assignedTo || ''}
+                    readOnly
                   />
                 </div>
                 {reportType !== "Monitoring Report" && (
-                  <div className="flex items-center gap-4">
-                    <label className="text-sm font-semibold min-w-[120px]">Status:</label>
+                  <div className="flex items-center gap-8">
+                    <label className="text-xs font-semibold min-w-[120px]">Status:</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
                         min="0"
                         max="100"
-                        className="w-20 p-2 border border-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+                        className="w-20  text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                         defaultValue={assignmentData?.status === "Completed" ? 100 : 50}
                       />
                       <span className="text-sm text-gray-600">of 100%</span>
@@ -403,35 +525,28 @@ export default function CreateReportPage() {
             <div className="space-y-6 flex-1">
               {assignmentData?.serviceType === "Monitoring" ? (
                 /* Photos for Monitoring */
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">Photos:</h4>
-                  <div className="bg-gray-100 rounded-lg p-6">
-                    <div className="mb-4">
+                <div className="h-[140px]">
+                  <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">Photos: </h4>
+                  <div className="bg-gray-100 rounded-lg p-3">
+                    <div className="mb-1">
                       {beforePhotos.length > 0 ? (
-                        <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
+                        <div className="flex items-start gap-2 overflow-x-auto flex-1 min-w-0">
                           {/* Image Previews */}
-                          <div className="flex gap-2 flex-shrink-0">
+             
                             {beforePhotos.map((file, index) => (
                               <div key={index} className="relative flex-shrink-0">
                                 <Image
                                   src={URL.createObjectURL(file)}
                                   alt={`Photo ${index + 1}`}
-                                  width={96}
-                                  height={96}
-                                  className="w-24 h-24 object-cover rounded border"
+                                  width={85}
+                                  height={85}
+                                  className="h-[85px] w-[85px] object-cover rounded border"
                                 />
-                                <button
-                                  onClick={() => setBeforePhotos(prev => prev.filter((_, i) => i !== index))}
-                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                                  aria-label="Remove photo"
-                                >
-                                  ×
-                                </button>
                               </div>
                             ))}
-                          </div>
 
-                          <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
+                          {/* Upload Button - Fixed Width */}
+                          <div className="h-[85px] w-[85px] border-2 border-dashed border-[#c4c4c4] rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0">
                             <input
                               type="file"
                               accept="image/*"
@@ -451,7 +566,7 @@ export default function CreateReportPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
+                        <div className="w-24 h-24 border-2 border-dashed border-[#c4c4c4] rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
                           <input
                             type="file"
                             accept="image/*"
@@ -477,41 +592,43 @@ export default function CreateReportPage() {
                       rows={1}
                       placeholder="Add note..."
                       aria-label="Photos Note"
+                      value={photosNote}
+                      onChange={(e) => setPhotosNote(e.target.value)}
                     />
                   </div>
                 </div>
               ) : (
                 <>
                   {/* Before SA Photos */}
-                  <div>
-                    <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">Before SA Photos:</h4>
-                    <div className="bg-gray-100 rounded-lg p-6">
-                      <div className="mb-4">
+                  <div >
+                    <h4 className="text-xs flex justify-between font-semibold text-gray-900 mb-3 leading-[100%]">Before SA Photos: <SquarePen className='h-4 w-4 text-gray-500' /> </h4>
+                    <div className="bg-gray-100 rounded-lg p-3 h-[140px]">
+                      <div className='mb-1'>
                         {beforePhotos.length > 0 ? (
-                          <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
+                          <div className="flex items-start gap-2 overflow-x-auto flex-1 min-w-0">
                             {/* Image Previews */}
-                            <div className="flex gap-2 flex-shrink-0">
-                              {beforePhotos.map((file, index) => (
-                                <div key={index} className="relative flex-shrink-0">
-                                  <Image
-                                    src={URL.createObjectURL(file)}
-                                    alt={`Before photo ${index + 1}`}
-                                    width={96}
-                                    height={96}
-                                    className="w-24 h-24 object-cover rounded border"
-                                  />
-                                  <button
+                            {beforePhotos.map((file, index) => (
+                              <div key={index} className="relative flex-shrink-0">
+                                <Image
+                                  src={URL.createObjectURL(file)}
+                                  alt={`Before photo ${index + 1}`}
+                                  width={85}
+                                  height={85}
+                                  className="h-[85px] w-[85px] object-cover rounded border"
+                                />
+                                {/* <button
                                     onClick={() => setBeforePhotos(prev => prev.filter((_, i) => i !== index))}
-                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
+                                    className="absolute top-1 right-0 w-3 h-3 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
                                     aria-label="Remove photo"
                                   >
                                     ×
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
+                                  </button> */}
+                              </div>
+                            ))}
 
-                            <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
+
+                            {/* Upload Button - Fixed Width */}
+                            <div className="w-[85px] h-[85px] border-2 border-dashed border-[#c4c4c4] rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0">
                               <input
                                 type="file"
                                 accept="image/*"
@@ -531,7 +648,7 @@ export default function CreateReportPage() {
                             </div>
                           </div>
                         ) : (
-                          <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
+                          <div className="w-[85px] h-[85px] border-2 border-dashed border-[#c4c4c4] rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
                             <input
                               type="file"
                               accept="image/*"
@@ -553,44 +670,45 @@ export default function CreateReportPage() {
                       </div>
 
                       <textarea
-                        className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                        className="w-[85px] h-[25px] border border-[#c4c4c4] text-[#c4c4c4] text-xs rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
                         rows={1}
                         placeholder="Add note..."
                         aria-label="Before SA Photos Note"
+                        value={beforePhotoNote}
+                        onChange={(e) => setBeforePhotoNote(e.target.value)}
                       />
                     </div>
                   </div>
 
                   {/* After SA Photos */}
                   <div>
-                    <h4 className="text-xs font-semibold text-gray-900 mb-3 leading-[100%]">After SA Photos:</h4>
-                    <div className="bg-gray-100 rounded-lg p-6">
-                      <div className="mb-4">
+                    <h4 className="text-xs flex justify-between font-semibold text-gray-900 mb-3 leading-[100%]">After SA Photos: <SquarePen className='h-4 w-4 text-gray-500' /> </h4>
+                    <div className="bg-gray-100 rounded-lg p-3 h-[140px]">
+                      <div className="mb-1">
                         {afterPhotos.length > 0 ? (
-                          <div className="flex items-start gap-4 overflow-x-auto pb-2 min-w-0">
+                          <div className="flex items-start gap-2 overflow-x-auto flex-1 min-w-0">
                             {/* Image Previews */}
-                            <div className="flex gap-2 flex-shrink-0">
-                              {afterPhotos.map((file, index) => (
-                                <div key={index} className="relative flex-shrink-0">
-                                  <Image
-                                    src={URL.createObjectURL(file)}
-                                    alt={`After photo ${index + 1}`}
-                                    width={96}
-                                    height={96}
-                                    className="w-24 h-24 object-cover rounded border"
-                                  />
-                                  <button
+                            {afterPhotos.map((file, index) => (
+                              <div key={index} className="relative flex-shrink-0">
+                                <Image
+                                  src={URL.createObjectURL(file)}
+                                  alt={`After photo ${index + 1}`}
+                                  width={85}
+                                  height={85}
+                                  className="h-[85px] w-[85px] object-cover rounded border"
+                                />
+                                {/* <button
                                     onClick={() => setAfterPhotos(prev => prev.filter((_, i) => i !== index))}
                                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
                                     aria-label="Remove photo"
                                   >
                                     ×
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
+                                  </button> */}
+                              </div>
+                            ))}
 
-                            <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0 ml-auto">
+                            {/* Upload Button - Fixed Width */}
+                            <div className="w-[85px] h-[85px] border-2 border-dashed border-[#c4c4c4] rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center flex-shrink-0">
                               <input
                                 type="file"
                                 accept="image/*"
@@ -610,7 +728,7 @@ export default function CreateReportPage() {
                             </div>
                           </div>
                         ) : (
-                          <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
+                          <div className="w-[85px] h-[85px] border-2 border-dashed border-[#c4c4c4] rounded-lg bg-gray-200 hover:bg-gray-100 transition-colors flex items-center justify-center">
                             <input
                               type="file"
                               accept="image/*"
@@ -632,10 +750,12 @@ export default function CreateReportPage() {
                       </div>
 
                       <textarea
-                        className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                        className="w-[85px] h-[25px] text-xs border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
                         rows={1}
                         placeholder="Add note..."
                         aria-label="After SA Photos Note"
+                        value={afterPhotoNote}
+                        onChange={(e) => setAfterPhotoNote(e.target.value)}
                       />
                     </div>
                   </div>
@@ -660,7 +780,6 @@ export default function CreateReportPage() {
               >
                 {creatingReport ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
                     Generating...
                   </>
                 ) : (

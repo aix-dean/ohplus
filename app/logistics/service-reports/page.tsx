@@ -1,10 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, Search, MoreVertical, Bell } from "lucide-react"
+import { Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
@@ -27,18 +25,10 @@ export default function ServiceReportsPage() {
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [postedReportId, setPostedReportId] = useState<string>("")
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleString())
 
   const router = useRouter()
   const { user, userData } = useAuth()
   const { toast } = useToast()
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date().toLocaleString())
-    }, 60000) // update every minute
-    return () => clearInterval(interval)
-  }, [])
 
   // Single useEffect to handle all data fetching
   useEffect(() => {
@@ -148,18 +138,6 @@ export default function ServiceReportsPage() {
     router.push(`/logistics/reports/${reportId}`)
   }
 
-  const handleEditReport = (reportId: string) => {
-    router.push(`/logistics/reports/${reportId}/edit`)
-  }
-
-  const handleDeleteReport = (reportId: string) => {
-    // Implement delete functionality
-    toast({
-      title: "Delete Report",
-      description: "Delete functionality will be implemented",
-    })
-  }
-
   // Pagination handlers
   const handleNextPage = () => {
     if (hasNextPage) {
@@ -173,165 +151,107 @@ export default function ServiceReportsPage() {
     }
   }
 
+  const handleCreateReport = () => {
+    router.push('/logistics/reports/select-service-assignment')
+  }
+
+  const handleHistory = () => {
+    // No function for now
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
-
-
-
-      {/* Reports Title */}
-      <div className="px-6 py-6">
-        <h2 className="text-2xl font-semibold text-gray-900">Reports</h2>
-      </div>
-
-      {/* Search */}
-      <div className="px-6 pb-4">
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-sm">
-            <div className="bg-white rounded-[15px] border-2 border-gray-300 px-4 flex items-center h-10">
-              <Search className="h-4 w-4 text-gray-400 mr-2 border-none" />
-              <Input
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="border-0 p-0 focus:ring-0 focus-visible:ring-0 focus:outline-none focus:border-transparent text-gray-400 h-[90%] rounded-none"
-              />
-            </div>
+    <div className="min-h-screen">
+      <div className="w-full mx-auto">
+        {/* Header with title and buttons */}
+        <div className="flex justify-between items-center px-6 py-6">
+          <h1 className="text-lg font-medium text-gray-900">Reports</h1>
+          <div className="flex gap-2">
+            <button onClick={handleHistory} className="text-xs w-[103px] h-6 border-[#c4c4c4] border-[2px] rounded-[5px]">
+              History
+            </button>
+            <button onClick={handleCreateReport} className="text-xs w-[103px] h-6 border-[#c4c4c4] border-[2px] rounded-[5px]">
+              Create Report
+            </button>
           </div>
         </div>
-      </div>
 
-      {/* Reports Table */}
-      <div className="bg-white mx-6 rounded-t-lg border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full table-fixed min-w-[800px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                  Date
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                  Report ID
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Site</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
-                  Campaign Name
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
-                  Type
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                  Sender
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
-                  Attachments
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                      <span className="ml-2">Loading reports...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : reports.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                    No reports found
-                  </td>
-                </tr>
-              ) : (
-                reports.map((report, index) => (
-                  <>
-                    <tr key={report.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-20">
-                        {formatDate(report.date || report.created)}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 w-24">
-                        {generateReportNumber(report.id || "")}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-32 truncate">
-                        {report.siteName || "Unknown Site"}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-40 truncate">
-                        {report.client || "N/A"}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-28 truncate">
-                        {getReportTypeDisplay(report.reportType)}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-32 truncate">
-                        LOG- {report.createdByName || "Unknown User"}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900 w-40">
-                        {report.attachments.length > 0 ? (
-                          <a
-                            href={report.attachments[0].fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 underline truncate block max-w-full"
-                          >
-                            {report.attachments[0].fileName}
-                          </a>
-                        ) : (
-                          "N/A"
-                        )}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 w-20">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="p-1">
-                              <div className="w-6 h-6 flex items-center justify-center">
-                                <div className="w-1 h-1 bg-gray-400 rounded-full"></div>
-                                <div className="w-1 h-1 bg-gray-400 rounded-full ml-1"></div>
-                                <div className="w-1 h-1 bg-gray-400 rounded-full ml-1"></div>
-                              </div>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleViewReport(report.id!)}>View Report</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditReport(report.id!)}>Edit Report</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDeleteReport(report.id!)} className="text-red-600">
-                              Delete Report
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                    {index < reports.length - 1 && (
-                      <tr>
-                        <td colSpan={8} className="p-0">
-                          <hr className="border-gray-200 mx-4" />
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* Search */}
+        <div className="mb-4 px-6">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-64 h-6 pl-8 pr-2 py-2 rounded-full bg-white border border-gray-300 text-gray-500 text-sm"
+            />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          </div>
         </div>
+
+        {/* Reports Grid */}
+        <div className="bg-white rounded-t-lg overflow-hidden shadow-sm mx-6">
+          <div className="grid grid-cols-7 gap-4 p-4 border-b mx-4 border-gray-200 text-xs font-semibold text-left">
+            <div>Date</div>
+            <div>Report ID</div>
+            <div>Site</div>
+            <div>Campaign Name</div>
+            <div>Type</div>
+            <div>Sender</div>
+            <div>Attachments</div>
+          </div>
+
+          <div className="p-4 space-y-2 relative">
+            {loading ? (
+              <div className="text-center py-8 text-gray-500">
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                  <span className="ml-2">Loading reports...</span>
+                </div>
+              </div>
+            ) : reports.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No reports found
+              </div>
+            ) : (
+              reports.map((report) => (
+                <div
+                  key={report.id}
+                  className="rounded-lg bg-blue-50 border border-blue-200 p-4 cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => handleViewReport(report.id!)}
+                >
+                  <div className="grid grid-cols-7 gap-4 text-sm">
+                    <div>{formatDate(report.date || report.created)}</div>
+                    <div>{generateReportNumber(report.id || "—")}</div>
+                    <div className="truncate">{report.siteName || "—"}</div>
+                    <div className="truncate">{report.client || "—"}</div>
+                    <div className="truncate">{getReportTypeDisplay(report.reportType)}</div>
+                    <div className="truncate">LOG- {report.createdByName || "—"}</div>
+                    <div className="truncate">
+                      {report.attachments.length > 0 ? report.attachments[0].fileName : "—"}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Pagination Controls */}
+        {reports.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            totalItems={reports.length}
+            onNextPage={handleNextPage}
+            onPreviousPage={handlePreviousPage}
+            hasMore={hasNextPage}
+          />
+        )}
+
+        {/* Report Post Success Dialog */}
+        <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />
       </div>
-
-      {/* Pagination Controls */}
-      {reports.length > 0 && (
-        <Pagination
-          currentPage={currentPage}
-          itemsPerPage={itemsPerPage}
-          totalItems={reports.length}
-          onNextPage={handleNextPage}
-          onPreviousPage={handlePreviousPage}
-          hasMore={hasNextPage}
-        />
-      )}
-
-      {/* Report Post Success Dialog */}
-      <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />
     </div>
   )
 }
