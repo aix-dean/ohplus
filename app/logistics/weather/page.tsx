@@ -174,7 +174,7 @@ export default function LogisticsWeatherPage() {
   }
 
   return (
-    <main className="flex-1 flex flex-col p-4">
+    <main className="flex-1 flex flex-col p-4 2xl:h-[80vh]">
       <div className="flex justify-between items-center mb-6">
         <h1 style={{
           color: 'var(--LIGHTER-BLACK, #333)',
@@ -188,9 +188,9 @@ export default function LogisticsWeatherPage() {
 
 
       {/* Two Column Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4 items-stretch h-[80vh]">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4 items-stretch min-h-screen">
         {/* Do I need to roll down today? */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-1 flex flex-col">
+        <div className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-1 flex flex-col xl:h-[80vh]">
           <div className="flex items-center justify-between mb-4">
             <h2 style={{
               color: 'var(--LIGHTER-BLACK, #333)',
@@ -253,7 +253,7 @@ export default function LogisticsWeatherPage() {
         </div>
 
         {/* Second Column Container */}
-        <div className="space-y-6 lg:col-span-2 flex flex-col flex-1 min-h-0">
+        <div className="space-y-6 lg:col-span-2 flex flex-col flex-1 min-h-0 xl:h-[80vh]">
           <div className="bg-white rounded-2xl p-6 border-0">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-[15.006px] font-semibold text-[#333] leading-none font-['Inter'] text-center">Weekly Weather Forecast</h2>
@@ -321,7 +321,7 @@ export default function LogisticsWeatherPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1.2fr] gap-6 flex-1 min-h-0">
+          <div className="grid grid-cols-2 xl:grid-cols-[1.3fr_1.2fr] gap-6 flex-1 min-h-0">
           {/* Publikong Impormasyon */}
           <div className="bg-white rounded-2xl shadow-lg p-4 flex flex-col flex-1 min-h-0">
           <h3 className="mb-2 flex items-center justify-between" style={{
@@ -336,45 +336,45 @@ export default function LogisticsWeatherPage() {
             <ChevronRight className="w-5 h-5" />
           </h3>
           <div className="relative flex items-center justify-center flex-1">
-              {videoLoading ? (
-                <div className="w-[85%] aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
-                  <div className="text-gray-600">Loading video...</div>
+            {videoLoading ? (
+              <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                <div className="text-gray-600">Loading video...</div>
+              </div>
+            ) : videoError ? (
+              <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                <div className="text-red-600 text-center">
+                  <div className="font-semibold mb-2">Failed to load video</div>
+                  <div className="text-sm">{videoError}</div>
                 </div>
-              ) : videoError ? (
-                <div className="w-[85%] aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
-                  <div className="text-red-600 text-center">
-                    <div className="font-semibold mb-2">Failed to load video</div>
-                    <div className="text-sm">{videoError}</div>
-                  </div>
-                </div>
-              ) : videoUrl ? (
-                <video
-                  className="w-[85%] aspect-square bg-gray-200 rounded-lg object-cover"
-                  controls
-                  autoPlay
-                  muted
-                  loop
-                  src={videoUrl}
-                  poster=""
-                  data-testid="video-element"
-                  onLoadStart={() => console.log('Weather page: Video load started')}
-                  onCanPlay={() => console.log('Weather page: Video can play')}
-                  onPlay={() => console.log('Weather page: Video started playing (autoplay working)')}
-                  onError={(e) => console.log('Weather page: Video error:', e)}
-                  onPause={() => console.log('Weather page: Video paused')}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              ) : (
-                <div className="w-[85%] aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
-                  <div className="text-gray-600">No video available</div>
-                </div>
-              )}
-            </div>
+              </div>
+            ) : videoUrl ? (
+              <video
+                className="w-[90%] aspect-square bg-gray-200 rounded-lg object-cover"
+                controls
+                autoPlay
+                muted
+                loop
+                src={videoUrl}
+                poster=""
+                data-testid="video-element"
+                onLoadStart={() => console.log('Weather page: Video load started')}
+                onCanPlay={() => console.log('Weather page: Video can play')}
+                onPlay={() => console.log('Weather page: Video started playing (autoplay working)')}
+                onError={(e) => console.log('Weather page: Video error:', e)}
+                onPause={() => console.log('Weather page: Video paused')}
+              >
+                Your browser does not support the video tag.
+              </video>
+            ) : (
+              <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                <div className="text-gray-600">No video available</div>
+              </div>
+            )}
+          </div>
           </div>
 
           {/* OOH News for you */}
-           <div className="bg-white rounded-2xl shadow-lg p-6 flex-1 flex flex-col flex-1 min-h-0 overflow-y-auto">
+           <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col overflow-y-auto">
              <div className="flex flex-col min-h-0 overflow-hidden">
                <h3 className="mb-4" style={{
                  color: 'var(--LIGHTER-BLACK, #333)',
@@ -396,7 +396,7 @@ export default function LogisticsWeatherPage() {
                    </div>
                  </div>
                ) : (
-                 <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-1 gap-4 flex-1">
+                 <div className="flex flex-col gap-4">
                    {newsItems.map((item, index) => (
                      <div
                        key={item.id || index}
