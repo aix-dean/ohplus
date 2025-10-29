@@ -246,7 +246,7 @@ export default function LogisticsWeatherPage() {
             ))}
           </div> */}
           <div className="mt-auto">
-            <button className="w-full text-white px-8 py-3 font-semibold hover:opacity-90 transition-colors" style={{borderRadius: '10px', background: '#1D0BEB'}} onClick={() => router.push('/logistics/assignments/create')}>
+            <button className="w-full text-white px-8 py-2 font-semibold hover:opacity-90 transition-colors" style={{borderRadius: '10px', background: '#1D0BEB'}} onClick={() => router.push('/logistics/assignments/create')}>
               Create Service Assignment
             </button>
           </div>
