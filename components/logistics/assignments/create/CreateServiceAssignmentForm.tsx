@@ -93,7 +93,7 @@ function JobOrderDetailsCard({
         </div>
         <div className="flex items-center">
           <Label className={`${fieldLabelClass} w-1/2`} style={{ textAlign: 'left' }}>Attachment:</Label>
-          {jobOrder.siteImageUrl || (jobOrder.attachments && jobOrder.attachments.length > 0) ? (
+          {jobOrder.siteImageUrl || jobOrder.attachments ? (
             <span className={`w-1/2 ${fieldValueClass} m-0 p-0 text-blue-500 underline font-bold cursor-pointer`} onClick={() => setIsDialogOpen(true)}>View Attachment</span>
           ) : (
             <p className={`w-1/2 ${fieldValueClass} m-0 p-0 text-gray-500`}>No attachments</p>
@@ -111,7 +111,7 @@ function JobOrderDetailsCard({
     </Card>
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <DialogContent className="max-w-4xl">
-        <img src={jobOrder.siteImageUrl || ''} alt="Attachment" className="mx-auto max-w-full h-auto" />
+        <img src={(jobOrder.attachments ? jobOrder.attachments.url : jobOrder.siteImageUrl) || ''} alt="Attachment" className="mx-auto max-w-full h-auto" />
         <DialogClose asChild>
           <Button variant="ghost" size="sm" className="absolute top-2 right-2">
             <X className="h-4 w-4" />

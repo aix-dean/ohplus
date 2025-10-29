@@ -78,16 +78,13 @@ function JobOrderDetailsCard({
               alt="Site Image"
               className="rounded-md h-32 w-32 object-cover"
             />
-          ) : jobOrder.attachments && jobOrder.attachments.length > 0 ? (
+          ) : jobOrder.attachments ? (
             <div className="grid grid-cols-2 gap-2">
-              {jobOrder.attachments.slice(0, 4).map((attachment, index) => (
-                <img
-                  key={index}
-                  src={attachment.url}
-                  alt={attachment.name}
-                  className="rounded-md h-16 w-16 object-cover"
-                />
-              ))}
+              <img
+                src={jobOrder.attachments.url}
+                alt={jobOrder.attachments.name}
+                className="rounded-md h-16 w-16 object-cover"
+              />
             </div>
           ) : (
             <p className="text-gray-500">No attachments</p>
@@ -590,7 +587,7 @@ export function ServiceAssignmentCard({
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-1">
                     {(() => {
-                      const imgSrc = selectedJobOrder?.siteImageUrl || "/logistics-sa-create-dl.png";
+                      const imgSrc = selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl || "/logistics-sa-create-dl.png";
                       return (
                         <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
                           <div className="relative">
@@ -611,7 +608,7 @@ export function ServiceAssignmentCard({
                   </div>
                   <div className="space-y-1">
                     {(() => {
-                      const imgSrc = selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl || "/logistics-sa-create-dl.png";
+                      const imgSrc = selectedJobOrder?.attachments?.url || "/logistics-sa-create-dl.png";
                       return (
                         <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
                           <div className="relative">

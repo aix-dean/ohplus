@@ -53,10 +53,12 @@ vi.mock('@/lib/utils', () => ({
 }))
 
 vi.mock('lucide-react', () => ({
+  Calendar: () => <div data-testid="calendar-icon" />,
   CalendarIcon: () => <div data-testid="calendar-icon" />,
   Search: () => <div data-testid="search-icon" />,
   X: () => <div data-testid="x-icon" />,
   ArrowRight: () => <div data-testid="arrow-right-icon" />,
+  FileText: () => <div data-testid="file-text-icon" />,
 }))
 
 vi.mock('date-fns', () => ({

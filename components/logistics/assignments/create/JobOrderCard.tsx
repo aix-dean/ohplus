@@ -8,16 +8,6 @@ import { MoreVertical } from 'lucide-react';
 import { JobOrderSelectionDialog } from './JobOrderSelectionDialog';
 import type { JobOrder } from '@/lib/types/job-order';
 
-interface JobOrder {
-  id: string;
-  jo_number: string;
-  campaign_name: string;
-  product_id: string;
-  name: string; // Add name field
-  description: string; // Add description field
-  siteImageUrl: string; // Add siteImageUrl field
-}
-
 interface JobOrderCardProps {
   company_id: string;
   product_id: string; // Add product_id prop
@@ -118,7 +108,7 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
                     className="w-full justify-start mb-2"
                     onClick={() => handleSelectJobOrder(jobOrder)}
                   >
-                    JO#: {jobOrder.jo_number} - {jobOrder.name} - {jobOrder.description}
+                    JO#: {jobOrder.joNumber} - {jobOrder.siteName} - {jobOrder.jobDescription}
                   </Button>
                 ))}
               </div>
@@ -131,11 +121,11 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>JO#:</Label>
-                <p className="font-medium">{selectedJobOrder.jo_number}</p>
+                <p className="font-medium">{selectedJobOrder.joNumber}</p>
               </div>
               <div className="space-y-2">
                 <Label>Campaign Name:</Label>
-                <p className="font-medium">{selectedJobOrder.campaign_name}</p>
+                <p className="font-medium">{selectedJobOrder.campaignName}</p>
               </div>
             </div>
             {/* You can add more fields from selectedJobOrder here */}
@@ -153,7 +143,12 @@ export function JobOrderCard({ company_id, product_id, onHideJobOrderCard }: Job
               <Label>Attachment:</Label>
               <div className="space-y-1">
                 <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
-                  <img src={selectedJobOrder.siteImageUrl || "/logistics-sa-create-dl.png"} alt="Attachment" className="rounded-md h-6 w-6 object-cover" />
+                  <img
+                    src={selectedJobOrder.attachments?.url || "/logistics-sa-create-dl.png"}
+                    alt="Attachment"
+                    className="rounded-md h-6 w-6 object-cover cursor-pointer"
+                    onClick={() => window.open(selectedJobOrder.attachments?.url || "/logistics-sa-create-dl.png", '_blank')}
+                  />
                   <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8', marginTop: '5px' }}>Upload</p>
                 </div>
               </div>
