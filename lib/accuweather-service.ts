@@ -321,7 +321,7 @@ export async function getPhilippinesWeatherData(locationKey = "264885"): Promise
       const processedForecast = forecast.DailyForecasts.slice(0, 5).map((day) => {
         const date = new Date(day.Date)
         return {
-          date: day.Date,
+          date: day.Date.split('T')[0], // Normalize to date-only string
           dayOfWeek: date.toLocaleDateString("en-US", { weekday: "long" }),
           temperature: {
             min: Math.round(day.Temperature.Minimum.Value),
