@@ -5,7 +5,7 @@ import { addDays, format } from "date-fns"
 import type { DateRange } from "react-day-picker"
 import type { WeatherForecast } from "@/lib/weather-service"
 import { getLatestVideoByCategory, getNewsItemsByCategory, type ContentMedia } from "@/lib/firebase-service"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
 import { DateRangePicker } from "@/components/ui/date-range-picker"
 import { ComingSoonModal } from "@/components/coming-soon-dialog"
 import { Button } from "@/components/ui/button"
@@ -155,8 +155,8 @@ export default function LogisticsWeatherPage() {
   const handleNewsItemClick = (item: ContentMedia) => {
     console.log('News item click handler called for item:', item.title || 'Untitled')
 
-    // Get the URL from the first media item
-    const url = item.media?.[0]?.url
+    // Construct the URL using the content id
+    const url = `https://oohshop.online/content/${item.id}`
     console.log('News item URL:', url)
 
     if (url) {
@@ -174,18 +174,32 @@ export default function LogisticsWeatherPage() {
   }
 
   return (
-    <main className="flex-1 overflow-auto p-4">
+    <main className="flex-1 flex flex-col p-4">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">News and Weather</h1>
+        <h1 style={{
+          color: 'var(--LIGHTER-BLACK, #333)',
+          fontFamily: 'Inter',
+          fontSize: '16px',
+          fontStyle: 'normal',
+          fontWeight: 700,
+          lineHeight: '100%'
+        }}>News and Weather</h1>
       </div>
 
 
       {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4 items-stretch h-[80vh]">
         {/* Do I need to roll down today? */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-1">
+        <div className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-1 flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-800">Do I need to roll down today?</h2>
+            <h2 style={{
+              color: 'var(--LIGHTER-BLACK, #333)',
+              fontFamily: 'Inter',
+              fontSize: '15.006px',
+              fontStyle: 'normal',
+              fontWeight: 600,
+              lineHeight: '100%'
+            }}>Do I need to roll down today?</h2>
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle cx="10" cy="10" r="9" stroke="var(--LIGHTER-BLACK, #333)" stroke-width="1.501"/>
               <text x="10" y="10" text-anchor="middle" dominant-baseline="middle" fill="var(--LIGHTER-BLACK, #333)" font-family="Inter" font-size="15.006" font-weight="400">?</text>
@@ -196,21 +210,21 @@ export default function LogisticsWeatherPage() {
             <span className="text-lg text-gray-600">Oscar</span>
           </div> */}
           {/* <div className="text-6xl font-bold text-green-500 text-center mb-6">No</div> */}
-          <div className="flex justify-center mt-20 mb-6">
+          <div className="flex justify-center mt-10 mb-6 flex-1 items-center">
             <div className="flex flex-col gap-4 items-center py-5">
               {/* Illustration */}
               <div className="flex-shrink-0">
                 <img
                   src="/coming-soon-oscar.png"
                   alt="Coming soon illustration"
-                  className="h-56 w-56 object-contain"
+                  className="h-32 w-32 sm:h-40 sm:w-40 lg:h-56 lg:w-56 object-contain"
                 />
               </div>
 
               {/* Text content */}
-              <div className="flex flex-col justify-center text-center">
-                <h2 className="mb-2 text-[#333] font-inter text-[24px] font-bold leading-none">Coming soon!</h2>
-                <p className="text-[#333] font-inter text-[16px] font-light leading-none">
+              <div className="flex flex-col justify-center text-center mb-10">
+                <h2 className="mb-2 text-[#333] font-inter text-[28px] font-bold leading-none">Coming soon!</h2>
+                <p className="text-[#333] font-inter text-[18px] font-light leading-none">
                   We are working hard to make this feature available to you as soon as possible!
                 </p>
               </div>
@@ -231,15 +245,15 @@ export default function LogisticsWeatherPage() {
               </div>
             ))}
           </div> */}
-          <div className="flex justify-center mt-4">
-            <button className="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors" onClick={() => router.push('/logistics/assignments/create')}>
+          <div className="mt-auto">
+            <button className="w-full text-white px-8 py-3 font-semibold hover:opacity-90 transition-colors" style={{borderRadius: '10px', background: '#1D0BEB'}} onClick={() => router.push('/logistics/assignments/create')}>
               Create Service Assignment
             </button>
           </div>
         </div>
 
         {/* Second Column Container */}
-        <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-6 lg:col-span-2 flex flex-col flex-1 min-h-0">
           <div className="bg-white rounded-2xl p-6 border-0">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-[15.006px] font-semibold text-[#333] leading-none font-['Inter'] text-center">Weekly Weather Forecast</h2>
@@ -286,11 +300,11 @@ export default function LogisticsWeatherPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex justify-around">
-                {weatherData?.forecast.slice(0, 5).map((item, index) => (
-                  <>
-                    <div key={index} className="text-center min-w-[80px] flex-shrink-0">
-                      <div className="text-sm font-medium text-gray-600 mb-2">{format(new Date(item.date), 'MMM d')} - {item.dayOfWeek}</div>
+              <div className="flex flex-col sm:flex-row justify-around items-center gap-0">
+                {weatherData?.forecast.slice(0, 5).flatMap((item, index) => [
+                  <div key={`day-${index}`} className="flex flex-col items-center">
+                    <div className="text-center min-w-[60px] sm:min-w-[80px] flex-shrink-0">
+                      <div className="text-sm font-medium text-gray-600 mb-2">{format(new Date(item.date), 'MMM d')} - {format(new Date(item.date), 'EEE')}</div>
                       <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center">
                         <img
                           src={getWeatherIcon(item.icon)}
@@ -300,24 +314,34 @@ export default function LogisticsWeatherPage() {
                       </div>
                       <div className="text-[15.006px] font-semibold text-[#333] text-center leading-none font-['Inter']">{item.temperature.max}°</div>
                     </div>
-                    {index < 4 && <div className="flex-shrink-0 self-center" style={{background: 'rgba(0, 0, 0, 0.25)', width: '1.501px', height: '125.802px'}}></div>}
-                  </>
-                ))}
+                  </div>,
+                  index < 4 ? <div key={`divider-${index}`} className="flex-shrink-0 self-center hidden sm:block" style={{background: 'rgba(0, 0, 0, 0.25)', width: '1.501px', height: '125.802px'}}></div> : null
+                ]).filter(Boolean)}
               </div>
             )}
           </div>
 
-          <div className="flex flex-col lg:flex-row gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.3fr_1.2fr] gap-6 flex-1 min-h-0">
           {/* Publikong Impormasyon */}
-          <div className="bg-white rounded-2xl shadow-lg p-6 flex-1 aspect-square">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">Publikong Impormasyon</h3>
-            <div className="relative">
+          <div className="bg-white rounded-2xl shadow-lg p-4 flex flex-col flex-1 min-h-0">
+          <h3 className="mb-2 flex items-center justify-between" style={{
+            color: 'var(--LIGHTER-BLACK, #333)',
+            fontFamily: 'Inter',
+            fontSize: '15.006px',
+            fontStyle: 'normal',
+            fontWeight: 600,
+            lineHeight: '100%'
+          }}>
+            Publikong Impormasyon
+            <ChevronRight className="w-5 h-5" />
+          </h3>
+          <div className="relative flex items-center justify-center flex-1">
               {videoLoading ? (
-                <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                <div className="w-[85%] aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
                   <div className="text-gray-600">Loading video...</div>
                 </div>
               ) : videoError ? (
-                <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                <div className="w-[85%] aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
                   <div className="text-red-600 text-center">
                     <div className="font-semibold mb-2">Failed to load video</div>
                     <div className="text-sm">{videoError}</div>
@@ -325,7 +349,7 @@ export default function LogisticsWeatherPage() {
                 </div>
               ) : videoUrl ? (
                 <video
-                  className="w-full aspect-square bg-gray-200 rounded-lg mb-4"
+                  className="w-[85%] aspect-square bg-gray-200 rounded-lg object-cover"
                   controls
                   autoPlay
                   muted
@@ -342,7 +366,7 @@ export default function LogisticsWeatherPage() {
                   Your browser does not support the video tag.
                 </video>
               ) : (
-                <div className="w-full aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
+                <div className="w-[85%] aspect-square bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
                   <div className="text-gray-600">No video available</div>
                 </div>
               )}
@@ -350,55 +374,69 @@ export default function LogisticsWeatherPage() {
           </div>
 
           {/* OOH News for you */}
-           <div className="bg-white rounded-2xl shadow-lg p-6 flex-1">
-             <h3 className="text-xl font-semibold text-gray-800 mb-4">OOH News for you</h3>
-             {newsLoading ? (
-               <div className="flex items-center justify-center py-8">
-                 <div className="text-gray-600">Loading news items...</div>
-               </div>
-             ) : newsError ? (
-               <div className="flex items-center justify-center py-8">
-                 <div className="text-red-600 text-center">
-                   <div className="font-semibold mb-2">Failed to load news items</div>
-                   <div className="text-sm">{newsError}</div>
+           <div className="bg-white rounded-2xl shadow-lg p-6 flex-1 flex flex-col flex-1 min-h-0 overflow-y-auto">
+             <div className="flex flex-col min-h-0 overflow-hidden">
+               <h3 className="mb-4" style={{
+                 color: 'var(--LIGHTER-BLACK, #333)',
+                 fontFamily: 'Inter',
+                 fontSize: '15.006px',
+                 fontStyle: 'normal',
+                 fontWeight: 600,
+                 lineHeight: '100%'
+               }}>OOH News for you</h3>
+               {newsLoading ? (
+                 <div className="flex items-center justify-center py-8">
+                   <div className="text-gray-600">Loading news items...</div>
                  </div>
-               </div>
-             ) : (
-               <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-1 gap-4">
-                 {newsItems.map((item, index) => (
-                   <div
-                     key={item.id || index}
-                     className="border border-gray-200 rounded-lg p-4 flex items-center space-x-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                     onClick={() => handleNewsItemClick(item)}
-                   >
-                     <div className="w-16 h-16 bg-gray-300 rounded-lg flex-shrink-0 overflow-hidden">
-                       {item.thumbnail ? (
-                         <img
-                           src={item.thumbnail}
-                           alt={item.title || "News thumbnail"}
-                           className="w-full h-full object-cover"
-                         />
-                       ) : (
-                         <div className="w-full h-full bg-gray-300 flex items-center justify-center">
-                           <span className="text-xs text-gray-500">No image</span>
-                         </div>
-                       )}
-                     </div>
-                     <div className="flex-1 min-w-0">
-                       <h4 className="font-semibold text-gray-800 truncate">{item.title || "Untitled News"}</h4>
-                       <p className="text-sm text-gray-600">
-                         {item.created ? new Date(item.created.toDate ? item.created.toDate() : item.created).toLocaleDateString() : "No date"}
-                       </p>
-                     </div>
+               ) : newsError ? (
+                 <div className="flex items-center justify-center py-8">
+                   <div className="text-red-600 text-center">
+                     <div className="font-semibold mb-2">Failed to load news items</div>
+                     <div className="text-sm">{newsError}</div>
                    </div>
-                 ))}
-                 {newsItems.length === 0 && (
-                   <div className="col-span-full text-center py-8 text-gray-500">
-                     No news items available
-                   </div>
-                 )}
-               </div>
-             )}
+                 </div>
+               ) : (
+                 <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-1 xl:grid-cols-1 gap-4 flex-1">
+                   {newsItems.map((item, index) => (
+                     <div
+                       key={item.id || index}
+                       className="p-4 flex items-center space-x-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                       style={{
+                         borderRadius: '11.255px',
+                         border: '2.251px solid rgba(196, 196, 196, 0.50)',
+                         background: '#FFF'
+                       }}
+                       onClick={() => handleNewsItemClick(item)}
+                     >
+                       <div className="w-16 h-16 bg-gray-300 rounded-lg flex-shrink-0 overflow-hidden">
+                         {item.thumbnail ? (
+                           <img
+                             src={item.thumbnail}
+                             alt={item.title || "News thumbnail"}
+                             className="w-full h-full object-cover"
+                           />
+                         ) : (
+                           <div className="w-full h-full bg-gray-300 flex items-center justify-center">
+                             <span className="text-xs text-gray-500">No image</span>
+                           </div>
+                         )}
+                       </div>
+                       <div className="flex-1 min-w-0">
+                         <h4 className="font-semibold text-gray-800 truncate">{item.title || "Untitled News"}</h4>
+                         <p className="text-sm text-gray-600">
+                           {item.created ? new Date(item.created.toDate ? item.created.toDate() : item.created).toLocaleDateString() : "No date"}
+                         </p>
+                       </div>
+                     </div>
+                   ))}
+                   {newsItems.length === 0 && (
+                     <div className="col-span-full text-center py-8 text-gray-500">
+                       No news items available
+                     </div>
+                   )}
+                 </div>
+               )}
+             </div>
            </div>
           </div>
         </div>
