@@ -301,22 +301,25 @@ export default function LogisticsWeatherPage() {
               </div>
             ) : (
               <div className="flex flex-col sm:flex-row justify-around items-center gap-0">
-                {weatherData?.forecast.slice(0, 5).flatMap((item, index) => [
-                  <div key={`day-${index}`} className="flex flex-col items-center">
-                    <div className="text-center min-w-[60px] sm:min-w-[80px] flex-shrink-0">
-                      <div className="text-sm font-medium text-gray-600 mb-2">{format(new Date(item.date), 'MMM d')} - {format(new Date(item.date), 'EEE')}</div>
-                      <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center">
-                        <img
-                          src={getWeatherIcon(item.icon)}
-                          alt={`${item.icon} weather icon`}
-                          className="w-[51px] h-[51px] flex-shrink-0 aspect-square"
-                        />
+                {weatherData?.forecast
+                  .filter((item, index, arr) => arr.findIndex(i => i.date === item.date) === index)
+                  .slice(0, 5)
+                  .flatMap((item, index) => [
+                    <div key={`day-${index}`} className="flex flex-col items-center">
+                      <div className="text-center min-w-[60px] sm:min-w-[80px] flex-shrink-0">
+                        <div className="text-sm font-medium text-gray-600 mb-2">{format(new Date(item.date), 'MMM d')} - {format(new Date(item.date), 'EEE')}</div>
+                        <div className="w-16 h-16 mx-auto mb-2 flex items-center justify-center">
+                          <img
+                            src={getWeatherIcon(item.icon)}
+                            alt={`${item.icon} weather icon`}
+                            className="w-[51px] h-[51px] flex-shrink-0 aspect-square"
+                          />
+                        </div>
+                        <div className="text-[15.006px] font-semibold text-[#333] text-center leading-none font-['Inter']">{item.temperature.max}°</div>
                       </div>
-                      <div className="text-[15.006px] font-semibold text-[#333] text-center leading-none font-['Inter']">{item.temperature.max}°</div>
-                    </div>
-                  </div>,
-                  index < 4 ? <div key={`divider-${index}`} className="flex-shrink-0 self-center hidden sm:block" style={{background: 'rgba(0, 0, 0, 0.25)', width: '1.501px', height: '125.802px'}}></div> : null
-                ]).filter(Boolean)}
+                    </div>,
+                    index < 4 ? <div key={`divider-${index}`} className="flex-shrink-0 self-center hidden sm:block" style={{background: 'rgba(0, 0, 0, 0.25)', width: '1.501px', height: '125.802px'}}></div> : null
+                  ]).filter(Boolean)}
               </div>
             )}
           </div>
