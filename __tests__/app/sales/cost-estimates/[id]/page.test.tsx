@@ -92,7 +92,20 @@ vi.mock('@/lib/firebase', () => ({
   collection: vi.fn(),
   query: vi.fn(),
   where: vi.fn(),
-  getDocs: vi.fn(),
+  getDocs: vi.fn(() => Promise.resolve({
+    empty: false,
+    docs: [{
+      id: 'company-1',
+      data: () => ({
+        name: 'Test Company',
+        logo: 'https://example.com/logo.jpg',
+        address: { street: '123 Test St', city: 'Test City' },
+        phone: '+1234567890',
+        email: 'company@test.com',
+      }),
+      exists: () => true,
+    }]
+  })),
 }))
 
 // Mock UI components
@@ -290,7 +303,6 @@ describe('CostEstimatePage', () => {
     const { getCostEstimate, getCostEstimatesByPageId, getCostEstimatesByProductIdAndCompanyId } = vi.mocked(await import('@/lib/cost-estimate-service'))
     const { getProposalActivities: getActivities } = vi.mocked(await import('@/lib/proposal-activity-service'))
     const { getDoc } = vi.mocked(await import('@/lib/firebase'))
-    const { getDocs } = vi.mocked(await import('firebase/firestore'))
 
     getCostEstimate.mockResolvedValue(mockCostEstimate)
     getCostEstimatesByPageId.mockResolvedValue(mockRelatedCostEstimates)
@@ -305,19 +317,6 @@ describe('CostEstimatePage', () => {
         phone: '+1234567890',
         email: 'company@test.com',
       }),
-    } as any)
-    getDocs.mockResolvedValue({
-      empty: false,
-      docs: [{
-        id: 'company-1',
-        data: () => ({
-          name: 'Test Company',
-          logo: 'https://example.com/logo.jpg',
-          address: { street: '123 Test St', city: 'Test City' },
-          phone: '+1234567890',
-          email: 'company@test.com',
-        })
-      }]
     } as any)
   })
 
