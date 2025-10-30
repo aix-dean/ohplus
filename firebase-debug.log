@@ -724,3 +724,71 @@
 [debug] [2025-10-28T08:54:52.118Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com [omitted]
 [debug] [2025-10-28T08:54:52.122Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
 [debug] [2025-10-28T08:54:52.122Z] > authorizing via signed-in user (dean.aisyndicate.ph@gmail.com)
+[debug] [2025-10-30T00:25:25.169Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.173Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.173Z] > refreshing access token with scopes: []
+[debug] [2025-10-30T00:25:25.176Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-10-30T00:25:25.176Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.234Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.234Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.234Z] > refreshing access token with scopes: []
+[debug] [2025-10-30T00:25:25.235Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-10-30T00:25:25.235Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.237Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.238Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.238Z] > refreshing access token with scopes: []
+[debug] [2025-10-30T00:25:25.238Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-10-30T00:25:25.238Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.268Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.268Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.268Z] > refreshing access token with scopes: []
+[debug] [2025-10-30T00:25:25.268Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-10-30T00:25:25.268Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.271Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.271Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.271Z] > refreshing access token with scopes: []
+[debug] [2025-10-30T00:25:25.271Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-10-30T00:25:25.271Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.273Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.273Z] Checked if tokens are valid: false, expires at: 1761645211181
+[debug] [2025-10-30T00:25:25.274Z] > refreshing access token with scopes: []
+[debug] [2025-10-30T00:25:25.274Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-10-30T00:25:25.274Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.372Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-10-30T00:25:25.372Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.382Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ [none]
+[debug] [2025-10-30T00:25:25.382Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ x-goog-quota-user=projects/oh-app-bcf24
+[debug] [2025-10-30T00:25:25.384Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-10-30T00:25:25.384Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.392Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebaseio.com [none]
+[debug] [2025-10-30T00:25:25.392Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebaseio.com x-goog-quota-user=projects/oh-app-bcf24
+[debug] [2025-10-30T00:25:25.395Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-10-30T00:25:25.395Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.401Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com [none]
+[debug] [2025-10-30T00:25:25.401Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com x-goog-quota-user=projects/oh-app-bcf24
+[debug] [2025-10-30T00:25:25.403Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-10-30T00:25:25.403Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.410Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com [none]
+[debug] [2025-10-30T00:25:25.410Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com x-goog-quota-user=projects/oh-app-bcf24
+[debug] [2025-10-30T00:25:25.411Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-10-30T00:25:25.412Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.419Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ [none]
+[debug] [2025-10-30T00:25:25.419Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ x-goog-quota-user=projects/oh-app-bcf24
+[debug] [2025-10-30T00:25:25.422Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-10-30T00:25:25.422Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-10-30T00:25:25.428Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebaseio.com [none]
+[debug] [2025-10-30T00:25:25.428Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebaseio.com x-goog-quota-user=projects/oh-app-bcf24
+[debug] [2025-10-30T00:25:26.600Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebaseio.com 403
+[debug] [2025-10-30T00:25:26.600Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebaseio.com [omitted]
+[debug] [2025-10-30T00:25:26.664Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com 200
+[debug] [2025-10-30T00:25:26.664Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com [omitted]
+[debug] [2025-10-30T00:25:26.987Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ 200
+[debug] [2025-10-30T00:25:26.987Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ [omitted]
+[debug] [2025-10-30T00:25:27.714Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebaseio.com 403
+[debug] [2025-10-30T00:25:27.714Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebaseio.com [omitted]
+[debug] [2025-10-30T00:25:27.893Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com 200
+[debug] [2025-10-30T00:25:27.893Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com [omitted]
+[debug] [2025-10-30T00:25:27.899Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-10-30T00:25:27.900Z] > authorizing via signed-in user (dean.aisyndicate.ph@gmail.com)
+[debug] [2025-10-30T00:25:28.479Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ 200
+[debug] [2025-10-30T00:25:28.479Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ [omitted]
