@@ -37,6 +37,8 @@ import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
 import { JobOrderSelectionDialog } from "@/components/logistics/assignments/create/JobOrderSelectionDialog"
 import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { storage } from "@/lib/firebase"
 
 
 // Service types as provided
@@ -444,7 +446,7 @@ export default function CreateServiceAssignmentPage() {
     }))
   }
 
-  // Handle form submission
+  // Handle form submission (now navigates to PDF preview without creating assignment)
   const handleSubmit = async () => {
     if (!user) return
 
@@ -494,17 +496,18 @@ export default function CreateServiceAssignmentPage() {
     }
 
     try {
-      setLoading(true)
+      setGeneratingPDF(true)
+
+      // Prepare assignment data for PDF generation
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
-      const selectedTeam = teams.find((t) => t.id === (formData.assignedTo || formData.crew))
+      const selectedTeam = teams.find((t) => t.id === formData.crew)
 
       const assignmentData = {
         saNumber,
-        projectSiteId: formData.projectSite,
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: formData.assignedTo || formData.crew,
+        assignedTo: selectedTeam?.name || formData.assignedTo,
         assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
@@ -516,90 +519,61 @@ export default function CreateServiceAssignmentPage() {
         sales: formData.sales,
         remarks: formData.remarks,
         requestedBy: {
-          id: user.uid,
           name: userData?.first_name && userData?.last_name
             ? `${userData.first_name} ${userData.last_name}`
             : user?.displayName || "Unknown User",
           department: "LOGISTICS",
         },
-        message: formData.message,
-        campaignName: formData.campaignName,
-        joNumber: jobOrderData?.joNumber || null, // Add job order number if present
-        coveredDateStart: formData.startDate,
-        coveredDateEnd: formData.endDate,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: convertAttachmentsForFirestore(formData.attachments),
+        attachments: formData.attachments,
         serviceExpenses: formData.serviceExpenses,
-        status: "Pending", // Always set to Pending when submitting
-        updated: serverTimestamp(),
-        project_key: userData?.license_key || "",
-        company_id: userData?.company_id || null,
-        jobOrderId: jobOrderData?.id || null, // Add job order ID if present
+        status: "Draft",
+        created: new Date(),
       }
 
-      let assignmentDocRef
+      // Generate PDF
+      const pdfBase64 = await generateServiceAssignmentPDF(
+        assignmentData,
+        jobOrderData,
+        products,
+        teams,
+        true // returnBase64
+      )
 
-      if (isEditingDraft && draftId) {
-        // Update existing draft to pending
-        assignmentDocRef = doc(db, "service_assignments", draftId)
-        await updateDoc(assignmentDocRef, assignmentData)
-      } else {
-        // Create new assignment
-        assignmentDocRef = await addDoc(collection(db, "service_assignments"), {
-          ...assignmentData,
-          created: serverTimestamp(),
-        })
-      }
-
-      // Create notification for Logistics and Admin
-      try {
-        const notificationTitle = `New Service Assignment: ${saNumber}`
-        const notificationDescription = `A new ${formData.serviceType} service assignment has been created for ${selectedProduct?.name || "Unknown Site"}`
-
-        // Create notification for Logistics department
-        await addDoc(collection(db, "notifications"), {
-          type: "Service Assignment",
-          title: notificationTitle,
-          description: notificationDescription,
-          department_to: "Logistics",
-          uid_to: null, // Send to all Logistics users
+      // Store form data and generated PDF in session storage
+      sessionStorage.setItem('serviceAssignmentFormData', JSON.stringify({
+        ...formData,
+        saNumber,
+        jobOrderId: 'Df4wxbfrO5EnAbml0r2I',
+        jobOrderData: jobOrderData,
+        userData: {
+          uid: user.uid,
+          first_name: userData?.first_name,
+          last_name: userData?.last_name,
           company_id: userData?.company_id,
-          department_from: "Logistics",
-          viewed: false,
-          navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/assignments/${assignmentDocRef.id}`,
-          created: serverTimestamp(),
-        })
+          license_key: userData?.license_key,
+        },
+        products,
+        teams,
+      }));
 
-        // Create notification for Admin department
-        await addDoc(collection(db, "notifications"), {
-          type: "Service Assignment",
-          title: notificationTitle,
-          description: notificationDescription,
-          department_to: "Admin",
-          uid_to: null, // Send to all Admin users
-          company_id: userData?.company_id,
-          department_from: "Logistics",
-          viewed: false,
-          navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/assignments/${assignmentDocRef.id}`,
-          created: serverTimestamp(),
-        })
+      // Store the generated PDF
+      sessionStorage.setItem('generatedPDF', pdfBase64);
 
-        console.log("Notifications created successfully for service assignment:", assignmentDocRef.id)
-      } catch (notificationError) {
-        console.error("Error creating notifications for service assignment:", notificationError)
-        // Don't throw here - we don't want notification failure to break assignment creation
-      }
-
-
-      // Set session storage and navigate to assignments
-      sessionStorage.setItem('lastCreatedServiceAssignmentId', assignmentDocRef.id)
-      sessionStorage.setItem('lastCreatedServiceAssignmentSaNumber', saNumber)
-      router.push('/logistics/assignments')
+      // Navigate to view-pdf page with the exact URL format
+      router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=Df4wxbfrO5EnAbml0r2I`);
     } catch (error) {
-      console.error("Error creating service assignment:", error)
+      console.error("Error generating PDF:", error)
+      toast({
+        title: "PDF Generation Failed",
+        description: "Failed to generate service assignment PDF. Please try again.",
+        variant: "destructive",
+      });
     } finally {
-      setLoading(false)
+      setGeneratingPDF(false)
     }
   }
 

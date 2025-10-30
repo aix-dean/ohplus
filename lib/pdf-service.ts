@@ -1087,9 +1087,9 @@ export async function generateJobOrderPDF(jobOrder: JobOrder, returnBase64 = fal
     pdf.setFont("helvetica", "bold")
     pdf.text("JOB ORDER", margin, 15)
 
-    // Add logistics badge
+    // Add department badge from props
     pdf.setFontSize(10)
-    pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
+    pdf.text(`${serviceAssignment.requestedBy.department} DEPARTMENT`, pageWidth - margin - 50, 15)
 
     yPosition = 35
     pdf.setTextColor(0, 0, 0)
