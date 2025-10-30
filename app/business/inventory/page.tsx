@@ -152,6 +152,8 @@ export default function BusinessInventoryPage() {
    const [landOwner, setLandOwner] = useState("")
    const [partner, setPartner] = useState("")
    const [orientation, setOrientation] = useState("")
+   const [locationVisibility, setLocationVisibility] = useState("")
+   const [locationVisibilityUnit, setLocationVisibilityUnit] = useState<string>("ft")
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
@@ -587,6 +589,10 @@ export default function BusinessInventoryPage() {
     setLandOwner("")
     setPartner("")
     setOrientation("")
+    setLocationVisibility("")
+    setLocationVisibilityUnit("ft")
+    setLocationVisibilityUnit("ft")
+    setLocationVisibility("")
 
     setShowAddSiteDialog(true)
   }
@@ -791,6 +797,16 @@ export default function BusinessInventoryPage() {
       return
     }
 
+    if (locationVisibility.trim() && isNaN(Number(locationVisibility))) {
+      toast({
+        title: "Validation Error",
+        description: "Location Visibility must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
     // Show validation error for missing required fields
     if (errors.length > 0) {
       setValidationErrors(errors)
@@ -837,6 +853,7 @@ export default function BusinessInventoryPage() {
           land_owner: landOwner,
           partner,
           orientation,
+          location_visibility: parseFloat(locationVisibility) || null,
           ...(geopoint && { geopoint }),
           traffic_count: parseInt(dailyTraffic) || null,
           height: parseFloat(height) || null,
@@ -1365,6 +1382,35 @@ export default function BusinessInventoryPage() {
                   value={locationLabel}
                   onChange={(e) => setLocationLabel(e.target.value)}
                 />
+              </div>
+
+              {/* Location Visibility */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Location Visibility:</Label>
+                <div className="flex gap-3">
+                  <Input
+                    type="number"
+                    placeholder="e.g., 100"
+                    className="flex-1 border-[#c4c4c4]"
+                    value={locationVisibility}
+                    onChange={(e) => setLocationVisibility(e.target.value)}
+                  />
+                  <Select value={locationVisibilityUnit} onValueChange={(value: string) => setLocationVisibilityUnit(value)}>
+                    <SelectTrigger className="w-20 border-[#c4c4c4]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="mm">mm</SelectItem>
+                      <SelectItem value="cm">cm</SelectItem>
+                      <SelectItem value="m">m</SelectItem>
+                      <SelectItem value="km">km</SelectItem>
+                      <SelectItem value="in">in</SelectItem>
+                      <SelectItem value="ft">ft</SelectItem>
+                      <SelectItem value="yd">yd</SelectItem>
+                      <SelectItem value="mi">mi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Land Owner */}
