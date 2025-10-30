@@ -63,6 +63,7 @@ export default function BusinessProductDetailPage() {
   const [category, setCategory] = useState("")
   const [siteName, setSiteName] = useState("")
   const [location, setLocation] = useState("")
+   const [geopoint, setGeopoint] = useState<[number, number] | null>(null)
   const [locationLabel, setLocationLabel] = useState("")
   const [height, setHeight] = useState("")
   const [width, setWidth] = useState("")
@@ -78,6 +79,9 @@ export default function BusinessProductDetailPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imagesToRemove, setImagesToRemove] = useState<string[]>([])
+   const [landOwner, setLandOwner] = useState("")
+   const [partner, setPartner] = useState("")
+   const [orientation, setOrientation] = useState("")
 
   useEffect(() => {
     async function fetchProduct() {
@@ -251,6 +255,10 @@ export default function BusinessProductDetailPage() {
           audience_types: selectedAudience,
           location,
           location_label: locationLabel,
+          land_owner: landOwner,
+           ...(geopoint && { geopoint }),
+          partner,
+          orientation,
           traffic_count: parseInt(dailyTraffic) || null,
           height: parseFloat(height) || null,
           width: parseFloat(width) || null,
@@ -312,6 +320,7 @@ export default function BusinessProductDetailPage() {
       setSiteType(currentSiteType)
       setCategory(product.categories?.[0] || "")
       setSiteName(product.name || "")
+       setGeopoint(product.specs_rental?.geopoint || null)
       setLocation(product.specs_rental?.location || "")
       setLocationLabel(product.specs_rental?.location_label || "")
       setHeight(product.specs_rental?.height?.toString() || "")
@@ -328,6 +337,9 @@ export default function BusinessProductDetailPage() {
       setUploadedFiles([])
       setCurrentImageIndex(0)
       setImagesToRemove([])
+       setLandOwner(product.specs_rental?.land_owner || "")
+       setPartner(product.specs_rental?.partner || "")
+       setOrientation(product.specs_rental?.orientation || "")
 
       setEditDialogOpen(true)
       setValidationErrors([])
@@ -681,6 +693,7 @@ export default function BusinessProductDetailPage() {
                 <GooglePlacesAutocomplete
                   value={location}
                   onChange={setLocation}
+                  onGeopointChange={setGeopoint}
                   placeholder="Enter street address or search location..."
                   enableMap={true}
                   mapHeight="250px"
@@ -694,6 +707,39 @@ export default function BusinessProductDetailPage() {
                   className="border-[#c4c4c4]"
                   value={locationLabel}
                   onChange={(e) => setLocationLabel(e.target.value)}
+                />
+              </div>
+
+              {/* Land Owner */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Land Owner:</Label>
+                <Input
+                  placeholder="Enter land owner name"
+                  className="border-[#c4c4c4]"
+                  value={landOwner}
+                  onChange={(e) => setLandOwner(e.target.value)}
+                />
+              </div>
+
+              {/* Partner */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Partner:</Label>
+                <Input
+                  placeholder="Enter partner name"
+                  className="border-[#c4c4c4]"
+                  value={partner}
+                  onChange={(e) => setPartner(e.target.value)}
+                />
+              </div>
+
+              {/* Orientation */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Orientation:</Label>
+                <Input
+                  placeholder="e.g., North, South, East, West"
+                  className="border-[#c4c4c4]"
+                  value={orientation}
+                  onChange={(e) => setOrientation(e.target.value)}
                 />
               </div>
 

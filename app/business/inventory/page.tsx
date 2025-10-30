@@ -149,6 +149,9 @@ export default function BusinessInventoryPage() {
   const [priceUnit, setPriceUnit] = useState<"per spot" | "per day" | "per month">("per month")
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+   const [landOwner, setLandOwner] = useState("")
+   const [partner, setPartner] = useState("")
+   const [orientation, setOrientation] = useState("")
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
@@ -581,6 +584,9 @@ export default function BusinessInventoryPage() {
     setPriceUnit("per month")
     setUploadedFiles([])
     setCurrentImageIndex(0)
+    setLandOwner("")
+    setPartner("")
+    setOrientation("")
 
     setShowAddSiteDialog(true)
   }
@@ -828,6 +834,9 @@ export default function BusinessInventoryPage() {
           audience_types: selectedAudience,
           location,
           location_label: locationLabel,
+          land_owner: landOwner,
+          partner,
+          orientation,
           ...(geopoint && { geopoint }),
           traffic_count: parseInt(dailyTraffic) || null,
           height: parseFloat(height) || null,
@@ -1355,6 +1364,39 @@ export default function BusinessInventoryPage() {
                   className="border-[#c4c4c4]"
                   value={locationLabel}
                   onChange={(e) => setLocationLabel(e.target.value)}
+                />
+              </div>
+
+              {/* Land Owner */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Land Owner:</Label>
+                <Input
+                  placeholder="Enter land owner name"
+                  className="border-[#c4c4c4]"
+                  value={landOwner}
+                  onChange={(e) => setLandOwner(e.target.value)}
+                />
+              </div>
+
+              {/* Partner */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Partner:</Label>
+                <Input
+                  placeholder="Enter partner name"
+                  className="border-[#c4c4c4]"
+                  value={partner}
+                  onChange={(e) => setPartner(e.target.value)}
+                />
+              </div>
+
+              {/* Orientation */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Orientation:</Label>
+                <Input
+                  placeholder="e.g., North, South, East, West"
+                  className="border-[#c4c4c4]"
+                  value={orientation}
+                  onChange={(e) => setOrientation(e.target.value)}
                 />
               </div>
 

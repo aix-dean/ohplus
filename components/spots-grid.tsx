@@ -113,7 +113,7 @@ export function SpotsGrid({ spots, totalSpots, occupiedCount, vacantCount, produ
               </div>
               <span
                 onClick={() => router?.push(`/sales/products/${productId}/spots/1`)}
-                className="text-blue-600 underline cursor-pointer"
+                className="text-blue-600 cursor-pointer"
               >
                 as of {currentDate} {'->'}
               </span>

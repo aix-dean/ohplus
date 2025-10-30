@@ -142,6 +142,9 @@ export interface Product {
     geopoint?: [number, number]
     location?: string
     location_label?: string
+    land_owner?: string
+    partner?: string
+    orientation?: string
     traffic_count?: number | null
     elevation?: number | null
     height?: number | null

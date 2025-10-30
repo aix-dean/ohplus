@@ -682,11 +682,16 @@ useEffect(() => {
       <SpotSelectionDialog
         open={spotSelectionDialogOpen}
         onOpenChange={setSpotSelectionDialogOpen}
-        productId={productId}
-        spots={generateSpotsData(currentDayBookings)}
-        totalSpots={totalSpots}
-        occupiedCount={calculateOccupiedSpots()}
-        vacantCount={calculateVacantSpots()}
+        products={product ? [product] : []}
+        spotsData={product ? {
+          [product.id || '']: {
+            spots: generateSpotsData(currentDayBookings),
+            totalSpots,
+            occupiedCount: calculateOccupiedSpots(),
+            vacantCount: calculateVacantSpots(),
+            currentDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          }
+        } : {}}
         currentDate={new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
         selectedDate={selectedDate}
         type={spotSelectionType}

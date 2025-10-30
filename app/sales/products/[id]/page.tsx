@@ -265,9 +265,9 @@ const GoogleMap = React.memo(({ location, className }: { location: string; class
 
   return (
     <div className={`relative ${className}`}>
-      <div ref={mapRef} className="w-full h-full rounded-lg" />
+      <div ref={mapRef} className="w-full h-full" />
       {!mapLoaded && (
-        <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
+        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
           <div className="text-center">
             <Loader2 className="h-6 w-6 animate-spin text-gray-400 mx-auto mb-2" />
             <p className="text-sm text-gray-500">Loading map...</p>
@@ -509,6 +509,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [screenSchedules, setScreenSchedules] = useState<any[]>([])
   const [currentDayBookings, setCurrentDayBookings] = useState<Booking[]>([])
   const [currentDayBookingsLoading, setCurrentDayBookingsLoading] = useState(false)
+  const [companyName, setCompanyName] = useState<string>("")
+  const [companyLoading, setCompanyLoading] = useState(false)
 
   const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
@@ -862,6 +864,30 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
     fetchCurrentDayBookings()
   }, [params.id])
+  useEffect(() => {
+    const fetchCompanyName = async () => {
+      if (!product?.company_id) {
+        setCompanyName("")
+        return
+      }
+      setCompanyLoading(true)
+      try {
+        const companyDoc = await getDoc(doc(db, "companies", product.company_id))
+        if (companyDoc.exists()) {
+          const companyData = companyDoc.data()
+          setCompanyName(companyData?.name || "Not Set Company")
+        } else {
+          setCompanyName("Not Set Company")
+        }
+      } catch (error) {
+        console.error("Error fetching company:", error)
+        setCompanyName("Not Set Company")
+      } finally {
+        setCompanyLoading(false)
+      }
+    }
+    fetchCompanyName()
+  }, [product?.company_id])
 
   const handleBack = () => {
     router.back()
@@ -1053,7 +1079,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         return {
           color: "bg-gray-100 text-gray-800 border-gray-200",
           icon: <Clock3 className="h-3.5 w-3.5" />,
-          label: "Unknown",
+          label: "Not Set",
         }
     }
   }
@@ -1100,7 +1126,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         return {
           color: "bg-gray-100 text-gray-800 border-gray-200",
           icon: <Clock3 className="h-3.5 w-3.5" />,
-          label: "Unknown",
+          label: "Not Set",
         }
     }
   }
@@ -1141,7 +1167,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         return {
           color: "bg-gray-100 text-gray-800 border-gray-200",
           icon: <Clock3 className="h-3.5 w-3.5" />,
-          label: "Unknown",
+          label: "Not Set",
         }
     }
   }
@@ -1294,7 +1320,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const currentContent = getCurrentContent(product)
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 pt-2 pb-6">
       {/* Notification */}
       <CustomNotification
         show={notification.show}
@@ -1439,40 +1465,58 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 {/* Site Name */}
                 <div>
                   <div className="text-sm text-gray-900 mb-1">Site</div>
-                  <div className="text-lg font-bold text-gray-900">
-                    {product?.name || "Unknown Site"}
+                  <div className="text-base font-bold text-gray-900">
+                    {product?.name || "Not Set Site"}
+                  </div>
+                </div>
+                {/* Location */}
+                <div>
+                  <div className="text-sm text-gray-900 mb-1">Location</div>
+                  <div className="text-base font-bold text-gray-800">
+                    {product?.type?.toLowerCase() === "rental"
+                      ? product.specs_rental?.location || "Not Set"
+                      : product.light?.location || "Not Set"}
+                  </div>
+                </div>
+                {/* Geopoint */}
+                <div>
+                  <div className="text-sm text-gray-900 mb-1">Geopoint</div>
+                  <div className="text-base font-bold text-gray-800">
+                    {product?.specs_rental?.geopoint ? `${product.specs_rental.geopoint[0]}, ${product.specs_rental.geopoint[1]}` : "Not Set"}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-gray-900">Type</div>
+                    <div className="text-base font-bold text-gray-800">
+                      {Array.isArray(product?.categories) ? (product.categories.length > 0 ? product.categories.join(', ') : "Not Set") : (product?.categories ? product.categories : "Not Set")}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-900">Orientation</div>
+                    <div className="text-base font-bold text-gray-800">{product?.specs_rental?.land_owner || "Not specified"}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="text-sm text-gray-900">Dimension</div>
+                    <div className="text-base font-bold text-gray-800">
+                      {product?.specs_rental?.height ? `${product.specs_rental.height} (H) x ${product.specs_rental.width || 'N/A'} (W)` : "Not specified"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-900">Elevation</div>
+                    <div className="text-base font-bold text-gray-800">
+                      {product?.specs_rental?.elevation || "Not specified"}
+                    </div>
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-900">Type</div>
-                  <div className="text-base font-bold text-gray-800">{product?.type || "Unknown"}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-900">Dimension</div>
-                  <div className="text-base font-bold text-gray-800">{product?.specs_rental?.dimensions || "Not specified"}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-900">Traffic Count</div>
+                  <div className="text-sm text-gray-900">Average Daily Traffic</div>
                   <div className="text-base font-bold text-gray-800">
                     {product?.specs_rental?.traffic_count || "Not specified"}
                   </div>
                 </div>
-                <div>
-                  <div className="text-sm text-gray-900">Location</div>
-                  <div className="text-base font-bold text-gray-800">
-                    {product?.type?.toLowerCase() === "rental"
-                      ? product.specs_rental?.location || "Unknown"
-                      : product.light?.location || "Unknown"}
-                  </div>
-                </div>
-                {product?.specs_rental?.geopoint && (
-                  <div>
-                    <div className="text-sm text-gray-900">Geopoint</div>
-                    <div className="text-base font-bold text-gray-800">
-                      {product.specs_rental.geopoint[0]}, {product.specs_rental.geopoint[1]}
-                    </div>
-                  </div>
-                )}
                 <div>
                   <div className="text-sm text-gray-900">Site Orientation</div>
                   <div className="text-base font-bold text-gray-800">{product?.specs_rental?.orientation || "Not specified"}</div>
@@ -1480,12 +1524,16 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 <div>
                   <div className="text-sm text-gray-900">Site Owner</div>
                   <div className="text-base font-bold text-gray-800">
-                    {product?.owner_name || product?.seller_name || "Unknown"}
+                    {companyLoading ? "Loading..." : companyName || "Not Set"}
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-900">Land Owner</div>
-                  <div className="text-base font-bold text-gray-800">{product?.land_owner || "Not specified"}</div>
+                  <div className="text-base font-bold text-gray-800">{product?.specs_rental?.land_owner || "Not specified"}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-900">Partner</div>
+                  <div className="text-base font-bold text-gray-800">{product?.specs_rental?.partner || "Not specified"}</div>
                 </div>
               </div>
 
@@ -1496,8 +1544,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
                 {/* Right Content - Tabbed Interface */}
         <section className="lg:col-span-2">
-          {/* Spots Section - Only show for digital/dynamic sites */}
-          {product && (product.content_type === "Dynamic" || product.content_type === "digital") && product.cms && (
+          {/* Spots Section - Only show for digital sites */}
+          {product && product.content_type?.toLowerCase() === "digital" && product.cms && (
             <div className="mb-6">
               <SpotsGrid
                 spots={generateSpotsData(product.cms, currentDayBookings)}
@@ -1558,7 +1606,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                               case "RESERVED":
                                 return "Ongoing"
                               default:
-                                return status || "Unknown"
+                                return status || "Not Set"
                             }
                           }
 
@@ -1682,7 +1730,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                             </div>
                             <div className="text-gray-600">Cost Estimate</div>
                             <div className="text-gray-900">
-                              {estimate.client?.company || estimate.client?.name || "Unknown Client"}
+                              {estimate.client?.company || estimate.client?.name || "Not Set Client"}
                             </div>
                             <div>
                               <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
@@ -1771,7 +1819,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                             </div>
                             <div className="text-gray-600">Quotation</div>
                             <div className="text-gray-900">
-                              {quotation.client_name || "Unknown Client"}
+                              {quotation.client_name || "Not Set Client"}
                             </div>
                             <div>
                               <span
@@ -1861,7 +1909,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                             </div>
                             <div className="text-gray-600">Job Order</div>
                             <div className="text-gray-900">
-                              {jobOrder.clientName || "Unknown Client"}
+                              {jobOrder.clientName || "Not Set Client"}
                             </div>
                             <div>
                               <span
@@ -1945,9 +1993,9 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                           <div className="text-gray-900 font-medium">
                             {report.report_id || report.id?.slice(-8) || "N/A"}
                           </div>
-                          <div className="text-gray-600">{report.reportType || "Unknown"}</div>
+                          <div className="text-gray-600">{report.reportType || "Not Set"}</div>
                           <div className="text-gray-900">
-                            {report.client || "Unknown Client"}
+                            {report.client || "Not Set Client"}
                           </div>
                           <div>
                             <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
