@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast"
 import { ServiceAssignmentViewForm } from '@/components/logistics/assignments/view/ServiceAssignmentViewForm';
 import { ServiceAssignmentSummaryBar } from '@/components/logistics/assignments/view/ServiceAssignmentSummaryBar';
 import { generateServiceAssignmentDetailsPDF } from '@/lib/pdf-service';
+import { CreateReportDialog } from '@/components/logistics/assignments/CreateReportDialog';
 
 export default function ViewServiceAssignmentPage() {
   const { user, userData } = useAuth()
@@ -49,6 +50,7 @@ export default function ViewServiceAssignmentPage() {
   const [isDataStable, setIsDataStable] = useState<boolean>(false)
   const [pdfLoadState, setPdfLoadState] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
   const pdfUrlRef = useRef<string | null>(null)
+  const [isCreateReportDialogOpen, setIsCreateReportDialogOpen] = useState<boolean>(false)
 
   // Fetch assignment data
   useEffect(() => {
@@ -434,6 +436,11 @@ export default function ViewServiceAssignmentPage() {
     }
   };
 
+  // Handle create report functionality
+  const handleCreateReport = () => {
+    setIsCreateReportDialogOpen(true);
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto py-4">
@@ -475,6 +482,7 @@ export default function ViewServiceAssignmentPage() {
         teams={teams}
         onPrint={handlePrint}
         onDownload={handleDownload}
+        onCreateReport={handleCreateReport}
       />
 
       {/* Control Bar */}
@@ -491,6 +499,13 @@ export default function ViewServiceAssignmentPage() {
         pdfError={pdfError}
         isLoadingPdf={isLoadingPdf}
         pdfKey={pdfKey}
+      />
+
+      {/* Create Report Dialog */}
+      <CreateReportDialog
+        open={isCreateReportDialogOpen}
+        onOpenChange={setIsCreateReportDialogOpen}
+        assignmentId={assignmentId}
       />
     </div>
   )
