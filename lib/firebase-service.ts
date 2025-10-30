@@ -146,6 +146,7 @@ export interface Product {
     partner?: string
     orientation?: string
     traffic_count?: number | null
+    traffic_unit?: "monthly" | "daily" | "weekly"
     elevation?: number | null
     height?: number | null
     width?: number | null
@@ -157,6 +158,10 @@ export interface Product {
     gondola?: boolean
     technology?: string
     site_code?: string
+    location_visibility?: number | null
+    location_visibility_unit?: string
+    dimension_unit?: "ft" | "m"
+    elevation_unit?: "ft" | "m"
     structure:{
       color?: string | null
       condition?: string | null
