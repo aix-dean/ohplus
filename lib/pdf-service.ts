@@ -1,4 +1,5 @@
 import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
@@ -1089,7 +1090,7 @@ export async function generateJobOrderPDF(jobOrder: JobOrder, returnBase64 = fal
 
     // Add department badge from props
     pdf.setFontSize(10)
-    pdf.text(`${serviceAssignment.requestedBy.department} DEPARTMENT`, pageWidth - margin - 50, 15)
+    pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
 
     yPosition = 35
     pdf.setTextColor(0, 0, 0)
@@ -2729,5 +2730,349 @@ export async function generateReportPDF(
   } catch (error) {
     console.error("Error generating report PDF:", error)
     throw new Error("Failed to generate report PDF")
+  }
+}
+
+export async function generateServiceAssignmentHTMLPDF(
+  serviceAssignment: ServiceAssignmentPDFData,
+  returnBase64 = false,
+): Promise<string | void> {
+  try {
+    // Generate HTML template for service assignment
+    const htmlTemplate = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Service Assignment - ${serviceAssignment.saNumber}</title>
+        <style>
+          body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #ffffff;
+            color: #000000;
+            line-height: 1.4;
+          }
+
+          .header {
+            background: linear-gradient(135deg, #1e3a8a 60%, #34d3eb 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin: -20px -20px 20px -20px;
+          }
+
+          .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+          }
+
+          .header p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+          }
+
+          .sa-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1e3a8a;
+            margin: 20px 0;
+            text-align: center;
+          }
+
+          .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+            margin: 10px 0;
+          }
+
+          .status-completed { background-color: #22c55e; }
+          .status-pending { background-color: #eab308; }
+          .status-in-progress { background-color: #3b82f6; }
+          .status-draft { background-color: #6b7280; }
+
+          .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            background-color: #ffffff;
+          }
+
+          .section h2 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            font-weight: bold;
+            color: #111827;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 5px;
+          }
+
+          .field-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+          }
+
+          .field {
+            margin-bottom: 10px;
+          }
+
+          .field label {
+            display: block;
+            font-weight: bold;
+            color: #374151;
+            margin-bottom: 3px;
+            font-size: 12px;
+          }
+
+          .field span {
+            color: #111827;
+            font-size: 14px;
+          }
+
+          .expenses-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+          }
+
+          .expenses-table th,
+          .expenses-table td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+          }
+
+          .expenses-table th {
+            background-color: #f9fafb;
+            font-weight: bold;
+            color: #374151;
+          }
+
+          .total-row {
+            border-top: 2px solid #374151;
+            font-weight: bold;
+          }
+
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            color: #6b7280;
+            font-size: 12px;
+          }
+
+          @media print {
+            body { margin: 0; }
+            .header { margin: 0 -20px 20px -20px; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SERVICE ASSIGNMENT</h1>
+          <p>LOGISTICS DEPARTMENT</p>
+        </div>
+
+        <div class="sa-number">SA# ${serviceAssignment.saNumber}</div>
+
+        <div class="status-badge status-${serviceAssignment.status.toLowerCase().replace(' ', '-')}">
+          ${serviceAssignment.status.toUpperCase()}
+        </div>
+
+        <div class="section">
+          <h2>SERVICE ASSIGNMENT INFORMATION</h2>
+          <div class="field-grid">
+            <div class="field">
+              <label>SA Number:</label>
+              <span>${serviceAssignment.saNumber}</span>
+            </div>
+            <div class="field">
+              <label>Project Site:</label>
+              <span>${serviceAssignment.projectSiteName}</span>
+            </div>
+            <div class="field">
+              <label>Location:</label>
+              <span>${serviceAssignment.projectSiteLocation || "N/A"}</span>
+            </div>
+            <div class="field">
+              <label>Service Type:</label>
+              <span>${serviceAssignment.serviceType}</span>
+            </div>
+            <div class="field">
+              <label>Assigned To:</label>
+              <span>${serviceAssignment.assignedToName || serviceAssignment.assignedTo}</span>
+            </div>
+            <div class="field">
+              <label>Duration:</label>
+              <span>${serviceAssignment.serviceDuration ? `${serviceAssignment.serviceDuration} hours` : "N/A"}</span>
+            </div>
+            <div class="field">
+              <label>Priority:</label>
+              <span>${serviceAssignment.priority}</span>
+            </div>
+            <div class="field">
+              <label>Created:</label>
+              <span>${serviceAssignment.created.toLocaleDateString()}</span>
+            </div>
+            <div class="field">
+              <label>Start Date:</label>
+              <span>${serviceAssignment.startDate ? serviceAssignment.startDate.toLocaleDateString() : "N/A"}</span>
+            </div>
+            <div class="field">
+              <label>End Date:</label>
+              <span>${serviceAssignment.endDate ? serviceAssignment.endDate.toLocaleDateString() : "N/A"}</span>
+            </div>
+            <div class="field">
+              <label>Alarm Date:</label>
+              <span>${serviceAssignment.alarmDate ? serviceAssignment.alarmDate.toLocaleDateString() : "N/A"}</span>
+            </div>
+            <div class="field">
+              <label>Alarm Time:</label>
+              <span>${serviceAssignment.alarmTime || "N/A"}</span>
+            </div>
+            <div class="field">
+              <label>Illumination:</label>
+              <span>${serviceAssignment.illuminationNits ? `${serviceAssignment.illuminationNits} nits` : "N/A"}</span>
+            </div>
+            <div class="field">
+              <label>Gondola:</label>
+              <span>${serviceAssignment.gondola || "N/A"}</span>
+            </div>
+            <div class="field">
+              <label>Technology:</label>
+              <span>${serviceAssignment.technology || "N/A"}</span>
+            </div>
+          </div>
+        </div>
+
+        ${serviceAssignment.equipmentRequired || serviceAssignment.materialSpecs ? `
+        <div class="section">
+          <h2>EQUIPMENT & MATERIALS</h2>
+          ${serviceAssignment.equipmentRequired ? `
+          <div class="field">
+            <label>Equipment Required:</label>
+            <span>${serviceAssignment.equipmentRequired}</span>
+          </div>
+          ` : ''}
+          ${serviceAssignment.materialSpecs ? `
+          <div class="field">
+            <label>Material Specifications:</label>
+            <span>${serviceAssignment.materialSpecs}</span>
+          </div>
+          ` : ''}
+        </div>
+        ` : ''}
+
+        ${serviceAssignment.serviceExpenses && serviceAssignment.serviceExpenses.length > 0 ? `
+        <div class="section">
+          <h2>SERVICE COST BREAKDOWN</h2>
+          <table class="expenses-table">
+            <thead>
+              <tr>
+                <th>Expense Name</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${serviceAssignment.serviceExpenses.map(expense => `
+                <tr>
+                  <td>${expense.name}</td>
+                  <td>PHP ${Number.parseFloat(expense.amount).toLocaleString()}</td>
+                </tr>
+              `).join('')}
+              <tr class="total-row">
+                <td><strong>TOTAL COST</strong></td>
+                <td><strong>PHP ${serviceAssignment.serviceExpenses.reduce((sum, expense) => sum + (Number.parseFloat(expense.amount) || 0), 0).toLocaleString()}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+
+        ${serviceAssignment.remarks ? `
+        <div class="section">
+          <h2>REMARKS</h2>
+          <div class="field">
+            <span>${serviceAssignment.remarks}</span>
+          </div>
+        </div>
+        ` : ''}
+
+        <div class="section">
+          <h2>REQUESTED BY</h2>
+          <div class="field">
+            <span>${serviceAssignment.requestedBy.department} - ${serviceAssignment.requestedBy.name}</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>Generated by OH Plus Platform - Logistics Department</p>
+          <p>Generated on ${new Date().toLocaleDateString()}</p>
+          <p>Smart. Seamless. Scalable. - OH+</p>
+        </div>
+      </body>
+      </html>
+    `
+
+    // Create a temporary DOM element to render the HTML
+    const tempDiv = document.createElement('div')
+    tempDiv.innerHTML = htmlTemplate
+    tempDiv.style.position = 'absolute'
+    tempDiv.style.left = '-9999px'
+    tempDiv.style.top = '-9999px'
+    document.body.appendChild(tempDiv)
+
+    try {
+      // Use html2canvas to capture the HTML as canvas
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2, // Higher quality
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: 794, // A4 width in pixels at 96 DPI
+        height: 1123, // A4 height in pixels at 96 DPI
+      })
+
+      // Remove the temporary element
+      document.body.removeChild(tempDiv)
+
+      // Convert canvas to PDF using jsPDF
+      const pdf = new jsPDF("p", "mm", "a4")
+      const imgData = canvas.toDataURL('image/png')
+
+      // Calculate dimensions to fit A4
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = canvas.width
+      const imgHeight = canvas.height
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+      const imgX = (pdfWidth - imgWidth * ratio) / 2
+      const imgY = 0
+
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+
+      if (returnBase64) {
+        return pdf.output("datauristring").split(",")[1]
+      } else {
+        const fileName = `service-assignment-${serviceAssignment.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+        pdf.save(fileName)
+      }
+    } catch (canvasError) {
+      console.error("Error with html2canvas:", canvasError)
+      throw new Error("Failed to convert HTML to canvas")
+    }
+  } catch (error) {
+    console.error("Error generating Service Assignment HTML PDF:", error)
+    throw new Error("Failed to generate Service Assignment HTML PDF")
   }
 }

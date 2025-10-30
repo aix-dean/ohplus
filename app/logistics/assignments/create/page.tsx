@@ -25,6 +25,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
@@ -33,7 +34,7 @@ import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
 import { useToast } from "@/hooks/use-toast"
 
-import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
+import { generateServiceAssignmentHTMLPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
 import { JobOrderSelectionDialog } from "@/components/logistics/assignments/create/JobOrderSelectionDialog"
 import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
@@ -264,7 +265,7 @@ export default function CreateServiceAssignmentPage() {
             setFormData({
               projectSite: draftData.projectSiteId || "",
               serviceType: draftData.serviceType || "",
-              assignedTo: draftData.assignedTo || draftData.crew || "",
+              assignedTo: draftData.crew || draftData.assignedTo || "",
               serviceDuration: draftData.serviceDuration || "",
               priority: draftData.priority || "",
               equipmentRequired: draftData.equipmentRequired || "",
@@ -502,12 +503,12 @@ export default function CreateServiceAssignmentPage() {
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
       const selectedTeam = teams.find((t) => t.id === formData.crew)
 
-      const assignmentData = {
+      const pdfAssignmentData = {
         saNumber,
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: selectedTeam?.name || formData.assignedTo,
+        assignedTo: selectedTeam?.name || formData.crew,
         assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
@@ -534,21 +535,52 @@ export default function CreateServiceAssignmentPage() {
         created: new Date(),
       }
 
-      // Generate PDF
-      const pdfBase64 = await generateServiceAssignmentPDF(
-        assignmentData,
-        jobOrderData,
-        products,
-        teams,
+      // Generate PDF using HTML-based approach
+      const pdfBase64 = await generateServiceAssignmentHTMLPDF(
+        pdfAssignmentData,
         true // returnBase64
       )
 
-      // Store form data and generated PDF in session storage
-      sessionStorage.setItem('serviceAssignmentFormData', JSON.stringify({
-        ...formData,
+      if (!pdfBase64) {
+        throw new Error('Failed to generate PDF')
+      }
+
+      // Store minimal assignment data in session storage (avoid quota issues)
+      const assignmentData = {
         saNumber,
-        jobOrderId: 'Df4wxbfrO5EnAbml0r2I',
-        jobOrderData: jobOrderData,
+        projectSiteName: selectedProduct?.name || "",
+        projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
+        serviceType: formData.serviceType,
+        assignedTo: selectedTeam?.name || formData.crew,
+        assignedToName: selectedTeam?.name || "",
+        serviceDuration: `${formData.serviceDuration} days`,
+        priority: formData.priority,
+        equipmentRequired: formData.equipmentRequired,
+        materialSpecs: formData.materialSpecs,
+        crew: formData.crew,
+        gondola: formData.gondola,
+        technology: formData.technology,
+        sales: formData.sales,
+        remarks: formData.remarks,
+        requestedBy: {
+          name: userData?.first_name && userData?.last_name
+            ? `${userData.first_name} ${userData.last_name}`
+            : user?.displayName || "Unknown User",
+          department: "LOGISTICS",
+        },
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        alarmDate: formData.alarmDate,
+        alarmTime: formData.alarmTime,
+        attachments: formData.attachments,
+        serviceExpenses: formData.serviceExpenses,
+        status: "Draft",
+        created: new Date(),
+        // Additional data needed for assignment creation
+        projectSiteId: formData.projectSite,
+        message: formData.message,
+        campaignName: formData.campaignName,
+        jobOrderId: jobOrderData?.id || null,
         userData: {
           uid: user.uid,
           first_name: userData?.first_name,
@@ -556,12 +588,9 @@ export default function CreateServiceAssignmentPage() {
           company_id: userData?.company_id,
           license_key: userData?.license_key,
         },
-        products,
-        teams,
-      }));
+      };
 
-      // Store the generated PDF
-      sessionStorage.setItem('generatedPDF', pdfBase64);
+      sessionStorage.setItem('serviceAssignmentData', JSON.stringify(assignmentData));
 
       // Navigate to view-pdf page with the exact URL format
       router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=Df4wxbfrO5EnAbml0r2I`);
@@ -637,7 +666,7 @@ export default function CreateServiceAssignmentPage() {
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: formData.assignedTo || formData.crew,
+        assignedTo: selectedTeam?.name || formData.assignedTo || formData.crew,
         assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
@@ -658,9 +687,9 @@ export default function CreateServiceAssignmentPage() {
         message: formData.message,
         campaignName: formData.campaignName,
         joNumber: jobOrderData?.joNumber || null, // Add job order number if present
-        coveredDateStart: formData.startDate,
-        coveredDateEnd: formData.endDate,
-        alarmDate: formData.alarmDate,
+        coveredDateStart: formData.startDate ? Timestamp.fromDate(formData.startDate) : null,
+        coveredDateEnd: formData.endDate ? Timestamp.fromDate(formData.endDate) : null,
+        alarmDate: formData.alarmDate ? Timestamp.fromDate(formData.alarmDate) : null,
         alarmTime: formData.alarmTime,
         attachments: convertAttachmentsForFirestore(formData.attachments),
         serviceExpenses: formData.serviceExpenses,
@@ -830,10 +859,10 @@ export default function CreateServiceAssignmentPage() {
 
       if (action === "print") {
         // Generate PDF and open in new window for printing
-        await generateServiceAssignmentPDF(serviceAssignmentData, false)
+        await generateServiceAssignmentHTMLPDF(serviceAssignmentData, false)
       } else {
         // Download PDF
-        await generateServiceAssignmentPDF(serviceAssignmentData, false)
+        await generateServiceAssignmentHTMLPDF(serviceAssignmentData, false)
       }
     } catch (error) {
       console.error("Error generating PDF:", error)
