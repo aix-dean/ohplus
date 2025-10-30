@@ -408,12 +408,13 @@ export default function ProposalDetailsPage() {
   const [editingCustomPage, setEditingCustomPage] = useState<CustomPage | null>(null)
   const [isBlankPageEditorOpen, setIsBlankPageEditorOpen] = useState(false)
   const [fieldVisibility, setFieldVisibility] = useState<{[productId: string]: {
-    location: boolean
-    dimension: boolean
-    type: boolean
-    traffic: boolean
-    srp: boolean
-    additionalMessage: boolean
+    location?: boolean
+    dimension?: boolean
+    type?: boolean
+    traffic?: boolean
+    location_visibility?: boolean
+    srp?: boolean
+    additionalMessage?: boolean
   }}>({})
 
   const fetchClients = async () => {
@@ -579,6 +580,7 @@ export default function ProposalDetailsPage() {
               dimension: proposalData.fieldVisibility?.[product.id]?.dimension ?? true,
               type: proposalData.fieldVisibility?.[product.id]?.type ?? true,
               traffic: proposalData.fieldVisibility?.[product.id]?.traffic ?? true,
+              location_visibility: proposalData.fieldVisibility?.[product.id]?.location_visibility ?? true,
               srp: proposalData.fieldVisibility?.[product.id]?.srp ?? true,
               additionalMessage: proposalData.fieldVisibility?.[product.id]?.additionalMessage ?? true,
             }
@@ -613,6 +615,7 @@ export default function ProposalDetailsPage() {
               dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
+              location_visibility: product.specs_rental?.location_visibility ? product.specs_rental.location_visibility.toLocaleString() : '',
               srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A',
               additionalMessage: product.additionalMessage || '',
               additionalSpecs: (product as any).additionalSpecs || []
@@ -1133,6 +1136,13 @@ export default function ProposalDetailsPage() {
             const traffic = parseInt(trafficStr)
             if (!isNaN(traffic) && updatedProduct.specs_rental) {
               updatedProduct.specs_rental = { ...updatedProduct.specs_rental, traffic_count: traffic }
+            }
+          }
+          if (editable.location_visibility) {
+            const visibilityStr = editable.location_visibility.replace(/[^\d]/g, '')
+            const visibility = parseInt(visibilityStr)
+            if (!isNaN(visibility) && updatedProduct.specs_rental) {
+              updatedProduct.specs_rental = { ...updatedProduct.specs_rental, location_visibility: visibility }
             }
           }
           if (editable.dimension) {
@@ -2526,6 +2536,32 @@ export default function ProposalDetailsPage() {
                   ) : (
                     <p className="font-normal text-[18px] break-words">
                       {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Location Visibility Row */}
+            {isEditMode || fieldVisibility[product.id]?.location_visibility !== false ? (
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Location Visibility:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.location_visibility || ''}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^\d]/g, '') // Only allow digits
+                        const formatted = value ? parseInt(value).toLocaleString() : ''
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location_visibility: formatted } }))
+                      }}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">
+                      {product.specs_rental?.location_visibility ? `${product.specs_rental.location_visibility.toLocaleString()} ${product.specs_rental.location_visibility_unit || 'm'}` : 'N/A'}
                     </p>
                   )}
                 </div>
