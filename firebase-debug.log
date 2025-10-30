@@ -792,3 +792,24 @@
 [debug] [2025-10-30T00:25:27.900Z] > authorizing via signed-in user (dean.aisyndicate.ph@gmail.com)
 [debug] [2025-10-30T00:25:28.479Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ 200
 [debug] [2025-10-30T00:25:28.479Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ [omitted]
+[debug] [2025-10-30T20:50:30.049Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.053Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.056Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.056Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.057Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.057Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.058Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.058Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.059Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.059Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.060Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.060Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.061Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.061Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.061Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.061Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.062Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.062Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.063Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.063Z] No OAuth tokens found
+[debug] [2025-10-30T20:50:30.094Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]

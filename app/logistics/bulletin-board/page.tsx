@@ -1,9 +1,5 @@
 "use client"
 
-import { Search, X } from "lucide-react"
-import Image from "next/image"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect, useState, useRef } from "react"
 import { useDebounce } from "@/hooks/use-debounce"
@@ -13,9 +9,8 @@ import type { Product } from "@/lib/firebase-service"
 import { searchBookings } from "@/lib/algolia-service"
 import { getLatestReportsPerBooking } from "@/lib/report-service"
 import type { ReportData } from "@/lib/report-service"
-import { Pagination } from "@/components/ui/pagination"
-import { Skeleton } from "@/components/ui/skeleton"
-import { formatTimeAgo, formatDateShort } from "@/lib/utils"
+import { formatDateShort } from "@/lib/utils"
+import { BulletinBoardContent } from "@/components/BulletinBoardContent"
 
 interface Booking {
   id: string
@@ -32,8 +27,7 @@ interface Booking {
 }
 
 export default function LogisticsBulletinBoardPage() {
-  const router = useRouter()
-  const { user, userData } = useAuth()
+   const { user, userData } = useAuth()
   const [products, setProducts] = useState<Product[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
@@ -291,171 +285,25 @@ export default function LogisticsBulletinBoardPage() {
     }
   }, [userData?.company_id])
 
-  const BookingCard = ({ booking, product }: { booking: Booking; product?: Product }) => {
-    const report = reports[booking.reservation_id || booking.id]
-
-    return (
-      <div className="bg-white rounded-[10px] shadow-[-1px_2px_5px_-0.5px_rgba(0,0,0,0.25)] p-4 relative min-h-[195px]">
-        <div className="absolute top-2 right-2 opacity-50">
-          <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="9.5" cy="9.5" r="1.5" fill="currentColor"/>
-            <circle cx="9.5" cy="4.5" r="1.5" fill="currentColor"/>
-            <circle cx="9.5" cy="14.5" r="1.5" fill="currentColor"/>
-          </svg>
-        </div>
-
-        <div className="flex gap-3 mb-3">
-          <div className="flex-shrink-0">
-            <div className="w-[75px] h-[76px] bg-gray-400 rounded-[7px] overflow-hidden">
-              {product?.media?.[0]?.url && product.media[0].url.trim() !== '' ? (
-                product.media[0].isVideo ? (
-                  <video
-                    src={product.media[0].url}
-                    className="w-full h-full object-cover"
-                    muted
-                    playsInline
-                  />
-                ) : (
-                  <Image
-                    src={product.media[0].url}
-                    alt="Site Photo"
-                    width={75}
-                    height={76}
-                    className="w-full h-full object-cover"
-                  />
-                )
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <span className="text-[11px] font-semibold text-center text-black">
-                    No<br/>image
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-[14px] font-semibold text-black mb-1">{booking.reservation_id || booking.id}</p>
-            <Link href={`/logistics/bulletin-board/${booking.id}`}>
-              <p className="text-[24px] font-semibold text-black mb-2 truncate cursor-pointer hover:text-blue-600 transition-colors">
-                {projectNames[booking.product_id || ''] || booking.project_name || "No Project Name"}
-              </p>
-            </Link>
-            <p className="text-[14px] font-semibold text-black">
-              Site: <span className="font-normal">{product?.name || "Unknown Location"}</span>
-            </p>
-          </div>
-        </div>
-
-        <div className="border-t border-gray-300 pt-3">
-          <p className="text-[14px] font-semibold text-black mb-2">Latest Activities:</p>
-          {reportsLoading ? (
-            <div className="space-y-1 pl-4">
-              <Skeleton className="h-3 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-            </div>
-          ) : report ? (
-            <div className="space-y-1 pl-4">
-              <p className="text-[13px] text-black font-light">
-                {formatDateShort(report.created)} - {report.descriptionOfWork || report.status}
-              </p>
-            </div>
-          ) : (
-            <p className="text-[13px] text-gray-500 pl-4">No Activities yet</p>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="bg-neutral-50 min-h-screen px-4 py-6">
-
-          <h1 className="text-lg font-bold text-gray-700 mb-4">Bulletin Board</h1>
-
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm text-gray-700">Search:</span>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-[190px] h-6 px-3 py-1 border border-gray-400 rounded text-sm text-gray-500 bg-white"
-              />
-            </div>
-            <div className="ml-auto flex gap-2 opacity-30">
-              <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M2.5 4.5h14v10h-14zM6.5 1.5v3M12.5 1.5v3M2.5 8.5h14" stroke="currentColor" strokeWidth="1"/>
-              </svg>
-              <svg width="27" height="27" viewBox="0 0 27 27" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="1" y="1" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-                <rect x="10" y="1" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-                <rect x="19" y="1" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-                <rect x="1" y="10" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-                <rect x="10" y="10" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-                <rect x="19" y="10" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-                <rect x="1" y="19" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-                <rect x="10" y="19" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-                <rect x="19" y="19" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-              </svg>
-            </div>
-          </div>
-
-          <div className="flex flex-col">
-            <div className="flex-1">
-              {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Array.from({ length: 9 }).map((_, i) => (
-                    <div key={i} className="bg-white rounded-lg shadow p-4 animate-pulse">
-                      <div className="h-16 bg-gray-300 rounded mb-2"></div>
-                      <div className="h-4 bg-gray-300 rounded mb-1"></div>
-                      <div className="h-6 bg-gray-300 rounded mb-2"></div>
-                      <div className="h-4 bg-gray-300 rounded mb-3"></div>
-                      <div className="border-t pt-2">
-                        <div className="h-3 bg-gray-300 rounded mb-1"></div>
-                        <div className="h-3 bg-gray-300 rounded mb-1"></div>
-                        <div className="h-3 bg-gray-300 rounded"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : bookings.length === 0 ? (
-                <div className="flex items-center justify-center py-12">
-                  <p className="text-gray-500 text-lg">No Activities yet</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {bookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((booking) => {
-                    const product = products.find(p => p.id === booking.product_id);
-                    return (
-                      <BookingCard
-                        key={booking.id}
-                        booking={booking}
-                        product={product}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex justify-center mt-4 pb-4">
-                <Pagination
-                  currentPage={currentPage}
-                  itemsPerPage={itemsPerPage}
-                  totalItems={Math.min(itemsPerPage, bookings.length - (currentPage - 1) * itemsPerPage)}
-                  totalOverall={bookings.length}
-                  onNextPage={handleNextPage}
-                  onPreviousPage={handlePreviousPage}
-                  hasMore={currentPage < totalPages}
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <BulletinBoardContent
+        title="Bulletin Board"
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        loading={loading}
+        bookings={bookings}
+        products={products}
+        currentPage={currentPage}
+        itemsPerPage={itemsPerPage}
+        totalPages={totalPages}
+        handleNextPage={handleNextPage}
+        handlePreviousPage={handlePreviousPage}
+        reports={Object.fromEntries(Object.entries(reports).map(([k, v]) => [k, [v]]))}
+        reportsLoading={reportsLoading}
+        projectNames={projectNames}
+      />
+    </div>
   )
 }
