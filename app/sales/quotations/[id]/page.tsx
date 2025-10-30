@@ -50,6 +50,7 @@ import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-
 import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
 import { generateSeparateQuotationPDFs } from "@/lib/quotation-pdf-service"
 import { Timestamp } from "firebase/firestore"
+import { getUserById, type User } from "@/lib/access-management-service"
 
 interface CompanyData {
   id: string
@@ -197,6 +198,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
   const [preparingSend, setPreparingSend] = useState(false)
   const [preparingDownload, setPreparingDownload] = useState(false)
   const [userSignatureUrl, setUserSignatureUrl] = useState<string | null>(null)
+  const [creatorUser, setCreatorUser] = useState<User | null>(null)
 
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<Record<string, any>>({})
@@ -455,30 +457,23 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
     }
   }, [fetchQuotationHistory])
 
-  // Fetch user signature
+
+  // Fetch creator user data
   useEffect(() => {
-    const fetchUserSignature = async () => {
-      if (!quotation?.created_by || !user?.uid) return
+    const fetchCreatorUser = async () => {
+      if (!quotation?.created_by) return
 
       try {
-        const userDocRef = doc(db, "iboard_users", user.uid)
-        const userDoc = await getDoc(userDocRef)
-
-        if (userDoc.exists()) {
-          const userData = userDoc.data()
-          // Check for user signature field (map with url, type, updated)
-          if (userData.signature && typeof userData.signature === 'object' && userData.signature.url) {
-            setUserSignatureUrl(userData.signature.url)
-            console.log("Found user signature URL:", userData.signature.url)
-          }
-        }
+        const creator = await getUserById(quotation.created_by)
+        setCreatorUser(creator)
+        setUserSignatureUrl(creator?.signature.url || null)
       } catch (error) {
-        console.error("Error fetching user signature:", error)
+        console.error("Error fetching creator user:", error)
       }
     }
 
-    fetchUserSignature()
-  }, [quotation?.created_by, user?.uid])
+    fetchCreatorUser()
+  }, [quotation?.created_by])
 
   // Handle automatic share when page loads with action parameter
   useEffect(() => {
@@ -606,7 +601,7 @@ The OH Plus Team`,
         }
       }
 
-      const { pdfUrl, password } = await generateAndUploadQuotationPDF(editableQuotation, companyData, logoDataUrl, userData, userSignatureDataUrl)
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(editableQuotation, companyData, logoDataUrl, creatorUser, userSignatureDataUrl)
 
       // Only save the quotation data if PDF generation succeeded
       await updateQuotation(
@@ -620,8 +615,8 @@ The OH Plus Team`,
       await updateQuotation(
         editableQuotation.id!,
         { pdf: pdfUrl, password: password },
-        userData?.uid || "system",
-        userData?.displayName || "System"
+        creatorUser?.id || "system",
+        creatorUser?.displayName || "System"
       )
 
       // Update local state
@@ -790,7 +785,7 @@ The OH Plus Team`,
     }
   }
 
-  const handleDownloadImage = async (userData: any) => {
+  const handleDownloadImage = async () => {
     if (!quotation) return
 
     // Check if any PDFs need to be generated
@@ -1006,7 +1001,7 @@ The OH Plus Team`,
             quotation: serializableQuotation,
             companyData,
             logoDataUrl,
-            userData,
+            creatorUser,
           }),
         })
 
@@ -1025,8 +1020,8 @@ The OH Plus Team`,
           await updateQuotation(
             historyItem.id!,
             { pdf: pdfUrl },
-            userData?.uid || "system",
-            userData?.displayName || "System"
+            creatorUser?.id || "system",
+            creatorUser?.displayName || "System"
           )
           console.log("PDF saved to quotation:", pdfUrl)
         } catch (saveError) {
@@ -1534,23 +1529,24 @@ The OH Plus Team`,
 
         <div className="space-y-8 mb-8">
           <div className="text-left">
-            <p className="mb-16">Very truly yours,</p>
+            <p className="mb-4">Very truly yours,</p>
             <div>
               {userSignatureUrl ? (
                 <div className="mb-2">
                   <img
                     src={userSignatureUrl}
                     alt="Signature"
-                    className="max-w-48 max-h-16 object-contain border-b border-gray-400"
+                    className="max-w-48 max-h-16 object-contain"
                     style={{ width: 'auto', height: 'auto' }}
                   />
+                  <div className="border-b border-gray-400 w-48 mb-2"></div>
                 </div>
               ) : (
                 <div className="border-b border-gray-400 w-48 mb-2"></div>
               )}
               <p className="font-medium">
-                {currentQuotation?.created_by_first_name && currentQuotation?.created_by_last_name
-                  ? `${currentQuotation.created_by_first_name} ${currentQuotation.created_by_last_name}`
+                {creatorUser?.first_name && creatorUser?.last_name
+                  ? `${creatorUser?.first_name} ${creatorUser?.last_name}`
                   : "AIX Xymbiosis"}
               </p>
               {isEditing && editingField === "signature_position" ? (
@@ -1571,7 +1567,7 @@ The OH Plus Team`,
                   onClick={() => isEditing && handleFieldEdit("signature_position", currentQuotation?.signature_position || "")}
                   title={isEditing ? "Click to edit position" : ""}
                 >
-                  {currentQuotation?.signature_position || "Account Manager"}
+                  {currentQuotation?.signature_position || "Sales"}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
               )}
@@ -1688,14 +1684,14 @@ The OH Plus Team`,
         }
       }
 
-      const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, companyData, logoDataUrl, userData, userSignatureDataUrl)
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, companyData, logoDataUrl, creatorUser, userSignatureDataUrl)
 
       // Update quotation with PDF URL and password
       await updateQuotation(
         quotation.id!,
         { pdf: pdfUrl, password: password },
-        userData?.uid || "system",
-        userData?.displayName || "System"
+        creatorUser?.id || "system",
+        creatorUser?.displayName || "System"
       )
 
       // Update local state - check if it's the current quotation or a related one
@@ -1817,7 +1813,7 @@ The OH Plus Team`,
             </Button>
             <Button
               variant="ghost"
-              onClick={ () => handleDownloadImage(userData)}
+              onClick={ () => handleDownloadImage()}
               disabled={downloadingImage || preparingDownload}
               className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
             >

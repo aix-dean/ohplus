@@ -59,6 +59,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
+import { getUserById, type User } from "@/lib/access-management-service"
 
 interface CompanyData {
   id: string
@@ -233,6 +234,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [showHistory, setShowHistory] = useState(false)
   const [generatingPDFsForSend, setGeneratingPDFsForSend] = useState(false)
   const [userSignatureUrl, setUserSignatureUrl] = useState<string | null>(null)
+  const [creatorUser, setCreatorUser] = useState<User | null>(null)
 
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
 
@@ -598,11 +600,11 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         }
       }
 
-      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, userData ? {
-        first_name: userData.first_name || undefined,
-        last_name: userData.last_name || undefined,
-        email: userData.email || undefined,
-        company_id: userData.company_id || undefined,
+      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, creatorUser ? {
+        first_name: creatorUser.first_name || undefined,
+        last_name: creatorUser.last_name || undefined,
+        email: creatorUser.email || undefined,
+        company_id: creatorUser.company_id || undefined,
       } : undefined, companyData ? {
         name: companyData.name || "Company Name",
         address: companyData.address,
@@ -824,30 +826,23 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   }, [fetchClientHistory])
 
   // Fetch user signature
+
   useEffect(() => {
-    const fetchUserSignature = async () => {
+    const fetchCreatorUser = async () => {
       if (!costEstimate?.createdBy) return
 
       try {
-        const userDocRef = doc(db, "iboard_users", user?.uid)
-        const userDoc = await getDoc(userDocRef)
-
-        if (userDoc.exists()) {
-          const userData = userDoc.data()
-          // Check for user signature field (map with url, type, updated)
-          if (userData.signature && typeof userData.signature === 'object' && userData.signature.url) {
-            setUserSignatureUrl(userData.signature.url)
-            console.log("Found user signature URL:", userData.signature.url)
-          }
-        }
+        const creator = await getUserById(costEstimate.createdBy)
+        setCreatorUser(creator)
+        console.log("Fetched creator user:", creator)
+        setUserSignatureUrl(creator?.signature.url || null)
       } catch (error) {
-        console.error("Error fetching user signature:", error)
+        console.error("Error fetching creator user:", error)
       }
     }
 
-    fetchUserSignature()
+    fetchCreatorUser()
   }, [costEstimate?.createdBy])
-
 
   // Handle automatic share when page loads with action parameter
   useEffect(() => {
@@ -1139,11 +1134,11 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         }
       }
 
-      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, userData ? {
-        first_name: userData.first_name || undefined,
-        last_name: userData.last_name || undefined,
-        email: userData.email || undefined,
-        company_id: userData.company_id || undefined,
+      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, creatorUser ? {
+        first_name: creatorUser.first_name || undefined,
+        last_name: creatorUser.last_name || undefined,
+        email: creatorUser.email || undefined,
+        company_id: creatorUser.company_id || undefined,
       } : undefined, companyData ? {
         name: companyData.name || "Company Name",
         address: companyData.address,
@@ -1166,7 +1161,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }
 
-  const handleDownloadPDF = async (userData: any) => {
+  const handleDownloadPDF = async () => {
     if (!costEstimate) return
 
     console.log('[PDF_DOWNLOAD] Starting PDF download process for cost estimate:', costEstimate.id)
@@ -1277,11 +1272,11 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
     setDownloadingPDF(true)
     try {
-      await generateCostEstimatePDF(costEstimate, selectedPages, false, undefined, userData ? {
-        first_name: userData.first_name || undefined,
-        last_name: userData.last_name || undefined,
-        email: userData.email || undefined,
-        company_id: userData.company_id || undefined,
+      await generateCostEstimatePDF(costEstimate, selectedPages, false, undefined, creatorUser ? {
+        first_name: creatorUser.first_name || undefined,
+        last_name: creatorUser.last_name || undefined,
+        email: creatorUser.email || undefined,
+        company_id: creatorUser.company_id || undefined,
       } : undefined)
       toast({
         title: "PDF Generated",
@@ -1565,7 +1560,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             companyData,
             logoDataUrl,
             userSignatureDataUrl,
-            userData,
+            creatorUser,
           }),
         })
 
@@ -2189,7 +2184,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
           <div className="space-y-8 mb-8">
             <div className="text-left">
-              <p className="mb-16">Very truly yours,</p>
+              <p className="mb-4">Very truly yours,</p>
               <div>
                 {userSignatureUrl ? (
                   <div className="mb-2">
@@ -2204,8 +2199,8 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                   <div className="border-b border-gray-400 w-48 mb-2"></div>
                 )}
                 <p className="font-medium">
-                  {userData?.first_name && userData?.last_name
-                    ? `${userData.first_name} ${userData.last_name}`
+                  {creatorUser?.first_name && creatorUser?.last_name
+                    ? `${creatorUser.first_name} ${creatorUser.last_name}`
                     : "Golden Touch Imaging Specialist"}
                 </p>
                 {isEditing && editingField === "signature_position" ? (
@@ -2223,7 +2218,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                     onClick={() => isEditing && handleFieldEdit("signature_position", tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "")}
                     title={isEditing ? "Click to edit position" : ""}
                   >
-                    {tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "Account Manager"}
+                    {tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "Sales"}
                     {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                   </p>
                 )}
@@ -2306,7 +2301,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             </Button>
             <Button
               variant="ghost"
-              onClick={() => handleDownloadPDF(userData)}
+              onClick={() => handleDownloadPDF()}
               disabled={downloadingPDF}
               className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
             >
