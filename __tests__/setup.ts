@@ -4,14 +4,57 @@ import { cleanup } from '@testing-library/react'
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 
-
-// Make React available globally for React 19 compatibility
-;(globalThis as any).React = React
-
-// Cleanup after each test
-afterEach(() => {
-  cleanup()
+// Mock DOM elements and global APIs
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(), // deprecated
+    removeListener: vi.fn(), // deprecated
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
 })
+
+Object.defineProperty(window, 'ResizeObserver', {
+  writable: true,
+  value: vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  })),
+})
+
+Object.defineProperty(window, 'IntersectionObserver', {
+  writable: true,
+  value: vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  })),
+})
+
+// Mock fetch and URL APIs
+global.fetch = vi.fn()
+global.URL.createObjectURL = vi.fn().mockReturnValue('blob:test-url')
+global.URL.revokeObjectURL = vi.fn()
+global.window.open = vi.fn().mockReturnValue({
+  onload: null,
+  print: vi.fn(),
+  close: vi.fn()
+})
+
+// Mock document methods
+document.createElement = vi.fn().mockReturnValue({
+  click: vi.fn(),
+  href: '',
+  download: ''
+})
+document.body.appendChild = vi.fn()
+document.body.removeChild = vi.fn()
 
 // Mock Firebase
 vi.mock('firebase/app', () => ({

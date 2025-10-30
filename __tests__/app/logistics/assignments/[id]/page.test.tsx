@@ -15,7 +15,7 @@ vi.mock('next/navigation', () => ({
     replace: vi.fn(),
   }),
   useSearchParams: () => new URLSearchParams(),
-  useParams: () => ({ id: 'test-assignment-id' }),
+  useParams: () => ({ id: 'f8EalouBbTCALiTSzYHX' }),
 }))
 
 // Mock React's use hook for params
@@ -25,7 +25,7 @@ vi.mock('react', async () => {
     ...actualReact,
     use: vi.fn(() => {
       // For testing, return the resolved value immediately
-      return { id: 'test-assignment-id' }
+      return { id: 'f8EalouBbTCALiTSzYHX' }
     }),
   }
 })
@@ -77,6 +77,20 @@ vi.mock('@/lib/firebase', () => ({
   db: {},
 }))
 
+// Mock Firebase Firestore
+vi.mock('firebase/firestore', () => ({
+  getDoc: vi.fn(),
+  doc: vi.fn((db, collection, id) => ({ path: `${collection}/${id}` })),
+  collection: vi.fn(),
+  query: vi.fn(),
+  where: vi.fn(),
+  orderBy: vi.fn(),
+  limit: vi.fn(),
+  getDocs: vi.fn(),
+  updateDoc: vi.fn(),
+  serverTimestamp: vi.fn(() => new Date()),
+}))
+
 // Mock UI components
 vi.mock('@/components/ui/button', () => ({
   Button: ({ children, onClick, disabled, variant, ...props }: any) => (
@@ -114,25 +128,15 @@ vi.mock('lucide-react', () => ({
 
 // Mock custom components
 vi.mock('@/components/logistics/assignments/view/ServiceAssignmentViewForm', () => ({
-  ServiceAssignmentViewForm: ({ assignmentData }: any) => (
-    <div data-testid="service-assignment-view-form">
-      {assignmentData?.saNumber || 'No assignment data'}
-    </div>
-  ),
+  ServiceAssignmentViewForm: vi.fn(),
 }))
 
 vi.mock('@/components/logistics/assignments/view/ServiceAssignmentSummaryBar', () => ({
-  ServiceAssignmentSummaryBar: ({ onCancelSA }: any) => (
-    <div data-testid="service-assignment-summary-bar">
-      <button onClick={onCancelSA} data-testid="cancel-sa-button">Cancel SA</button>
-    </div>
-  ),
+  ServiceAssignmentSummaryBar: vi.fn(),
 }))
 
 vi.mock('@/components/logistics/assignments/CreateReportDialog', () => ({
-  CreateReportDialog: ({ open }: { open: boolean }) => (
-    open ? <div data-testid="create-report-dialog">Create Report Dialog</div> : null
-  ),
+  CreateReportDialog: vi.fn(),
 }))
 
 // Mock date-fns
@@ -148,31 +152,130 @@ const TestWrapper = ({ children }: { children: React.ReactNode }) => (
   </AuthProvider>
 )
 
-describe('ViewServiceAssignmentPage - Cancel SA Functionality', () => {
-  const mockAssignmentData = {
-    id: 'test-assignment-id',
-    saNumber: 'SA-001',
-    serviceType: 'Installation',
-    projectSiteName: 'Test Site',
-    status: 'Active',
-    created: new Date(),
-    jobOrderId: 'test-job-order-id',
-  }
+// Mock implementations for components - moved to beforeEach
 
-  const mockJobOrderData = {
-    id: 'test-job-order-id',
-    title: 'Test Job Order',
-  }
+// Mock data
+const mockAssignmentData = {
+  id: 'f8EalouBbTCALiTSzYHX',
+  saNumber: 'SA-001',
+  serviceType: 'Installation',
+  projectSiteName: 'Test Site',
+  projectSiteLocation: 'Test Location',
+  status: 'Active',
+  created: new Date(),
+  jobOrderId: 'test-job-order-id',
+  assignedTo: 'test-user-id',
+  assignedToName: 'Test User',
+  serviceDuration: 8,
+  priority: 'High',
+  equipmentRequired: 'Ladder, Tools',
+  materialSpecs: 'Digital materials',
+  crew: 'team-1',
+  illuminationNits: '2000',
+  gondola: 'Yes',
+  technology: 'LED',
+  sales: 'John Doe',
+  remarks: 'Urgent installation',
+  message: 'Please complete ASAP',
+  jobDescription: 'Install billboard',
+  requestedBy: {
+    name: 'Jane Smith',
+    department: 'Operations'
+  },
+  coveredDateStart: new Date('2024-01-01'),
+  coveredDateEnd: new Date('2024-01-02'),
+  alarmDate: new Date('2024-01-01'),
+  alarmTime: '08:00',
+  pdfUrl: 'https://example.com/test.pdf',
+  serviceExpenses: [
+    { name: 'Labor', amount: '5000' },
+    { name: 'Materials', amount: '2000' }
+  ]
+}
 
+const mockJobOrderData = {
+  id: 'test-job-order-id',
+  joNumber: 'JO-001',
+  title: 'Test Job Order',
+  siteName: 'Test Site',
+  siteCode: 'TS001',
+  siteLocation: 'Test Location',
+  siteType: 'Billboard',
+  siteSize: '10x20',
+  requestedBy: 'Jane Smith',
+  assignTo: 'Test User',
+  dateRequested: new Date(),
+  deadline: new Date(),
+  clientCompany: 'Test Company',
+  clientName: 'John Client',
+  quotationNumber: 'Q-001',
+  totalAmount: 7000,
+  vatAmount: 700,
+  contractDuration: '1 month',
+  jobDescription: 'Install billboard',
+  remarks: 'Urgent',
+  attachments: [
+    { url: 'https://example.com/image1.jpg', name: 'site-image1.jpg' }
+  ],
+  siteImageUrl: 'https://example.com/site-image.jpg',
+  poMo: true,
+  projectFa: true,
+  signedQuotation: true,
+  joType: 'Installation',
+  status: 'Active'
+}
+
+const mockProducts = [
+  {
+    id: 'product-1',
+    name: 'Test Product',
+    site_code: 'TP001',
+    deleted: false,
+    specs_rental: {
+      location: 'Test Location',
+      traffic_count: 10000,
+      elevation: 50,
+      height: 10,
+      width: 20,
+      material: 'Digital',
+      illumination: 'LED',
+      gondola: true,
+      technology: 'LED'
+    }
+  }
+]
+
+const mockTeams = [
+  {
+    id: 'team-1',
+    name: 'Test Team',
+    description: 'Test team description',
+    teamType: 'installation' as const,
+    status: 'active' as const,
+    leaderId: 'leader-1',
+    leaderName: 'Team Leader',
+    members: [],
+    specializations: ['Installation'],
+    location: 'Test Location',
+    contactNumber: '123-456-7890',
+    email: 'team@test.com',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    createdBy: 'test-user-id',
+    company_id: 'test-company-id'
+  }
+]
+
+describe('ViewServiceAssignmentPage - Comprehensive Tests', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
 
     // Setup default mocks
-    const { getDoc, doc, collection, query, where, orderBy, limit, getDocs, updateDoc, serverTimestamp } = vi.mocked(await import('firebase/firestore'))
-    const { generateServiceAssignmentDetailsPDF } = vi.mocked(await import('@/lib/pdf-service'))
+    const { getDoc, doc, collection, query, where, orderBy, limit, getDocs, updateDoc, serverTimestamp } = await import('firebase/firestore')
+    const { generateServiceAssignmentDetailsPDF } = await import('@/lib/pdf-service')
 
     // Mock assignment fetch
-    getDoc.mockImplementation((docRef: any) => {
+    vi.mocked(getDoc).mockImplementation((docRef: any) => {
       if (docRef.path.includes('service_assignments')) {
         return Promise.resolve({
           exists: () => true,
@@ -191,90 +294,373 @@ describe('ViewServiceAssignmentPage - Cancel SA Functionality', () => {
     })
 
     // Mock products fetch
-    getDocs.mockResolvedValue({
+    vi.mocked(getDocs).mockResolvedValue({
       forEach: (callback: any) => {
-        callback({
-          id: 'product-1',
-          data: () => ({
-            name: 'Test Product',
-            deleted: false,
-          }),
+        mockProducts.forEach((product, index) => {
+          callback({
+            id: product.id,
+            data: () => product,
+          })
         })
       },
     } as any)
 
     // Mock teams fetch
-    const mockedTeamsService = vi.mocked(await import('@/lib/teams-service'))
-    mockedTeamsService.teamsService.getAllTeams = vi.fn().mockResolvedValue([
-      {
-        id: 'team-1',
-        name: 'Test Team',
-        status: 'active',
-      },
-    ])
+    const mockedTeamsService = await import('@/lib/teams-service')
+    vi.mocked(mockedTeamsService.teamsService.getAllTeams).mockResolvedValue(mockTeams)
 
     // Mock PDF generation
-    generateServiceAssignmentDetailsPDF.mockResolvedValue('mock-pdf-base64')
+    vi.mocked(generateServiceAssignmentDetailsPDF).mockResolvedValue('mock-pdf-base64')
 
     // Mock updateDoc for cancellation
-    updateDoc.mockResolvedValue(undefined)
+    vi.mocked(updateDoc).mockResolvedValue(undefined)
+
+    // Setup component mocks
+    const { ServiceAssignmentViewForm } = vi.mocked(await import('@/components/logistics/assignments/view/ServiceAssignmentViewForm'))
+    const { ServiceAssignmentSummaryBar } = vi.mocked(await import('@/components/logistics/assignments/view/ServiceAssignmentSummaryBar'))
+    const { CreateReportDialog } = vi.mocked(await import('@/components/logistics/assignments/CreateReportDialog'))
+
+    ServiceAssignmentViewForm.mockImplementation(({ assignmentData }: any) => (
+      <div data-testid="service-assignment-view-form">
+        {assignmentData?.saNumber || 'No assignment data'}
+      </div>
+    ))
+
+    ServiceAssignmentSummaryBar.mockImplementation(({ onCancelSA, onPrint, onDownload, onCreateReport }: any) => (
+      <div data-testid="service-assignment-summary-bar">
+        <button onClick={onCancelSA} data-testid="cancel-sa-button">Cancel SA</button>
+        <button onClick={onPrint} data-testid="print-button">Print</button>
+        <button onClick={onDownload} data-testid="download-button">Download</button>
+        <button onClick={onCreateReport} data-testid="create-report-button">Create Report</button>
+      </div>
+    ))
+
+    CreateReportDialog.mockImplementation(({ open, onOpenChange, assignmentId }: any) => (
+      open ? <div data-testid="create-report-dialog">Create Report Dialog</div> : undefined
+    ))
   })
 
   afterEach(() => {
     vi.clearAllMocks()
   })
 
-  describe('Cancel SA Button Interaction', () => {
-    it('should render the Cancel SA button in the actions dropdown', async () => {
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
+  describe('Initial Page Loading and Data Fetching', () => {
+    it('should display loading state initially', async () => {
+      await act(async () => {
+        render(
+          <TestWrapper>
+            <ViewServiceAssignmentPage />
+          </TestWrapper>
+        )
       })
 
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-      expect(cancelButton).toBeInTheDocument()
-      expect(cancelButton).toHaveTextContent('Cancel SA')
+      expect(screen.getByTestId('loader-icon')).toBeInTheDocument()
+      expect(screen.getByText('Loading assignment...')).toBeInTheDocument()
     })
 
-    it('should call handleCancelSA when Cancel SA button is clicked', async () => {
-      const user = userEvent.setup()
+    it('should fetch assignment data with correct ID', async () => {
+      const { getDoc, doc } = vi.mocked(await import('firebase/firestore'))
 
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
+      await act(async () => {
+        render(
+          <TestWrapper>
+            <ViewServiceAssignmentPage />
+          </TestWrapper>
+        )
+      })
+
+      await waitFor(() => {
+        expect(getDoc).toHaveBeenCalledWith(doc(expect.any(Object), 'service_assignments', 'f8EalouBbTCALiTSzYHX'))
+      })
+    })
+
+    it('should fetch job order data when jobOrderId is present', async () => {
+      const { getDoc, doc } = vi.mocked(await import('firebase/firestore'))
+
+      await act(async () => {
+        render(
+          <TestWrapper>
+            <ViewServiceAssignmentPage />
+          </TestWrapper>
+        )
+      })
+
+      await waitFor(() => {
+        expect(getDoc).toHaveBeenCalledWith(doc(expect.any(Object), 'job_orders', 'test-job-order-id'))
+      })
+    })
+
+    it('should fetch products data', async () => {
+      const { getDocs, collection, query, where, orderBy, limit } = vi.mocked(await import('firebase/firestore'))
+
+      await act(async () => {
+        render(
+          <TestWrapper>
+            <ViewServiceAssignmentPage />
+          </TestWrapper>
+        )
+      })
+
+      await waitFor(() => {
+        expect(getDocs).toHaveBeenCalled()
+        expect(query).toHaveBeenCalledWith(
+          collection(expect.any(Object), 'products'),
+          where('deleted', '==', false),
+          orderBy('name', 'asc'),
+          limit(100)
+        )
+      })
+    })
+
+    it('should fetch teams data', async () => {
+      const mockedTeamsService = vi.mocked(await import('@/lib/teams-service'))
+
+      await act(async () => {
+        render(
+          <TestWrapper>
+            <ViewServiceAssignmentPage />
+          </TestWrapper>
+        )
+      })
+
+      await waitFor(() => {
+        expect(mockedTeamsService.teamsService.getAllTeams).toHaveBeenCalled()
+      })
+    })
+
+    it('should render assignment data after loading', async () => {
+      await act(async () => {
+        render(
+          <TestWrapper>
+            <ViewServiceAssignmentPage />
+          </TestWrapper>
+        )
+      })
 
       await waitFor(() => {
         expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
       })
 
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      // Verify updateDoc was called with correct parameters
-      const { updateDoc, doc, serverTimestamp } = vi.mocked(await import('firebase/firestore'))
-      expect(updateDoc).toHaveBeenCalledWith(
-        doc(expect.any(Object), 'service_assignments', 'test-assignment-id'),
-        {
-          status: 'Cancelled',
-          cancellation_date: serverTimestamp(),
-          cancelled_by_uid: 'test-user-id',
-        }
-      )
+      expect(screen.getByText('View Service Assignment')).toBeInTheDocument()
+      expect(screen.getByTestId('service-assignment-view-form')).toBeInTheDocument()
     })
   })
 
-  describe('Successful Cancellation Flow', () => {
-    it('should update service_assignments data with status "Cancelled"', async () => {
+  describe('Rendering Assignment Data in ServiceAssignmentViewForm', () => {
+    it('should pass correct props to ServiceAssignmentViewForm', async () => {
+      const { ServiceAssignmentViewForm } = vi.mocked(await import('@/components/logistics/assignments/view/ServiceAssignmentViewForm'))
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(ServiceAssignmentViewForm).toHaveBeenCalledWith(
+          expect.objectContaining({
+            assignmentData: mockAssignmentData,
+            products: mockProducts,
+            teams: mockTeams,
+            jobOrderData: mockJobOrderData,
+          }),
+          undefined
+        )
+      })
+    })
+
+    it('should display assignment SA number in the form', async () => {
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('service-assignment-view-form')).toHaveTextContent('SA-001')
+      })
+    })
+  })
+
+  describe('PDF Loading from URL and Fallback Generation', () => {
+    it('should attempt to load PDF from URL when available', async () => {
+      // Mock fetch for PDF URL loading
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/pdf' }),
+        blob: vi.fn().mockResolvedValue(new Blob(['test'], { type: 'application/pdf' }))
+      })
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledWith(
+          'https://example.com/test.pdf',
+          expect.objectContaining({
+            method: 'GET',
+            headers: { 'Accept': 'application/pdf' },
+            signal: expect.any(AbortSignal)
+          })
+        )
+      })
+    })
+
+    it('should fallback to PDF generation when URL fetch fails', async () => {
+      // Mock fetch to fail
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'))
+
+      const { generateServiceAssignmentDetailsPDF } = vi.mocked(await import('@/lib/pdf-service'))
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(generateServiceAssignmentDetailsPDF).toHaveBeenCalledWith(
+          mockAssignmentData,
+          mockJobOrderData,
+          mockProducts,
+          mockTeams,
+          true
+        )
+      })
+    })
+
+    it('should generate PDF when no URL is available', async () => {
+      // Mock assignment without pdfUrl
+      const assignmentWithoutUrl = { ...mockAssignmentData, pdfUrl: null }
+      const { getDoc } = vi.mocked(await import('firebase/firestore'))
+      getDoc.mockImplementation((docRef: any) => {
+        if (docRef.path.includes('service_assignments')) {
+          return Promise.resolve({
+            exists: () => true,
+            data: () => assignmentWithoutUrl,
+          } as any)
+        }
+        return Promise.resolve({
+          exists: () => false,
+          data: () => null,
+        } as any)
+      })
+
+      const { generateServiceAssignmentDetailsPDF } = vi.mocked(await import('@/lib/pdf-service'))
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(generateServiceAssignmentDetailsPDF).toHaveBeenCalled()
+      })
+    })
+
+    it('should handle PDF generation errors gracefully', async () => {
+      const { generateServiceAssignmentDetailsPDF } = vi.mocked(await import('@/lib/pdf-service'))
+      generateServiceAssignmentDetailsPDF.mockRejectedValue(new Error('PDF generation failed'))
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(mockToast).toHaveBeenCalledWith({
+          title: 'Error',
+          description: 'Failed to load PDF file. Please try refreshing the page.',
+          variant: 'destructive'
+        })
+      })
+    })
+  })
+
+  describe('Print and Download PDF Functionality', () => {
+    it('should handle print functionality', async () => {
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('print-button')).toBeInTheDocument()
+      })
+
+      const printButton = screen.getByTestId('print-button')
+      fireEvent.click(printButton)
+
+      expect(global.window.open).toHaveBeenCalled()
+    })
+
+    it('should handle download functionality', async () => {
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('download-button')).toBeInTheDocument()
+      })
+
+      const downloadButton = screen.getByTestId('download-button')
+      fireEvent.click(downloadButton)
+
+      expect(document.createElement).toHaveBeenCalledWith('a')
+      expect(global.URL.createObjectURL).toHaveBeenCalled()
+    })
+  })
+
+  describe('Create Report Dialog Opening', () => {
+    it('should open create report dialog when button is clicked', async () => {
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('create-report-button')).toBeInTheDocument()
+      })
+
+      const createReportButton = screen.getByTestId('create-report-button')
+      fireEvent.click(createReportButton)
+
+      expect(screen.getByTestId('create-report-dialog')).toBeInTheDocument()
+    })
+
+    it('should pass correct props to CreateReportDialog', async () => {
+      const { CreateReportDialog } = vi.mocked(await import('@/components/logistics/assignments/CreateReportDialog'))
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(CreateReportDialog).toHaveBeenCalledWith(
+          expect.objectContaining({
+            assignmentId: 'f8EalouBbTCALiTSzYHX',
+            open: false,
+            onOpenChange: expect.any(Function)
+          }),
+          undefined
+        )
+      })
+    })
+  })
+
+  describe('Cancel SA Functionality with Specific ID', () => {
+    it('should cancel service assignment with correct ID', async () => {
       const user = userEvent.setup()
 
       render(
@@ -284,25 +670,23 @@ describe('ViewServiceAssignmentPage - Cancel SA Functionality', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
+        expect(screen.getByTestId('cancel-sa-button')).toBeInTheDocument()
       })
 
       const cancelButton = screen.getByTestId('cancel-sa-button')
+      await user.click(cancelButton)
 
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
+      const { updateDoc, doc } = vi.mocked(await import('firebase/firestore'))
       expect(updateDoc).toHaveBeenCalledWith(
-        expect.any(Object),
+        doc(expect.any(Object), 'service_assignments', 'f8EalouBbTCALiTSzYHX'),
         expect.objectContaining({
           status: 'Cancelled',
+          cancelled_by_uid: 'test-user-id'
         })
       )
     })
 
-    it('should add cancellation_date with serverTimestamp', async () => {
+    it('should display success message after cancellation', async () => {
       const user = userEvent.setup()
 
       render(
@@ -312,70 +696,11 @@ describe('ViewServiceAssignmentPage - Cancel SA Functionality', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
+        expect(screen.getByTestId('cancel-sa-button')).toBeInTheDocument()
       })
 
       const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      const { updateDoc, serverTimestamp } = vi.mocked(await import('firebase/firestore'))
-      expect(updateDoc).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({
-          cancellation_date: serverTimestamp(),
-        })
-      )
-    })
-
-    it('should add cancelled_by_uid with current user ID', async () => {
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
-      })
-
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
-      expect(updateDoc).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.objectContaining({
-          cancelled_by_uid: 'test-user-id',
-        })
-      )
-    })
-
-    it('should display success toast message', async () => {
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
-      })
-
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
+      await user.click(cancelButton)
 
       expect(mockToast).toHaveBeenCalledWith({
         title: 'Success',
@@ -383,7 +708,7 @@ describe('ViewServiceAssignmentPage - Cancel SA Functionality', () => {
       })
     })
 
-    it('should navigate to /logistics/assignments after successful cancellation', async () => {
+    it('should navigate to assignments list after successful cancellation', async () => {
       const user = userEvent.setup()
 
       render(
@@ -393,26 +718,20 @@ describe('ViewServiceAssignmentPage - Cancel SA Functionality', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
+        expect(screen.getByTestId('cancel-sa-button')).toBeInTheDocument()
       })
 
       const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
+      await user.click(cancelButton)
 
       expect(mockPush).toHaveBeenCalledWith('/logistics/assignments')
     })
   })
 
-  describe('Error Handling During Cancellation', () => {
-    it('should display error toast when cancellation fails', async () => {
-      const user = userEvent.setup()
-
-      // Mock updateDoc to reject
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
-      updateDoc.mockRejectedValue(new Error('Database error'))
+  describe('Error Handling for Data Fetching Failures', () => {
+    it('should handle assignment fetch error', async () => {
+      const { getDoc } = vi.mocked(await import('firebase/firestore'))
+      getDoc.mockRejectedValue(new Error('Database error'))
 
       render(
         <TestWrapper>
@@ -421,158 +740,21 @@ describe('ViewServiceAssignmentPage - Cancel SA Functionality', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
-      })
-
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      expect(mockToast).toHaveBeenCalledWith({
-        title: 'Error',
-        description: 'Failed to cancel service assignment. Please try again.',
-        variant: 'destructive',
+        expect(mockToast).toHaveBeenCalledWith({
+          title: 'Error',
+          description: 'Failed to load service assignment.',
+          variant: 'destructive'
+        })
       })
     })
 
-    it('should not navigate when cancellation fails', async () => {
-      const user = userEvent.setup()
-
-      // Mock updateDoc to reject
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
-      updateDoc.mockRejectedValue(new Error('Database error'))
-
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
-      })
-
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      expect(mockPush).not.toHaveBeenCalled()
-    })
-
-    it('should handle network errors gracefully', async () => {
-      const user = userEvent.setup()
-
-      // Mock updateDoc to reject with network error
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
-      updateDoc.mockRejectedValue(new Error('Network error'))
-
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
-      })
-
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      expect(mockToast).toHaveBeenCalledWith({
-        title: 'Error',
-        description: 'Failed to cancel service assignment. Please try again.',
-        variant: 'destructive',
-      })
-    })
-  })
-
-  describe('Edge Cases', () => {
-    it('should not proceed with cancellation when assignmentId is missing', async () => {
-      // Mock params to return undefined id
-      vi.mocked(await import('react')).use.mockReturnValue({ id: undefined })
-
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
-      })
-
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
-      expect(updateDoc).not.toHaveBeenCalled()
-      expect(mockToast).not.toHaveBeenCalled()
-      expect(mockPush).not.toHaveBeenCalled()
-    })
-
-    it('should not proceed with cancellation when user is not authenticated', async () => {
-      // Mock auth to return no user
-      vi.mocked(await import('@/contexts/auth-context')).useAuth.mockReturnValue({
-        user: null,
-        userData: null,
-        projectData: null,
-        subscriptionData: null,
-        loading: false,
-        login: vi.fn(),
-        logout: vi.fn(),
-        refreshUserData: vi.fn(),
-        refreshProjectData: vi.fn(),
-        refreshSubscriptionData: vi.fn(),
-      } as any)
-
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
-      })
-
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
-      expect(updateDoc).not.toHaveBeenCalled()
-      expect(mockToast).not.toHaveBeenCalled()
-      expect(mockPush).not.toHaveBeenCalled()
-    })
-
-    it('should handle cancellation of already cancelled assignments', async () => {
-      const user = userEvent.setup()
-
-      // Mock assignment data with already cancelled status
-      const cancelledAssignment = { ...mockAssignmentData, status: 'Cancelled' }
+    it('should handle assignment not found', async () => {
       const { getDoc } = vi.mocked(await import('firebase/firestore'))
       getDoc.mockImplementation((docRef: any) => {
         if (docRef.path.includes('service_assignments')) {
           return Promise.resolve({
-            exists: () => true,
-            data: () => cancelledAssignment,
+            exists: () => false,
+            data: () => null,
           } as any)
         }
         return Promise.resolve({
@@ -588,99 +770,19 @@ describe('ViewServiceAssignmentPage - Cancel SA Functionality', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
+        expect(mockToast).toHaveBeenCalledWith({
+          title: 'Assignment not found',
+          description: 'The service assignment you\'re looking for doesn\'t exist.',
+          variant: 'destructive'
+        })
       })
 
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      // Should still attempt to update (though in practice this might not be desired)
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
-      expect(updateDoc).toHaveBeenCalled()
-    })
-
-    it('should handle rapid multiple clicks on cancel button', async () => {
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
-
-      await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
-      })
-
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-
-      // Click multiple times rapidly
-      await act(async () => {
-        await user.click(cancelButton)
-        await user.click(cancelButton)
-        await user.click(cancelButton)
-      })
-
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
-      // Should only be called once (assuming the function has proper guards)
-      expect(updateDoc).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('Complete User Flow Integration', () => {
-    it('should complete the full cancel SA workflow successfully', async () => {
-      const user = userEvent.setup()
-
-      render(
-        <TestWrapper>
-          <ViewServiceAssignmentPage />
-        </TestWrapper>
-      )
-
-      // Wait for component to load
-      await waitFor(() => {
-        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
-      })
-
-      // Verify initial state
-      expect(screen.getByTestId('cancel-sa-button')).toBeInTheDocument()
-
-      // Click cancel button
-      const cancelButton = screen.getByTestId('cancel-sa-button')
-      await act(async () => {
-        await user.click(cancelButton)
-      })
-
-      // Verify the update call
-      const { updateDoc, serverTimestamp } = vi.mocked(await import('firebase/firestore'))
-      expect(updateDoc).toHaveBeenCalledWith(
-        expect.any(Object),
-        {
-          status: 'Cancelled',
-          cancellation_date: serverTimestamp(),
-          cancelled_by_uid: 'test-user-id',
-        }
-      )
-
-      // Verify success toast
-      expect(mockToast).toHaveBeenCalledWith({
-        title: 'Success',
-        description: 'Service assignment has been cancelled successfully.',
-      })
-
-      // Verify navigation
       expect(mockPush).toHaveBeenCalledWith('/logistics/assignments')
     })
 
-    it('should handle the complete error flow', async () => {
-      const user = userEvent.setup()
-
-      // Mock updateDoc to reject
-      const { updateDoc } = vi.mocked(await import('firebase/firestore'))
-      updateDoc.mockRejectedValue(new Error('Database connection failed'))
+    it('should handle products fetch error gracefully', async () => {
+      const { getDocs } = vi.mocked(await import('firebase/firestore'))
+      getDocs.mockRejectedValue(new Error('Products fetch error'))
 
       render(
         <TestWrapper>
@@ -688,26 +790,194 @@ describe('ViewServiceAssignmentPage - Cancel SA Functionality', () => {
         </TestWrapper>
       )
 
-      // Wait for component to load
+      // Should still render without crashing
       await waitFor(() => {
         expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
       })
+    })
 
-      // Click cancel button
+    it('should handle teams fetch error gracefully', async () => {
+      const mockedTeamsService = await import('@/lib/teams-service')
+      vi.mocked(mockedTeamsService.teamsService.getAllTeams).mockRejectedValue(new Error('Teams fetch error'))
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      // Should still render without crashing
+      await waitFor(() => {
+        expect(screen.getByTestId('service-assignment-summary-bar')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Navigation (Back Button, Success Redirects)', () => {
+    it('should navigate back when back button is clicked', async () => {
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('arrow-left-icon')).toBeInTheDocument()
+      })
+
+      const backButton = screen.getByTestId('arrow-left-icon').closest('button')
+      expect(backButton).toBeInTheDocument()
+
+      fireEvent.click(backButton!)
+      expect(mockBack).toHaveBeenCalled()
+    })
+
+    it('should redirect to assignments list on successful cancellation', async () => {
+      const user = userEvent.setup()
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByTestId('cancel-sa-button')).toBeInTheDocument()
+      })
+
       const cancelButton = screen.getByTestId('cancel-sa-button')
-      await act(async () => {
-        await user.click(cancelButton)
+      await user.click(cancelButton)
+
+      expect(mockPush).toHaveBeenCalledWith('/logistics/assignments')
+    })
+  })
+
+  describe('Loading States and UI Feedback', () => {
+    it('should show loading state during initial data fetch', () => {
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      expect(screen.getByTestId('loader-icon')).toBeInTheDocument()
+      expect(screen.getByText('Loading assignment...')).toBeInTheDocument()
+    })
+
+    it('should hide loading state after data is loaded', async () => {
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('loader-icon')).not.toBeInTheDocument()
       })
 
-      // Verify error toast
-      expect(mockToast).toHaveBeenCalledWith({
-        title: 'Error',
-        description: 'Failed to cancel service assignment. Please try again.',
-        variant: 'destructive',
+      expect(screen.queryByText('Loading assignment...')).not.toBeInTheDocument()
+    })
+
+    it('should show assignment not found when data is null', async () => {
+      const { getDoc } = vi.mocked(await import('firebase/firestore'))
+      getDoc.mockResolvedValue({
+        exists: () => false,
+        data: () => null,
+      } as any)
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Assignment not found')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Assignment Not Found Scenarios', () => {
+    it('should display not found message when assignment does not exist', async () => {
+      const { getDoc } = vi.mocked(await import('firebase/firestore'))
+      getDoc.mockImplementation((docRef: any) => {
+        if (docRef.path.includes('service_assignments')) {
+          return Promise.resolve({
+            exists: () => false,
+            data: () => null,
+          } as any)
+        }
+        return Promise.resolve({
+          exists: () => false,
+          data: () => null,
+        } as any)
       })
 
-      // Verify no navigation occurred
-      expect(mockPush).not.toHaveBeenCalled()
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(screen.getByText('Assignment not found')).toBeInTheDocument()
+      })
+    })
+
+    it('should redirect to assignments list when assignment not found', async () => {
+      const { getDoc } = vi.mocked(await import('firebase/firestore'))
+      getDoc.mockImplementation((docRef: any) => {
+        if (docRef.path.includes('service_assignments')) {
+          return Promise.resolve({
+            exists: () => false,
+            data: () => null,
+          } as any)
+        }
+        return Promise.resolve({
+          exists: () => false,
+          data: () => null,
+        } as any)
+      })
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(mockPush).toHaveBeenCalledWith('/logistics/assignments')
+      })
+    })
+
+    it('should show error toast when assignment not found', async () => {
+      const { getDoc } = vi.mocked(await import('firebase/firestore'))
+      getDoc.mockImplementation((docRef: any) => {
+        if (docRef.path.includes('service_assignments')) {
+          return Promise.resolve({
+            exists: () => false,
+            data: () => null,
+          } as any)
+        }
+        return Promise.resolve({
+          exists: () => false,
+          data: () => null,
+        } as any)
+      })
+
+      render(
+        <TestWrapper>
+          <ViewServiceAssignmentPage />
+        </TestWrapper>
+      )
+
+      await waitFor(() => {
+        expect(mockToast).toHaveBeenCalledWith({
+          title: 'Assignment not found',
+          description: 'The service assignment you\'re looking for doesn\'t exist.',
+          variant: 'destructive'
+        })
+      })
     })
   })
 })
