@@ -92,288 +92,24 @@ export function ServiceAssignmentViewForm({
   products,
   teams,
   jobOrderData,
+  pdfBlob,
+  pdfUrl,
+  pdfError,
+  isLoadingPdf,
+  pdfKey,
 }: {
   assignmentData: any;
   products: Product[];
   teams: Team[];
   jobOrderData: JobOrder | null;
+  pdfBlob: Blob | null;
+  pdfUrl: string | null;
+  pdfError: string | null;
+  isLoadingPdf: boolean;
+  pdfKey: number;
 }) {
-  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-  const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(false);
-  const [pdfKey, setPdfKey] = useState<number>(0); // Add key for iframe re-rendering
 
 
-  // Enhanced data validation function
-  const validatePdfGenerationData = (assignmentData: any, jobOrderData: any, products: any[], teams: any[]) => {
-    const validationErrors: string[] = [];
-
-    // Validate assignment data
-    if (!assignmentData) {
-      validationErrors.push('Assignment data is missing');
-    } else {
-      if (!assignmentData.saNumber) {
-        validationErrors.push('Assignment SA number is missing');
-      }
-      if (!assignmentData.projectSiteName && !assignmentData.projectSiteId) {
-        validationErrors.push('Project site information is missing');
-      }
-      if (!assignmentData.serviceType) {
-        validationErrors.push('Service type is missing');
-      }
-    }
-
-    // Validate products array
-    if (!Array.isArray(products)) {
-      validationErrors.push('Products data is not an array');
-    } else if (products.length === 0) {
-      console.warn('PDF Validation: No products data available - PDF may have limited site information');
-    }
-
-    // Validate teams array
-    if (!Array.isArray(teams)) {
-      validationErrors.push('Teams data is not an array');
-    } else if (teams.length === 0) {
-      console.warn('PDF Validation: No teams data available - PDF may have limited team information');
-    }
-
-    // Log validation results
-    if (validationErrors.length > 0) {
-      console.error('PDF Validation: Critical validation errors found:', validationErrors);
-      return { isValid: false, errors: validationErrors };
-    }
-
-    console.log('PDF Validation: Data validation passed successfully');
-    return { isValid: true, errors: [] };
-  };
-
-  // Enhanced error logging function
-  const logPdfError = (stage: string, error: any, context?: any) => {
-    const errorDetails = {
-      stage,
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      } : String(error),
-      context: context || {},
-      assignmentId: assignmentData?.id || assignmentData?.saNumber || 'unknown',
-      userAgent: navigator.userAgent,
-      url: window.location.href
-    };
-
-    console.error(`PDF Error [${stage}]:`, errorDetails);
-
-    // Could send to error reporting service here
-    // Example: errorReportingService.log(errorDetails);
-  };
-
-  // Fetch PDF as blob when assignmentData changes
-  useEffect(() => {
-    const loadPdf = async () => {
-      console.log('PDF Loading: Starting enhanced PDF load process for assignment:', assignmentData?.id || assignmentData?.saNumber);
-      console.log('PDF Loading: Assignment data keys:', Object.keys(assignmentData || {}));
-      console.log('PDF Loading: Job order data available:', !!jobOrderData);
-      console.log('PDF Loading: Products count:', products?.length || 0);
-      console.log('PDF Loading: Teams count:', teams?.length || 0);
-
-      setIsLoadingPdf(true);
-      setPdfError(null);
-
-      let pdfBlob: Blob | null = null;
-      let loadStage = 'initialization';
-
-      try {
-        // Stage 1: URL-based PDF loading (if available)
-        if (assignmentData?.pdfUrl) {
-          loadStage = 'url_fetch';
-          console.log('PDF Loading: Attempting to fetch PDF from URL:', assignmentData.pdfUrl);
-
-          try {
-            const response = await fetch(assignmentData.pdfUrl, {
-              method: 'GET',
-              headers: {
-                'Accept': 'application/pdf',
-              },
-              // Add timeout
-              signal: AbortSignal.timeout(30000) // 30 second timeout
-            });
-
-            console.log('PDF Loading: Fetch response status:', response.status);
-
-            if (!response.ok) {
-              const errorMsg = `HTTP error! status: ${response.status} - ${response.statusText}`;
-              logPdfError('url_fetch', new Error(errorMsg), { url: assignmentData.pdfUrl, status: response.status });
-              throw new Error(errorMsg);
-            }
-
-            const contentType = response.headers.get('content-type');
-            console.log('PDF Loading: Response content-type:', contentType);
-
-            if (!contentType || !contentType.includes('application/pdf')) {
-              const errorMsg = `Invalid content type, expected PDF but got: ${contentType}`;
-              logPdfError('url_fetch', new Error(errorMsg), { contentType, url: assignmentData.pdfUrl });
-              throw new Error(errorMsg);
-            }
-
-            const blob = await response.blob();
-            console.log('PDF Loading: Successfully fetched PDF blob, size:', blob.size, 'bytes');
-
-            if (blob.size === 0) {
-              const errorMsg = 'PDF file is empty';
-              logPdfError('url_fetch', new Error(errorMsg), { blobSize: blob.size, url: assignmentData.pdfUrl });
-              throw new Error(errorMsg);
-            }
-
-            if (blob.size < 1000) {
-              console.warn('PDF Loading: PDF blob is very small, might be corrupted:', blob.size, 'bytes');
-            }
-
-            pdfBlob = blob;
-            console.log('PDF Loading: PDF loaded successfully from URL');
-          } catch (urlError) {
-            console.warn('PDF Loading: URL fetch failed, proceeding to generation fallback:', urlError instanceof Error ? urlError.message : String(urlError));
-            logPdfError('url_fetch_fallback', urlError, { url: assignmentData.pdfUrl });
-          }
-        }
-
-        // Stage 2: PDF generation (if URL failed or not available)
-        if (!pdfBlob) {
-          loadStage = 'data_validation';
-          console.log('PDF Loading: Starting PDF generation process');
-
-          // Validate data before generation
-          const validation = validatePdfGenerationData(assignmentData, jobOrderData, products, teams);
-          if (!validation.isValid) {
-            const errorMsg = `Data validation failed: ${validation.errors.join(', ')}`;
-            logPdfError('data_validation', new Error(errorMsg), {
-              validationErrors: validation.errors,
-              assignmentData: assignmentData,
-              jobOrderData: jobOrderData,
-              productsCount: products?.length,
-              teamsCount: teams?.length
-            });
-            throw new Error(errorMsg);
-          }
-
-          loadStage = 'pdf_generation';
-          console.log('PDF Loading: Attempting PDF generation using pdf-service');
-
-          try {
-            const pdfBase64 = await generateServiceAssignmentDetailsPDF(
-              assignmentData,
-              jobOrderData,
-              products,
-              teams,
-              true // returnBase64 = true
-            );
-
-            console.log('PDF Loading: PDF generation result type:', typeof pdfBase64, 'length:', pdfBase64?.length);
-
-            if (!pdfBase64 || pdfBase64.length === 0) {
-              const errorMsg = 'PDF generation returned empty result';
-              logPdfError('pdf_generation', new Error(errorMsg), {
-                resultType: typeof pdfBase64,
-                resultLength: pdfBase64?.length,
-                assignmentData: assignmentData
-              });
-              throw new Error(errorMsg);
-            }
-
-            // Convert base64 to blob with error handling
-            loadStage = 'base64_conversion';
-            const byteCharacters = atob(pdfBase64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            pdfBlob = new Blob([byteArray], { type: 'application/pdf' });
-
-            console.log('PDF Loading: Successfully generated PDF, size:', pdfBlob.size, 'bytes');
-
-            if (pdfBlob.size === 0) {
-              const errorMsg = 'Generated PDF blob is empty';
-              logPdfError('base64_conversion', new Error(errorMsg), { blobSize: pdfBlob.size });
-              throw new Error(errorMsg);
-            }
-
-          } catch (generationError) {
-            logPdfError('pdf_generation', generationError, {
-              assignmentData: assignmentData,
-              jobOrderData: jobOrderData,
-              productsCount: products?.length,
-              teamsCount: teams?.length
-            });
-
-            // Provide user-friendly error message based on error type
-            let userFriendlyMessage = 'Failed to generate PDF. Please try again.';
-            const errorMessage = generationError instanceof Error ? generationError.message : String(generationError);
-            if (errorMessage.includes('validation failed')) {
-              userFriendlyMessage = 'Unable to generate PDF due to missing assignment data. Please ensure all required information is provided.';
-            } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
-              userFriendlyMessage = 'Network error occurred while generating PDF. Please check your connection and try again.';
-            }
-
-            setPdfError(userFriendlyMessage);
-            setIsLoadingPdf(false);
-            return;
-          }
-        }
-
-        // Stage 3: Success
-        loadStage = 'success';
-        setPdfBlob(pdfBlob);
-        setPdfError(null);
-        setIsLoadingPdf(false);
-        setPdfKey(prev => prev + 1); // Increment key to force iframe re-render
-        console.log('PDF Loading: PDF loading process completed successfully, key incremented to:', pdfKey + 1);
-
-      } catch (error) {
-        logPdfError(loadStage, error, {
-          assignmentData: assignmentData,
-          jobOrderData: jobOrderData,
-          productsCount: products?.length,
-          teamsCount: teams?.length
-        });
-
-        // Fallback: Try to show a basic error message and allow retry
-        const fallbackMessage = loadStage === 'data_validation'
-          ? 'Unable to load PDF due to missing or invalid data. Please contact support if this persists.'
-          : 'Failed to load PDF file. Please try refreshing the page.';
-
-        setPdfError(fallbackMessage);
-        setIsLoadingPdf(false);
-      }
-    };
-
-    // Only load PDF if we have assignment data
-    if (assignmentData) {
-      loadPdf();
-    } else {
-      console.warn('PDF Loading: No assignment data available, skipping PDF load');
-      setIsLoadingPdf(false);
-    }
-  }, [assignmentData, jobOrderData, products, teams]);
-
-  // Create blob URL when pdfBlob changes
-  useEffect(() => {
-    console.log('PDF URL Effect: pdfBlob changed, current blob:', pdfBlob ? `size: ${pdfBlob.size} bytes` : 'null');
-    if (pdfBlob) {
-      const url = URL.createObjectURL(pdfBlob);
-      console.log('PDF URL Effect: Created blob URL:', url);
-      setPdfUrl(url);
-      return () => {
-        console.log('PDF URL Effect: Revoking blob URL:', url);
-        URL.revokeObjectURL(url);
-      };
-    } else {
-      console.log('PDF URL Effect: Setting pdfUrl to null');
-      setPdfUrl(null);
-    }
-  }, [pdfBlob]);
 
   // Helper function to safely parse and validate dates
   const parseDateSafely = (dateValue: any): Date | null => {
@@ -428,7 +164,7 @@ export function ServiceAssignmentViewForm({
         <div className="">
           {assignmentData.pdfUrl ? (
             <div className="w-full h-[842px] max-h-screen bg-white">
-              {isLoadingPdf ? (
+              {isLoadingPdf && !pdfUrl ? (
                 <div className="flex flex-col items-center justify-center h-full space-y-4">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   <div className="text-center">
@@ -458,10 +194,8 @@ export function ServiceAssignmentViewForm({
                       variant="default"
                       size="sm"
                       onClick={() => {
-                        setPdfError(null);
-                        setIsLoadingPdf(true);
-                        // Trigger PDF reload by updating a dependency
-                        setPdfBlob(null);
+                        // Retry functionality removed - PDF loading is now handled by parent component
+                        window.location.reload();
                       }}
                       className="bg-blue-600 hover:bg-blue-700"
                     >
@@ -472,9 +206,11 @@ export function ServiceAssignmentViewForm({
               ) : pdfUrl ? (
                 <iframe
                   key={pdfKey} // Use pdfKey instead of pdfUrl for consistent re-rendering
-                  src={pdfUrl}
+                  src={`${pdfUrl}#zoom=110`}
                   className="w-full h-full border-0 bg-white"
                   title="Service Assignment PDF"
+                  onLoad={() => console.log('PDF iframe loaded successfully')}
+                  onError={() => console.log('PDF iframe failed to load')}
                 />
               ) : null}
             </div>
