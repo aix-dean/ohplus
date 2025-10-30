@@ -102,6 +102,7 @@ export function ServiceAssignmentViewForm({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(false);
+  const [pdfKey, setPdfKey] = useState<number>(0); // Add key for iframe re-rendering
 
 
   // Enhanced data validation function
@@ -327,7 +328,8 @@ export function ServiceAssignmentViewForm({
         setPdfBlob(pdfBlob);
         setPdfError(null);
         setIsLoadingPdf(false);
-        console.log('PDF Loading: PDF loading process completed successfully');
+        setPdfKey(prev => prev + 1); // Increment key to force iframe re-render
+        console.log('PDF Loading: PDF loading process completed successfully, key incremented to:', pdfKey + 1);
 
       } catch (error) {
         logPdfError(loadStage, error, {
@@ -358,11 +360,17 @@ export function ServiceAssignmentViewForm({
 
   // Create blob URL when pdfBlob changes
   useEffect(() => {
+    console.log('PDF URL Effect: pdfBlob changed, current blob:', pdfBlob ? `size: ${pdfBlob.size} bytes` : 'null');
     if (pdfBlob) {
       const url = URL.createObjectURL(pdfBlob);
+      console.log('PDF URL Effect: Created blob URL:', url);
       setPdfUrl(url);
-      return () => URL.revokeObjectURL(url);
+      return () => {
+        console.log('PDF URL Effect: Revoking blob URL:', url);
+        URL.revokeObjectURL(url);
+      };
     } else {
+      console.log('PDF URL Effect: Setting pdfUrl to null');
       setPdfUrl(null);
     }
   }, [pdfBlob]);
@@ -463,8 +471,9 @@ export function ServiceAssignmentViewForm({
                 </div>
               ) : pdfUrl ? (
                 <iframe
+                  key={pdfKey} // Use pdfKey instead of pdfUrl for consistent re-rendering
                   src={pdfUrl}
-                  className="w-full h-full border-0"
+                  className="w-full h-full border-0 bg-white"
                   title="Service Assignment PDF"
                 />
               ) : null}
