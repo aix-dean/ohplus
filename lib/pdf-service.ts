@@ -2134,6 +2134,7 @@ export async function generateReportPDF(
   projectData?: any,
   returnBase64 = false,
   module = "logistics", // Added module parameter with default value
+  companyData?: any, // Added company data parameter
 ): Promise<string | void> {
   try {
     const pdf = new jsPDF("p", "mm", "a4")
@@ -2291,51 +2292,83 @@ export async function generateReportPDF(
     let companyLogoUrl = "/ohplus-new-logo.png"
     let preparedByName = "User"
 
-    // Query companies collection for logo and name
-    if (userData?.uid || report?.createdBy) {
-      try {
-        const userId = userData?.uid || report?.createdBy
-        let companyData = null
+    // Use provided company data if available, otherwise fetch it
+    if (companyData) {
+      console.log("PDF: Using provided company data:", companyData)
+      preparedByName =
+        companyData.name ||
+        companyData.company_name ||
+        userData?.displayName ||
+        userData?.email?.split("@")[0] ||
+        "User"
 
-        console.log("PDF: Fetching user data for uid:", userId)
+      if (companyData.photo_url && companyData.photo_url.trim() !== "") {
+        console.log("PDF: Setting company logo to:", companyData.photo_url)
+        companyLogoUrl = companyData.photo_url
+      } else if (companyData.logo && companyData.logo.trim() !== "") {
+        console.log("PDF: Setting company logo to:", companyData.logo)
+        companyLogoUrl = companyData.logo
+      } else {
+        console.log("PDF: No company logo found, using default OH+ logo")
+        companyLogoUrl = "/ohplus-new-logo.png"
+      }
+    } else {
+      // Fallback to fetching company data if not provided
+      if (userData?.uid || report?.createdBy) {
+        try {
+          const userId = userData?.uid || report?.createdBy
+          let fetchedCompanyData = null
 
-        // First, get the user document from iboard_users collection to access company_id
-        const userDocRef = doc(db, "iboard_users", userId)
-        const userDoc = await getDoc(userDocRef)
+          console.log("PDF: Fetching user data for uid:", userId)
 
-        if (userDoc.exists()) {
-          const fullUserData = userDoc.data()
-          console.log("PDF: User data found:", fullUserData)
+          // First, get the user document from iboard_users collection to access company_id
+          const userDocRef = doc(db, "iboard_users", userId)
+          const userDoc = await getDoc(userDocRef)
 
-          // Try to get company using user's company_id as the document ID
-          if (fullUserData.company_id) {
-            console.log("PDF: Fetching company data for company_id:", fullUserData.company_id)
+          if (userDoc.exists()) {
+            const fullUserData = userDoc.data()
+            console.log("PDF: User data found:", fullUserData)
 
-            const companyDocRef = doc(db, "companies", fullUserData.company_id)
-            const companyDoc = await getDoc(companyDocRef)
+            // Try to get company using user's company_id as the document ID
+            if (fullUserData.company_id) {
+              console.log("PDF: Fetching company data for company_id:", fullUserData.company_id)
 
-            if (companyDoc.exists()) {
-              companyData = companyDoc.data()
-              console.log("PDF: Company data found:", companyData)
+              const companyDocRef = doc(db, "companies", fullUserData.company_id)
+              const companyDoc = await getDoc(companyDocRef)
 
-              preparedByName =
-                companyData.name ||
-                companyData.company_name ||
-                fullUserData.display_name ||
-                fullUserData.first_name + " " + fullUserData.last_name ||
-                userData?.displayName ||
-                userData?.email?.split("@")[0] ||
-                "User"
+              if (companyDoc.exists()) {
+                fetchedCompanyData = companyDoc.data()
+                console.log("PDF: Company data found:", fetchedCompanyData)
 
-              if (companyData.photo_url && companyData.photo_url.trim() !== "") {
-                console.log("PDF: Setting company logo to:", companyData.photo_url)
-                companyLogoUrl = companyData.photo_url
+                preparedByName =
+                  fetchedCompanyData.name ||
+                  fetchedCompanyData.company_name ||
+                  fullUserData.display_name ||
+                  fullUserData.first_name + " " + fullUserData.last_name ||
+                  userData?.displayName ||
+                  userData?.email?.split("@")[0] ||
+                  "User"
+
+                if (fetchedCompanyData.photo_url && fetchedCompanyData.photo_url.trim() !== "") {
+                  console.log("PDF: Setting company logo to:", fetchedCompanyData.photo_url)
+                  companyLogoUrl = fetchedCompanyData.photo_url
+                } else {
+                  console.log("PDF: No company photo_url found, using default OH+ logo")
+                  companyLogoUrl = "/ohplus-new-logo.png"
+                }
               } else {
-                console.log("PDF: No company photo_url found, using default OH+ logo")
+                console.log("PDF: Company document not found for company_id:", fullUserData.company_id)
+                // Use user data as fallback
+                preparedByName =
+                  fullUserData.display_name ||
+                  fullUserData.first_name + " " + fullUserData.last_name ||
+                  userData?.displayName ||
+                  userData?.email?.split("@")[0] ||
+                  "User"
                 companyLogoUrl = "/ohplus-new-logo.png"
               }
             } else {
-              console.log("PDF: Company document not found for company_id:", fullUserData.company_id)
+              console.log("PDF: No company_id found in user data")
               // Use user data as fallback
               preparedByName =
                 fullUserData.display_name ||
@@ -2346,26 +2379,16 @@ export async function generateReportPDF(
               companyLogoUrl = "/ohplus-new-logo.png"
             }
           } else {
-            console.log("PDF: No company_id found in user data")
-            // Use user data as fallback
-            preparedByName =
-              fullUserData.display_name ||
-              fullUserData.first_name + " " + fullUserData.last_name ||
-              userData?.displayName ||
-              userData?.email?.split("@")[0] ||
-              "User"
+            console.log("PDF: User document not found for uid:", userId)
+            // Final fallback to provided userData or default
+            preparedByName = userData?.displayName || userData?.email?.split("@")[0] || "User"
             companyLogoUrl = "/ohplus-new-logo.png"
           }
-        } else {
-          console.log("PDF: User document not found for uid:", userId)
-          // Final fallback to provided userData or default
+        } catch (error) {
+          console.error("PDF: Error fetching company data:", error)
           preparedByName = userData?.displayName || userData?.email?.split("@")[0] || "User"
           companyLogoUrl = "/ohplus-new-logo.png"
         }
-      } catch (error) {
-        console.error("PDF: Error fetching company data:", error)
-        preparedByName = userData?.displayName || userData?.email?.split("@")[0] || "User"
-        companyLogoUrl = "/ohplus-new-logo.png"
       }
     }
 

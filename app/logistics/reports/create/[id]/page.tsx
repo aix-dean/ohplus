@@ -1,4 +1,4 @@
-"use client";
+t "use client";
 
 import React from "react";
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -16,6 +16,23 @@ import {
 } from "@/lib/firebase-service";
 import { Timestamp } from "firebase/firestore";
 import { ArrowLeft, Loader2, SquarePen, Upload } from "lucide-react";
+
+interface CompanyData {
+  id: string
+  name?: string
+  company_location?: any
+  address?: any
+  company_website?: string
+  website?: string
+  logo?: string
+  contact_person?: string
+  email?: string
+  phone?: string
+  social_media?: any
+  created_by?: string
+  created?: Date
+  updated?: Date
+}
 
 export default function CreateReportPage() {
   const params = useParams();
@@ -67,6 +84,7 @@ export default function CreateReportPage() {
   const [photosNote, setPhotosNote] = useState<string>("");
   const [reportType, setReportType] = useState<string>("");
   const [teamsMap, setTeamsMap] = useState<Record<string, string>>({});
+  const [companyData, setCompanyData] = useState<CompanyData | null>(null);
 
   const onCreateAReportClick = useCallback(() => {
     router.back();
@@ -220,6 +238,31 @@ export default function CreateReportPage() {
 
       setCreatedReportId(reportId);
 
+      // Generate PDF after report creation using API
+      try {
+        console.log("Generating PDF for report:", reportId);
+        const response = await fetch('/api/generate-report-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reportId: reportId,
+            companyData: companyData,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`);
+        }
+
+        console.log("PDF generated successfully via API");
+      } catch (pdfError) {
+        console.error("Error generating PDF:", pdfError);
+        // Don't fail the report creation if PDF generation fails
+      }
+
       // Navigate to the created report page
       setTimeout(() => {
         router.push(`/logistics/reports/${reportId}`);
@@ -239,6 +282,8 @@ export default function CreateReportPage() {
     photosAttachments,
     bookingData,
     completePercentage,
+    reportType,
+    reportNumber,
   ]);
 
   useEffect(() => {
@@ -255,11 +300,11 @@ export default function CreateReportPage() {
     const urlReportType = searchParams.get("reportType");
     if (urlReportType) {
       if (urlReportType === "progress") {
-        setReportType("Progress Report");
+        setReportType("Progress");
       } else if (urlReportType === "completion") {
-        setReportType("Completion Report");
+        setReportType("Completion");
       } else if (urlReportType === "monitoring") {
-        setReportType("Monitoring Report");
+        setReportType("Monitoring");
       }
     } else if (assignmentData?.serviceType) {
       if (assignmentData.serviceType === "Monitoring") {
@@ -286,6 +331,48 @@ export default function CreateReportPage() {
 
     fetchTeams();
   }, []);
+
+  useEffect(() => {
+    console.log("[v0] useEffect triggered - user:", !!user)
+    if (user) {
+      console.log("[v0] Calling fetchCompanyData")
+      fetchCompanyData()
+    }
+  }, [user])
+
+  const fetchCompanyData = useCallback(async () => {
+    if (!user) {
+      console.log("[v0] fetchCompanyData: Missing user")
+      return
+    }
+
+    try {
+      console.log("[v0] fetchCompanyData: user:", user)
+
+      // Get user data from auth context - check if user has userData property
+      const userData = (user as any).userData || user
+      console.log("[v0] fetchCompanyData: userData:", userData)
+      console.log("[v0] fetchCompanyData: userData.company_id:", userData.company_id)
+
+      if (!userData.company_id) {
+        console.warn("[v0] No company_id found in userData:", userData)
+        return
+      }
+
+      console.log("[v0] Fetching company data for company_id:", userData.company_id)
+      const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
+
+      if (companyDoc.exists()) {
+        const companyData = { id: companyDoc.id, ...companyDoc.data() } as CompanyData
+        console.log("[v0] Company data fetched successfully:", companyData)
+        setCompanyData(companyData)
+      } else {
+        console.warn("[v0] No company data found for company_id:", userData.company_id)
+      }
+    } catch (error) {
+      console.error("[v0] Error fetching company data:", error)
+    }
+  }, [user])
 
   const fetchAssignmentData = useCallback(async () => {
     if (!assignmentId) return;

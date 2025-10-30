@@ -7,8 +7,9 @@ import type { ReportData } from '@/lib/report-service'
 export async function POST(request: NextRequest) {
   console.log('[API_REPORT_PDF] Received report PDF generation request')
 
-  const { reportId }: { reportId: string } = await request.json()
+  const { reportId, companyData }: { reportId: string; companyData?: any } = await request.json()
   console.log('[API_REPORT_PDF] Report ID:', reportId)
+  console.log('[API_REPORT_PDF] Company data provided:', !!companyData)
 
   try {
     // Fetch the report data from Firestore
@@ -22,9 +23,9 @@ export async function POST(request: NextRequest) {
 
     // Fetch product data if available
     let product = null
-    if (reportData.siteId) {
+    if (reportData.site?.id) {
       try {
-        const productDoc = await getDoc(doc(db, 'products', reportData.siteId))
+        const productDoc = await getDoc(doc(db, 'products', reportData.site.id))
         if (productDoc.exists()) {
           product = { id: productDoc.id, ...productDoc.data() }
           console.log('[API_REPORT_PDF] Product data retrieved:', product.id)
@@ -48,9 +49,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Use provided company data or fetch it if not provided
+    let finalCompanyData = companyData
+    if (!finalCompanyData && (userData as any)?.company_id) {
+      try {
+        const companyDoc = await getDoc(doc(db, 'companies', (userData as any).company_id))
+        if (companyDoc.exists()) {
+          finalCompanyData = { id: companyDoc.id, ...companyDoc.data() }
+          console.log('[API_REPORT_PDF] Company data retrieved:', finalCompanyData.id)
+        }
+      } catch (error) {
+        console.warn('[API_REPORT_PDF] Could not fetch company data:', error)
+      }
+    }
+
     // Generate PDF with base64 return
     console.log('[API_REPORT_PDF] Generating PDF...')
-    const pdfBase64 = await generateReportPDF(reportData, product, userData, null, true) as string
+    const pdfBase64 = await generateReportPDF(reportData, product, userData, finalCompanyData, true) as string
     console.log('[API_REPORT_PDF] PDF generated successfully, size:', pdfBase64.length)
 
     // Convert base64 to buffer
