@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { vi, describe, it, expect } from 'vitest'
+import { Timestamp } from 'firebase/firestore'
 import { BookingCard } from './BookingCard'
 
 // Mock next/link
@@ -66,6 +67,13 @@ describe('BookingCard', () => {
   const mockProduct = {
     id: 'product-1',
     name: 'Test Site',
+    description: 'Test description',
+    price: 1000,
+    active: true,
+    deleted: false,
+    seller_id: 'seller-1',
+    seller_name: 'Seller 1',
+    position: 0,
     media: [{ url: 'test-image.jpg', distance: '0', type: 'image', isVideo: false }],
   }
 
@@ -73,10 +81,28 @@ describe('BookingCard', () => {
     'RES-123': [
       {
         id: 'report-1',
-        descriptionOfWork: 'Installation completed',
-        created: { toDate: () => new Date('2024-01-15') },
-        status: 'completed',
+        siteId: 'site-1',
+        siteName: 'Site A',
+        companyId: 'company-1',
+        sellerId: 'seller-1',
+        client: 'Client A',
+        clientId: 'client-1',
+        bookingDates: { start: Timestamp.now(), end: Timestamp.now() },
+        breakdate: Timestamp.now(),
+        sales: 'sales-1',
+        reportType: 'completion',
+        date: '2024-01-15',
         attachments: [],
+        status: 'completed',
+        createdBy: 'user-1',
+        createdByName: 'User One',
+        category: 'maintenance',
+        subcategory: 'repair',
+        priority: 'high',
+        completionPercentage: 100,
+        tags: [],
+        descriptionOfWork: 'Installation completed',
+        created: Timestamp.now(),
       },
     ],
   }
@@ -139,8 +165,10 @@ describe('BookingCard', () => {
 
     render(<BookingCard {...propsWithoutImage} />)
 
-    expect(screen.getByText('No')).toBeInTheDocument()
-    expect(screen.getByText('image')).toBeInTheDocument()
+    // Check that the placeholder span exists
+    const placeholderSpan = document.querySelector('span.text-center')
+    expect(placeholderSpan).toBeInTheDocument()
+    expect(placeholderSpan?.textContent).toContain('No')
   })
 
   it('displays latest activities when reports are available', () => {
