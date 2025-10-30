@@ -18,6 +18,8 @@ import {
   orderBy,
   limit,
   getDocs,
+  updateDoc,
+  serverTimestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/contexts/auth-context"
@@ -441,6 +443,34 @@ export default function ViewServiceAssignmentPage() {
     setIsCreateReportDialogOpen(true);
   };
 
+  // Handle cancel SA functionality
+  const handleCancelSA = async () => {
+    if (!assignmentId || !user?.uid) return;
+
+    try {
+      const assignmentRef = doc(db, "service_assignments", assignmentId);
+      await updateDoc(assignmentRef, {
+        status: "Cancelled",
+        cancellation_date: serverTimestamp(),
+        cancelled_by_uid: user.uid,
+      });
+
+      toast({
+        title: "Success",
+        description: "Service assignment has been cancelled successfully.",
+      });
+
+      router.push("/logistics/assignments");
+    } catch (error) {
+      console.error("Error cancelling service assignment:", error);
+      toast({
+        title: "Error",
+        description: "Failed to cancel service assignment. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto py-4">
@@ -483,6 +513,7 @@ export default function ViewServiceAssignmentPage() {
         onPrint={handlePrint}
         onDownload={handleDownload}
         onCreateReport={handleCreateReport}
+        onCancelSA={handleCancelSA}
       />
 
       {/* Control Bar */}
