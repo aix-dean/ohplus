@@ -129,7 +129,7 @@ export default function ViewPDFPage() {
       )}
 
       {/* PDF Viewer */}
-      <div className="w-full h-screen">
+      <div className="w-full h-screen flex justify-center">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="h-8 w-8 animate-spin" />
@@ -143,12 +143,13 @@ export default function ViewPDFPage() {
             </div>
           </div>
         ) : pdfData ? (
-            <iframe
-              src={`data:application/pdf;base64,${pdfData}#toolbar=0#zoom=page-fit`}
-              style={{ width: '100%', height: '100%' }}
-              className="shadow-lg"
-              title="PDF Viewer"
-            />
+            <div className="w-[210mm] min-h-[297mm] bg-white shadow-md rounded-sm overflow-hidden">
+              <iframe
+                src={`data:application/pdf;base64,${pdfData}#zoom=96&navpanes=0&sidebar=0&scrollbar=0`}
+                className="w-full h-full min-h-[297mm]"
+                title="PDF Viewer"
+              />
+            </div>
           ) : null}
       </div>
     </div>
