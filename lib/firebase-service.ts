@@ -260,10 +260,12 @@ export interface Booking {
   product_id: string
   client_id: string
   client_name: string
+  client: any
   seller_id: string
   start_date: string | Timestamp
   end_date: string | Timestamp
   status: string
+  items: any
   total_amount: number
   payment_status: string
   created: string | Timestamp

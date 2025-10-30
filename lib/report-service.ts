@@ -18,15 +18,17 @@ import { db } from "./firebase"
 export interface ReportData {
   id?: string
   report_id?: string
-  siteId: string
-  siteName: string
-  siteCode?: string
+  site: {
+    name: string
+    id: string
+    location: string
+    media_url: string
+  }
   companyId: string
   sellerId: string
-  client: string
-  clientId: string
-  client_email?: string
+  client: any
   campaignName?: string
+  crew?: string
   joNumber?: string
   joType?: string
   booking_id?: string
@@ -34,11 +36,11 @@ export interface ReportData {
     start: Timestamp
     end: Timestamp
   }
+  start_date: Timestamp
   booking_id?: string
-  breakdate: Timestamp
   sales: string
   reportType: string
-  date: string
+  end_date: Timestamp
   attachments: Array<{
     note: string
     fileName: string
@@ -51,15 +53,13 @@ export interface ReportData {
     name: string
     id: string
   }
+  saNumber?: string
+  saId?: string
+  saType?: string
   status: string
   createdBy: string
-  createdByName: string
   created?: Timestamp
   updated?: Timestamp
-  location?: string
-  category: string
-  subcategory: string
-  priority: string
   completionPercentage: number
   tags: string[]
   assignedTo?: string
@@ -143,34 +143,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
 
     // Create the final report data with proper structure
     const finalReportData: any = {
-      report_id: reportId,
-      siteId: reportData.siteId,
-      siteName: reportData.siteName,
-      companyId: reportData.companyId,
-      sellerId: reportData.sellerId,
-      client: reportData.client,
-      clientId: reportData.clientId,
-      client_email: reportData.client_email,
-      campaignName: reportData.campaignName,
-      joNumber: reportData.joNumber,
-      joType: reportData.joType,
-      bookingDates: {
-        start: reportData.bookingDates.start,
-        end: reportData.bookingDates.end,
-      },
-      breakdate: reportData.breakdate,
-      sales: reportData.sales,
-      reportType: reportData.reportType,
-      date: reportData.date,
-      attachments: processedAttachments,
-      status: reportData.status || "draft",
-      createdBy: reportData.createdBy,
-      createdByName: reportData.createdByName,
-      category: reportData.category,
-      subcategory: reportData.subcategory,
-      priority: reportData.priority,
-      completionPercentage: reportData.completionPercentage,
-      tags: reportData.tags || [],
+      ...reportData,
       created: Timestamp.now(),
       updated: Timestamp.now(),
     }
@@ -178,15 +151,6 @@ export async function createReport(reportData: ReportData): Promise<string> {
     // Add product information if provided
     if (reportData.product) {
       finalReportData.product = reportData.product
-    }
-
-    // Add optional fields only if they have values
-    if (reportData.siteCode) {
-      finalReportData.siteCode = reportData.siteCode
-    }
-
-    if (reportData.location) {
-      finalReportData.location = reportData.location
     }
 
     if (reportData.assignedTo) {

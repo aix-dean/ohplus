@@ -149,8 +149,8 @@ const SelectServiceAssignmentPage = () => {
 
   const handleAssignmentClick = (assignment: ServiceAssignment) => {
     if (assignment.serviceType.toLowerCase() === "monitoring") {
-      // For monitoring assignments, navigate directly to create report
-      router.push(`/logistics/reports/create/${assignment.id}`)
+      // For monitoring assignments, navigate directly to create report with report type
+      router.push(`/logistics/reports/create/${assignment.id}?reportType=monitoring`)
     } else {
       // For other types, show the report type selection dialog
       setSelectedAssignment(assignment)
@@ -160,8 +160,8 @@ const SelectServiceAssignmentPage = () => {
 
   const handleReportTypeSelect = (reportType: "progress" | "completion") => {
     if (selectedAssignment) {
-      // Navigate to the create report page with the selected assignment
-      router.push(`/logistics/reports/create/${selectedAssignment.id}`)
+      // Navigate to the create report page with the selected assignment and report type
+      router.push(`/logistics/reports/create/${selectedAssignment.id}?reportType=${reportType}`)
     }
   }
 
