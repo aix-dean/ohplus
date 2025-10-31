@@ -1467,7 +1467,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
           <Button
             variant="outline"
             className="bg-white border-[#C4C4C4] text-[#333333] hover:bg-gray-50"
-            onClick={() => router.push(`/sales/job-orders/select-quotation?productId=${params.id}`)}
+            onClick={() => router.push(`/sales/job-orders/select-booking?productId=${params.id}`)}
           >
             Job Order
           </Button>

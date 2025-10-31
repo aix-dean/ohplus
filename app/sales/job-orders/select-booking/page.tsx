@@ -160,8 +160,14 @@ export default function SelectBookingPage() {
     return bookings
   }
 
-  const handleSelect = (booking: Booking) => {
-    router.push(`/sales/job-orders/create?bookingId=${booking.id}`)
+  const handleSelect = (item: Booking | SearchResult) => {
+    console.log('[handleSelect] Item clicked:', item)
+    const isSearchResult = 'objectID' in item
+    console.log('[handleSelect] Is search result:', isSearchResult)
+    const bookingId = isSearchResult ? (item as SearchResult).objectID : (item as Booking).id
+    console.log('[handleSelect] Booking ID:', bookingId)
+    console.log('[handleSelect] Navigating to:', `/sales/job-orders/create?bookingId=${bookingId}`)
+    router.push(`/sales/job-orders/create?bookingId=${bookingId}`)
   }
 
   const handleNextPage = async () => {

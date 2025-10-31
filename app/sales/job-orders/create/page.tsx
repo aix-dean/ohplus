@@ -48,7 +48,7 @@ import type { Product } from "@/lib/firebase-service"
 import { type Client, updateClient, updateClientCompany, type ClientCompany, getClientCompanyById, createNotifications } from "@/lib/client-service" // Import updateClient, updateClientCompany, ClientCompany, and getClientCompanyById
 import { cn, getProjectCompliance } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
-import { ComingSoonDialog } from "@/components/coming-soon-dialog"
+import { ComingSoonModal } from "@/components/coming-soon-dialog"
 import { ComplianceConfirmationDialog } from "@/components/compliance-confirmation-dialog"
 import { ComplianceDialog } from "@/components/compliance-dialog"
 import { serverTimestamp, Timestamp } from "firebase/firestore"
@@ -1692,7 +1692,15 @@ export default function CreateJobOrderPage() {
 
 
       {/* Coming Soon Dialog */}
-      <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} feature="Timeline" />
+      {showComingSoonDialog && (
+        <ComingSoonModal
+          onClose={() => setShowComingSoonDialog(false)}
+          onNotify={() => {
+            // Handle notify functionality if needed
+            setShowComingSoonDialog(false)
+          }}
+        />
+      )}
 
       {/* Compliance Confirmation Dialog */}
       <ComplianceConfirmationDialog

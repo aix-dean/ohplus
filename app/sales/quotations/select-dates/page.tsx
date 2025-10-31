@@ -116,7 +116,7 @@ export default function SelectDatesPage() {
               // Convert spots to site-like objects for display
               const spotSites = selectedSpots.map(spot => ({
                 ...product,
-                id: `${product.id}-spot-${spot.number}`,
+                id: `${product.id}`,
                 name: `${product.name}`,
                 spotNumber: spot.number,
                 spotData: spot,
