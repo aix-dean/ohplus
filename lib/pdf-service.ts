@@ -40,6 +40,7 @@ export async function loadImageAsBase64(url: string): Promise<string | null> {
     })
   } catch (error) {
     console.error("Error loading image:", url, error)
+    // Return null for failed image loads instead of throwing
     return null
   }
 }
@@ -743,7 +744,7 @@ export async function generateServiceAssignmentDetailsPDF(
     }
   } catch (error) {
     console.error("Error generating Service Assignment Details PDF:", error)
-    throw new Error("Failed to generate Service Assignment Details PDF")
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1042,7 +1043,7 @@ export async function generateServiceAssignmentPDF(
     }
   } catch (error) {
     console.error("Error generating Service Assignment PDF:", error)
-    throw new Error("Failed to generate Service Assignment PDF")
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1373,7 +1374,7 @@ export async function generateJobOrderPDF(jobOrder: JobOrder, returnBase64 = fal
     }
   } catch (error) {
     console.error("Error generating Job Order PDF:", error)
-    throw new Error("Failed to generate Job Order PDF")
+    throw new Error("Unable to create job order PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1639,7 +1640,7 @@ try {
     }
   } catch (error) {
     console.error("Error generating PDF:", error)
-    throw new Error("Failed to generate PDF")
+    throw new Error("Unable to create proposal PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1738,7 +1739,7 @@ export async function generateSeparateCostEstimatePDFs(
     }
   } catch (error) {
     console.error("Error generating separate PDFs:", error)
-    throw error
+    throw new Error("Unable to create separate cost estimate PDFs. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -2124,7 +2125,7 @@ export async function generateCostEstimatePDF(
     }
   } catch (error) {
     console.error("Error generating Cost Estimate PDF:", error)
-    throw new Error("Failed to generate Cost Estimate PDF")
+    throw new Error("Unable to create cost estimate PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -2729,7 +2730,7 @@ export async function generateReportPDF(
     }
   } catch (error) {
     console.error("Error generating report PDF:", error)
-    throw new Error("Failed to generate report PDF")
+    throw new Error("Unable to create report PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -2806,279 +2807,55 @@ export async function generateServiceAssignmentHTMLPDF(
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Service Assignment - ${serviceAssignment.saNumber}</title>
-        <style>
-          body {
-            font-family: 'Helvetica', 'Arial', sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #ffffff;
-            color: #000000;
-            line-height: 1.4;
-          }
-
-          .header {
-            background: linear-gradient(135deg, #1e3a8a 60%, #34d3eb 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
-            margin: -20px -20px 20px -20px;
-          }
-
-          .header h1 {
-            margin: 0;
-            font-size: 28px;
-            font-weight: bold;
-          }
-
-          .header p {
-            margin: 5px 0 0 0;
-            font-size: 14px;
-          }
-
-          .sa-number {
-            font-size: 32px;
-            font-weight: bold;
-            color: #1e3a8a;
-            margin: 20px 0;
-            text-align: center;
-          }
-
-          .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
-            color: white;
-            margin: 10px 0;
-          }
-
-          .status-completed { background-color: #22c55e; }
-          .status-pending { background-color: #eab308; }
-          .status-in-progress { background-color: #3b82f6; }
-          .status-draft { background-color: #6b7280; }
-
-          .section {
-            margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            background-color: #ffffff;
-          }
-
-          .section h2 {
-            margin: 0 0 15px 0;
-            font-size: 18px;
-            font-weight: bold;
-            color: #111827;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 5px;
-          }
-
-          .field-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-          }
-
-          .field {
-            margin-bottom: 10px;
-          }
-
-          .field label {
-            display: block;
-            font-weight: bold;
-            color: #374151;
-            margin-bottom: 3px;
-            font-size: 12px;
-          }
-
-          .field span {
-            color: #111827;
-            font-size: 14px;
-          }
-
-          .expenses-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 10px;
-          }
-
-          .expenses-table th,
-          .expenses-table td {
-            padding: 8px 12px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-          }
-
-          .expenses-table th {
-            background-color: #f9fafb;
-            font-weight: bold;
-            color: #374151;
-          }
-
-          .total-row {
-            border-top: 2px solid #374151;
-            font-weight: bold;
-          }
-
-          .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #e5e7eb;
-            text-align: center;
-            color: #6b7280;
-            font-size: 12px;
-          }
-
-          @media print {
-            body { margin: 0; }
-            .header { margin: 0 -20px 20px -20px; }
-          }
-        </style>
       </head>
-      <body>
-        <div class="header">
-          <h1>SERVICE ASSIGNMENT</h1>
-          <p>LOGISTICS DEPARTMENT</p>
-        </div>
-
-        <div class="sa-number">SA# ${serviceAssignment.saNumber}</div>
-
-        <div class="status-badge status-${serviceAssignment.status.toLowerCase().replace(' ', '-')}">
-          ${serviceAssignment.status.toUpperCase()}
-        </div>
-
-        <div class="section">
-          <h2>SERVICE ASSIGNMENT INFORMATION</h2>
-          <div class="field-grid">
-            <div class="field">
-              <label>SA Number:</label>
-              <span>${serviceAssignment.saNumber}</span>
-            </div>
-            <div class="field">
-              <label>Project Site:</label>
-              <span>${serviceAssignment.projectSiteName}</span>
-            </div>
-            <div class="field">
-              <label>Location:</label>
-              <span>${serviceAssignment.projectSiteLocation || "N/A"}</span>
-            </div>
-            <div class="field">
-              <label>Service Type:</label>
-              <span>${serviceAssignment.serviceType}</span>
-            </div>
-            <div class="field">
-              <label>Assigned To:</label>
-              <span>${serviceAssignment.assignedToName || serviceAssignment.assignedTo}</span>
-            </div>
-            <div class="field">
-              <label>Duration:</label>
-              <span>${serviceAssignment.serviceDuration ? `${serviceAssignment.serviceDuration} hours` : "N/A"}</span>
-            </div>
-            <div class="field">
-              <label>Priority:</label>
-              <span>${serviceAssignment.priority}</span>
-            </div>
-            <div class="field">
-              <label>Created:</label>
-              <span>${safeToDate(serviceAssignment.created).toLocaleDateString()}</span>
-            </div>
-            <div class="field">
-              <label>Start Date:</label>
-              <span>${serviceAssignment.startDate ? safeToDate(serviceAssignment.startDate).toLocaleDateString() : "N/A"}</span>
-            </div>
-            <div class="field">
-              <label>End Date:</label>
-              <span>${serviceAssignment.endDate ? safeToDate(serviceAssignment.endDate).toLocaleDateString() : "N/A"}</span>
-            </div>
-            <div class="field">
-              <label>Alarm Date:</label>
-              <span>${serviceAssignment.alarmDate ? safeToDate(serviceAssignment.alarmDate).toLocaleDateString() : "N/A"}</span>
-            </div>
-            <div class="field">
-              <label>Alarm Time:</label>
-              <span>${serviceAssignment.alarmTime || "N/A"}</span>
-            </div>
-            <div class="field">
-              <label>Illumination:</label>
-              <span>${serviceAssignment.illuminationNits ? `${serviceAssignment.illuminationNits} nits` : "N/A"}</span>
-            </div>
-            <div class="field">
-              <label>Gondola:</label>
-              <span>${serviceAssignment.gondola || "N/A"}</span>
-            </div>
-            <div class="field">
-              <label>Technology:</label>
-              <span>${serviceAssignment.technology || "N/A"}</span>
-            </div>
-          </div>
-        </div>
-
-        ${serviceAssignment.equipmentRequired || serviceAssignment.materialSpecs ? `
-        <div class="section">
-          <h2>EQUIPMENT & MATERIALS</h2>
-          ${serviceAssignment.equipmentRequired ? `
-          <div class="field">
-            <label>Equipment Required:</label>
-            <span>${serviceAssignment.equipmentRequired}</span>
-          </div>
-          ` : ''}
-          ${serviceAssignment.materialSpecs ? `
-          <div class="field">
-            <label>Material Specifications:</label>
-            <span>${serviceAssignment.materialSpecs}</span>
-          </div>
-          ` : ''}
-        </div>
-        ` : ''}
-
-        ${serviceAssignment.serviceExpenses && serviceAssignment.serviceExpenses.length > 0 ? `
-        <div class="section">
-          <h2>SERVICE COST BREAKDOWN</h2>
-          <table class="expenses-table">
-            <thead>
-              <tr>
-                <th>Expense Name</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${serviceAssignment.serviceExpenses.map(expense => `
-                <tr>
-                  <td>${expense.name}</td>
-                  <td>PHP ${Number.parseFloat(expense.amount).toLocaleString()}</td>
-                </tr>
-              `).join('')}
-              <tr class="total-row">
-                <td><strong>TOTAL COST</strong></td>
-                <td><strong>PHP ${serviceAssignment.serviceExpenses.reduce((sum, expense) => sum + (Number.parseFloat(expense.amount) || 0), 0).toLocaleString()}</strong></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        ` : ''}
-
-        ${serviceAssignment.remarks ? `
-        <div class="section">
-          <h2>REMARKS</h2>
-          <div class="field">
-            <span>${serviceAssignment.remarks}</span>
-          </div>
-        </div>
-        ` : ''}
-
-        <div class="section">
-          <h2>REQUESTED BY</h2>
-          <div class="field">
-            <span>${serviceAssignment.requestedBy.department} - ${serviceAssignment.requestedBy.name}</span>
-          </div>
-        </div>
-
-        <div class="footer">
-          <p>Generated by OH Plus Platform - Logistics Department</p>
-          <p>Generated on ${new Date().toLocaleDateString()}</p>
-          <p>Smart. Seamless. Scalable. - OH+</p>
+      <body style="margin:0; padding:0;">
+        <div style="width: 794px; height: 1123px; position: relative">
+          <div style="width: 507px; height: 31px; left: 55px; top: 93px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 21px; font-family: Inter; font-weight: 700; line-height: 21px; word-wrap: break-word">Golden Touch Imaging Specialist</div>
+          <div style="width: 507px; height: 31px; left: 138px; top: 1023px; position: absolute; text-align: center; color: var(--LIGHTER-BLACK, #333333); font-size: 13px; font-family: Inter; font-weight: 400; line-height: 13px; word-wrap: break-word">Golden Touch Imaging Specialist<br/>721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines</div>
+          <div style="width: 449px; height: 18px; left: 55px; top: 120px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 13px; font-family: Inter; font-weight: 400; line-height: 13px; word-wrap: break-word">+63 917 849 1054 | 721 Gen Solano St., San Miguel, Manila</div>
+          <div style="width: 78px; height: 18px; left: 55px; top: 170px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Recipient</div>
+          <div style="width: 254px; height: 27px; left: 55px; top: 197px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 26px; font-family: Inter; font-weight: 700; line-height: 26px; word-wrap: break-word">${serviceAssignment.assignedToName || serviceAssignment.assignedTo}</div>
+          <div style="width: 190px; height: 18px; left: 534px; top: 239px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Issued on ${serviceAssignment.created ? new Date(serviceAssignment.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
+          <div style="width: 190px; height: 18px; left: 55px; top: 228px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Production</div>
+          <div style="width: 115px; height: 18px; left: 67px; top: 327px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Site Name</div>
+          <div style="width: 153px; height: 18px; left: 269px; top: 327px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.projectSiteName}</div>
+          <div style="width: 115px; height: 18px; left: 67px; top: 358px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Site Address</div>
+          <div style="width: 307px; height: 18px; left: 269px; top: 358px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.projectSiteLocation}</div>
+          <div style="width: 132px; height: 18px; left: 67px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Campaign Name</div>
+          <div style="width: 241px; height: 18px; left: 269px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Eyes on Your Fries</div>
+          <div style="width: 115px; height: 18px; left: 67px; top: 420px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Service Type</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 420px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 700; line-height: 15px; word-wrap: break-word">${serviceAssignment.serviceType}</div>
+          <div style="width: 115px; height: 18px; left: 67px; top: 451px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Material Specs</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 451px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.materialSpecs}</div>
+          <div style="width: 148px; height: 18px; left: 67px; top: 482px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Service Start Date</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 482px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.startDate ? new Date(serviceAssignment.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
+          <div style="width: 138px; height: 18px; left: 67px; top: 513px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Service End Date</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 513px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.endDate ? new Date(serviceAssignment.endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
+          <div style="width: 138px; height: 18px; left: 67px; top: 544px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Crew</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 544px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.crew}</div>
+          <div style="width: 138px; height: 18px; left: 67px; top: 575px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Remarks</div>
+          <div style="width: 353px; height: 18px; left: 269px; top: 575px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.remarks}</div>
+          <div style="width: 115px; height: 18px; left: 55px; top: 621px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 700; line-height: 15px; word-wrap: break-word">Attachments:</div>
+          <img style="width: 105px; height: 41px; left: 48px; top: 49px; position: absolute" src="https://placehold.co/105x41" />
+          <div style="width: 166px; height: 42px; left: 556px; top: 190px; position: absolute; background: #32A7FA"></div>
+          <div style="width: 668px; height: 35px; left: 55px; top: 283px; position: absolute; background: #32A7FA"></div>
+          <div style="width: 151px; height: 31px; left: 561px; top: 200px; position: absolute; text-align: right; color: white; font-size: 26px; font-family: Inter; font-weight: 700; line-height: 26px; word-wrap: break-word">SA#${serviceAssignment.saNumber}</div>
+          <div style="width: 355px; height: 19px; left: 67px; top: 291px; position: absolute; color: white; font-size: 21px; font-family: Inter; font-weight: 700; line-height: 21px; word-wrap: break-word">Service Assignment Information</div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 318px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 351px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 384px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 417px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 450px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 483px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 549px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 582px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 516px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 194px; height: 290px; left: 55px; top: 318px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 255px; height: 255px; left: 55px; top: 649px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 109px; height: 18px; left: 634px; top: 669px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Prepared By</div>
+          <div style="width: 220px; height: 27px; left: 519px; top: 749px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 26px; font-family: Inter; font-weight: 700; line-height: 26px; word-wrap: break-word">${serviceAssignment.requestedBy.name}</div>
+          <div style="width: 190px; height: 18px; left: 549px; top: 779px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Logistics Team</div>
+          <div style="width: 125px; height: 42px; left: 605px; top: 55px; position: absolute; text-align: right"><span style="color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Tagged JO<br/></span><span style="color: var(--LIGHTER-BLACK, #333333); font-size: 21px; font-family: Inter; font-weight: 700; line-height: 24.57px; word-wrap: break-word">JO#${serviceAssignment.saNumber.slice(-4)} </span></div>
         </div>
       </body>
       </html>
@@ -3160,9 +2937,9 @@ export async function generateServiceAssignmentHTMLPDF(
       // Use html2canvas to capture the iframe content
       console.log("[DEBUG] Starting html2canvas with options...")
       const canvas = await html2canvas(iframe, {
-        scale: 1.5, // Reduced scale for better performance while maintaining quality
+        scale: 2, // Higher resolution capture for better PDF quality
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#ffffff',
         width: 794, // A4 width in pixels at 96 DPI
         height: 1123, // A4 height in pixels at 96 DPI
@@ -3170,12 +2947,13 @@ export async function generateServiceAssignmentHTMLPDF(
         scrollY: 0,
         windowWidth: 794,
         windowHeight: 1123,
-        // Optimize for performance and memory usage
+        // Optimize for absolute positioning capture
         imageTimeout: 0,
         removeContainer: true,
         foreignObjectRendering: false,
-        // Additional performance optimizations
+        // Additional optimizations for absolute positioning
         logging: false,
+        // proxy: undefined,
         ignoreElements: (element) => {
           // Skip elements that might cause layout shifts
           return element.tagName === 'SCRIPT' || element.tagName === 'STYLE'
@@ -3196,7 +2974,7 @@ export async function generateServiceAssignmentHTMLPDF(
       // Convert canvas to PDF using jsPDF
       console.log("[DEBUG] Converting canvas to PDF...")
       const pdf = new jsPDF("p", "mm", "a4")
-      const imgData = canvas.toDataURL('image/png')
+      const imgData = canvas.toDataURL('image/jpeg', 0.95) // Use JPEG format with high quality (0.95)
       console.log("[DEBUG] Canvas converted to data URL, length:", imgData.length)
 
       // Validate data URL
@@ -3215,7 +2993,7 @@ export async function generateServiceAssignmentHTMLPDF(
 
       console.log("[DEBUG] PDF dimensions - pdf:", pdfWidth, "x", pdfHeight, "img:", imgWidth, "x", imgHeight, "ratio:", ratio)
 
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+      pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
       console.log("[DEBUG] Image added to PDF successfully")
 
       const base64Result = pdf.output("datauristring").split(",")[1]
@@ -3523,7 +3301,7 @@ export async function generateServiceAssignmentCreatePDF(
     }
   } catch (error) {
     console.error("Error generating Service Assignment Create PDF:", error)
-    throw new Error("Failed to generate Service Assignment Create PDF")
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -3818,7 +3596,7 @@ export async function generateServiceAssignmentFallbackPDF(
     }
   } catch (error) {
     console.error("Error generating Service Assignment Fallback PDF:", error)
-    throw new Error("Failed to generate Service Assignment Fallback PDF")
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 

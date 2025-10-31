@@ -27,6 +27,7 @@ export default function ViewPDFPage() {
    const [pdfData, setPdfData] = useState<string | null>(null);
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState<string | null>(null);
+   const [iframeError, setIframeError] = useState(false);
    const [showSuccessDialog, setShowSuccessDialog] = useState(false);
    const [successDialogProps, setSuccessDialogProps] = useState({
      title: "Success!",
@@ -213,7 +214,14 @@ export default function ViewPDFPage() {
 
           if (pdfBase64 && pdfBase64.length > 0) {
             console.log('[PDF Loading] Setting PDF data, first 50 chars:', pdfBase64.substring(0, 50));
+
+            // Validate PDF data format
+            if (!pdfBase64.startsWith('JVBERi0xLj') && !pdfBase64.startsWith('JVBERi0xLj')) {
+              console.warn('[PDF Loading] PDF data does not start with PDF header, but proceeding...');
+            }
+
             setPdfData(pdfBase64);
+            setIframeError(false); // Reset iframe error state
           } else {
             const errorMsg = 'PDF generation returned empty result. Please check assignment data and try again.';
             console.error('[PDF Loading] Error:', errorMsg);
@@ -264,7 +272,14 @@ export default function ViewPDFPage() {
 
             if (pdfBase64 && pdfBase64.length > 0) {
               console.log('[PDF Loading] Client-side PDF generation successful, base64 length:', pdfBase64.length);
+
+              // Validate PDF data format
+              if (!pdfBase64.startsWith('JVBERi0xLj') && !pdfBase64.startsWith('JVBERi0xLj')) {
+                console.warn('[PDF Loading] PDF data does not start with PDF header, but proceeding...');
+              }
+
               setPdfData(pdfBase64);
+              setIframeError(false); // Reset iframe error state
             } else {
               throw new Error('Client-side PDF generation returned empty result');
             }
@@ -329,12 +344,22 @@ export default function ViewPDFPage() {
          }
        }
 
-       // Upload PDF to Firebase Storage
-       const pdfBlob = new Blob([Uint8Array.from(atob(pdfData!), c => c.charCodeAt(0))], { type: 'application/pdf' });
-       const pdfFileName = `service-assignments/${assignmentData.saNumber}-${Date.now()}.pdf`;
-       const pdfRef = ref(storage, pdfFileName);
-       await uploadBytes(pdfRef, pdfBlob);
-       const pdfUrl = await getDownloadURL(pdfRef);
+       // Upload PDF to Firebase Storage with validation
+       if (!pdfData || pdfData.length === 0) {
+         throw new Error('PDF data is empty or invalid');
+       }
+
+       let pdfUrl: string;
+       try {
+         const pdfBlob = new Blob([Uint8Array.from(atob(pdfData), c => c.charCodeAt(0))], { type: 'application/pdf' });
+         const pdfFileName = `service-assignments/${assignmentData.saNumber}-${Date.now()}.pdf`;
+         const pdfRef = ref(storage, pdfFileName);
+         await uploadBytes(pdfRef, pdfBlob);
+         pdfUrl = await getDownloadURL(pdfRef);
+       } catch (blobError) {
+         console.error('Error creating PDF blob:', blobError);
+         throw new Error('Failed to create PDF blob from data');
+       }
 
        // Create service assignment data with defaults
        const firestoreAssignmentData = {
@@ -428,12 +453,22 @@ export default function ViewPDFPage() {
          }
        }
 
-       // Upload PDF to Firebase Storage
-       const pdfBlob = new Blob([Uint8Array.from(atob(pdfData!), c => c.charCodeAt(0))], { type: 'application/pdf' });
-       const pdfFileName = `service-assignments/${assignmentData.saNumber}-${Date.now()}.pdf`;
-       const pdfRef = ref(storage, pdfFileName);
-       await uploadBytes(pdfRef, pdfBlob);
-       const pdfUrl = await getDownloadURL(pdfRef);
+       // Upload PDF to Firebase Storage with validation
+       if (!pdfData || pdfData.length === 0) {
+         throw new Error('PDF data is empty or invalid');
+       }
+
+       let pdfUrl: string;
+       try {
+         const pdfBlob = new Blob([Uint8Array.from(atob(pdfData), c => c.charCodeAt(0))], { type: 'application/pdf' });
+         const pdfFileName = `service-assignments/${assignmentData.saNumber}-${Date.now()}.pdf`;
+         const pdfRef = ref(storage, pdfFileName);
+         await uploadBytes(pdfRef, pdfBlob);
+         pdfUrl = await getDownloadURL(pdfRef);
+       } catch (blobError) {
+         console.error('Error creating PDF blob:', blobError);
+         throw new Error('Failed to create PDF blob from data');
+       }
 
        // Create service assignment data with draft status
        const draftAssignmentData = {
@@ -613,25 +648,72 @@ export default function ViewPDFPage() {
             </div>
           </div>
         ) : pdfData ? (
-            <div className="w-[210mm] min-h-[297mm] bg-white shadow-md rounded-sm overflow-hidden">
-              {(() => {
-                console.log('[PDF Loading] Rendering iframe with data length:', pdfData.length);
-                console.log('[PDF Loading] PDF data starts with:', pdfData.substring(0, 50));
-                console.log('[PDF Loading] PDF data ends with:', pdfData.substring(pdfData.length - 50));
-                return null;
-              })()}
-              <iframe
-                src={`data:application/pdf;base64,${pdfData}#zoom=96&navpanes=0&sidebar=0&scrollbar=0`}
-                className="w-full h-full min-h-[297mm]"
-                title="PDF Viewer"
-                onLoad={() => console.log('[PDF Loading] Iframe loaded successfully')}
-                onError={(e) => {
-                  console.error('[PDF Loading] Iframe failed to load:', e);
-                  console.error('[PDF Loading] PDF data that failed:', pdfData.substring(0, 100));
-                  setError('Failed to display PDF. The generated PDF data may be corrupted.');
-                }}
-              />
-            </div>
+            iframeError ? (
+              // Fallback display when iframe fails
+              <div className="w-[210mm] min-h-[297mm] bg-white shadow-md rounded-sm overflow-hidden flex flex-col items-center justify-center p-8">
+                <div className="text-center">
+                  <div className="mb-4">
+                    <svg className="mx-auto h-16 w-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">PDF Display Error</h3>
+                  <p className="text-gray-600 mb-4">
+                    The PDF cannot be displayed inline. This may be due to browser limitations or corrupted PDF data.
+                  </p>
+                  <div className="space-y-2">
+                    <Button
+                      onClick={() => {
+                        // Create a download link for the PDF
+                        const link = document.createElement('a');
+                        link.href = `data:application/pdf;base64,${pdfData}`;
+                        link.download = `service-assignment-${Date.now()}.pdf`;
+                        link.click();
+                      }}
+                      className="mr-2"
+                    >
+                      Download PDF
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        // Try to reload the page to attempt iframe again
+                        window.location.reload();
+                      }}
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                  <div className="mt-4 text-sm text-gray-500">
+                    <p>If the problem persists, try opening the downloaded PDF in an external PDF viewer.</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="w-[210mm] min-h-[297mm] bg-white shadow-md rounded-sm overflow-hidden">
+                {(() => {
+                  console.log('[PDF Loading] Rendering iframe with data length:', pdfData.length);
+                  console.log('[PDF Loading] PDF data starts with:', pdfData.substring(0, 50));
+                  console.log('[PDF Loading] PDF data ends with:', pdfData.substring(pdfData.length - 50));
+                  return null;
+                })()}
+                <iframe
+                  src={`data:application/pdf;base64,${pdfData}#zoom=96&navpanes=0&sidebar=0&scrollbar=0`}
+                  className="w-full h-full min-h-[297mm]"
+                  title="PDF Viewer"
+                  onLoad={() => {
+                    console.log('[PDF Loading] Iframe loaded successfully');
+                    setIframeError(false);
+                  }}
+                  onError={(e) => {
+                    console.error('[PDF Loading] Iframe failed to load:', e);
+                    console.error('[PDF Loading] PDF data that failed:', pdfData?.substring(0, 100));
+                    setIframeError(true);
+                    setError('Failed to display PDF in iframe. The PDF data may be corrupted or the browser does not support inline PDF viewing.');
+                  }}
+                />
+              </div>
+            )
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">

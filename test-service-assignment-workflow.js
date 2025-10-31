@@ -4,12 +4,13 @@ async function testServiceAssignmentWorkflow() {
   console.log('Starting Service Assignment Workflow Test...');
 
   const browser = await puppeteer.launch({
-    headless: false, // Set to true for headless mode
+    headless: true, // Set to true for headless mode
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
+  let page;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
 
     // Set viewport for better visibility
     await page.setViewport({ width: 1280, height: 1024 });
@@ -90,7 +91,7 @@ async function testServiceAssignmentWorkflow() {
     await page.goto('http://localhost:3000', { waitUntil: 'networkidle2' });
 
     // Wait for the page to load
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     // Populate localStorage with test data
     console.log('Populating localStorage with test data...');
@@ -113,22 +114,75 @@ async function testServiceAssignmentWorkflow() {
     // Navigate to the PDF preview page
     console.log('Navigating to PDF preview page...');
     const previewUrl = '/logistics/assignments/view-pdf/preview?jobOrderId=Df4wxbfrO5EnAbml0r2I';
-    await page.goto(`http://localhost:3000${previewUrl}`, { waitUntil: 'networkidle2' });
+    await page.goto(`http://localhost:3000${previewUrl}`, { waitUntil: 'networkidle2', timeout: 60000 });
+
+    // Wait for the page to fully load
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     // Wait for PDF loading to complete
     console.log('Waiting for PDF to load...');
-    await page.waitForSelector('iframe', { timeout: 30000 });
+    try {
+      await page.waitForSelector('iframe', { timeout: 60000 });
+    } catch (iframeError) {
+      console.log('Iframe not found, checking page content...');
+      // Check page content to understand what's happening
+      const bodyContent = await page.evaluate(() => document.body.innerHTML);
+      console.log('Page body content (first 1000 chars):', bodyContent.substring(0, 1000));
+
+      // Check for loading indicators
+      const loadingElements = await page.$$('[class*="animate-spin"], [class*="loading"], [class*="Loading"]');
+      console.log('Loading elements found:', loadingElements.length);
+
+      // Check for error messages
+      const errorElements = await page.$$('[class*="error"], [class*="Error"]');
+      console.log('Error elements found:', errorElements.length);
+
+      if (errorElements.length > 0) {
+        const errorText = await page.evaluate(el => el.textContent, errorElements[0]);
+        throw new Error(`Page shows error: ${errorText}`);
+      }
+
+      // Check if we're still on the login page or redirected
+      const currentUrl = page.url();
+      console.log('Current URL:', currentUrl);
+      if (!currentUrl.includes('/logistics/assignments/view-pdf/preview')) {
+        throw new Error(`Redirected away from PDF page. Current URL: ${currentUrl}`);
+      }
+
+      throw new Error('PDF iframe not found after timeout');
+    }
 
     // Check if PDF iframe is present and has content
+    console.log('Checking for PDF iframe...');
     const iframeExists = await page.$('iframe') !== null;
+    console.log('Iframe exists:', iframeExists);
+
     if (!iframeExists) {
+      // Check what elements are actually on the page
+      const bodyContent = await page.evaluate(() => document.body.innerHTML);
+      console.log('Page body content (first 500 chars):', bodyContent.substring(0, 500));
+
+      // Check for loading indicators
+      const loadingElements = await page.$$('[class*="animate-spin"], [class*="loading"], [class*="Loading"]');
+      console.log('Loading elements found:', loadingElements.length);
+
+      // Check for error messages
+      const errorElements = await page.$$('[class*="error"], [class*="Error"]');
+      console.log('Error elements found:', errorElements.length);
+
+      if (errorElements.length > 0) {
+        const errorText = await page.evaluate(el => el.textContent, errorElements[0]);
+        console.log('Error message found:', errorText);
+        throw new Error(`Page shows error: ${errorText}`);
+      }
+
       throw new Error('PDF iframe not found');
     }
 
     console.log('PDF iframe found');
 
     // Wait a bit more for PDF to render
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 10000));
 
     // Check for any console errors
     const errors = [];
@@ -199,11 +253,17 @@ async function testServiceAssignmentWorkflow() {
 
   } catch (error) {
     console.error('Test failed:', error.message);
-    await page.screenshot({
-      path: 'test-service-assignment-error.png',
-      fullPage: true
-    });
-    console.log('Error screenshot saved as test-service-assignment-error.png');
+    try {
+      if (page && !page.isClosed()) {
+        await page.screenshot({
+          path: 'test-service-assignment-error.png',
+          fullPage: true
+        });
+        console.log('Error screenshot saved as test-service-assignment-error.png');
+      }
+    } catch (screenshotError) {
+      console.error('Failed to take error screenshot:', screenshotError);
+    }
 
     return {
       success: false,
@@ -211,7 +271,13 @@ async function testServiceAssignmentWorkflow() {
       screenshot: 'test-service-assignment-error.png'
     };
   } finally {
-    await browser.close();
+    try {
+      if (browser) {
+        await browser.close();
+      }
+    } catch (closeError) {
+      console.error('Error closing browser:', closeError);
+    }
   }
 }
 

@@ -183,11 +183,11 @@ export async function POST(request: NextRequest) {
     // Check for specific Puppeteer/Chrome errors
     if (error instanceof Error && error.message.includes('Could not find Chrome')) {
       return NextResponse.json({
-        error: 'PDF generation failed: Chrome browser not found. Please ensure Chrome is installed or run: npx puppeteer browsers install chrome'
+        error: 'Unable to create PDF - browser not available. Please try again later or contact support if the issue persists.'
       }, { status: 500 })
     }
 
-    return NextResponse.json({ error: `Failed to generate PDF` }, { status: 500 })
+    return NextResponse.json({ error: `Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.` }, { status: 500 })
   }
 }
 
@@ -205,333 +205,459 @@ function generateServiceAssignmentHTML(
     <meta charset="UTF-8">
     <title>Service Assignment - ${assignment.saNumber}</title>
     <style>
-  @page {
-  margin: 25mm 15mm 30mm 15mm; /* extra bottom space */
-}
-    *{
-      border-size: border-box;
-      margin: 0;
-      padding:0;
-    }
-      .page-footer {
-        position: fixed;
-          bottom: 0mm;
-          left: 5mm;             /* match @page left margin */
-          right: 15mm;            /* match @page right margin */
-          text-align: center;
-          font-size: 10px;
-          color: #555;
-          box-sizing: border-box;
+      @page {
+        margin: 25mm 15mm 30mm 15mm;
+        size: A4;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
       }
       body {
-        font-family: Arial, sans-serif;
-        background: #fff;
-        color: #333;
-        line-height: 1.5;
+        font-family: Inter, Arial, sans-serif;
+        background: white;
+        color: #333333;
+        line-height: 1.2;
+        position: relative;
+        width: 612px;
+        height: 792px;
+        margin: 0 auto;
       }
-      .date-ref {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 15px;
-        font-size: 14px;
+      .company-name {
+        position: absolute;
+        width: 395px;
+        height: 24px;
+        left: 43px;
+        top: 72px;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 16px;
       }
-      .client-info {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 15px;
-      }
-      .client-left p {
-        margin: 2px 0;
-        font-size: 14px;
-        text-align: left;
-      }
-      .client-right p {
-        font-size: 14px;
-        text-align: right;
-      }
-      .title {
+      .company-address {
+        position: absolute;
+        width: 395px;
+        height: 24px;
+        left: 108px;
+        top: 749px;
         text-align: center;
-        font-size: 18px;
-        font-weight: bold;
-        margin-bottom: 15px;
+        font-size: 10px;
+        font-weight: 400;
+        line-height: 10px;
       }
-      .salutation {
-        margin-bottom: 10px;
-        font-size: 14px;
+      .company-contact {
+        position: absolute;
+        width: 349px;
+        height: 14px;
+        left: 43px;
+        top: 93px;
+        font-size: 10px;
+        font-weight: 400;
+        line-height: 10px;
       }
-      .details-header {
-        font-weight: bold;
-        margin-bottom: 5px;
-        font-size: 14px;
-      }
-      .details-list {
-        margin-bottom: 15px;
-        font-size: 14px;
-      }
-      .details-list .detail-item {
-        margin-bottom: 4px;
-      }
-      .details-list .label {
-        font-weight: bold;
-      }
-      .price-breakdown-title {
-        font-weight: bold;
-        margin-bottom: 5px;
-        font-size: 14px;
-      }
-      .price-breakdown {
-        margin-bottom: 15px;
-        page-break-inside: avoid;
-      }
-      .price-row {
-        display: flex;
-        justify-content: space-between;
-        font-size: 14px;
-        margin-bottom: 3px;
-        margin-left: 20px;
-        margin-right: 10px;
-      }
-      .price-total {
-        font-weight: bold;
-        border-top: 1px solid #858080ff;
-        margin-top: 5px;
-        padding-top: 4px;
-      }
-      .price-notes {
-        margin-top: 10px;
-        margin-bottom: 15px;
+      .recipient-label {
+        position: absolute;
+        width: 61px;
+        height: 14px;
+        left: 43px;
+        top: 132px;
         font-size: 12px;
-        color: gray;
-        font-style: italic;
+        font-weight: 400;
+        line-height: 12px;
       }
-      .price-notes p {
-        font-style: italic;
+      .recipient-name {
+        position: absolute;
+        width: 198px;
+        height: 21px;
+        left: 43px;
+        top: 153px;
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 20px;
       }
-      .site-details {
-  margin-bottom: 15px;
-  font-size: 14px;
-  page-break-inside: avoid;
-}
-
-.details-row {
-  display: flex;
-  margin-bottom: 4px;
-}
-
-.details-label {
-  width: 180px; /* fixed width so values align neatly */
-}
-
-.details-value {
-  flex: 1;
-}
-  .site-details ul {
-  list-style-type: disc;  /* or circle/square */
-  padding-left: 20px;     /* space for bullets */
-}
-
-.site-details li {
-  margin-bottom: 6px;
-}
-      .terms {
-        margin-top: 15px;
-        font-size: 13px;
-        page-break-inside: avoid;
+      .issued-date {
+        position: absolute;
+        width: 148px;
+        height: 14px;
+        left: 417px;
+        top: 186px;
+        text-align: right;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
       }
-      .terms-title {
-        font-weight: bold;
-        margin-bottom: 5px;
-        font-size: 14px;
+      .department {
+        position: absolute;
+        width: 148px;
+        height: 14px;
+        left: 43px;
+        top: 177px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
       }
-      .term-item {
-        margin-bottom: 3px;
+      .site-name-label {
+        position: absolute;
+        width: 90px;
+        height: 14px;
+        left: 52px;
+        top: 255px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
       }
-      .signatures {
-        margin-top: 25px;
-        page-break-inside: avoid;
+      .site-name-value {
+        position: absolute;
+        width: 119px;
+        height: 14px;
+        left: 210px;
+        top: 255px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
       }
-      .signature-section {
-        font-size: 13px;
-        margin-bottom: 20px;
+      .site-address-label {
+        position: absolute;
+        width: 90px;
+        height: 14px;
+        left: 52px;
+        top: 280px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
       }
-      .signature-line {
-        font-weight: bold;
-        border-bottom: 1px solid #000;
-        margin-top: 10px;
-        padding-top: 20px;
-        max-width: 200px; /* 👈 shorten the line */
-        margin-right: 0;
+      .site-address-value {
+        position: absolute;
+        width: 239px;
+        height: 14px;
+        left: 210px;
+        top: 280px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .campaign-name-label {
+        position: absolute;
+        width: 103px;
+        height: 14px;
+        left: 52px;
+        top: 305px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .campaign-name-value {
+        position: absolute;
+        width: 188px;
+        height: 14px;
+        left: 210px;
+        top: 305px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .service-type-label {
+        position: absolute;
+        width: 90px;
+        height: 14px;
+        left: 52px;
+        top: 330px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .service-type-value {
+        position: absolute;
+        width: 164px;
+        height: 14px;
+        left: 210px;
+        top: 330px;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 12px;
+      }
+      .material-specs-label {
+        position: absolute;
+        width: 90px;
+        height: 14px;
+        left: 52px;
+        top: 355px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .material-specs-value {
+        position: absolute;
+        width: 164px;
+        height: 14px;
+        left: 210px;
+        top: 355px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .start-date-label {
+        position: absolute;
+        width: 115px;
+        height: 14px;
+        left: 52px;
+        top: 380px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .start-date-value {
+        position: absolute;
+        width: 164px;
+        height: 14px;
+        left: 210px;
+        top: 380px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .end-date-label {
+        position: absolute;
+        width: 108px;
+        height: 14px;
+        left: 52px;
+        top: 405px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .end-date-value {
+        position: absolute;
+        width: 164px;
+        height: 14px;
+        left: 210px;
+        top: 405px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .crew-label {
+        position: absolute;
+        width: 108px;
+        height: 14px;
+        left: 52px;
+        top: 430px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .crew-value {
+        position: absolute;
+        width: 164px;
+        height: 14px;
+        left: 210px;
+        top: 430px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .remarks-label {
+        position: absolute;
+        width: 108px;
+        height: 14px;
+        left: 52px;
+        top: 454px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .remarks-value {
+        position: absolute;
+        width: 276px;
+        height: 14px;
+        left: 210px;
+        top: 454px;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .attachments-label {
+        position: absolute;
+        width: 90px;
+        height: 14px;
+        left: 43px;
+        top: 488px;
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 12px;
+      }
+      .logo {
+        position: absolute;
+        width: 82px;
+        height: 32px;
+        left: 37px;
+        top: 38px;
+      }
+      .sa-header-bg {
+        position: absolute;
+        width: 130px;
+        height: 33px;
+        left: 435px;
+        top: 148px;
+        background: #32A7FA;
+      }
+      .sa-info-bg {
+        position: absolute;
+        width: 522px;
+        height: 27px;
+        left: 43px;
+        top: 221px;
+        background: #32A7FA;
+      }
+      .sa-number {
+        position: absolute;
+        width: 118px;
+        height: 24px;
+        left: 438px;
+        top: 156px;
+        text-align: right;
+        color: white;
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 20px;
+      }
+      .sa-info-title {
+        position: absolute;
+        width: 277px;
+        height: 15px;
+        left: 52px;
+        top: 227px;
+        color: white;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 16px;
+      }
+      .border-row {
+        border: 1px #D9D9D9 solid;
+      }
+      .row-1 { position: absolute; width: 522px; height: 26px; left: 43px; top: 248px; }
+      .row-2 { position: absolute; width: 522px; height: 26px; left: 43px; top: 273px; }
+      .row-3 { position: absolute; width: 522px; height: 26px; left: 43px; top: 298px; }
+      .row-4 { position: absolute; width: 522px; height: 26px; left: 43px; top: 323px; }
+      .row-5 { position: absolute; width: 522px; height: 26px; left: 43px; top: 348px; }
+      .row-6 { position: absolute; width: 522px; height: 26px; left: 43px; top: 373px; }
+      .row-7 { position: absolute; width: 522px; height: 26px; left: 43px; top: 398px; }
+      .row-8 { position: absolute; width: 522px; height: 26px; left: 43px; top: 423px; }
+      .row-9 { position: absolute; width: 522px; height: 26px; left: 43px; top: 448px; }
+      .labels-column {
+        position: absolute;
+        width: 152px;
+        height: 226px;
+        left: 43px;
+        top: 248px;
+        border: 1px #D9D9D9 solid;
+      }
+      .attachments-box {
+        position: absolute;
+        width: 200px;
+        height: 200px;
+        left: 43px;
+        top: 507px;
+        border: 1px #D9D9D9 solid;
+      }
+      .prepared-by-label {
+        position: absolute;
+        width: 85px;
+        height: 14px;
+        left: 494px;
+        top: 523px;
+        text-align: right;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .prepared-by-name {
+        position: absolute;
+        width: 172px;
+        height: 21px;
+        left: 407px;
+        top: 587px;
+        text-align: right;
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 20px;
+      }
+      .prepared-by-dept {
+        position: absolute;
+        width: 148px;
+        height: 14px;
+        left: 431px;
+        top: 611px;
+        text-align: right;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .tagged-jo {
+        position: absolute;
+        width: 98px;
+        height: 33px;
+        left: 473px;
+        top: 43px;
+        text-align: right;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 12px;
+      }
+      .tagged-jo-number {
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 19.20px;
       }
     </style>
   </head>
   <body>
-    <div class="date-ref">
-      <div>${formatDate(new Date())}</div>
-    </div>
-
-    <div class="client-info">
-      <div class="client-left">
-        <p>${assignment.projectSiteName || "Project Site"}</p>
-        <p>${assignment.projectSiteLocation || "Location"}</p>
-        <p><strong>${companyData?.name || "COMPANY NAME"}</strong></p>
-      </div>
-      <div class="client-right">
-        <p>SA. No. ${assignment.saNumber}</p>
-      </div>
-    </div>
-
-    <div class="title">Service Assignment</div>
-
-    <div class="salutation">
-      Dear Team,
-    </div>
-
-    <div class="greeting">
-      Please find below the service assignment details for ${assignment.projectSiteName || "the project site"}.
-    </div>
-
-    <div class="details-header">Service details:</div>
-    <div class="site-details">
-      <ul>
-        <li>
-          <div class="details-row">
-            <div class="details-label">Service Type:</div>
-            <div class="details-value">${assignment.serviceType || "N/A"}</div>
-          </div>
-        </li>
-        <li>
-          <div class="details-row">
-            <div class="details-label">Assigned To:</div>
-            <div class="details-value">${assignment.assignedToName || assignment.assignedTo || "N/A"}</div>
-          </div>
-        </li>
-        <li>
-          <div class="details-row">
-            <div class="details-label">Duration:</div>
-            <div class="details-value">${assignment.serviceDuration ? `${assignment.serviceDuration} hours` : "N/A"}</div>
-          </div>
-        </li>
-        <li>
-          <div class="details-row">
-            <div class="details-label">Priority:</div>
-            <div class="details-value">${assignment.priority || "N/A"}</div>
-          </div>
-        </li>
-        <li>
-          <div class="details-row">
-            <div class="details-label">Start Date:</div>
-            <div class="details-value">${assignment.startDate ? formatDate(assignment.startDate) : "N/A"}</div>
-          </div>
-        </li>
-        <li>
-          <div class="details-row">
-            <div class="details-label">End Date:</div>
-            <div class="details-value">${assignment.endDate ? formatDate(assignment.endDate) : "N/A"}</div>
-          </div>
-        </li>
-        ${assignment.alarmDate ? `
-        <li>
-          <div class="details-row">
-            <div class="details-label">Alarm Date:</div>
-            <div class="details-value">${formatDate(assignment.alarmDate)} ${assignment.alarmTime ? `at ${assignment.alarmTime}` : ""}</div>
-          </div>
-        </li>
-        ` : ""}
-        ${assignment.illuminationNits ? `
-        <li>
-          <div class="details-row">
-            <div class="details-label">Illumination:</div>
-            <div class="details-value">${assignment.illuminationNits} nits</div>
-          </div>
-        </li>
-        ` : ""}
-        ${assignment.gondola ? `
-        <li>
-          <div class="details-row">
-            <div class="details-label">Gondola:</div>
-            <div class="details-value">${assignment.gondola}</div>
-          </div>
-        </li>
-        ` : ""}
-        ${assignment.technology ? `
-        <li>
-          <div class="details-row">
-            <div class="details-label">Technology:</div>
-            <div class="details-value">${assignment.technology}</div>
-          </div>
-        </li>
-        ` : ""}
-      </ul>
-    </div>
-
-    ${assignment.equipmentRequired ? `
-    <div class="price-notes">
-      <p><strong>Equipment Required:</strong> ${assignment.equipmentRequired}</p>
-    </div>
-    ` : ''}
-
-    ${assignment.materialSpecs ? `
-    <div class="price-notes">
-      <p><strong>Material Specifications:</strong> ${assignment.materialSpecs}</p>
-    </div>
-    ` : ''}
-
-    ${assignment.crew ? `
-    <div class="price-notes">
-      <p><strong>Crew:</strong> ${assignment.crew}</p>
-    </div>
-    ` : ''}
-
-    ${assignment.remarks ? `
-    <div class="price-notes">
-      <p><strong>Remarks:</strong> ${assignment.remarks}</p>
-    </div>
-    ` : ''}
-
-    ${totalCost > 0 ? `
-    <div class="price-breakdown-title">Service cost breakdown:</div>
-    <div class="price-breakdown">
-      ${assignment.serviceExpenses?.map((expense: { name: string; amount: string }) => `
-      <div class="price-row">
-        <span>${expense.name}</span>
-        <span>PHP ${Number.parseFloat(expense.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-      </div>
-      `).join('')}
-      <div class="price-row price-total">
-        <span>Total Cost</span>
-        <span>PHP ${totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-      </div>
-    </div>
-    ` : ''}
-
-    <div class="terms">
-      <div class="terms-title">Service Assignment Terms:</div>
-      <div class="term-item">1. Service must be completed within the specified duration.</div>
-      <div class="term-item">2. All equipment and materials must be handled with care.</div>
-      <div class="term-item">3. Safety protocols must be followed at all times.</div>
-      <div class="term-item">4. Any issues must be reported immediately to the logistics team.</div>
-    </div>
-
-    <div class="signatures">
-      <div class="signature-section">
-        <div>Requested by:</div>
-        <div class="signature-line"></div>
-        <div>${assignment.requestedBy?.name || "Requester Name"}</div>
-        <div>${assignment.requestedBy?.department || "Department"}</div>
-      </div>
-      <div class="signature-section">
-        <div>Assigned to:</div>
-        <div class="signature-line"></div>
-        <div>${assignment.assignedToName || assignment.assignedTo || "Assignee Name"}</div>
-        <div>Service Technician</div>
-      </div>
-    </div>
-        <div class="page-footer" style="font-size:8px; width:100%; text-align:center; padding:2px 0; color: #444;">
-          <div>${companyData?.name || companyData?.company_name || "Company Name"}</div>
-          <div>${formatCompanyAddress(companyData)}</div>
-          <div>Tel: ${companyData?.phone || 'N/A'} | Email: ${companyData?.email || 'N/A'}</div>
-        </div>
+    <div class="company-name">${companyData?.name || "Golden Touch Imaging Specialist"}</div>
+    <div class="company-address">${companyData?.name || "Golden Touch Imaging Specialist"}<br/>${formatCompanyAddress(companyData) || "721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines"}</div>
+    <div class="company-contact">${companyData?.phone || "+63 917 849 1054"} | ${formatCompanyAddress(companyData) || "721 Gen Solano St., San Miguel, Manila"}</div>
+    <div class="recipient-label">Recipient</div>
+    <div class="recipient-name">${assignment.assignedToName || assignment.assignedTo || "Jonathan Dela Cruz"}</div>
+    <div class="issued-date">Issued on ${formatDate(new Date())}</div>
+    <div class="department">${assignment.requestedBy?.department || "Production"}</div>
+    <div class="site-name-label">Site Name</div>
+    <div class="site-name-value">${assignment.projectSiteName || "Petplans Tower NB"}</div>
+    <div class="site-address-label">Site Address</div>
+    <div class="site-address-value">${assignment.projectSiteLocation || "444 EDSA, Guadalupe Viejo, Makati City"}</div>
+    <div class="campaign-name-label">Campaign Name</div>
+    <div class="campaign-name-value">${assignment.sales || "Eyes on Your Fries"}</div>
+    <div class="service-type-label">Service Type</div>
+    <div class="service-type-value">${assignment.serviceType || "Roll Up"}</div>
+    <div class="material-specs-label">Material Specs</div>
+    <div class="material-specs-value">${assignment.materialSpecs || "Sticker"}</div>
+    <div class="start-date-label">Service Start Date</div>
+    <div class="start-date-value">${assignment.startDate ? formatDate(assignment.startDate) : "October 15, 2025"}</div>
+    <div class="end-date-label">Service End Date</div>
+    <div class="end-date-value">${assignment.endDate ? formatDate(assignment.endDate) : "October 18, 2025"}</div>
+    <div class="crew-label">Crew</div>
+    <div class="crew-value">${assignment.crew || "Crew C"}</div>
+    <div class="remarks-label">Remarks</div>
+    <div class="remarks-value">${assignment.remarks || "Please bring Engr John to site. Thank you!"}</div>
+    <div class="attachments-label">Attachments:</div>
+    <img class="logo" src="${companyData?.logo || 'https://placehold.co/82x32'}" alt="Company Logo" />
+    <div class="sa-header-bg"></div>
+    <div class="sa-info-bg"></div>
+    <div class="sa-number">SA#${assignment.saNumber || "00642"}</div>
+    <div class="sa-info-title">Service Assignment Information</div>
+    <div class="border-row row-1"></div>
+    <div class="border-row row-2"></div>
+    <div class="border-row row-3"></div>
+    <div class="border-row row-4"></div>
+    <div class="border-row row-5"></div>
+    <div class="border-row row-6"></div>
+    <div class="border-row row-7"></div>
+    <div class="border-row row-8"></div>
+    <div class="border-row row-9"></div>
+    <div class="labels-column"></div>
+    <div class="attachments-box"></div>
+    <div class="prepared-by-label">Prepared By</div>
+    <div class="prepared-by-name">${assignment.requestedBy?.name || userData?.first_name + ' ' + userData?.last_name || "May Tuyan"}</div>
+    <div class="prepared-by-dept">${assignment.requestedBy?.department || "Logistics Team"}</div>
+    <div class="tagged-jo">Tagged JO<br/><span class="tagged-jo-number">JO#${assignment.saNumber || "00642"}</span></div>
   </body>
   </html>
   `

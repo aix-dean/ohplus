@@ -598,7 +598,7 @@ export default function CreateServiceAssignmentPage() {
       console.error("Error generating PDF:", error)
       toast({
         title: "PDF Generation Failed",
-        description: "Failed to generate service assignment PDF. Please try again.",
+        description: "Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.",
         variant: "destructive",
       });
     } finally {
@@ -866,7 +866,11 @@ export default function CreateServiceAssignmentPage() {
       }
     } catch (error) {
       console.error("Error generating PDF:", error)
-      // You could add a toast notification here
+      toast({
+        title: "PDF Generation Failed",
+        description: "Unable to create PDF. Please check your connection and try again. If the problem persists, contact support.",
+        variant: "destructive",
+      });
     } finally {
       setGeneratingPDF(false)
     }
@@ -952,8 +956,8 @@ export default function CreateServiceAssignmentPage() {
     return (
       <div className="container mx-auto py-4">
         <div className="flex justify-center items-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          <span className="ml-2 text-gray-500">Loading...</span>
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <span className="ml-2 text-gray-700">Loading products...</span>
         </div>
       </div>
     )
@@ -962,17 +966,25 @@ export default function CreateServiceAssignmentPage() {
   return (
 <section className="p-8 bg-white">
       {/* Header */}
-
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 mb-6">
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center text-gray-600 hover:text-gray-800"
+          className="inline-flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+          disabled={loading || generatingPDF}
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="text-xl font-semibold text-gray-800">
           {isEditingDraft ? "Edit Service Assignment Draft" : "Create Service Assignment"}
         </h1>
+        {(loading || generatingPDF) && (
+          <div className="ml-auto flex items-center gap-2 text-blue-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">
+              {generatingPDF ? "Generating PDF..." : "Processing..."}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Form Card */}
