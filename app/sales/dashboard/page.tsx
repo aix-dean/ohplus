@@ -2527,10 +2527,10 @@ export function ProductCard({
   const isDynamicSite = product.content_type?.toLowerCase() === "digital";
 
   return isDynamicSite ? (
-    <div className="p-[4px] rounded-[16px] gradient-border">
+    <div className="p-[4px] rounded-[16px] gradient-border h-[344px]">
       <div
         className={cn(
-          "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border",
+          "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border h-[335px] flex flex-col",
           isSelected ? "border-green-500" : "border-gray-200",
           selectionMode ? "hover:border-green-300" : "",
         )}
@@ -2565,9 +2565,8 @@ export function ProductCard({
 
       </div>
 
-      <div className="p-4">
+      <div className="p-4 flex-1 flex flex-col justify-end">
         <div className="space-y-2">
-          <div className="text-sm text-gray-500 font-medium">{siteCode || "N/A"}</div>
           <div className="text-sm text-black font-medium">{product.name}</div>
           <div className="text-sm text-black font-medium truncate">{location}</div>
           <div className="text-sm text-black font-medium">{formattedPrice}</div>
@@ -2578,7 +2577,7 @@ export function ProductCard({
    ) : (
     <div
       className={cn(
-        "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border",
+        "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border h-[340px] flex flex-col",
         isSelected ? "border-green-500" : "border-gray-200",
         selectionMode ? "hover:border-green-300" : "",
       )}
@@ -2613,9 +2612,8 @@ export function ProductCard({
 
       </div>
 
-      <div className="p-4">
+      <div className="p-4 flex-1 flex flex-col justify-end">
         <div className="space-y-2">
-          <div className="text-sm text-gray-500 font-medium">{siteCode || "N/A"}</div>
           <div className="text-sm text-black font-medium">{product.name}</div>
           <div className="text-sm text-black font-medium truncate">{location}</div>
           <div className="text-sm text-black font-medium">{formattedPrice}</div>
