@@ -239,6 +239,116 @@ function CostEstimatesPageContent() {
     router.push(`/sales/cost-estimates/${costEstimateId}`)
   }
 
+  // Helper function to fetch current user's signature.updated date
+  const getCurrentUserSignatureDate = async (): Promise<Date | null> => {
+    if (!user?.uid) return null
+    try {
+      const { doc, getDoc } = await import("firebase/firestore")
+      const { db } = await import("@/lib/firebase")
+      const userDocRef = doc(db, "iboard_users", user.uid)
+      const userDoc = await getDoc(userDocRef)
+      if (userDoc.exists()) {
+        const userDataFetched = userDoc.data()
+        if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+          return userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+        }
+      }
+      return null
+    } catch (error) {
+      console.error('Error fetching current user signature date:', error)
+      return null
+    }
+  }
+
+  // Helper function to generate PDF if needed with signature date check
+  const generatePDFIfNeeded = async (costEstimate: CostEstimate, userData: any) => {
+    // Check if PDF exists and signature dates match
+    if (costEstimate.pdf) {
+      const currentSignatureDate = await getCurrentUserSignatureDate()
+      const storedSignatureDate = costEstimate.signature_date
+
+      if (currentSignatureDate && storedSignatureDate) {
+        const currentDate = new Date(currentSignatureDate).getTime()
+        const storedDate = new Date(storedSignatureDate).getTime()
+
+        if (currentDate === storedDate) {
+          console.log('[LIST_PDF_GENERATE] Signature dates match, using existing PDF')
+          return { pdfUrl: costEstimate.pdf, password: costEstimate.password }
+        } else {
+          console.log('[LIST_PDF_GENERATE] Signature dates do not match, regenerating PDF')
+        }
+      } else {
+        console.log('[LIST_PDF_GENERATE] Missing signature date info, regenerating PDF')
+      }
+    }
+
+    try {
+      // Fetch user signature from iboard_users collection
+      let userSignatureDataUrl: string | null = null
+      let signatureDate: Date | null = null
+      if (costEstimate.createdBy) {
+        try {
+          const { doc, getDoc } = await import("firebase/firestore")
+          const { db } = await import("@/lib/firebase")
+          const userDocRef = doc(db, "iboard_users", costEstimate.createdBy)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+              const signatureUrl = userDataFetched.signature.url
+              console.log('[LIST_PDF_GENERATE] Found user signature URL:', signatureUrl)
+
+              // Convert signature image to base64 data URL
+              try {
+                const response = await fetch(signatureUrl)
+                if (response.ok) {
+                  const blob = await response.blob()
+                  const arrayBuffer = await blob.arrayBuffer()
+                  const base64 = Buffer.from(arrayBuffer).toString('base64')
+                  const mimeType = blob.type || 'image/png'
+                  userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                  console.log('[LIST_PDF_GENERATE] Converted signature to base64 data URL')
+                } else {
+                  console.warn('[LIST_PDF_GENERATE] Failed to fetch signature image:', response.status)
+                }
+              } catch (fetchError) {
+                console.error('[LIST_PDF_GENERATE] Error converting signature to base64:', fetchError)
+              }
+            }
+            // Also fetch signature date
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('[LIST_PDF_GENERATE] Error fetching user signature:', error)
+        }
+      }
+
+      // Generate and upload PDF, then save to database
+      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, userData ? {
+        first_name: userData.first_name || undefined,
+        last_name: userData.last_name || undefined,
+        email: userData.email || undefined,
+        company_id: userData.company_id || undefined,
+      } : undefined, undefined, userSignatureDataUrl)
+
+      // Update cost estimate with PDF URL, password, and signature date
+      await updateCostEstimate(costEstimate.id, {
+        pdf: pdfUrl,
+        password: password,
+        signature_date: signatureDate
+      })
+
+      console.log("Cost estimate PDF generated and uploaded successfully:", pdfUrl)
+      return { pdfUrl, password }
+    } catch (error) {
+      console.error("Error generating cost estimate PDF:", error)
+      throw error
+    }
+  }
+
   const handleDownloadPDF = async (costEstimate: CostEstimate, userData: any) => {
     try {
       // Fetch the full cost estimate data first
@@ -250,7 +360,82 @@ function CostEstimatesPageContent() {
 
       // Check if PDF already exists
       if (fullCostEstimate.pdf) {
-        // If PDF exists, download it directly
+        // If PDF exists, check signature dates
+        const currentSignatureDate = await getCurrentUserSignatureDate()
+        const storedSignatureDate = fullCostEstimate.signature_date
+
+        if (currentSignatureDate && storedSignatureDate) {
+          const currentDate = new Date(currentSignatureDate).getTime()
+          const storedDate = new Date(storedSignatureDate).getTime()
+
+          if (currentDate !== storedDate) {
+            console.log('[LIST_DOWNLOAD] Signature dates do not match, regenerating PDF')
+            // Generate new PDF
+            const result = await generatePDFIfNeeded(fullCostEstimate, userData)
+            const newPdfUrl = result.pdfUrl
+
+            // Download the newly generated PDF
+            const response = await fetch(newPdfUrl)
+            if (!response.ok) {
+              throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`)
+            }
+
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${fullCostEstimate.costEstimateNumber || fullCostEstimate.id}.pdf`
+            document.body.appendChild(a)
+            a.click()
+            document.body.removeChild(a)
+
+            // Revoke blob URL after a short delay
+            setTimeout(() => {
+              window.URL.revokeObjectURL(url)
+            }, 2000)
+
+            toast({
+              title: "Success",
+              description: "PDF regenerated and downloaded successfully",
+            })
+            return
+          } else {
+            console.log('[LIST_DOWNLOAD] Signature dates match, using existing PDF')
+          }
+        } else {
+          console.log('[LIST_DOWNLOAD] Missing signature date info, regenerating PDF')
+          // Generate new PDF
+          const result = await generatePDFIfNeeded(fullCostEstimate, userData)
+          const newPdfUrl = result.pdfUrl
+
+          // Download the newly generated PDF
+          const response = await fetch(newPdfUrl)
+          if (!response.ok) {
+            throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`)
+          }
+
+          const blob = await response.blob()
+          const url = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `${fullCostEstimate.costEstimateNumber || fullCostEstimate.id}.pdf`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+
+          // Revoke blob URL after a short delay
+          setTimeout(() => {
+            window.URL.revokeObjectURL(url)
+          }, 2000)
+
+          toast({
+            title: "Success",
+            description: "PDF generated and downloaded successfully",
+          })
+          return
+        }
+
+        // If PDF exists and signature dates match, download it directly
         const response = await fetch(fullCostEstimate.pdf)
         if (!response.ok) {
           throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`)
@@ -384,7 +569,72 @@ function CostEstimatesPageContent() {
 
       // Check if PDF already exists in the cost estimate document
       if (fullCostEstimate.pdf) {
-        // If PDF exists, open it directly for printing
+        // If PDF exists, check signature dates
+        const currentSignatureDate = await getCurrentUserSignatureDate()
+        const storedSignatureDate = fullCostEstimate.signature_date
+
+        if (currentSignatureDate && storedSignatureDate) {
+          const currentDate = new Date(currentSignatureDate).getTime()
+          const storedDate = new Date(storedSignatureDate).getTime()
+
+          if (currentDate !== storedDate) {
+            console.log('[LIST_PRINT] Signature dates do not match, regenerating PDF')
+            // Show generating toast
+            toast({
+              title: "Generating PDF",
+              description: "Please wait while we regenerate your PDF for printing...",
+            })
+            // Generate new PDF
+            const result = await generatePDFIfNeeded(fullCostEstimate, userData)
+            const newPdfUrl = result.pdfUrl
+
+            // Open the newly generated PDF for printing
+            const printWindow = window.open(newPdfUrl)
+            if (printWindow) {
+              printWindow.onload = () => {
+                printWindow.print()
+              }
+            } else {
+              console.error("Failed to open print window")
+            }
+
+            toast({
+              title: "Success",
+              description: "PDF regenerated and opened for printing",
+            })
+            return
+          } else {
+            console.log('[LIST_PRINT] Signature dates match, using existing PDF')
+          }
+        } else {
+          console.log('[LIST_PRINT] Missing signature date info, regenerating PDF')
+          // Show generating toast
+          toast({
+            title: "Generating PDF",
+            description: "Please wait while we generate your PDF for printing...",
+          })
+          // Generate new PDF
+          const result = await generatePDFIfNeeded(fullCostEstimate, userData)
+          const newPdfUrl = result.pdfUrl
+
+          // Open the newly generated PDF for printing
+          const printWindow = window.open(newPdfUrl)
+          if (printWindow) {
+            printWindow.onload = () => {
+              printWindow.print()
+            }
+          } else {
+            console.error("Failed to open print window")
+          }
+
+          toast({
+            title: "Success",
+            description: "PDF generated and opened for printing",
+          })
+          return
+        }
+
+        // If PDF exists and signature dates match, open it directly for printing
         const printWindow = window.open(fullCostEstimate.pdf)
         if (printWindow) {
           printWindow.onload = () => {
