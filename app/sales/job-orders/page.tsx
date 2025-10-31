@@ -238,7 +238,7 @@ export default function JobOrdersPage() {
           <Button
             onClick={() => {
               setIsCreating(true);
-              router.push("/sales/job-orders/select-quotation");
+              router.push("/sales/job-orders/select-booking");
             }}
             size="sm"
             className="flex items-center gap-2"

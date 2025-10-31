@@ -74,6 +74,8 @@ async function indexServiceAssignment(serviceAssignment: ServiceAssignment) {
       alarmTime: serviceAssignment.alarmTime,
       created: serviceAssignment.created?.toISOString() || '',
       company_id: serviceAssignment.company_id || '',
+      reservation_number: serviceAssignment.reservation_number || '',
+      booking_id: serviceAssignment.booking_id || '',
     }
 
     await serviceAssignmentsIndex.saveObject(algoliaObject)
@@ -239,6 +241,8 @@ export interface ServiceAssignment {
   created: any
   updated: any
   company_id?: string
+  reservation_number?: string
+  booking_id?: string
 }
 
 // Booking interface
@@ -1242,6 +1246,8 @@ export async function updateServiceAssignment(
           alarmTime: updatedData.alarmTime,
           created: updatedData.created?.toDate(),
           updated: new Date(),
+          reservation_number: updatedData.reservation_number || '',
+          booking_id: updatedData.booking_id || '',
           company_id: updatedData.company_id || '',
         } as ServiceAssignment
 
