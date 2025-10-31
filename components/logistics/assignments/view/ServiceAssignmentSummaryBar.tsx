@@ -102,7 +102,7 @@ export function ServiceAssignmentSummaryBar({
         )}
         <div>
           <div className="text-gray-600 mb-0.5">Crew</div>
-          <div className="font-semibold text-gray-900">{selectedTeam?.name || assignmentData.assignedTo || "-"}</div>
+          <div className="font-semibold text-gray-900">{selectedTeam?.name || assignmentData.assignedToName || "-"}</div>
         </div>
         <div>
           <div className="text-gray-600 mb-0.5">Issued</div>
