@@ -1637,8 +1637,8 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   )}
                 
               
-
-                 </Card>
+                </CardContent>
+                </Card>
             </TabsContent>
             {/* CE Tab */}
             <TabsContent value="ce" className="mt-0">
@@ -1735,7 +1735,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                   )}
                 
               
-
+              </CardContent>
               </Card>
             </TabsContent>
             {/* Quote Tab */}
