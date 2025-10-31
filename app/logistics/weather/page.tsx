@@ -190,7 +190,7 @@ export default function LogisticsWeatherPage() {
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4 items-stretch min-h-screen">
         {/* Do I need to roll down today? */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-1 flex flex-col xl:h-[80vh]">
+        <div className="bg-white rounded-2xl shadow-lg p-6 lg:col-span-1 flex flex-col xl:h-[80vh] min-h-[657px]">
           <div className="flex items-center justify-between mb-4">
             <h2 style={{
               color: 'var(--LIGHTER-BLACK, #333)',
@@ -246,7 +246,7 @@ export default function LogisticsWeatherPage() {
             ))}
           </div> */}
           <div className="mt-auto">
-            <button className="w-full text-white px-8 py-2 font-semibold hover:opacity-90 transition-colors" style={{borderRadius: '10px', background: '#1D0BEB'}} onClick={() => router.push('/logistics/assignments/create')}>
+            <button className="w-full text-white px-8 py-2 font-semibold text-sm hover:opacity-90 transition-colors" style={{borderRadius: '10px', background: '#1D0BEB'}} onClick={() => router.push('/logistics/assignments/create')}>
               Create Service Assignment
             </button>
           </div>
@@ -326,7 +326,7 @@ export default function LogisticsWeatherPage() {
 
           <div className="grid grid-cols-2 xl:grid-cols-[1.3fr_1.2fr] gap-6 flex-1 min-h-0">
           {/* Publikong Impormasyon */}
-          <div className="bg-white rounded-2xl shadow-lg p-4 flex flex-col flex-1 min-h-0">
+          <div className="bg-white rounded-2xl shadow-lg p-4 flex flex-col flex-1 min-h-0 min-h-[415px]">
           <h3 className="mb-2 flex items-center justify-between" style={{
             color: 'var(--LIGHTER-BLACK, #333)',
             fontFamily: 'Inter',
@@ -377,7 +377,7 @@ export default function LogisticsWeatherPage() {
           </div>
 
           {/* OOH News for you */}
-           <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col overflow-y-auto">
+           <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col overflow-y-auto min-h-[415px]">
              <div className="flex flex-col min-h-0">
                <h3 className="mb-4" style={{
                  color: 'var(--LIGHTER-BLACK, #333)',
