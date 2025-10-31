@@ -195,7 +195,9 @@ export async function createProposal(
         dimension: true,
         type: true,
         traffic: true,
+        location_visibility: true,
         srp: true,
+        additionalMessage: true,
       }
     })
 
