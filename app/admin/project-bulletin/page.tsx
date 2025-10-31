@@ -4,7 +4,7 @@ import { ArrowLeft, Search, X, FileText, Loader2, CheckCircle, PlusCircle, MoreV
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect, useState, useRef } from "react"
-import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebase/firestore"
+import { collection, query, where, orderBy, getDocs, doc, getDoc, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Product } from "@/lib/firebase-service"
 import { Button } from "@/components/ui/button"
@@ -80,6 +80,7 @@ export default function ProjectMonitoringPage() {
   const [reportsLoading, setReportsLoading] = useState(true)
   const [serviceAssignments, setServiceAssignments] = useState<{ [bookingId: string]: ServiceAssignment }>({})
   const [serviceAssignmentsLoading, setServiceAssignmentsLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
 
 
 
@@ -236,6 +237,40 @@ export default function ProjectMonitoringPage() {
     }
 
     fetchReports()
+
+    // Set up real-time listener for reports
+    if (userData?.company_id) {
+      const reportsQuery = query(
+        collection(db, "reports"),
+        where("companyId", "==", userData.company_id),
+        orderBy("created", "desc")
+      )
+
+      const unsubscribe = onSnapshot(reportsQuery, (snapshot) => {
+        const latestReports: { [bookingId: string]: ReportData[] } = {}
+
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data()
+          const report: ReportData = {
+            id: doc.id,
+            ...data,
+            attachments: Array.isArray(data.attachments) ? data.attachments : [],
+          } as ReportData
+
+          // Add all reports for each booking_id
+          if (report.booking_id) {
+            if (!latestReports[report.booking_id]) {
+              latestReports[report.booking_id] = []
+            }
+            latestReports[report.booking_id].push(report)
+          }
+        })
+
+        setReports(latestReports)
+      })
+
+      return () => unsubscribe()
+    }
   }, [userData?.company_id])
 
   useEffect(() => {
@@ -268,28 +303,17 @@ export default function ProjectMonitoringPage() {
   const reportsData = reports
 
   return (
-    <div className="p-6 bg-[#fafafa] min-h-screen" role="main" aria-labelledby="project-bulletin-title">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center gap-2 text-gray-700 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 id="project-bulletin-title" className="text-2xl font-semibold text-[#333333]">Project Bulletin</h1>
-        </div>
-      </div>
-
+    <div className="min-h-screen">
       <BulletinBoardContent
-        showTitle={false}
-        showSearch={false}
-        containerClassName=""
-        paginationClassName="flex justify-end mt-4"
+        title="Bulletin Board"
+        showTitle={true}
+        showSearch={true}
+        containerClassName="bg-neutral-50 min-h-screen px-4 py-6"
+        paginationClassName="flex justify-end mt-4 pb-4"
         linkPrefix="/admin/project-bulletin/details"
         latestJoIds={latestJoIds}
-        searchTerm=""
-        setSearchTerm={() => {}}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
         loading={loading}
         bookings={bookingData}
         products={products}
