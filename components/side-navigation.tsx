@@ -31,6 +31,7 @@ import {
   Wallet,
   CalendarCheck,
   Calculator, // Import Calculator icon
+  User,
 } from "lucide-react"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
 import { useAuth } from "@/contexts/auth-context"
@@ -159,6 +160,16 @@ const navigationItems = [
       { title: "Plan Profile", href: "/admin/subscriptions", icon: FileText },
     ],
   },
+  {
+    section: "account",
+    title: "Account",
+    icon: User,
+    items: [
+      { title: "Account Details", href: "/account", icon: User },
+      { title: "Change Password", href: "/account/change-password", icon: Settings },
+      { title: "Signature", href: "/account/signature", icon: FileText },
+    ],
+  },
 ]
 
 function isActive(pathname: string, href: string) {
@@ -214,6 +225,9 @@ export function SideNavigation() {
   if (pathname?.startsWith("/business")) {
     currentSection = "business"
   }
+  if (pathname?.startsWith("/account")) {
+    currentSection = "account"
+  }
 
   // Find the navigation item for the current section
   const currentNavItem = navigationItems.find((item) => item.section === currentSection)
@@ -227,7 +241,8 @@ export function SideNavigation() {
     currentSection !== "business" &&
     currentSection !== "it" &&
     currentSection !== "finance" &&
-    currentSection !== "accounting"
+    currentSection !== "accounting" &&
+    currentSection !== "account"
   ) {
     return null
   }
@@ -242,6 +257,7 @@ export function SideNavigation() {
     if (section === 'it') return 'bg-[#80bfbf]'
     if (section === 'business') return 'bg-[#a0b4f0]'
     if (section === 'cms') return 'bg-[#fed7aa]'
+    if (section === 'account') return 'bg-[#CFCFCF]'
     return 'bg-[#38b6ff]'
   }
 
@@ -1442,6 +1458,37 @@ export function SideNavigation() {
             </div>
 
           </>
+        ) : currentSection === "account" ? (
+          <>
+            {/* Account Menu */}
+            <div className="bg-white/55 backdrop-blur-sm border border-white/30 rounded-[20px] shadow-sm">
+              <div className="p-1">
+                {[
+                  { title: "Account Details", href: "/account", icon: User, isBold: false },
+                  { title: "Change Password", href: "/account/change-password", icon: Settings },
+                  { title: "Signature", href: "/account/signature", icon: FileText },
+                ].map((item) => {
+                  const Icon = item.icon
+                  const active = isActive(pathname, item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center py-2 px-3 text-sm rounded-md transition-all duration-200 w-full",
+                        active
+                          ? "bg-white/40 text-gray-900 font-medium"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+                        item.isBold && "font-bold"
+                      )}
+                    >
+                      <span className="flex-1">{item.title}</span>
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+          </>
         ) : (
           <div className="bg-white rounded-[20px] border border-gray-200 shadow-sm">
             <div className="px-3 py-2 border-b border-gray-100">
@@ -1462,7 +1509,7 @@ export function SideNavigation() {
                         : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                     )}
                   >
-                    
+
                     <span className="flex-1">{item.title}</span>
                   </Link>
                 )

@@ -138,8 +138,15 @@ const formatDuration = (days: number, startDate?: Date | any, endDate?: Date | a
 }
 
 const safeFormatNumber = (value: any, options?: Intl.NumberFormatOptions): string => {
-  if (value === null || value === undefined || isNaN(Number(value))) return "0.00"
-  const numValue = typeof value === "string" ? Number.parseFloat(value) : Number(value)
+  if (value === null || value === undefined) return "0.00"
+  let numValue: number
+  if (typeof value === "string") {
+    // Remove commas and parse
+    const cleaned = value.replace(/,/g, '').replace(/[^0-9.-]/g, '')
+    numValue = Number.parseFloat(cleaned)
+  } else {
+    numValue = Number(value)
+  }
   if (isNaN(numValue)) return "0.00"
   return numValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2, ...options })
 }
@@ -189,6 +196,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
   const [loadingPdfPreview, setLoadingPdfPreview] = useState(false)
   const [preparingSend, setPreparingSend] = useState(false)
   const [preparingDownload, setPreparingDownload] = useState(false)
+  const [userSignatureUrl, setUserSignatureUrl] = useState<string | null>(null)
 
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<Record<string, any>>({})
@@ -447,6 +455,31 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
     }
   }, [fetchQuotationHistory])
 
+  // Fetch user signature
+  useEffect(() => {
+    const fetchUserSignature = async () => {
+      if (!quotation?.created_by || !user?.uid) return
+
+      try {
+        const userDocRef = doc(db, "iboard_users", user.uid)
+        const userDoc = await getDoc(userDocRef)
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data()
+          // Check for user signature field (map with url, type, updated)
+          if (userData.signature && typeof userData.signature === 'object' && userData.signature.url) {
+            setUserSignatureUrl(userData.signature.url)
+            console.log("Found user signature URL:", userData.signature.url)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user signature:", error)
+      }
+    }
+
+    fetchUserSignature()
+  }, [quotation?.created_by, user?.uid])
+
   // Handle automatic share when page loads with action parameter
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -554,7 +587,26 @@ The OH Plus Team`,
         }
       }
 
-      const { pdfUrl, password } = await generateAndUploadQuotationPDF(editableQuotation, companyData, logoDataUrl, userData)
+      // Prepare signature data URL if user signature exists
+      let userSignatureDataUrl: string | null = null
+      if (userSignatureUrl) {
+        try {
+          const signatureResponse = await fetch(userSignatureUrl)
+          if (signatureResponse.ok) {
+            const signatureBlob = await signatureResponse.blob()
+            userSignatureDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(signatureBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching user signature:', error)
+          // Continue without signature if fetch fails
+        }
+      }
+
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(editableQuotation, companyData, logoDataUrl, userData, userSignatureDataUrl)
 
       // Only save the quotation data if PDF generation succeeded
       await updateQuotation(
@@ -1269,9 +1321,18 @@ The OH Plus Team`,
                 <Input
                   type="number"
                   value={tempValues.price || ""}
-                  onChange={(e) => updateTempValues("price", Number.parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const parsed = Number.parseFloat(value);
+                    if (!isNaN(parsed)) {
+                      updateTempValues("price", Number(parsed.toFixed(2)));
+                    } else if (value === "") {
+                      updateTempValues("price", 0);
+                    }
+                  }}
                   className="w-32 h-6 text-sm"
                   placeholder={item?.price?.toString() || "0.00"}
+                  step="0.01"
                 />
                 <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
               </div>
@@ -1475,7 +1536,18 @@ The OH Plus Team`,
           <div className="text-left">
             <p className="mb-16">Very truly yours,</p>
             <div>
-              <div className="border-b border-gray-400 w-48 mb-2"></div>
+              {userSignatureUrl ? (
+                <div className="mb-2">
+                  <img
+                    src={userSignatureUrl}
+                    alt="Signature"
+                    className="max-w-48 max-h-16 object-contain border-b border-gray-400"
+                    style={{ width: 'auto', height: 'auto' }}
+                  />
+                </div>
+              ) : (
+                <div className="border-b border-gray-400 w-48 mb-2"></div>
+              )}
               <p className="font-medium">
                 {currentQuotation?.created_by_first_name && currentQuotation?.created_by_last_name
                   ? `${currentQuotation.created_by_first_name} ${currentQuotation.created_by_last_name}`
@@ -1597,7 +1669,26 @@ The OH Plus Team`,
         }
       }
 
-      const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, companyData, logoDataUrl, userData)
+      // Prepare signature data URL if user signature exists
+      let userSignatureDataUrl: string | null = null
+      if (userSignatureUrl) {
+        try {
+          const signatureResponse = await fetch(userSignatureUrl)
+          if (signatureResponse.ok) {
+            const signatureBlob = await signatureResponse.blob()
+            userSignatureDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(signatureBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching user signature:', error)
+          // Continue without signature if fetch fails
+        }
+      }
+
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, companyData, logoDataUrl, userData, userSignatureDataUrl)
 
       // Update quotation with PDF URL and password
       await updateQuotation(

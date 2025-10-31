@@ -4,6 +4,8 @@ import type { Quotation, QuotationProduct } from "./types/quotation" // Import Q
 import type { JobOrder, JobOrderStatus } from "./types/job-order"
 import type { Product } from "./firebase-service"
 import type { Client, ClientCompany } from "./client-service" // Import ClientCompany
+import type { Booking } from "./booking-service"
+import { getAllBookings } from "./booking-service"
  
  const QUOTATIONS_COLLECTION = "quotations"
 const JOB_ORDERS_COLLECTION = "job_orders"
@@ -37,6 +39,36 @@ export async function getQuotationsForSelection(userId: string, companyId?: stri
     return quotations
   } catch (error: any) { // Explicitly type error
     console.error("Error fetching quotations for selection:", error)
+    throw error
+  }
+}
+
+export async function getBookingsForSelection(companyId?: string, status?: string): Promise<Booking[]> {
+  try {
+    const allBookings = await getAllBookings()
+
+    let filteredBookings = allBookings
+
+    // If companyId is provided, filter by company_id
+    if (companyId) {
+      filteredBookings = filteredBookings.filter(booking => booking.company_id === companyId)
+    }
+
+    // If status is provided, filter by status
+    if (status) {
+      filteredBookings = filteredBookings.filter(booking => booking.status.toLowerCase() === status.toLowerCase())
+    }
+
+    // Sort by created date descending (assuming created is a Firestore timestamp)
+    filteredBookings.sort((a, b) => {
+      const aTime = a.created?.toMillis ? a.created.toMillis() : new Date(a.created).getTime()
+      const bTime = b.created?.toMillis ? b.created.toMillis() : new Date(b.created).getTime()
+      return bTime - aTime
+    })
+
+    return filteredBookings
+  } catch (error: any) { // Explicitly type error
+    console.error("Error fetching bookings for selection:", error)
     throw error
   }
 }
@@ -203,6 +235,105 @@ export async function getQuotationDetailsForJobOrder(quotationId: string): Promi
   } catch (error: any) { // Explicitly type error
     console.error("[getQuotationDetailsForJobOrder] Error fetching quotation details for job order:", error)
     throw new Error("Failed to fetch quotation details due to an unexpected error.")
+  }
+}
+
+export async function getBookingDetailsForJobOrder(bookingId: string): Promise<{
+  booking: Booking
+  products: Product[]
+  client: Client | null
+} | null> {
+  console.log(`[getBookingDetailsForJobOrder] Attempting to fetch details for bookingId: ${bookingId}`)
+  try {
+    // Fetch the booking
+    const allBookings = await getAllBookings()
+    const booking = allBookings.find(b => b.id === bookingId)
+
+    if (!booking) {
+      console.warn(`[getBookingDetailsForJobOrder] Booking with ID ${bookingId} not found.`)
+      return null
+    }
+
+    console.log("[getBookingDetailsForJobOrder] Fetched booking:", booking)
+
+    // Fetch the product
+    const products: Product[] = []
+    if (booking.product_id) {
+      console.log(`[getBookingDetailsForJobOrder] Fetching product with ID: ${booking.product_id}`)
+      const productDocRef = doc(db, PRODUCTS_COLLECTION, booking.product_id)
+      const productDocSnap = await getDoc(productDocRef)
+      if (productDocSnap.exists()) {
+        const product = { id: productDocSnap.id, ...productDocSnap.data() } as Product
+        products.push(product)
+        console.log("[getBookingDetailsForJobOrder] Fetched product:", product)
+      } else {
+        console.warn(`[getBookingDetailsForJobOrder] Product with ID ${booking.product_id} not found.`)
+      }
+    }
+
+    // Fetch client information
+    let client: Client | null = null
+    if (booking.client?.id) {
+      console.log(`[getBookingDetailsForJobOrder] Attempting to fetch client by ID: ${booking.client.id}`)
+      const clientDocRef = doc(db, CLIENTS_COLLECTION, booking.client.id)
+      const clientDocSnap = await getDoc(clientDocRef)
+      if (clientDocSnap.exists()) {
+        client = { id: clientDocSnap.id, ...clientDocSnap.data() } as Client
+        console.log("[getBookingDetailsForJobOrder] Fetched client by ID:", client)
+      } else {
+        console.warn(`[getBookingDetailsForJobOrder] Client with ID ${booking.client.id} not found.`)
+      }
+    }
+
+    // Fetch client company details if available
+    if (booking.client?.company_id) {
+      console.log(`[getBookingDetailsForJobOrder] Attempting to fetch client company by ID: ${booking.client.company_id}`)
+      const clientCompanyDocRef = doc(db, CLIENT_COMPANIES_COLLECTION, booking.client.company_id)
+      const clientCompanyDocSnap = await getDoc(clientCompanyDocRef)
+      if (clientCompanyDocSnap.exists()) {
+        const clientCompanyData = clientCompanyDocSnap.data() as ClientCompany
+        console.log("[getBookingDetailsForJobOrder] clientCompanyDocSnap.exists():", clientCompanyDocSnap.exists());
+
+        // Update client object with compliance URLs from client company
+        if (client) {
+          // Note: Client type may not have these properties, but we're adding them for compatibility
+          (client as any).dti_bir_2303_url = clientCompanyData.compliance?.dti || null;
+          (client as any).gis_url = clientCompanyData.compliance?.gis || null;
+          (client as any).id_signature_url = clientCompanyData.compliance?.id || null;
+          console.log("[getBookingDetailsForJobOrder] Updated client with compliance URLs from client company:", client)
+        } else {
+          // If client wasn't found by client_id, but client_company_id exists,
+          // we can create a minimal client object with compliance info.
+          client = {
+            id: booking.client.company_id,
+            name: clientCompanyData.name || "N/A",
+            email: "", // ClientCompany might not have email
+            phone: "", // ClientCompany might not have phone
+            company: clientCompanyData.name || "N/A", // Use company name for company field
+            status: "active", // Default status
+            dti_bir_2303_url: clientCompanyData.compliance?.dti || null,
+            gis_url: clientCompanyData.compliance?.gis || null,
+            id_signature_url: clientCompanyData.compliance?.id || null,
+            created: clientCompanyData.created || serverTimestamp(),
+            updated: clientCompanyData.updated || serverTimestamp(),
+          } as Client
+          console.log("[getBookingDetailsForJobOrder] Created client from client company with compliance URLs:", client)
+        }
+      } else {
+        console.warn(`[getBookingDetailsForJobOrder] Client company with ID ${booking.client.company_id} not found.`)
+      }
+    }
+
+    if (products.length === 0) {
+      console.warn(`[getBookingDetailsForJobOrder] No products found for booking ${bookingId}.`)
+      return null
+    }
+
+    console.log("[getBookingDetailsForJobOrder] Successfully fetched all details.")
+    return { booking, products, client }
+  } catch (error: any) { // Explicitly type error
+    console.error("[getBookingDetailsForJobOrder] Error fetching booking details for job order:", error)
+    throw new Error("Failed to fetch booking details due to an unexpected error.")
   }
 }
 

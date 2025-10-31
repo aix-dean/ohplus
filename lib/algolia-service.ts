@@ -682,7 +682,7 @@ export async function searchCollectibles(query: string, companyId?: string, page
 }
 
 // Function to search reports
-export async function searchReports(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 50, filters?: string): Promise<SearchResponse> {
+export async function searchReports(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10, filters?: string): Promise<SearchResponse> {
   try {
     // Log the search attempt
     console.log(`Searching reports for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
@@ -694,7 +694,7 @@ export async function searchReports(query: string, companyId?: string, page: num
     if (filters) {
       requestBody.filters = filters
     } else if (companyId) {
-      requestBody.filters = `companyId:${companyId}`
+      requestBody.filters = `company_id:${companyId}`
     }
 
     const response = await fetch("/api/search", {
@@ -750,6 +750,89 @@ export async function searchReports(query: string, companyId?: string, page: num
     return data
   } catch (error) {
     console.error("Error searching reports:", error)
+    // Return empty results instead of throwing
+    return {
+      hits: [],
+      nbHits: 0,
+      page: 0,
+      nbPages: 0,
+      hitsPerPage: 0,
+      processingTimeMS: 0,
+      query,
+      error: error instanceof Error ? error.message : "Unknown search error",
+    }
+  }
+}
+
+// Function to search emails
+export async function searchEmails(query: string, companyId?: string, page: number = 0, hitsPerPage: number = 10, filters?: string): Promise<SearchResponse> {
+  try {
+    // Log the search attempt
+    console.log(`Searching emails for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
+
+    // Create the request body
+    const requestBody: any = { query, indexName: 'emails', page, hitsPerPage }
+
+    // Add filters if provided
+    if (filters) {
+      requestBody.filters = filters
+    } else if (companyId) {
+      requestBody.filters = `company_id:${companyId}`
+    }
+
+    const response = await fetch("/api/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestBody),
+      cache: "no-store", // Disable caching for search requests
+    })
+
+    // Log the response status
+    console.log(`Search response status: ${response.status}`)
+
+    // Check if response is ok before trying to parse JSON
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`Search API error (${response.status}): ${errorText}`)
+      return {
+        hits: [],
+        nbHits: 0,
+        page: 0,
+        nbPages: 0,
+        hitsPerPage: 0,
+        processingTimeMS: 0,
+        query,
+        error: `API error: ${response.status} ${response.statusText}`,
+        details: errorText.substring(0, 200), // Limit the error text length
+      }
+    }
+
+    // Try to parse the response as JSON
+    let data
+    try {
+      data = await response.json()
+    } catch (jsonError) {
+      console.error("Error parsing JSON response:", jsonError)
+      const text = await response.text()
+      console.error("Raw response:", text.substring(0, 200))
+      return {
+        hits: [],
+        nbHits: 0,
+        page: 0,
+        nbPages: 0,
+        hitsPerPage: 0,
+        processingTimeMS: 0,
+        query,
+        error: "Invalid JSON response from search API",
+        details: text.substring(0, 200), // Limit the error text length
+      }
+    }
+
+    return data
+  } catch (error) {
+    console.error("Error searching emails:", error)
     // Return empty results instead of throwing
     return {
       hits: [],

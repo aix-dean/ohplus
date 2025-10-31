@@ -232,6 +232,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [generatingPDFsForSend, setGeneratingPDFsForSend] = useState(false)
+  const [userSignatureUrl, setUserSignatureUrl] = useState<string | null>(null)
 
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
 
@@ -578,6 +579,25 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         }
       }
 
+      // Prepare signature data URL if user signature exists
+      let userSignatureDataUrl: string | null = null
+      if (userSignatureUrl) {
+        try {
+          const signatureResponse = await fetch(userSignatureUrl)
+          if (signatureResponse.ok) {
+            const signatureBlob = await signatureResponse.blob()
+            userSignatureDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(signatureBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching user signature:', error)
+          // Continue without signature if fetch fails
+        }
+      }
+
       const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, userData ? {
         first_name: userData.first_name || undefined,
         last_name: userData.last_name || undefined,
@@ -589,7 +609,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         phone: companyData.phone,
         email: companyData.email,
         website: companyData.website || companyData.company_website,
-      } : undefined)
+      } : undefined, userSignatureDataUrl)
 
       // Update cost estimate with new PDF URL and password
       await updateCostEstimate(updatedCostEstimate.id, { pdf: pdfUrl, password: password })
@@ -803,6 +823,31 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }, [fetchClientHistory])
 
+  // Fetch user signature
+  useEffect(() => {
+    const fetchUserSignature = async () => {
+      if (!costEstimate?.createdBy) return
+
+      try {
+        const userDocRef = doc(db, "iboard_users", user?.uid)
+        const userDoc = await getDoc(userDocRef)
+
+        if (userDoc.exists()) {
+          const userData = userDoc.data()
+          // Check for user signature field (map with url, type, updated)
+          if (userData.signature && typeof userData.signature === 'object' && userData.signature.url) {
+            setUserSignatureUrl(userData.signature.url)
+            console.log("Found user signature URL:", userData.signature.url)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user signature:", error)
+      }
+    }
+
+    fetchUserSignature()
+  }, [costEstimate?.createdBy])
+
 
   // Handle automatic share when page loads with action parameter
   useEffect(() => {
@@ -884,6 +929,25 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
           // Check if PDF already exists
           if (!estimate.pdf) {
+            // Prepare signature data URL if user signature exists
+            let userSignatureDataUrl: string | null = null
+            if (userSignatureUrl) {
+              try {
+                const signatureResponse = await fetch(userSignatureUrl)
+                if (signatureResponse.ok) {
+                  const signatureBlob = await signatureResponse.blob()
+                  userSignatureDataUrl = await new Promise<string>((resolve) => {
+                    const reader = new FileReader()
+                    reader.onload = () => resolve(reader.result as string)
+                    reader.readAsDataURL(signatureBlob)
+                  })
+                }
+              } catch (error) {
+                console.error('Error fetching user signature:', error)
+                // Continue without signature if fetch fails
+              }
+            }
+
             // Generate PDF and get URL/password
             const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(estimate, userData ? {
               first_name: userData.first_name || undefined,
@@ -896,7 +960,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               phone: companyData.phone,
               email: companyData.email,
               website: companyData.website || companyData.company_website,
-            } : undefined)
+            } : undefined, userSignatureDataUrl)
 
             // Update the cost estimate with PDF URL and password
             await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password })
@@ -1056,6 +1120,25 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
 
     try {
+      // Prepare signature data URL if user signature exists
+      let userSignatureDataUrl: string | null = null
+      if (userSignatureUrl) {
+        try {
+          const signatureResponse = await fetch(userSignatureUrl)
+          if (signatureResponse.ok) {
+            const signatureBlob = await signatureResponse.blob()
+            userSignatureDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(signatureBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching user signature:', error)
+          // Continue without signature if fetch fails
+        }
+      }
+
       const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, userData ? {
         first_name: userData.first_name || undefined,
         last_name: userData.last_name || undefined,
@@ -1067,7 +1150,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         phone: companyData.phone,
         email: companyData.email,
         website: companyData.website || companyData.company_website,
-      } : undefined)
+      } : undefined, userSignatureDataUrl)
       await updateCostEstimate(costEstimate.id, { pdf: pdfUrl, password: password })
       setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
       // Also update the relatedCostEstimates if this estimate is in there
@@ -1434,6 +1517,43 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           endDate: historyItem.endDate?.toISOString ? historyItem.endDate.toISOString() : historyItem.endDate,
         }
 
+        // Fetch user signature if available
+        let userSignatureDataUrl: string | null = null
+        if (historyItem.createdBy) {
+          try {
+            console.log('[HISTORY_PDF] Fetching user signature for createdBy:', historyItem.createdBy)
+            const userDocRef = doc(db, "iboard_users", historyItem.createdBy)
+            const userDoc = await getDoc(userDocRef)
+
+            if (userDoc.exists()) {
+              const userDataFetched = userDoc.data()
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+                const signatureUrl = userDataFetched.signature.url
+                console.log('[HISTORY_PDF] Found user signature URL:', signatureUrl)
+
+                // Convert signature image to base64 data URL
+                try {
+                  const response = await fetch(signatureUrl)
+                  if (response.ok) {
+                    const blob = await response.blob()
+                    const arrayBuffer = await blob.arrayBuffer()
+                    const base64 = Buffer.from(arrayBuffer).toString('base64')
+                    const mimeType = blob.type || 'image/png'
+                    userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                    console.log('[HISTORY_PDF] Converted signature to base64 data URL')
+                  } else {
+                    console.warn('[HISTORY_PDF] Failed to fetch signature image:', response.status)
+                  }
+                } catch (fetchError) {
+                  console.error('[HISTORY_PDF] Error converting signature to base64:', fetchError)
+                }
+              }
+            }
+          } catch (error) {
+            console.error('[HISTORY_PDF] Error fetching user signature:', error)
+          }
+        }
+
         // Call the generate-cost-estimate-pdf API
         const response = await fetch('/api/generate-cost-estimate-pdf', {
           method: 'POST',
@@ -1444,6 +1564,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             costEstimate: serializableCostEstimate,
             companyData,
             logoDataUrl,
+            userSignatureDataUrl,
             userData,
           }),
         })
@@ -1470,7 +1591,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             phone: companyData.phone,
             email: companyData.email,
             website: companyData.website || companyData.company_website,
-          } : undefined)
+          } : undefined, userSignatureDataUrl)
           await updateCostEstimate(historyItem.id, { pdf: pdfUrl })
           console.log("PDF saved to cost estimate:", pdfUrl)
         } catch (saveError) {
@@ -1852,9 +1973,18 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                   <Input
                     type="number"
                     value={tempValues.unitPrice || ""}
-                    onChange={(e) => updateTempValues("unitPrice", Number.parseFloat(e.target.value) || 0)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const parsed = Number.parseFloat(value);
+                      if (!isNaN(parsed)) {
+                        updateTempValues("unitPrice", Number(parsed.toFixed(2)));
+                      } else if (value === "") {
+                        updateTempValues("unitPrice", 0);
+                      }
+                    }}
                     className="w-32 h-6 text-sm"
                     placeholder={monthlyRate?.toString() || "0.00"}
+                    step="0.01"
                     onBlur={() => setEditingField(null)}
                   />
                   <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
@@ -2061,7 +2191,18 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             <div className="text-left">
               <p className="mb-16">Very truly yours,</p>
               <div>
-                <div className="border-b border-gray-400 w-48 mb-2"></div>
+                {userSignatureUrl ? (
+                  <div className="mb-2">
+                    <img
+                      src={userSignatureUrl}
+                      alt="Signature"
+                      className="max-w-48 max-h-16 object-contain border-b border-gray-400"
+                      style={{ width: 'auto', height: 'auto' }}
+                    />
+                  </div>
+                ) : (
+                  <div className="border-b border-gray-400 w-48 mb-2"></div>
+                )}
                 <p className="font-medium">
                   {userData?.first_name && userData?.last_name
                     ? `${userData.first_name} ${userData.last_name}`
@@ -2278,7 +2419,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                       {historyItem.costEstimateNumber || historyItem.id.slice(-8)}
                     </div>
                     <div className="text-sm text-red-600 font-medium mb-2">
-                      PHP {historyItem.totalAmount.toLocaleString()}/month
+                      PHP {historyItem.totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month
                     </div>
                     <div className="flex justify-end">
                       <span
@@ -2654,7 +2795,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                         </div>
                         <div className="text-xs text-gray-500">
                           Total: ₱
-                          {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString()}
+                          {items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </div>
                       </div>
                     </div>

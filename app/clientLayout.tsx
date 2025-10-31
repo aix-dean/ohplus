@@ -73,7 +73,9 @@ export default function ClientLayout({
 
           {/* Router content area */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden">
-            <div className="py-6 px-2 sm:px-4 lg:px-8 min-h-full">{children}</div>
+            <div className={`${pathname === "/account" ? "p-0" : "py-6 px-2 sm:px-4 lg:px-8"} min-h-full`}>
+              {children}
+            </div>
           </div>
         </main>
       </div>

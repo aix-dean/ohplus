@@ -12,13 +12,14 @@ import {
   Building,
   MapPin,
   Globe,
-  Edit2,
+  SquarePen,
   Save,
   Loader2,
   LogOut,
   Facebook,
   Instagram,
   Youtube,
+  MoreVertical,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { type RoleType } from "@/lib/hardcoded-access-service"
 import { storage, db } from "@/lib/firebase"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp, getDoc } from "firebase/firestore"
@@ -33,6 +35,19 @@ import { getUserProductsCount } from "@/lib/firebase-service"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { subscriptionService } from "@/lib/subscription-service"
+
+// Department color mapping for role badges
+const departmentMapping: Record<RoleType, { name: string; color: string }> = {
+  admin: { name: "Administrator", color: "bg-purple-500" },
+  it: { name: "IT", color: "bg-teal-500" },
+  sales: { name: "Sales", color: "bg-red-500" },
+  logistics: { name: "Logistics", color: "bg-blue-500" },
+  cms: { name: "CMS", color: "bg-orange-500" },
+  business: { name: "Business", color: "bg-purple-500" },
+  treasury: { name: "Treasury", color: "bg-green-500" },
+  accounting: { name: "Accounting", color: "bg-blue-500" },
+  finance: { name: "Finance", color: "bg-emerald-500" }
+}
 
 // Helper function to mask the license key
 const maskLicenseKey = (key: string | undefined | null) => {
@@ -267,10 +282,10 @@ export default function AccountPage() {
       setFirstName(userData.first_name || "")
       setMiddleName(userData.middle_name || "")
       setLastName(userData.last_name || "")
-      setDisplayName(userData.display_name || "")
+      setDisplayName(userData.displayName || "")
       setPhoneNumber(userData.phone_number || "")
       setGender(userData.gender || "")
-      setPhotoURL(userData.photo_url || "")
+      setPhotoURL((userData as any).photo_url || "")
     }
 
     if (projectData) {
@@ -331,11 +346,11 @@ export default function AccountPage() {
         first_name: firstName,
         middle_name: middleName,
         last_name: lastName,
-        display_name: displayName,
+        displayName: displayName,
         phone_number: phoneNumber,
         gender,
-        photo_url: photoURL,
-      })
+        ...(photoURL && { photo_url: photoURL }),
+      } as any)
 
       // Update project data if it exists
       if (projectData) {
@@ -384,7 +399,7 @@ export default function AccountPage() {
       const snapshot = await uploadBytes(storageRef, file)
       const downloadURL = await getDownloadURL(snapshot.ref)
       setPhotoURL(downloadURL)
-      await updateUserData({ photo_url: downloadURL })
+      await updateUserData({ photo_url: downloadURL } as any)
       toast({
         title: "Success",
         description: "Profile photo updated successfully!",
@@ -467,445 +482,194 @@ export default function AccountPage() {
   const daysRemaining = subscriptionData ? subscriptionService.getDaysRemaining(subscriptionData) : 0
 
   return (
-    <main className="min-h-screen bg-[#FFFFF]] py-8 px-4 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        {/* Header Section */}
-        <div className="mb-16 flex flex-col items-center justify-between gap-4 rounded-xl bg-white p-6 shadow-sm md:flex-row md:p-8">
-          <div className="flex flex-col items-center gap-4 md:flex-row">
-            <div className="relative group flex-shrink-0">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full border-4 border-primary/20 p-1 shadow-md">
-                {isUploading ? (
-                  <Loader2 size={36} className="animate-spin text-primary" />
-                ) : photoURL ? (
-                  <img
-                    src={photoURL || "/placeholder.svg"}
-                    alt={userData?.display_name || "Profile"}
-                    className="h-full w-full object-cover rounded-full"
-                  />
-                ) : (
-                  <User size={36} className="text-gray-400" />
-                )}
-              </div>
-              <button
-                className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary p-1.5 text-white shadow-md transition-colors duration-200 hover:bg-primary/90"
-                onClick={handlePhotoClick}
-                disabled={isUploading}
-                aria-label="Change profile photo"
-              >
-                <Camera size={16} />
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                className="hidden"
-                accept="image/*"
-                onChange={handlePhotoChange}
-                disabled={isUploading}
-              />
-            </div>
-            <div className="text-center md:text-left">
-              <h1 className="text-2xl font-bold tracking-tight text-gray-500">
-                Hello, {userData?.first_name || "User"}!
-              </h1>
-              <p className="mt-0.5 text-base text-gray-500">Manage your account and company details.</p>
-            </div>
+    <div className="relative size-full" data-name="ACCOUNT SETTING" data-node-id="7174:4241">
+      <div className="absolute bg-neutral-50 h-[661px] left-0 top-[59px] w-[1280px]" data-node-id="7174:4819" />
+      <div className="absolute bg-white left-[31px] rounded-[20px] top-[59px] w-[1002px] px-4 py-8 relative" data-node-id="7174:4779" style={{height: '344px'}} />
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[24px] leading-none left-[51px] not-italic text-[16px] text-[var(--lighter-black,#333333)] top-[79px] w-[315px]" data-node-id="7174:4755">
+        Account Details
+      </p>
+      {isEditingPersonal ? (
+        <>
+          <input
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[157px] w-[190px] px-2 text-sm"
+            placeholder="First Name"
+            maxLength={50}
+          />
+          <input
+            type="text"
+            value={middleName}
+            onChange={(e) => setMiddleName(e.target.value)}
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[190px] w-[190px] px-2 text-sm"
+            placeholder="Middle Name"
+            maxLength={50}
+          />
+          <input
+            type="text"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[223px] w-[190px] px-2 text-sm"
+            placeholder="Last Name"
+            maxLength={50}
+          />
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[256px] w-[190px] px-2 text-sm"
+          >
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+          <div className="absolute left-[371px] top-[289px] flex items-center">
+            <span className="bg-gray-100 border border-gray-400 h-[24px] px-2 rounded-l-[6px] text-sm text-gray-600">+63</span>
+            <input
+              type="text"
+              value={phoneNumber.replace(/^\+63/, '')}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, ''); // Only allow digits
+                setPhoneNumber(value);
+              }}
+              className="bg-white border border-gray-400 border-l-0 h-[24px] rounded-r-[6px] w-[150px] px-2 text-sm"
+              placeholder="Phone Number"
+              maxLength={10}
+            />
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button
-              variant="outline"
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-100 bg-transparent"
+          <input
+            type="email"
+            value={userData?.email || ""}
+            className="absolute bg-white border border-gray-400 h-[24px] left-[371px] rounded-[6px] top-[322px] w-[190px] px-2 text-sm"
+            disabled
+            placeholder="Email (read-only)"
+          />
+          <button
+            onClick={handlePhotoClick}
+            className="absolute bg-white border border-gray-400 h-[24px] left-[93px] rounded-[6px] top-[237px] w-[108px] text-sm text-gray-700 hover:bg-gray-50 z-10"
+          >
+            Choose Avatar
+          </button>
+          <div className="absolute left-[695px] top-[339px] flex gap-2">
+            <button
+              onClick={() => setIsEditingPersonal(false)}
+              className="bg-white border-2 border-gray-400 h-[27px] rounded-[10px] w-[149px] text-gray-700 hover:bg-gray-50"
             >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Button>
-            <Button
-              onClick={() => (isEditingPersonal ? handleSave() : setIsEditingPersonal(true))}
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
               disabled={isSaving}
-              className="flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary/90"
+              className="bg-blue-600 h-[27px] rounded-[10px] w-[149px] text-white hover:bg-blue-700 disabled:opacity-50"
             >
-              {isEditingPersonal ? (
-                <>
-                  <Save className="h-4 w-4" />
-                  {isSaving ? "Saving..." : "Save Personal"}
-                </>
-              ) : (
-                <>
-                  <Edit2 className="h-4 w-4" />
-                  Edit Personal
-                </>
-              )}
-            </Button>
+              {isSaving ? "Saving..." : "Save Changes"}
+            </button>
           </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="max-w-4xl mx-auto space-y-8">
-          {/* Personal Information */}
-          <div className="space-y-6">
-            {/* Personal Details Card */}
-            <Card className="rounded-xl shadow-sm">
-              <CardHeader className="border-b px-5 py-3">
-                <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
-                  <User className="h-5 w-5 text-primary" />
-                  Personal Details
-                </CardTitle>
-                <CardDescription className="text-xs text-gray-600">
-                  Manage your personal information and preferences.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-5">
-                <div className="grid grid-cols-1 gap-x-5 gap-y-3 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="firstName" className="text-xs font-medium text-gray-700">
-                      First Name
-                    </Label>
-                    <Input
-                      id="firstName"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      disabled={!isEditingPersonal}
-                      className={cn(
-                        "rounded-md border px-3 py-2 text-sm shadow-sm",
-                        isEditingPersonal
-                          ? "border-primary/40 focus:border-primary"
-                          : "border-gray-200 bg-gray-50 text-gray-700",
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="lastName" className="text-xs font-medium text-gray-700">
-                      Last Name
-                    </Label>
-                    <Input
-                      id="lastName"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      disabled={!isEditingPersonal}
-                      className={cn(
-                        "rounded-md border px-3 py-2 text-sm shadow-sm",
-                        isEditingPersonal
-                          ? "border-primary/40 focus:border-primary"
-                          : "border-gray-200 bg-gray-50 text-gray-700",
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="middleName" className="text-xs font-medium text-gray-700">
-                      Middle Name
-                    </Label>
-                    <Input
-                      id="middleName"
-                      value={middleName}
-                      onChange={(e) => setMiddleName(e.target.value)}
-                      disabled={!isEditingPersonal}
-                      className={cn(
-                        "rounded-md border px-3 py-2 text-sm shadow-sm",
-                        isEditingPersonal
-                          ? "border-primary/40 focus:border-primary"
-                          : "border-gray-200 bg-gray-50 text-gray-700",
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="displayName" className="text-xs font-medium text-gray-700">
-                      Display Name
-                    </Label>
-                    <Input
-                      id="displayName"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      disabled={!isEditingPersonal}
-                      className={cn(
-                        "rounded-md border px-3 py-2 text-sm shadow-sm",
-                        isEditingPersonal
-                          ? "border-primary/40 focus:border-primary"
-                          : "border-gray-200 bg-gray-50 text-gray-700",
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="phoneNumber" className="text-xs font-medium text-gray-700">
-                      Phone Number
-                    </Label>
-                    <Input
-                      id="phoneNumber"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      disabled={!isEditingPersonal}
-                      className={cn(
-                        "rounded-md border px-3 py-2 text-sm shadow-sm",
-                        isEditingPersonal
-                          ? "border-primary/40 focus:border-primary"
-                          : "border-gray-200 bg-gray-50 text-gray-700",
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="gender" className="text-xs font-medium text-gray-700">
-                      Gender
-                    </Label>
-                    <select
-                      id="gender"
-                      value={gender}
-                      onChange={(e) => setGender(e.target.value)}
-                      disabled={!isEditingPersonal}
-                      className={cn(
-                        `flex h-9 w-full rounded-md border px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm`,
-                        isEditingPersonal
-                          ? "border-primary/40 focus:border-primary"
-                          : "border-gray-200 bg-gray-50 text-gray-700",
-                      )}
-                    >
-                      <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="email" className="text-xs font-medium text-gray-700">
-                      Email
-                    </Label>
-                    <Input
-                      id="email"
-                      value={userData?.email || ""}
-                      disabled
-                      className="rounded-md border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-600 shadow-sm"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Email cannot be changed.</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        </>
+      ) : (
+        <>
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[157.05px] w-[94.74px]" data-node-id="7174:4758">
+            {userData?.first_name || "-"}
+          </p>
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[190.05px] w-[94.74px]" data-node-id="7174:4762">
+            {userData?.middle_name || "-"}
+          </p>
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[223.05px] w-[94.74px]" data-node-id="7174:4765">
+            {userData?.last_name || "-"}
+          </p>
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[256.05px] w-[94.74px]" data-node-id="7174:4771">
+            {userData?.gender || "-"}
+          </p>
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15.118px] leading-none left-[371.06px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[289.05px] w-[94.74px]" data-node-id="7174:4774">
+            {userData?.phone_number || "-"}
+          </p>
+          <p className="absolute font-['Inter:Medium',_sans-serif] font-medium h-[15px] leading-none left-[371px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[322px] w-[143px]" data-node-id="7174:4777">
+            {userData?.email || "-"}
+          </p>
+        </>
+      )}
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[157px] w-[84px]" data-node-id="7174:4759">
+        First Name:
+      </p>
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[190px] w-[84px]" data-node-id="7174:4763">
+        Middle Name:
+      </p>
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[223px] w-[84px]" data-node-id="7174:4766">
+        Last Name:
+      </p>
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[256px] w-[94px]" data-node-id="7174:4772">
+        Gender:
+      </p>
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[289px] w-[94px]" data-node-id="7174:4775">
+        Phone No.:
+      </p>
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[15px] leading-none left-[266px] not-italic text-[12.004px] text-[var(--lighter-black,#333333)] top-[322px] w-[94px]" data-node-id="7174:4778">
+        Email:
+      </p>
+      <div className="absolute left-[66px] size-[162px] top-[168px] rounded-full border-2 border-gray-400 overflow-hidden" data-node-id="7174:4830">
+        {isUploading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 size={48} className="animate-spin text-primary" />
           </div>
-
-          {/* Company Information */}
-          <div className="space-y-6">
-            {/* Company Profile Card */}
-            <Card className="rounded-xl shadow-sm">
-              <CardHeader className="border-b px-5 py-3">
-                <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
-                  <Building className="h-5 w-5 text-primary" />
-                  Company Profile
-                </CardTitle>
-                <CardDescription className="text-xs text-gray-600">
-                  Manage your company details and information.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-5">
-                {companyLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-5 flex flex-col items-center gap-5 sm:flex-row sm:items-start">
-                      <div className="relative group flex-shrink-0">
-                        <div
-                          className="flex h-24 w-24 items-center justify-center rounded-lg border border-gray-200 bg-gray-100 shadow-sm cursor-pointer hover:bg-gray-200 transition-colors overflow-hidden"
-                          onClick={handleCompanyLogoClick}
-                        >
-                          {isUploadingCompanyLogo ? (
-                            <Loader2 size={40} className="animate-spin text-primary" />
-                          ) : companyLogoPreviewUrl || companyData?.photo_url ? (
-                            <img
-                              src={companyLogoPreviewUrl || companyData?.photo_url || "/placeholder.svg"}
-                              alt="Company Logo"
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <Building size={40} className="text-gray-400" />
-                          )}
-                        </div>
-                        <button
-                          className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary p-1.5 text-white shadow-md transition-colors duration-200 hover:bg-primary/90"
-                          onClick={handleCompanyLogoClick}
-                          disabled={isUploadingCompanyLogo || true}
-                          aria-label="Change company logo"
-                        >
-                          <Camera size={16} />
-                        </button>
-                        <input
-                          type="file"
-                          ref={companyLogoInputRef}
-                          className="hidden"
-                          accept="image/*"
-                          onChange={handleCompanyLogoChange}
-                          disabled={isUploadingCompanyLogo || true}
-                        />
-                      </div>
-
-                      <div className="flex-1 text-center sm:text-left">
-                        <h2 className="text-xl font-bold text-gray-900">{companyData?.name || "Your Company"}</h2>
-                        <p className="mt-0.5 text-base text-gray-600">
-                          {projectData?.project_name || "Default Project"}
-                        </p>
-                        <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm text-gray-700 sm:justify-start">
-                          {companyData?.company_location && (
-                            <div className="flex items-center gap-1.5">
-                              <MapPin size={14} className="text-gray-500" />
-                              <span>{formatLocation(companyData.company_location)}</span>
-                            </div>
-                          )}
-                          {companyData?.company_website && (
-                            <div className="flex items-center gap-1.5">
-                              <Globe size={14} className="text-gray-500" />
-                              <a
-                                href={companyData.company_website}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline"
-                              >
-                                Website
-                              </a>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-1">
-                        <Label htmlFor="companyName" className="text-xs font-medium text-gray-700">
-                          Company Name
-                        </Label>
-                        <Input
-                          id="companyName"
-                          value={companyName}
-                          onChange={(e) => setCompanyName(e.target.value)}
-                          disabled={true}
-                          placeholder="Your Company Name"
-                          className={cn(
-                            "rounded-md border px-3 py-2 text-sm shadow-sm",
-                            false
-                              ? "border-primary/40 focus:border-primary"
-                              : "border-gray-200 bg-gray-50 text-gray-700",
-                          )}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label htmlFor="companyLocation" className="text-xs font-medium text-gray-700">
-                          Company Address
-                        </Label>
-                        <Input
-                          id="companyLocation"
-                          value={companyLocation}
-                          onChange={(e) => setCompanyLocation(e.target.value)}
-                          disabled={true}
-                          placeholder="123 Main St, City, Country"
-                          className={cn(
-                            "rounded-md border px-3 py-2 text-sm shadow-sm",
-                            false
-                              ? "border-primary/40 focus:border-primary"
-                              : "border-gray-200 bg-gray-50 text-gray-700",
-                          )}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label htmlFor="companyWebsite" className="text-xs font-medium text-gray-700">
-                          Company Website
-                        </Label>
-                        <Input
-                          id="companyWebsite"
-                          value={companyWebsite}
-                          onChange={(e) => setCompanyWebsite(e.target.value)}
-                          disabled={true}
-                          placeholder="https://www.example.com"
-                          className={cn(
-                            "rounded-md border px-3 py-2 text-sm shadow-sm",
-                            false
-                              ? "border-primary/40 focus:border-primary"
-                              : "border-gray-200 bg-gray-50 text-gray-700",
-                          )}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Social Media Card */}
-            <Card className="rounded-xl shadow-sm">
-              <CardHeader className="border-b px-5 py-3">
-                <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-800">
-                  <Globe className="h-5 w-5 text-primary" />
-                  Social Media
-                </CardTitle>
-                <CardDescription className="text-xs text-gray-600">
-                  Connect your company's social media accounts.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-5">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
-                      <Facebook className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Input
-                      value={facebook}
-                      onChange={(e) => setFacebook(e.target.value)}
-                      disabled={true}
-                      placeholder="Facebook URL"
-                      className={cn(
-                        "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
-                        false
-                          ? "border-primary/40 focus:border-primary"
-                          : "border-gray-200 bg-gray-50 text-gray-700",
-                      )}
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
-                      <Instagram className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Input
-                      value={instagram}
-                      onChange={(e) => setInstagram(e.target.value)}
-                      disabled={true}
-                      placeholder="Instagram URL"
-                      className={cn(
-                        "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
-                        false
-                          ? "border-primary/40 focus:border-primary"
-                          : "border-gray-200 bg-gray-50 text-gray-700",
-                      )}
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
-                      <Youtube className="h-4 w-4 text-gray-600" />
-                    </div>
-                    <Input
-                      value={youtube}
-                      onChange={(e) => setYoutube(e.target.value)}
-                      disabled={true}
-                      placeholder="YouTube URL"
-                      className={cn(
-                        "flex-1 rounded-md border px-3 py-2 text-sm shadow-sm",
-                        false
-                          ? "border-primary/40 focus:border-primary"
-                          : "border-gray-200 bg-gray-50 text-gray-700",
-                      )}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        ) : photoURL ? (
+          <img
+            src={photoURL || "/placeholder.svg"}
+            alt={userData?.displayName || "Profile"}
+            className={`w-full h-full object-cover ${isEditingPersonal ? 'grayscale' : ''}`}
+          />
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <User size={48} className="text-gray-400" />
           </div>
-        </div>
+        )}
       </div>
-    </main>
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[20px] leading-none left-[147px] not-italic text-[20px] text-[var(--lighter-black,#333333)] text-center top-[342px] translate-x-[-50%] w-[90px]" data-node-id="7174:4831">
+        {userData?.first_name || "Noemi"}
+      </p>
+      <button
+        className="absolute right-4 top-4 bg-white border-2 border-gray-400 h-[27px] rounded-[10px] w-[80px] text-gray-700 hover:bg-gray-50"
+        onClick={handleLogout}
+      >
+        Logout
+      </button>
+      <button
+        className="absolute left-[993px] size-[23.996px] top-[134px]"
+        onClick={() => setIsEditingPersonal(!isEditingPersonal)}
+        aria-label="Edit account info"
+        data-name="edit (1)"
+        data-node-id="7174:4890"
+      >
+        <SquarePen size={16} className="text-black" />
+      </button>
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        accept="image/*"
+        onChange={handlePhotoChange}
+        disabled={isUploading}
+      />
+      <div className="absolute bg-white left-[31px] rounded-[20px] top-[410px] w-[1002px] px-4 py-8" data-node-id="7174:4943" style={{height: '151px'}} />
+      <p className="absolute font-['Inter:Bold',_sans-serif] font-bold h-[24px] leading-none left-[51px] not-italic text-[16px] text-[var(--lighter-black,#333333)] top-[426px] w-[315px]" data-node-id="7174:4944">
+        Department and Roles
+      </p>
+      {userData?.roles && userData.roles.length > 0 && (
+        <div className="absolute left-[51px] top-[455px] flex flex-wrap gap-2">
+          {userData.roles.map((role: RoleType) => {
+            const department = departmentMapping[role]
+            return department ? (
+              <div key={role} className="flex flex-col items-center">
+                <div className={`h-[46px] rounded-[20px] px-4 flex items-center justify-center ${department.color} text-white`}>
+                  <span className="font-bold text-[16px]">{department.name}</span>
+                </div>
+              </div>
+            ) : null
+          })}
+        </div>
+      )}
+      <div className="absolute left-[994px] top-[426px]" data-name="dots" data-node-id="7174:4951">
+        <MoreVertical size={24} className="text-black" />
+      </div>
+    </div>
   )
 }

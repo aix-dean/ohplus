@@ -1,8 +1,8 @@
 "use client"
 
-import type React from "react"
+import React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useLayoutEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -50,7 +50,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { ResponsiveCardGrid } from "@/components/responsive-card-grid"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { BlankPageEditor } from "@/components/blank-page-editor"
 import { Vibrant } from 'node-vibrant/browser'
+import type { CustomPage } from "@/lib/types/proposal"
 
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
   const mapRef = useRef<HTMLDivElement>(null)
@@ -209,20 +211,6 @@ const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; on
     fetchCompanyData()
   }, [userData?.company_id, proposal?.companyName, proposal?.companyLogo])
 
-  useEffect(() => {
-    if (companyLogo && onColorExtracted) {
-      Vibrant.from(companyLogo).getPalette().then(palette => {
-        const vibrant = palette.Vibrant
-        if (vibrant) {
-          const hex = vibrant.hex
-          onColorExtracted(hex)
-        }
-      }).catch(error => {
-        console.error('Error extracting color:', error)
-        onColorExtracted('#f8c102')
-      })
-    }
-  }, [companyLogo, onColorExtracted])
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -375,7 +363,6 @@ export default function ProposalDetailsPage() {
   const [isSendOptionsDialogOpen, setIsSendOptionsDialogOpen] = useState(false)
   const [printLoading, setPrintLoading] = useState(false)
   const [dominantColor, setDominantColor] = useState<string | null>(null)
-  const [originalDominantColor, setOriginalDominantColor] = useState<string | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string>("")
   const [isAddSiteDialogOpen, setIsAddSiteDialogOpen] = useState(false)
@@ -388,12 +375,21 @@ export default function ProposalDetailsPage() {
   const [downloading, setDownloading] = useState(false)
   const [editableTitle, setEditableTitle] = useState("Site Proposals")
   const [editableProposalTitle, setEditableProposalTitle] = useState("Site Proposals")
+  const [editableProposalMessage, setEditableProposalMessage] = useState("Thank You!")
+  const [editableContactInfo, setEditableContactInfo] = useState({
+    heading: "contact us:",
+    name: "",
+    role: "Sales",
+    phone: "",
+    email: "",
+  })
   const [editableCompanyName, setEditableCompanyName] = useState("")
   const [editableClientContact, setEditableClientContact] = useState("")
   const [editableClientCompany, setEditableClientCompany] = useState("")
   const [editablePreparedByName, setEditablePreparedByName] = useState("")
   const [editablePreparedByCompany, setEditablePreparedByCompany] = useState("")
   const [editableProducts, setEditableProducts] = useState<{ [key: string]: any }>({})
+  const [originalEditableProducts, setOriginalEditableProducts] = useState<{ [key: string]: any }>({})
   const [savingEdit, setSavingEdit] = useState(false)
   const [editableLogo, setEditableLogo] = useState<string>("")
   const [pendingSiteImages, setPendingSiteImages] = useState<{[productId: string]: string}>({})
@@ -409,6 +405,16 @@ export default function ProposalDetailsPage() {
   const [logoResizeDirection, setLogoResizeDirection] = useState<string>('')
   const [selectedProductForMedia, setSelectedProductForMedia] = useState<ProposalProduct | null>(null)
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false)
+  const [editingCustomPage, setEditingCustomPage] = useState<CustomPage | null>(null)
+  const [isBlankPageEditorOpen, setIsBlankPageEditorOpen] = useState(false)
+  const [fieldVisibility, setFieldVisibility] = useState<{[productId: string]: {
+    location: boolean
+    dimension: boolean
+    type: boolean
+    traffic: boolean
+    srp: boolean
+    additionalMessage: boolean
+  }}>({})
 
   const fetchClients = async () => {
     if (!userData?.company_id) return
@@ -506,7 +512,24 @@ export default function ProposalDetailsPage() {
     fetchClients()
   }, [userData?.company_id])
 
+  // Auto-resize textareas when entering edit mode or when content changes
+  useLayoutEffect(() => {
+    if (isEditMode) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        const textareas = document.querySelectorAll('textarea[placeholder="Add specs"], textarea[placeholder="Add data"]') as NodeListOf<HTMLTextAreaElement>
+        textareas.forEach((ta) => {
+          ta.style.height = 'auto'
+          ta.style.height = ta.scrollHeight + 'px'
+        })
+      }, 0)
+    }
+  }, [isEditMode, editableProducts])
+
   useEffect(() => {
+    // Reset field visibility to defaults when proposal changes
+    setFieldVisibility({})
+
     async function fetchProposal() {
       if (!params.id) return
 
@@ -515,7 +538,7 @@ export default function ProposalDetailsPage() {
         const proposalData = await getProposalById(params.id as string)
         if (proposalData) {
           setProposal(proposalData)
-          setSelectedClientId(proposalData.client.id || "")
+          setSelectedClientId(proposalData.client?.id || "")
           const currentPageContent = getPageContent(1, proposalData.templateLayout || "1")
           const currentPagePrice = getPagePrice(currentPageContent)
           setEditablePrice(currentPagePrice.toString())
@@ -540,9 +563,30 @@ export default function ProposalDetailsPage() {
           // Set editable states
           setEditableTitle(proposalData.title || "Site Proposals")
           setEditableProposalTitle(proposalData.proposalTitle || "Site Proposals")
+          setEditableProposalMessage("Thank You!")
+          setEditableContactInfo({
+            heading: "contact us:",
+            name: `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim() || userData?.email || 'Sales Rep',
+            role: 'Sales',
+            phone: userData?.phone_number || '',
+            email: userData?.email || '',
+          })
+          // Initialize field visibility for each product
+          const productFieldVisibility: {[productId: string]: any} = {}
+          proposalData.products.forEach((product: any) => {
+            productFieldVisibility[product.id] = {
+              location: proposalData.fieldVisibility?.[product.id]?.location ?? true,
+              dimension: proposalData.fieldVisibility?.[product.id]?.dimension ?? true,
+              type: proposalData.fieldVisibility?.[product.id]?.type ?? true,
+              traffic: proposalData.fieldVisibility?.[product.id]?.traffic ?? true,
+              srp: proposalData.fieldVisibility?.[product.id]?.srp ?? true,
+              additionalMessage: proposalData.fieldVisibility?.[product.id]?.additionalMessage ?? true,
+            }
+          })
+          setFieldVisibility(productFieldVisibility)
           setEditableCompanyName(proposalData.companyName || "")
-          setEditableClientContact(proposalData.client.contactPerson || "")
-          setEditableClientCompany(proposalData.client.company || "")
+          setEditableClientContact(proposalData.client?.contactPerson || "")
+          setEditableClientCompany(proposalData.client?.company || "")
           setEditablePreparedByName(proposalData.preparedByName || `${userData?.first_name || ''} ${userData?.last_name || ''}`.trim())
           setEditablePreparedByCompany(proposalData.preparedByCompany || proposalData.companyName || "")
           setLogoDimensions({
@@ -569,7 +613,9 @@ export default function ProposalDetailsPage() {
               dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
-              srp: product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'
+              srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A',
+              additionalMessage: product.additionalMessage || '',
+              additionalSpecs: (product as any).additionalSpecs || []
             }
           })
           setEditableProducts(products)
@@ -663,24 +709,35 @@ export default function ProposalDetailsPage() {
         url.searchParams.delete("action")
         window.history.replaceState({}, "", url.toString())
       }, 1000)
+    } else if (action === "edit" && proposal && !loading) {
+      // Automatically enter edit mode for newly created proposals
+      setTimeout(() => {
+        setIsEditMode(true)
+        // Clean up the URL parameter
+        const url = new URL(window.location.href)
+        url.searchParams.delete("action")
+        window.history.replaceState({}, "", url.toString())
+      }, 500)
     }
   }, [proposal, loading])
 
-  // Extract color from editable logo when it changes
+  // Extract color from current logo (editable or proposal)
   useEffect(() => {
-    if (editableLogo) {
-      Vibrant.from(editableLogo).getPalette().then(palette => {
+    const currentLogo = editableLogo || proposal?.companyLogo || ''
+    if (currentLogo) {
+      Vibrant.from(currentLogo).getPalette().then(palette => {
         const vibrant = palette.Vibrant
         if (vibrant) {
-          const hex = vibrant.hex
-          setDominantColor(hex)
+          setDominantColor(vibrant.hex)
         }
       }).catch(error => {
-        console.error('Error extracting color from editable logo:', error)
+        console.error('Error extracting color:', error)
         setDominantColor('#f8c102')
       })
+    } else {
+      setDominantColor('#f8c102') // default color
     }
-  }, [editableLogo])
+  }, [editableLogo, proposal?.companyLogo])
 
   const fetchTemplates = async () => {
     if (!userData?.company_id) {
@@ -1096,6 +1153,12 @@ export default function ProposalDetailsPage() {
             }
             updatedProduct.categories[0] = editable.type
           }
+          if (editable.additionalSpecs) {
+            const filteredSpecs = editable.additionalSpecs.filter((spec: {specs: string, data: string}) => spec.specs.trim() || spec.data.trim())
+            ;(updatedProduct as any).additionalSpecs = filteredSpecs
+            // Also update editableProducts to remove empty specs
+            editable.additionalSpecs = filteredSpecs
+          }
           return updatedProduct
         }
         return product
@@ -1118,6 +1181,9 @@ export default function ProposalDetailsPage() {
       const updateData: any = {
         title: editableTitle,
         proposalTitle: editableProposalTitle,
+        proposalMessage: editableProposalMessage,
+        contactInfo: editableContactInfo,
+        fieldVisibility: fieldVisibility,
         companyName: editableCompanyName,
         logoWidth: logoDimensions.width,
         logoHeight: logoDimensions.height,
@@ -1127,6 +1193,24 @@ export default function ProposalDetailsPage() {
         products: updatedProducts,
         preparedByName: editablePreparedByName,
         preparedByCompany: editablePreparedByCompany
+      }
+
+      // Save additional messages for products
+      if (Object.keys(editableProducts).length > 0) {
+        const productsWithMessages = updatedProducts.map(product => {
+          const editable = editableProducts[product.id]
+          if (editable?.additionalMessage && editable.additionalMessage.trim() !== '') {
+            return {
+              ...product,
+              additionalMessage: editable.additionalMessage.trim()
+            }
+          } else {
+            // Remove additionalMessage if it's empty or whitespace-only
+            const { additionalMessage, ...productWithoutMessage } = product as any
+            return productWithoutMessage
+          }
+        })
+        updateData.products = productsWithMessages
       }
 
       // Save company logo if changed
@@ -1157,7 +1241,7 @@ export default function ProposalDetailsPage() {
 
       console.log("Update successful")
 
-      setProposal(prev => prev ? { ...prev, title: editableTitle, proposalTitle: editableProposalTitle, companyName: editableCompanyName, logoWidth: logoDimensions.width, logoHeight: logoDimensions.height, logoLeft: logoPosition.left, logoTop: logoPosition.top, client: updatedClient, products: updateData.products || updatedProducts, companyLogo: editableLogo || prev.companyLogo, preparedByName: editablePreparedByName, preparedByCompany: editablePreparedByCompany } : null)
+      setProposal(prev => prev ? { ...prev, title: editableTitle, proposalTitle: editableProposalTitle, proposalMessage: editableProposalMessage, contactInfo: editableContactInfo, fieldVisibility: fieldVisibility, companyName: editableCompanyName, logoWidth: logoDimensions.width, logoHeight: logoDimensions.height, logoLeft: logoPosition.left, logoTop: logoPosition.top, client: updatedClient, products: updateData.products || updatedProducts, companyLogo: editableLogo || prev.companyLogo, preparedByName: editablePreparedByName, preparedByCompany: editablePreparedByCompany } : null)
 
       // Clear pending changes after successful save
       setEditableLogo("")
@@ -1193,7 +1277,7 @@ export default function ProposalDetailsPage() {
       // Entering edit mode - store original values
       setOriginalLogoDimensions({ ...logoDimensions })
       setOriginalLogoPosition({ ...logoPosition })
-      setOriginalDominantColor(dominantColor)
+      setOriginalEditableProducts(JSON.parse(JSON.stringify(editableProducts))) // Deep copy
     } else {
       // Exiting edit mode - reset cursor
       document.body.style.cursor = ''
@@ -1203,10 +1287,10 @@ export default function ProposalDetailsPage() {
   }
 
   const handleCancelEdit = () => {
-    // Restore original logo dimensions and position
+    // Restore original values
     setLogoDimensions({ ...originalLogoDimensions })
     setLogoPosition({ ...originalLogoPosition })
-    setDominantColor(originalDominantColor)
+    setEditableProducts(JSON.parse(JSON.stringify(originalEditableProducts))) // Restore original editable products
     // Clear pending changes
     setEditableLogo("")
     setPendingSiteImages({})
@@ -1335,22 +1419,43 @@ export default function ProposalDetailsPage() {
   const getTotalPages = (layout: string) => {
     const numberOfSites = proposal?.products?.length || 1
     const sitesPerPage = getSitesPerPage(layout)
-    // Always include 1 page for intro + pages for sites
-    return 1 + Math.ceil(numberOfSites / sitesPerPage)
+    const customPages = proposal?.customPages?.length || 0
+    // Always include 1 page for intro + pages for sites + custom pages + 1 page for outro
+    return 1 + Math.ceil(numberOfSites / sitesPerPage) + customPages + 1
   }
 
   const getPageContent = (pageNumber: number, layout: string) => {
     if (!proposal?.products) return []
 
-    // Page 1 is always intro, so site pages start from page 2
+    // Page 1 is always intro
+    if (pageNumber === 1) return []
+
+    const numberOfSitePages = Math.ceil((proposal.products?.length || 0) / getSitesPerPage(layout))
     const sitePageNumber = pageNumber - 1
-    if (sitePageNumber < 1) return []
 
-    const sitesPerPage = getSitesPerPage(layout)
-    const startIndex = (sitePageNumber - 1) * sitesPerPage
-    const endIndex = startIndex + sitesPerPage
+    // Check if this is a site page
+    if (sitePageNumber <= numberOfSitePages) {
+      const sitesPerPage = getSitesPerPage(layout)
+      const startIndex = (sitePageNumber - 1) * sitesPerPage
+      const endIndex = startIndex + sitesPerPage
+      return proposal.products.slice(startIndex, endIndex)
+    }
 
-    return proposal.products.slice(startIndex, endIndex)
+    // This is a custom page
+    return []
+  }
+
+  const getCustomPageForPageNumber = (pageNumber: number) => {
+    if (!proposal?.customPages) return null
+
+    const numberOfSitePages = Math.ceil((proposal.products?.length || 0) / getSitesPerPage(selectedLayout))
+    const customPageIndex = pageNumber - 2 - numberOfSitePages // -2 because page 1 is intro, page 2+ are site pages
+
+    if (customPageIndex >= 0 && customPageIndex < proposal.customPages.length) {
+      return proposal.customPages[customPageIndex]
+    }
+
+    return null
   }
 
   const getLayoutGridClass = (layout: string) => {
@@ -1364,6 +1469,34 @@ export default function ProposalDetailsPage() {
         return "grid-cols-1 md:grid-cols-2 lg:grid-cols-2"
       default:
         return "grid-cols-1"
+    }
+  }
+
+  const getPageDimensions = (size: string, orientation: string) => {
+    const dpi = 96
+    const mmToPx = 3.7795
+
+    switch (size) {
+      case "A4":
+        if (orientation === "Landscape") {
+          return { width: Math.round(280 * mmToPx), height: Math.round(180 * mmToPx) }
+        } else {
+          return { width: Math.round(200 * mmToPx), height: Math.round(240 * mmToPx) }
+        }
+      case "Letter size":
+        if (orientation === "Landscape") {
+          return { width: 10 * dpi, height: 7 * dpi }
+        } else {
+          return { width: 8 * dpi, height: 9 * dpi }
+        }
+      case "Legal size":
+        if (orientation === "Landscape") {
+          return { width: 12 * dpi, height: 7 * dpi }
+        } else {
+          return { width: 8 * dpi, height: 10 * dpi }
+        }
+      default:
+        return { width: 800, height: 600 }
     }
   }
 
@@ -1526,6 +1659,24 @@ export default function ProposalDetailsPage() {
       )
 
       setProposal((prev) => (prev ? { ...prev, products: updatedProducts } : null))
+
+      // Update editableProducts state to include the new products
+      const newEditableProducts: { [key: string]: any } = {}
+      selectedProductsForAddition.forEach(product => {
+        const productId = product.id || `temp-${Date.now()}`
+        newEditableProducts[productId] = {
+          name: product.name,
+          location: product.specs_rental?.location || (product as any).light?.location || 'N/A',
+          dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
+          type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
+          traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
+          srp: product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A',
+          additionalMessage: (product as any).additionalMessage || '',
+          additionalSpecs: []
+        }
+      })
+      setEditableProducts(prev => ({ ...prev, ...newEditableProducts }))
+
       setIsAddSiteDialogOpen(false)
       setSelectedProductsForAddition([])
 
@@ -1724,6 +1875,86 @@ export default function ProposalDetailsPage() {
     setLogoResizeDirection('')
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
+  }
+
+  const handleAddBlankPage = (position: number) => {
+    const newPage: CustomPage = {
+      id: `blank-${Date.now()}`,
+      type: 'blank',
+      elements: [],
+      position
+    }
+
+    // Save the blank page immediately
+    handleSaveBlankPage(newPage)
+  }
+
+  const handleEditBlankPage = (page: CustomPage) => {
+    setEditingCustomPage(page)
+    setIsBlankPageEditorOpen(true)
+  }
+
+  const handleSaveBlankPage = async (page: CustomPage) => {
+    if (!proposal || !userData) return
+
+    try {
+      const existingPages = proposal.customPages || []
+      const updatedPages = editingCustomPage?.id
+        ? existingPages.map(p => p.id === page.id ? page : p)
+        : [...existingPages, page]
+
+      await updateProposal(
+        proposal.id,
+        { customPages: updatedPages },
+        userData.uid,
+        userData.displayName || "User"
+      )
+
+      setProposal(prev => prev ? { ...prev, customPages: updatedPages } : null)
+      setIsBlankPageEditorOpen(false)
+      setEditingCustomPage(null)
+
+      toast({
+        title: "Success",
+        description: "Blank page saved successfully"
+      })
+    } catch (error) {
+      console.error("Error saving blank page:", error)
+      toast({
+        title: "Error",
+        description: "Failed to save blank page",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleDeleteBlankPage = async (pageId: string) => {
+    if (!proposal || !userData) return
+
+    try {
+      const updatedPages = (proposal.customPages || []).filter(p => p.id !== pageId)
+
+      await updateProposal(
+        proposal.id,
+        { customPages: updatedPages },
+        userData.uid,
+        userData.displayName || "User"
+      )
+
+      setProposal(prev => prev ? { ...prev, customPages: updatedPages } : null)
+
+      toast({
+        title: "Success",
+        description: "Blank page deleted successfully"
+      })
+    } catch (error) {
+      console.error("Error deleting blank page:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete blank page",
+        variant: "destructive"
+      })
+    }
   }
 
   useEffect(() => {
@@ -1999,7 +2230,7 @@ export default function ProposalDetailsPage() {
         ) : (
           <div className="absolute text-[#333333] text-[18px] left-[100px] top-[386px] w-[645px] leading-[1.2]">
             <p className="font-bold mb-0">Prepared for:</p>
-            <p>{proposal?.client.contactPerson} - {proposal?.client.company}</p>
+            <p>{proposal?.client?.contactPerson} - {proposal?.client?.company}</p>
           </div>
         )}
 
@@ -2052,6 +2283,12 @@ export default function ProposalDetailsPage() {
   const renderSitePage = (pageNumber: number) => {
     const totalPages = getTotalPages(selectedLayout)
     const pageContent = getPageContent(pageNumber, selectedLayout)
+    const customPage = getCustomPageForPageNumber(pageNumber)
+
+    // Check if this is a custom blank page
+    if (customPage) {
+      return renderBlankPage(customPage, pageNumber, totalPages)
+    }
 
     // For now, we'll take the first product on this page (assuming 1 site per page for this layout)
     const product = pageContent[0]
@@ -2066,9 +2303,6 @@ export default function ProposalDetailsPage() {
 
     return (
       <div className="relative w-full h-full bg-white">
-        {/* Header - scaled */}
-        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
-        <div className="absolute top-0 left-0 w-[1310px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
 
         {/* Background borders and accents - scaled */}
         <div className="absolute flex h-[0px] items-center justify-center left-0 top-0 w-[0px]">
@@ -2182,9 +2416,15 @@ export default function ProposalDetailsPage() {
         </div>
 
         {/* Site Details - Right Side - scaled */}
-        <div className="absolute font-bold text-[#333333] text-[18px] left-[358px] top-[171px] w-[434px] leading-[1.2]">
+        <div
+          className="absolute font-bold text-[#333333] text-[18px] left-[358px] w-[600px] leading-[1.2]"
+          style={{
+            top: ((editableProducts[product.id]?.additionalSpecs?.length || 0) > 0 ||
+                  (isEditMode || (fieldVisibility[product.id]?.additionalMessage !== false && (product.additionalMessage || '').trim() !== ''))) ? '120px' : '191px'
+          }}
+        >
           {/* Site Name */}
-          <div className="mb-2 text-[35px]">
+          <div className="mb-2 text-[35px] ml-2">
             {isEditMode ? (
               <input
                 value={editableProducts[product.id]?.name || product.name}
@@ -2197,85 +2437,256 @@ export default function ProposalDetailsPage() {
           </div>
 
           <div className="ml-2">
-            {/* Location */}
-            <div className="mb-2">
-              <p className="mb-0">Location:</p>
-              {isEditMode ? (
-                <input
-                  value={editableProducts[product.id]?.location || product.location || 'N/A'}
-                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: e.target.value } }))}
-                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                />
-              ) : (
-                <p className="font-normal text-[18px]">{product.location || 'N/A'}</p>
-              )}
+            {/* Location Row */}
+            {isEditMode || fieldVisibility[product.id]?.location !== false ? (
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Location:</p>
+                </div>
+                <div className="flex-1" style={{ minWidth: 0 }}>
+                  {isEditMode ? (
+                    <textarea
+                      value={editableProducts[product.id]?.location || product.location || 'N/A'}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        const lineBreaks = (value.match(/\n/g) || []).length
+                        if (lineBreaks <= 1) {
+                          setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location: value } }))
+                        }
+                      }}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none"
+                      rows={2}
+                      placeholder="Location"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">{product.location || 'N/A'}</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Dimension Row */}
+            {isEditMode || fieldVisibility[product.id]?.dimension !== false ? (
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Dimension:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.dimension || ''}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], dimension: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">
+                      {product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}
+                      {product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}
+                      {product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}
+                      {!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Type Row */}
+            {isEditMode || fieldVisibility[product.id]?.type !== false ? (
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Type:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.type || ''}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], type: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Average Monthly Traffic Count Row */}
+            {isEditMode || fieldVisibility[product.id]?.traffic !== false ? (
+              <div className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left">
+                  <p className="font-bold text-[18px]">Average Monthly Traffic Count:</p>
+                </div>
+                <div className="flex-1">
+                  {isEditMode ? (
+                    <input
+                      value={editableProducts[product.id]?.traffic || ''}
+                      onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], traffic: e.target.value } }))}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                    />
+                  ) : (
+                    <p className="font-normal text-[18px] break-words">
+                      {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {/* SRP Row */}
+            <div className="flex mb-2">
+              <div className="w-[200px] pr-4 text-left">
+                <p className="font-bold text-[18px]">SRP:</p>
+              </div>
+              <div className="flex-1">
+                {isEditMode ? (
+                  <input
+                    value={editableProducts[product.id]?.srp || ''}
+                    onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
+                    className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                  />
+                ) : (
+                  <p className="font-normal text-[18px] break-words">
+                    {product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A'}
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Dimension */}
-            <div className="mb-2">
-              <p className="mb-0">Dimension:</p>
-              {isEditMode ? (
-                <input
-                  value={editableProducts[product.id]?.dimension || ''}
-                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], dimension: e.target.value } }))}
-                  className="font-normal text-[18px] mb-0 border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                />
-              ) : (
-                <p className="font-normal text-[18px] mb-0">
-                  {product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}
-                  {product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}
-                  {product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}
-                  {!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}
-                </p>
-              )}
+            {/* Additional Specs Rows */}
+            {(editableProducts[product.id]?.additionalSpecs || []).map((spec: {specs: string, data: string}, index: number) => (
+              <div key={index} className="flex mb-2">
+                <div className="w-[200px] pr-4 text-left" style={{ minWidth: 0 }}>
+                  {isEditMode ? (
+                    <textarea
+                      value={spec.specs}
+                      onChange={(e) => {
+                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                        newSpecs[index].specs = e.target.value
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        e.target.style.height = 'auto'
+                        e.target.style.height = e.target.scrollHeight + 'px'
+                      }}
+                      className="font-bold text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none overflow-hidden"
+                      placeholder="Add specs"
+                      rows={1}
+                      style={{ minHeight: '40px' }}
+                    />
+                  ) : (
+                    <div
+                      className="font-bold text-[18px] border-none outline-none w-full bg-transparent"
+                      style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', overflow: 'visible' }}
+                    >
+                      {spec.specs || ''}
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1" style={{ minWidth: 0 }}>
+                  {isEditMode ? (
+                    <textarea
+                      value={spec.data}
+                      onChange={(e) => {
+                        const newSpecs = [...(editableProducts[product.id]?.additionalSpecs || [])]
+                        newSpecs[index].data = e.target.value
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalSpecs: newSpecs } }))
+                        e.target.style.height = 'auto'
+                        e.target.style.height = e.target.scrollHeight + 'px'
+                      }}
+                      className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full resize-none overflow-hidden"
+                      placeholder="Add data"
+                      rows={1}
+                      style={{ minHeight: '40px' }}
+                    />
+                  ) : (
+                    <div
+                      className="font-normal text-[18px] border-none outline-none w-full bg-transparent"
+                      style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', overflow: 'visible' }}
+                    >
+                      {spec.data || ''}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Add Specs Button */}
+            {isEditMode && (
+              <div className="flex mb-2 justify-end">
+                <div className="flex-1">
+                  <Button
+                    onClick={() => {
+                      const current = editableProducts[product.id]?.additionalSpecs || []
+                      if (current.length < 3) {
+                        setEditableProducts(prev => ({
+                          ...prev,
+                          [product.id]: {
+                            ...prev[product.id],
+                            additionalSpecs: [...current, { specs: '', data: '' }]
+                          }
+                        }))
+                      }
+                    }}
+                    
+                    className="self-start"
+                    style={{ transform: 'translateX(475px)' }}
+                    variant="outline"
+                  >
+                    + Add Specs
+                  </Button>
+                </div>
+              </div>
+            )}
+
             </div>
 
-            {/* Type */}
-            <div className="mb-2">
-              <p className="mb-0">Type:</p>
-              {isEditMode ? (
-                <input
-                  value={editableProducts[product.id]?.type || ''}
-                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], type: e.target.value } }))}
-                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                />
-              ) : (
-                <p className="font-normal text-[18px]">{product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A'}</p>
-              )}
-            </div>
-
-            {/* Average Daily Traffic Count */}
-            <div className="mb-2">
-              <p className="mb-0">Average Monthly Traffic Count:</p>
-              {isEditMode ? (
-                <input
-                  value={editableProducts[product.id]?.traffic || ''}
-                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], traffic: e.target.value } }))}
-                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                />
-              ) : (
-                <p className="font-normal text-[18px]">
-                  {product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A'}
-                </p>
-              )}
-            </div>
-
-            {/* SRP */}
-            <div className="mb-2">
-              <p className="mb-0">SRP:</p>
-              {isEditMode ? (
-                <input
-                  value={editableProducts[product.id]?.srp || ''}
-                  onChange={(e) => setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], srp: e.target.value } }))}
-                  className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
-                />
-              ) : (
-                <p className="font-normal text-[18px]">
-                  {product.price ? `₱${product.price.toLocaleString()}.00 per month` : 'N/A'}
-                </p>
-              )}
-            </div>
-          </div>
+           {/* Additional Message - Outside the column layout */}
+           {isEditMode || (fieldVisibility[product.id]?.additionalMessage !== false && (product.additionalMessage || '').trim() !== '') ? (
+             <div className="mt-4 ml-2">
+               <div className="flex items-center gap-2">
+                 <div className="flex-1" style={{ minWidth: 0 }}>
+                   {isEditMode ? (
+                     <textarea
+                       value={editableProducts[product.id]?.additionalMessage || ''}
+                       onChange={(e) => {
+                         const value = e.target.value
+                         const lineBreaks = (value.match(/\n/g) || []).length
+                         if (lineBreaks <= 1) {
+                           setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], additionalMessage: value } }))
+                         }
+                       }}
+                       className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-2 py-1 outline-none w-full resize-none"
+                       placeholder="Additional message..."
+                       rows={2}
+                       maxLength={130}
+                       style={{ width: '105%', whiteSpace: 'pre-wrap' }}
+                     />
+                   ) : (
+                     <div
+                       className="font-normal text-[18px] border-none outline-none w-full bg-transparent"
+                       style={{ whiteSpace: 'pre-wrap', overflowWrap: 'break-word', wordBreak: 'break-word', overflow: 'visible' }}
+                     >
+                       {product.additionalMessage || ''}
+                     </div>
+                   )}
+                 </div>
+                 {isEditMode && (
+                   <button
+                     onClick={() => setFieldVisibility(prev => ({
+                       ...prev,
+                       [product.id]: {
+                         ...prev[product.id],
+                         additionalMessage: !prev[product.id]?.additionalMessage
+                       }
+                     }))}
+                     className={`transition-colors ${fieldVisibility[product.id]?.additionalMessage !== false ? 'text-red-500 hover:text-red-700' : 'text-green-500 hover:text-green-700'}`}
+                     style={{ transform: 'translateX(24px)' }}
+                     title={fieldVisibility[product.id]?.additionalMessage !== false ? "Hide Additional Message field" : "Show Additional Message field"}
+                   >
+                     <X className="h-4 w-4" />
+                   </button>
+                 )}
+               </div>
+             </div>
+           ) : null}
         </div>
 
         {/* Bottom Logo */}
@@ -2295,10 +2706,235 @@ export default function ProposalDetailsPage() {
             <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
           )}
         </div>
+      </div>
+    )
+  }
 
-        {/* Footer - scaled */}
+  const renderBlankPage = (customPage: CustomPage, pageNumber: number, totalPages: number) => {
+    return (
+      <div className="relative w-full h-full bg-white">
+        {/* Header */}
+        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-0 left-0 w-[1310px] h-[70px] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+
+        {/* Page Number */}
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[89px] right-[28px] w-[51px]">
+          {pageNumber}/{totalPages}
+        </p>
+
+        {/* Custom Elements */}
+        {customPage.elements.map((element) => (
+          <div
+            key={element.id}
+            className="absolute"
+            style={{
+              left: element.position.x,
+              top: element.position.y + 70, // Account for header
+              width: element.size.width,
+              height: element.size.height,
+              zIndex: 5
+            }}
+          >
+            {element.type === 'text' && (
+              <div
+                className="w-full h-full overflow-hidden"
+                style={{
+                  fontSize: element.style?.fontSize || 16,
+                  fontFamily: element.style?.fontFamily || 'Arial',
+                  color: element.style?.color || '#000000',
+                  fontWeight: element.style?.fontWeight || 'normal',
+                  textAlign: element.style?.textAlign as any || 'left',
+                  lineHeight: '1.2'
+                }}
+              >
+                {element.content}
+              </div>
+            )}
+            {element.type === 'image' && (
+              <img
+                src={element.content}
+                alt="Custom content"
+                className="w-full h-full object-cover"
+              />
+            )}
+            {element.type === 'video' && (
+              <video
+                src={element.content}
+                className="w-full h-full object-cover"
+                controls
+              />
+            )}
+          </div>
+        ))}
+
+        {/* Footer */}
         <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
         <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] bg-[rgba(248,193,2,0.5)] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+
+        {/* Edit Mode Overlay for Blank Pages */}
+        {isEditMode && customPage.elements.length === 0 && (
+          <div className="absolute top-[350px] left-0 right-0 bottom-[70px] flex items-center justify-center bg-gray-50 bg-opacity-80 z-10">
+            <div className="text-center">
+              <div className="mb-4">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Edit className="h-8 w-8 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Blank Page</h3>
+                <p className="text-gray-600 mb-4">Click the edit button to add content</p>
+              </div>
+              <Button
+                onClick={() => {
+                  setEditingCustomPage(customPage)
+                  setIsBlankPageEditorOpen(true)
+                }}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Page
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderOutroPage = (pageNumber: number) => {
+    const totalPages = getTotalPages(selectedLayout)
+    const formattedDate = proposal?.createdAt ? new Date(proposal.createdAt).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    }) : 'N/A'
+
+    return (
+      <div className="relative w-full h-full bg-white">
+        {/* Header */}
+        <div className="absolute top-0 left-0 w-[700px] h-[70px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-0 left-0 w-[1310px] h-[70px] rounded-tl-[44px] rounded-tr-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
+
+        {/* Background borders and accents - scaled */}
+        <div className="absolute flex h-[0px] items-center justify-center left-0 top-0 w-[0px]">
+          <div className="flex-none rotate-[270deg]">
+            <div className="bg-white h-[857px] w-[675px]" />
+          </div>
+        </div>
+        <div className="absolute flex h-[0px] items-center justify-center left-[473px] top-[2px] w-[0px]">
+          <div className="flex-none rotate-[270deg]">
+            <div className="h-[393px] w-[69px]" />
+          </div>
+        </div>
+        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[594px] w-[0px]">
+          <div className="flex-none rotate-[90deg]">
+            <div className="h-[393px] w-[69px]" />
+          </div>
+        </div>
+        <div className="absolute flex h-[0px] items-center justify-center left-0 top-[2px] w-[0px]">
+          <div className="flex-none rotate-[270deg]">
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
+          </div>
+        </div>
+        <div className="absolute flex h-[0px] items-center justify-center left-[208px] top-[594px] w-[0px]">
+          <div className="flex-none rotate-[90deg]">
+            <div className="h-[651px] rounded-bl-[44px] rounded-br-[44px] w-[69px]" />
+          </div>
+        </div>
+
+
+        {/* Thank You Message - Group 534 content */}
+        {isEditMode ? (
+          <input
+            value={editableProposalMessage}
+            onChange={(e) => setEditableProposalMessage(e.target.value)}
+            className="absolute font-bold text-[#333333] text-[71px] left-[73px] top-[307px] min-w-[200px] max-w-[500px] w-auto border-2 border-[#c4c4c4] border-dashed rounded px-2 outline-none whitespace-nowrap"
+            style={{ width: `${Math.max(200, (editableProposalMessage.length * 45) + 35)}px` }}
+          />
+        ) : (
+          <div className="absolute font-bold text-[#333333] text-[71px] left-[73px] top-[307px] whitespace-nowrap">
+            Thank You!
+          </div>
+        )}
+
+        {/* Contact Information */}
+        <div className="absolute font-normal text-[#333333] text-[20px] left-[93px] top-[429px] w-[316px] leading-[1.2]">
+          {isEditMode ? (
+            <input
+              value={editableContactInfo.heading}
+              onChange={(e) => setEditableContactInfo(prev => ({ ...prev, heading: e.target.value }))}
+              className="font-bold mb-0 text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+              placeholder="Contact Heading"
+            />
+          ) : (
+            <p className="font-bold mb-0 text-[20px]">contact us:</p>
+          )}
+          {isEditMode ? (
+            <>
+              <input
+                value={editableContactInfo.name}
+                onChange={(e) => setEditableContactInfo(prev => ({ ...prev, name: e.target.value }))}
+                className="mb-0 text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                placeholder="Contact Name"
+              />
+              <input
+                value={editableContactInfo.role}
+                onChange={(e) => setEditableContactInfo(prev => ({ ...prev, role: e.target.value }))}
+                className="mb-0 text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                placeholder="Role"
+              />
+              <input
+                value={editableContactInfo.phone}
+                onChange={(e) => setEditableContactInfo(prev => ({ ...prev, phone: e.target.value }))}
+                className="mb-0 text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                placeholder="Phone Number"
+              />
+              <input
+                value={editableContactInfo.email}
+                onChange={(e) => setEditableContactInfo(prev => ({ ...prev, email: e.target.value }))}
+                className="text-[20px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
+                placeholder="Email Address"
+              />
+            </>
+          ) : (
+            <>
+              <p className="mb-0 text-[20px]">{proposal?.contactInfo?.name || 'N/A'}</p>
+              <p className="mb-0 text-[20px]">{proposal?.contactInfo?.role || 'Sales'}</p>
+              <p className="mb-0 text-[20px]">{proposal?.contactInfo?.phone || 'N/A'}</p>
+              <p className="text-[20px]">{proposal?.contactInfo?.email || 'N/A'}</p>
+            </>
+          )}
+        </div>
+
+        {/* Date */}
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[89px] right-[28px] w-[191px]">
+          {formattedDate}
+        </p>
+
+        {/* Page Number */}
+        <p className="absolute font-normal text-[#333333] text-[18px] text-right top-[558px] right-[28px] w-[51px]">
+          {pageNumber}/{totalPages}
+        </p>
+
+        {/* Bottom Logo */}
+        <div className="absolute h-[40px] left-[28px] top-[626px] w-[67px] z-20">
+          {editableLogo ? (
+            <div
+              style={{
+                backgroundImage: `url(${editableLogo})`,
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                width: '100%',
+                height: '100%',
+              }}
+            />
+          ) : (
+            <CompanyLogo className="h-full w-full" proposal={proposal} onColorExtracted={setDominantColor} />
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="absolute top-[612px] right-0 w-[700px] h-[70px] rounded-tl-[44px] rounded-bl-[44px] z-10" style={{ backgroundColor: dominantColor || undefined }} />
+        <div className="absolute top-[612px] right-0 w-[1320px] h-[70px] rounded-tl-[44px] rounded-tl-[44px] rounded-br-[44px] z-10" style={{ backgroundColor: dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : undefined }} />
       </div>
     )
   }
@@ -2395,6 +3031,14 @@ export default function ProposalDetailsPage() {
             >
               <span className="font-medium text-[16px] text-[#333333]">+Add Site</span>
             </div>
+            {isEditMode && (
+              <div
+                className="bg-blue-50 shadow h-[32px] rounded-[8px] flex items-center px-2 min-w-[120px] cursor-pointer hover:bg-blue-100 border border-blue-200"
+                onClick={() => handleAddBlankPage(getTotalPages(selectedLayout))}
+              >
+                <span className="font-medium text-[14px] text-blue-700">+Add Blank Page</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2407,7 +3051,47 @@ export default function ProposalDetailsPage() {
             const pageNumber = index + 1
             return (
               <div key={pageNumber} className={`${getPageContainerClass(selectedSize, "Landscape")} ${index > 0 ? 'mt-[-65px]' : ''}`} style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}>
-                {pageNumber === 1 ? renderIntroPage(pageNumber) : renderSitePage(pageNumber)}
+                {pageNumber === 1 ? renderIntroPage(pageNumber) : pageNumber === getTotalPages(selectedLayout) ? renderOutroPage(pageNumber) : renderSitePage(pageNumber)}
+                {/* Add blank page button between pages */}
+                {isEditMode && pageNumber === 1 && (
+                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 z-20">
+                    <Button
+                      onClick={() => handleAddBlankPage(pageNumber)}
+                      size="sm"
+                      className="bg-blue-500 hover:bg-blue-600 text-white rounded-full w-8 h-8 p-0"
+                      title="Add blank page"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                {/* Edit/Delete blank page buttons */}
+                {isEditMode && getCustomPageForPageNumber(pageNumber) && (
+                  <div className="absolute top-2 right-2 z-30 flex gap-1">
+                    <Button
+                      onClick={() => {
+                        const page = getCustomPageForPageNumber(pageNumber)!
+                        setEditingCustomPage(page)
+                        setIsBlankPageEditorOpen(true)
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="bg-white hover:bg-gray-50 w-8 h-8 p-0"
+                      title="Edit blank page"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      onClick={() => handleDeleteBlankPage(getCustomPageForPageNumber(pageNumber)!.id)}
+                      size="sm"
+                      variant="outline"
+                      className="bg-white hover:bg-red-50 border-red-200 w-8 h-8 p-0"
+                      title="Delete blank page"
+                    >
+                      <X className="h-3 w-3 text-red-500" />
+                    </Button>
+                  </div>
+                )}
               </div>
             )
           })}
@@ -2418,7 +3102,7 @@ export default function ProposalDetailsPage() {
             <h3 className="text-lg font-semibold">
               Proposal History
               {proposal && (
-                <span className="text-sm font-normal text-gray-500 block">for {proposal.client.company}</span>
+                <span className="text-sm font-normal text-gray-500 block">for {proposal.client?.company}</span>
               )}
             </h3>
           </div>
@@ -2427,9 +3111,9 @@ export default function ProposalDetailsPage() {
               selectedClient={
                 proposal
                   ? {
-                      id: proposal.client.id || "",
-                      company: proposal.client.company,
-                      contactPerson: proposal.client.contactPerson,
+                      id: proposal.client?.id || "",
+                      company: proposal.client?.company,
+                      contactPerson: proposal.client?.contactPerson,
                     }
                   : null
               }
@@ -2725,7 +3409,7 @@ export default function ProposalDetailsPage() {
                               {product.specs_rental?.location || (product as any).light?.location || "Unknown location"}
                             </div>
                             <div className="text-xs text-black font-medium">
-                              ₱{product.price ? Number(product.price).toLocaleString() : "Not set"}
+                              ₱{product.price ? Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "Not set"}
                             </div>
                           </div>
                         </div>
@@ -2848,6 +3532,25 @@ export default function ProposalDetailsPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Blank Page Editor Dialog */}
+      <Dialog open={isBlankPageEditorOpen} onOpenChange={setIsBlankPageEditorOpen}>
+        <DialogContent className="w-full max-w-7xl mx-auto border-0 shadow-lg h-[90vh] sm:h-[95vh]">
+          <DialogTitle className="sr-only">Blank Page Editor</DialogTitle>
+          {editingCustomPage && (
+            <BlankPageEditor
+              page={editingCustomPage}
+              onSave={handleSaveBlankPage}
+              onCancel={() => {
+                setIsBlankPageEditorOpen(false)
+                setEditingCustomPage(null)
+              }}
+              pageWidth={getPageDimensions(selectedSize, selectedOrientation).width}
+              pageHeight={getPageDimensions(selectedSize, selectedOrientation).height}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

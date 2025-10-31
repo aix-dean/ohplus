@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 /.kilocode
+/.kilocodemodes
 # next.js
 /.next/
 /out/
@@ -26,11 +27,18 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# testing
+coverage/
+.vitest/
+test-blank-page-feature.test.js
+lib/proposal-service.test.ts
+lib/types/proposal.test.ts
+app/sales/proposals/__tests__/proposal-details-page.test.tsx
+
 #mcp server
 mcp.json
 
-# test files
-app/**/*.test.ts
-
 #DS files
 .DS_Store
+mcp.json
+
