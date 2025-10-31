@@ -210,7 +210,7 @@ export default function ProjectMonitoringPage() {
 
   return (
     <BulletinBoardContent
-      title="Project Bulletin"
+      title="Bulletin Board"
       showTitle={true}
       showSearch={true}
       containerClassName="bg-neutral-50 min-h-screen px-4 py-6"
