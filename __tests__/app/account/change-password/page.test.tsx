@@ -1,3 +1,4 @@
+import React from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -26,6 +27,13 @@ vi.mock('firebase/auth', () => ({
   EmailAuthProvider: {
     credential: vi.fn(),
   },
+}))
+
+// Mock lucide-react icons
+vi.mock('lucide-react', () => ({
+  Eye: () => <div data-testid="eye-icon" />,
+  EyeOff: () => <div data-testid="eye-off-icon" />,
+  Loader2: () => <div data-testid="loader-icon" />,
 }))
 
 vi.mock('@/lib/firebase', () => ({
@@ -71,7 +79,7 @@ describe('ChangePasswordPage', () => {
       render(<ChangePasswordPage />)
 
       // The component shows a Loader2 component (SVG), not text
-      expect(screen.getByTestId('loader')).toBeInTheDocument()
+      expect(screen.getByTestId('loader-icon')).toBeInTheDocument()
     })
 
     it('renders the change password form when user is authenticated', () => {

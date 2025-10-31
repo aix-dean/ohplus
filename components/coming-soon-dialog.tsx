@@ -1,37 +1,60 @@
 "use client"
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Clock, Sparkles } from "lucide-react"
 
-interface ComingSoonDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  feature: string
+interface ComingSoonModalProps {
+  onClose?: () => void
+  onNotify?: () => void
 }
 
-export function ComingSoonDialog({ isOpen, onClose, feature }: ComingSoonDialogProps) {
+export function ComingSoonModal({ onClose, onNotify }: ComingSoonModalProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
-            <div className="relative">
-              <Clock className="h-8 w-8 text-blue-600" />
-              <Sparkles className="absolute -top-1 -right-1 h-4 w-4 text-yellow-500 animate-pulse" />
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="relative w-[346px] h-[196px] flex-shrink-0 rounded-2xl bg-white p-8 shadow-xl">
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4 text-[#333] font-inter text-[16px] font-normal leading-[16px]" />
+        </button>
+
+        {/* Content */}
+        <div className="flex gap-6">
+          {/* Illustration */}
+          <div className="flex-shrink-0">
+            <img
+              src="/coming-soon-oscar.png"
+              alt="Coming soon illustration"
+              className="h-24 w-24 object-contain"
+            />
           </div>
-          <DialogTitle className="text-xl font-semibold text-gray-900">Coming Soon!</DialogTitle>
-          <DialogDescription className="text-gray-600 mt-2">
-            {feature} is coming soon. We're working hard to bring you this feature. Stay tuned for updates!
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex justify-center mt-6">
-          <Button onClick={onClose} className="bg-blue-600 hover:bg-blue-700 text-white px-6">
-            Got it
+
+          {/* Text content */}
+          <div className="flex flex-col justify-center">
+            <h2 className="mb-2 text-[#333] font-inter text-[16px] font-bold leading-none">Coming soon!</h2>
+            <p className="text-[#333] font-inter text-[12px] font-light leading-none">
+              We are working hard to make this feature available to you as soon as possible!
+            </p>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div className="mt-8 flex gap-3">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="flex-1 w-[149.172px] h-[23px] flex-shrink-0 text-[#333] text-center font-inter text-xs font-bold leading-[12px]"
+          >
+            OK
+          </Button>
+          <Button onClick={onNotify} className="flex-1 w-[149.172px] h-[23px] flex-shrink-0 rounded-[6.024px] bg-[#1D0BEB] text-white text-center font-inter text-xs font-bold leading-[12px] hover:bg-[#1D0BEB]">
+            Notify me for updates
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   )
 }
