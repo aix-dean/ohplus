@@ -306,7 +306,7 @@ describe('CostEstimatePage', () => {
         email: 'company@test.com',
       }),
     } as any)
-    getDocs.mockResolvedValue({
+    vi.mocked(getDocs).mockResolvedValue({
       empty: false,
       docs: [{
         id: 'company-1',
@@ -316,7 +316,8 @@ describe('CostEstimatePage', () => {
           address: { street: '123 Test St', city: 'Test City' },
           phone: '+1234567890',
           email: 'company@test.com',
-        })
+        }),
+        exists: () => true,
       }]
     } as any)
   })
