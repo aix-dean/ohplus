@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, MapPin, Calendar, Trash2, Upload, X, Loader2 } from "lucide-react"
 import Image from "next/image"
@@ -20,6 +20,7 @@ import { softDeleteProduct } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
+import SiteInformation from "@/components/SiteInformation"
 // Price validation functions
 const validatePriceInput = (value: string): boolean => {
   // Allow empty string, numbers, and decimal point
@@ -29,9 +30,9 @@ const validatePriceInput = (value: string): boolean => {
 
 const formatPriceOnBlur = (value: string): string => {
   if (!value || value === '') return '0';
-  const num = parseFloat(value);
+  const num = parseFloat(value.replace(/,/g, ''));
   if (isNaN(num)) return '0';
-  return num.toFixed(2);
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>, setPrice: (value: string) => void) => {
@@ -47,8 +48,16 @@ const handlePriceBlur = (e: React.FocusEvent<HTMLInputElement>, setPrice: (value
   setPrice(formatted);
 };
 
+const handleFormattedNumberInput = (e: React.ChangeEvent<HTMLInputElement>, setValue: (value: string) => void) => {
+  let value = e.target.value.replace(/,/g, '');
+  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+    setValue(value === '' ? '' : Number(value).toLocaleString());
+  }
+};
+
 export default function BusinessProductDetailPage() {
   const params = useParams()
+  const resolvedParams = use(params)
   const router = useRouter()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -82,14 +91,22 @@ export default function BusinessProductDetailPage() {
    const [landOwner, setLandOwner] = useState("")
    const [partner, setPartner] = useState("")
    const [orientation, setOrientation] = useState("")
+   const [locationVisibility, setLocationVisibility] = useState("")
+   const [locationVisibilityUnit, setLocationVisibilityUnit] = useState<string>("ft")
+   // SiteInformation component states
+   const [activeImageIndex, setActiveImageIndex] = useState(0)
+   const [imageViewerOpen, setImageViewerOpen] = useState(false)
+   const [companyName, setCompanyName] = useState("")
+   const [companyLoading, setCompanyLoading] = useState(false)
+   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
   useEffect(() => {
     async function fetchProduct() {
-      if (!params.id) return
+      if (!resolvedParams.id) return
 
       setLoading(true)
       try {
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(resolvedParams.id) ? resolvedParams.id[0] : resolvedParams.id
 
         const productDoc = await getDoc(doc(db, "products", productId))
 
@@ -112,6 +129,9 @@ export default function BusinessProductDetailPage() {
   useEffect(() => {
     setPriceUnit(siteType === "static" ? "per month" : "per spot")
   }, [siteType])
+  const handleCalendarOpen = () => {
+    setIsCalendarOpen(true)
+  }
 
   const handleBack = () => {
     router.back()
@@ -201,10 +221,50 @@ export default function BusinessProductDetailPage() {
 
     if (!price.trim()) {
       errors.push("Price")
-    } else if (isNaN(Number(price))) {
+    } else if (isNaN(Number(price.replace(/,/g, '')))) {
       toast({
         title: "Validation Error",
         description: "Price must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (locationVisibility.trim() && isNaN(Number(locationVisibility.replace(/,/g, '')))) {
+      toast({
+        title: "Validation Error",
+        description: "Location Visibility must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (height.trim() && isNaN(Number(height.replace(/,/g, '')))) {
+      toast({
+        title: "Validation Error",
+        description: "Height must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (width.trim() && isNaN(Number(width.replace(/,/g, '')))) {
+      toast({
+        title: "Validation Error",
+        description: "Width must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (elevation.trim() && isNaN(Number(elevation.replace(/,/g, '')))) {
+      toast({
+        title: "Validation Error",
+        description: "Elevation must be a valid number.",
         variant: "destructive",
       })
       setIsSubmitting(false)
@@ -248,7 +308,7 @@ export default function BusinessProductDetailPage() {
       const updateData = {
         name: siteName,
         description,
-        price: parseFloat(price) || 0,
+        price: parseFloat(price.replace(/,/g, '')) || 0,
         content_type: siteType,
         categories: [category],
         specs_rental: {
@@ -259,10 +319,15 @@ export default function BusinessProductDetailPage() {
            ...(geopoint && { geopoint }),
           partner,
           orientation,
+          location_visibility: parseFloat(locationVisibility.replace(/,/g, '')) || null,
+          location_visibility_unit: locationVisibilityUnit,
           traffic_count: parseInt(dailyTraffic) || null,
-          height: parseFloat(height) || null,
-          width: parseFloat(width) || null,
-          elevation: parseFloat(elevation) || null,
+          traffic_unit: trafficUnit,
+          height: parseFloat(height.replace(/,/g, '')) || null,
+          width: parseFloat(width.replace(/,/g, '')) || null,
+          elevation: parseFloat(elevation.replace(/,/g, '')) || null,
+          dimension_unit: dimensionUnit,
+          elevation_unit: elevationUnit,
           structure: product.specs_rental?.structure || {
             color: null,
             condition: null,
@@ -323,15 +388,15 @@ export default function BusinessProductDetailPage() {
        setGeopoint(product.specs_rental?.geopoint || null)
       setLocation(product.specs_rental?.location || "")
       setLocationLabel(product.specs_rental?.location_label || "")
-      setHeight(product.specs_rental?.height?.toString() || "")
-      setWidth(product.specs_rental?.width?.toString() || "")
-      setDimensionUnit("ft") // Default
-      setElevation(product.specs_rental?.elevation?.toString() || "")
-      setElevationUnit("ft") // Default
+      setHeight(product.specs_rental?.height ? Number(product.specs_rental.height).toLocaleString() : "")
+      setWidth(product.specs_rental?.width ? Number(product.specs_rental.width).toLocaleString() : "")
+      setDimensionUnit(product.specs_rental?.dimension_unit || "ft")
+      setElevation(product.specs_rental?.elevation ? Number(product.specs_rental.elevation).toLocaleString() : "")
+      setElevationUnit(product.specs_rental?.elevation_unit || "ft")
       setDescription(product.description || "")
       setSelectedAudience(product.specs_rental?.audience_types || [])
-      setDailyTraffic(product.specs_rental?.traffic_count?.toString() || "")
-      setTrafficUnit("monthly") // Default
+      setDailyTraffic(product.specs_rental?.traffic_count ? Number(product.specs_rental.traffic_count).toLocaleString() : "")
+      setTrafficUnit(product.specs_rental?.traffic_unit || "monthly")
       setPrice(product.price ? formatPriceOnBlur(String(product.price)) : "0")
       setPriceUnit(currentSiteType === "static" ? "per month" : "per spot")
       setUploadedFiles([])
@@ -340,6 +405,8 @@ export default function BusinessProductDetailPage() {
        setLandOwner(product.specs_rental?.land_owner || "")
        setPartner(product.specs_rental?.partner || "")
        setOrientation(product.specs_rental?.orientation || "")
+       setLocationVisibility(product.specs_rental?.location_visibility ? Number(product.specs_rental.location_visibility).toLocaleString() : "")
+       setLocationVisibilityUnit(product.specs_rental?.location_visibility_unit || "ft")
 
       setEditDialogOpen(true)
       setValidationErrors([])
@@ -356,7 +423,7 @@ export default function BusinessProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="overflow-auto p-6">
+      <div className="p-6">
         <div className="max-w-xs">
           <Skeleton className="h-8 w-32 mb-6" />
           <Skeleton className="h-[300px] w-full mb-6 rounded-lg" />
@@ -368,7 +435,7 @@ export default function BusinessProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="overflow-auto p-6">
+      <div className="p-6">
         <div className="max-w-xs text-center py-12">
           <h2 className="text-2xl font-bold mb-2">Product Not Found</h2>
           <p className="text-gray-500 mb-6">The product you're looking for doesn't exist or has been removed.</p>
@@ -382,7 +449,7 @@ export default function BusinessProductDetailPage() {
   }
 
   return (
-    <div className="overflow-auto p-6">
+    <div className="p-6">
       <div className="max-w-xs">
         <div className="space-y-4">
           <div className="flex flex-row items-center">
@@ -404,168 +471,15 @@ export default function BusinessProductDetailPage() {
             </h2>
           </div>
 
-          {/* Site Image and Map */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-            {/* Site Image - Left Side */}
-            <div className="relative aspect-square w-full">
-              <Image
-                src={product.media && product.media.length > 0 ? product.media[0].url : "/placeholder.svg"}
-                alt={product.name}
-                fill
-                className="object-cover rounded-md"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = "/abstract-geometric-sculpture.png"
-                }}
-              />
-            </div>
-
-            {/* Map Placeholder - Right Side */}
-            <div className="relative aspect-square w-full bg-gray-100 rounded-md overflow-hidden flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <MapPin className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">Map view</p>
-                <p className="text-xs mt-1">
-                  {product.type?.toLowerCase() === "rental"
-                    ? product.specs_rental?.location || "Unknown location"
-                    : product.light?.location || "Unknown location"}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Site Details */}
-          <div className="space-y-2">
-            <h3
-              style={{
-                fontFamily: 'Inter',
-                fontWeight: 700,
-                fontSize: '28px',
-                lineHeight: '120%',
-                letterSpacing: '0%',
-                color: '#000000'
-              }}
-            >
-              {product.name}
-            </h3>
-            <Button variant="outline" className="mt-2 w-full">
-              <Calendar className="mr-2 h-4 w-4" />
-              Site Calendar
-            </Button>
-
-            <div className="space-y-2 text-sm mt-4">
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 600,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#000000'
-                  }}
-                >
-                  Type:
-                </span>{" "}
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 400,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#333333'
-                  }}
-                >
-                  {product.content_type === "static" ? "Static" : "Dynamic"} - Billboard
-                </span>
-              </div>
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 600,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#000000'
-                  }}
-                >
-                  Dimension:
-                </span>{" "}
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 400,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#333333'
-                  }}
-                >
-                  {product.specs_rental?.height && product.specs_rental?.width
-                    ? `${product.specs_rental.height}ft x ${product.specs_rental.width}ft`
-                    : "Not specified"}
-                </span>
-              </div>
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 600,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#000000'
-                  }}
-                >
-                  Location:
-                </span>{" "}
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 400,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#333333'
-                  }}
-                >
-                  {product.type?.toLowerCase() === "rental"
-                    ? product.specs_rental?.location || "Unknown location"
-                    : product.light?.location || "Unknown location"}
-                </span>
-              </div>
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 600,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#000000'
-                  }}
-                >
-                  Geopoint:
-                </span>{" "}
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 400,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#333333'
-                  }}
-                >
-                  {product.specs_rental?.geopoint
-                    ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
-                    : "12.5346567742,14.09346723"}
-                </span>
-              </div>
-            </div>
-          </div>
+          <SiteInformation
+            product={product}
+            activeImageIndex={activeImageIndex}
+            setActiveImageIndex={setActiveImageIndex}
+            setImageViewerOpen={setImageViewerOpen}
+            handleCalendarOpen={handleCalendarOpen}
+            companyName={companyName}
+            companyLoading={companyLoading}
+          />
 
           {/* Action Buttons */}
           <div className="border-t pt-4 space-y-2">
@@ -710,6 +624,29 @@ export default function BusinessProductDetailPage() {
                 />
               </div>
 
+              {/* Location Visibility */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Location Visibility:</Label>
+                <div className="flex gap-3">
+                  <Input
+                    type="text"
+                    placeholder="e.g., 100"
+                    className="flex-1 border-[#c4c4c4]"
+                    value={locationVisibility}
+                    onChange={(e) => handleFormattedNumberInput(e, setLocationVisibility)}
+                  />
+                  <Select value={locationVisibilityUnit} onValueChange={(value: string) => setLocationVisibilityUnit(value)}>
+                    <SelectTrigger className="w-20 border-[#c4c4c4]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ft">ft</SelectItem>
+                      <SelectItem value="m">m</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {/* Land Owner */}
               <div>
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Land Owner:</Label>
@@ -750,20 +687,20 @@ export default function BusinessProductDetailPage() {
                   <div className="flex-1">
                     <Label className="text-[#4e4e4e] text-sm mb-1 block">Height:</Label>
                     <Input
-                      type="number"
+                      type="text"
                       className="border-[#c4c4c4]"
                       value={height}
-                      onChange={(e) => setHeight(e.target.value)}
+                      onChange={(e) => handleFormattedNumberInput(e, setHeight)}
                     />
                   </div>
                   <span className="text-[#4e4e4e]">x</span>
                   <div className="flex-1">
                     <Label className="text-[#4e4e4e] text-sm mb-1 block">Width:</Label>
                     <Input
-                      type="number"
+                      type="text"
                       className="border-[#c4c4c4]"
                       value={width}
-                      onChange={(e) => setWidth(e.target.value)}
+                      onChange={(e) => handleFormattedNumberInput(e, setWidth)}
                     />
                   </div>
                   <Select value={dimensionUnit} onValueChange={(value: "ft" | "m") => setDimensionUnit(value)}>
@@ -785,10 +722,10 @@ export default function BusinessProductDetailPage() {
                 </Label>
                 <div className="flex gap-3">
                   <Input
-                    type="number"
+                    type="text"
                     className="flex-1 border-[#c4c4c4]"
                     value={elevation}
-                    onChange={(e) => setElevation(e.target.value)}
+                    onChange={(e) => handleFormattedNumberInput(e, setElevation)}
                   />
                   <Select value={elevationUnit} onValueChange={(value: "ft" | "m") => setElevationUnit(value)}>
                     <SelectTrigger className="w-20 border-[#c4c4c4]">
@@ -844,10 +781,10 @@ export default function BusinessProductDetailPage() {
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Traffic:</Label>
                 <div className="flex gap-3">
                   <Input
-                    type="number"
+                    type="text"
                     className="flex-1 border-[#c4c4c4]"
                     value={dailyTraffic}
-                    onChange={(e) => setDailyTraffic(e.target.value)}
+                    onChange={(e) => handleFormattedNumberInput(e, setDailyTraffic)}
                   />
                   <Select value={trafficUnit} onValueChange={(value: "daily" | "weekly" | "monthly") => setTrafficUnit(value)}>
                     <SelectTrigger className="w-24 border-[#c4c4c4]">
@@ -1026,10 +963,10 @@ export default function BusinessProductDetailPage() {
                 </Label>
                 <div className="flex gap-3">
                   <Input
-                    type="number"
+                    type="text"
                     className="flex-1 border-[#c4c4c4]"
                     value={price}
-                    onChange={(e) => handlePriceChange(e, setPrice)}
+                    onChange={(e) => handleFormattedNumberInput(e, setPrice)}
                     onBlur={(e) => handlePriceBlur(e, setPrice)}
                   />
                   <Select value={priceUnit} disabled>

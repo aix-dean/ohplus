@@ -36,6 +36,7 @@ import {
 import { subscriptionService } from "@/lib/subscription-service"
 import { RouteProtection } from "@/components/route-protection"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
+import InventoryContent from "@/components/InventoryContent"
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 12
@@ -69,15 +70,22 @@ const validatePriceInput = (value: string): boolean => {
 
 const formatPriceOnBlur = (value: string): string => {
   if (!value || value === '') return '0';
-  const num = parseFloat(value);
+  const num = parseFloat(value.replace(/,/g, ''));
   if (isNaN(num)) return '0';
   return num.toFixed(2);
 };
 
 const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>, setPrice: (value: string) => void) => {
-  const value = e.target.value;
+  let value = e.target.value.replace(/,/g, '');
   if (validatePriceInput(value)) {
-    setPrice(value);
+    setPrice(value === '' ? '' : Number(value).toLocaleString());
+  }
+};
+
+const handleFormattedNumberInput = (e: React.ChangeEvent<HTMLInputElement>, setValue: (value: string) => void) => {
+  let value = e.target.value.replace(/,/g, '');
+  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+    setValue(value === '' ? '' : Number(value).toLocaleString());
   }
 };
 
@@ -152,6 +160,8 @@ export default function BusinessInventoryPage() {
    const [landOwner, setLandOwner] = useState("")
    const [partner, setPartner] = useState("")
    const [orientation, setOrientation] = useState("")
+   const [locationVisibility, setLocationVisibility] = useState("")
+   const [locationVisibilityUnit, setLocationVisibilityUnit] = useState<string>("ft")
 
   // Fetch total count of products
   const fetchTotalCount = useCallback(async () => {
@@ -194,6 +204,28 @@ export default function BusinessInventoryPage() {
     })
 
     return unsubscribe
+  }, [userData?.company_id])
+
+  // Refresh data when page becomes focused (user navigates back)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (userData?.company_id) {
+        // Force refresh by temporarily setting loading and re-triggering the listener
+        setLoading(true)
+        const unsubscribe = getUserProductsRealtime(userData.company_id, (products) => {
+          setAllProducts(products)
+          setLoading(false)
+        })
+
+        // Clean up the temporary listener after a short delay
+        setTimeout(() => {
+          unsubscribe()
+        }, 100)
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
   }, [userData?.company_id])
 
   // Load total count
@@ -587,6 +619,10 @@ export default function BusinessInventoryPage() {
     setLandOwner("")
     setPartner("")
     setOrientation("")
+    setLocationVisibility("")
+    setLocationVisibilityUnit("ft")
+    setLocationVisibilityUnit("ft")
+    setLocationVisibility("")
 
     setShowAddSiteDialog(true)
   }
@@ -761,7 +797,7 @@ export default function BusinessInventoryPage() {
 
     if (!price.trim()) {
       errors.push("Price")
-    } else if (isNaN(Number(price))) {
+    } else if (isNaN(Number(price.replace(/,/g, '')))) {
       toast({
         title: "Validation Error",
         description: "Price must be a valid number.",
@@ -771,7 +807,7 @@ export default function BusinessInventoryPage() {
       return
     }
 
-    if (height.trim() && isNaN(Number(height))) {
+    if (height.trim() && isNaN(Number(height.replace(/,/g, '')))) {
       toast({
         title: "Validation Error",
         description: "Height must be a valid number.",
@@ -781,10 +817,20 @@ export default function BusinessInventoryPage() {
       return
     }
 
-    if (width.trim() && isNaN(Number(width))) {
+    if (width.trim() && isNaN(Number(width.replace(/,/g, '')))) {
       toast({
         title: "Validation Error",
         description: "Width must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (locationVisibility.trim() && isNaN(Number(locationVisibility.replace(/,/g, '')))) {
+      toast({
+        title: "Validation Error",
+        description: "Location Visibility must be a valid number.",
         variant: "destructive",
       })
       setIsSubmitting(false)
@@ -824,7 +870,7 @@ export default function BusinessInventoryPage() {
       const productData: Partial<Product> = {
         name: siteName,
         description,
-        price: parseFloat(price) || 0,
+        price: parseFloat(price.replace(/,/g, '')) || 0,
         content_type: siteType,
         categories: [category],
         company_id: userData.company_id,
@@ -837,11 +883,15 @@ export default function BusinessInventoryPage() {
           land_owner: landOwner,
           partner,
           orientation,
+          location_visibility: parseFloat(locationVisibility.replace(/,/g, '')) || null,
+          location_visibility_unit: locationVisibilityUnit,
           ...(geopoint && { geopoint }),
-          traffic_count: parseInt(dailyTraffic) || null,
-          height: parseFloat(height) || null,
-          width: parseFloat(width) || null,
-          elevation: parseFloat(elevation) || null,
+          traffic_count: parseInt(dailyTraffic.replace(/,/g, '')) || null,
+          height: parseFloat(height.replace(/,/g, '')) || null,
+          width: parseFloat(width.replace(/,/g, '')) || null,
+          elevation: parseFloat(elevation.replace(/,/g, '')) || null,
+          dimension_unit: dimensionUnit,
+          elevation_unit: elevationUnit,
           structure: {
             color: null,
             condition: null,
@@ -920,284 +970,39 @@ export default function BusinessInventoryPage() {
 
   return (
     <RouteProtection requiredRoles="business">
-      <main className="flex-1 p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-[#333333] mb-4">Inventory</h1>
-
-          <div className="flex items-center justify-between mb-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] w-4 h-4" />
-              <Input
-                placeholder="Search products..."
-                className="pl-10 pr-10 w-80 bg-white border-[#d9d9d9]"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && !isSearching && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] hover:text-gray-700"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-              {isSearching && (
-                <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#a1a1a1] w-4 h-4 animate-spin" />
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setViewMode("list")} className={viewMode === "list" ? "bg-gray-100" : ""}>
-                <List className="w-4 h-4 text-[#a1a1a1]" />
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setViewMode("grid")} className={viewMode === "grid" ? "bg-gray-100" : ""}>
-                <Grid3X3 className="w-4 h-4 text-[#a1a1a1]" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Inventory Display - Grid or List View */}
-          {viewMode === "grid" ? (
-            /* Grid View */
-            <div ref={cardsRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {loading && allProducts.length === 0
-                ? Array.from({ length: 8 }).map((_, index) => (
-                    <Card key={`shimmer-${index}`} className="overflow-hidden border border-gray-200 shadow-md rounded-xl">
-                      <div className="h-48 bg-gray-200 animate-pulse" />
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          <div className="h-4 bg-gray-200 rounded animate-pulse" />
-                          <div className="h-4 bg-gray-200 rounded w-2/3 animate-pulse" />
-                          <div className="flex items-center space-x-2">
-                            <div className="h-3 w-3 bg-gray-200 rounded animate-pulse" />
-                            <div className="h-3 bg-gray-200 rounded w-3/4 animate-pulse" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                : displayedProducts.map((product, index) => (
-                    <Card
-                      key={product.id}
-                      ref={setCardRef(index)}
-                      className="bg-white border-[#d9d9d9] hover:shadow-md transition-shadow cursor-pointer"
-                      onClick={() => product.id && handleViewDetails(product.id)}
-                    >
-                      <div className="h-48 bg-gray-200 relative">
-                        <Image
-                          src={
-                            product.media && product.media.length > 0
-                              ? product.media[0].url
-                              : "/abstract-geometric-sculpture.png"
-                          }
-                          alt={product.name || "Product image"}
-                          fill
-                          className="object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement
-                            target.src = "/abstract-geometric-sculpture.png"
-                            target.className = "opacity-50"
-                          }}
-                        />
-                      </div>
-
-                      <CardContent className="p-4">
-                        <div className="flex flex-col">
-                          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
-                          <div className="mt-2 text-sm font-medium text-green-700">
-                            ₱{Number(product.price).toLocaleString()}
-                          </div>
-                          <div className="mt-1 text-xs text-gray-500 flex items-center">
-                            <MapPin size={12} className="mr-1 flex-shrink-0" />
-                            <span className="truncate">{product.specs_rental?.location || "Unknown location"}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-            </div>
-          ) : (
-            /* List View */
-            <div className="bg-white border border-[#d9d9d9] rounded-lg overflow-hidden">
-              {/* List Header */}
-              <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
-                <div className="grid grid-cols-10 gap-4 text-sm font-medium text-gray-700">
-                  <div className="col-span-4">Site Details</div>
-                  <div className="col-span-2">Type</div>
-                  <div className="col-span-2">Location</div>
-                  <div className="col-span-2">Price</div>
-                </div>
-              </div>
-
-              {/* List Items */}
-              <div className="divide-y divide-gray-200">
-                {loading && allProducts.length === 0
-                  ? Array.from({ length: 8 }).map((_, index) => (
-                      <div key={`shimmer-list-${index}`} className="px-6 py-4">
-                        <div className="grid grid-cols-10 gap-4 items-center">
-                          <div className="col-span-4 flex items-center space-x-3">
-                            <div className="w-12 h-12 bg-gray-200 rounded animate-pulse" />
-                            <div className="space-y-2">
-                              <div className="h-4 bg-gray-200 rounded w-32 animate-pulse" />
-                              <div className="h-3 bg-gray-200 rounded w-24 animate-pulse" />
-                            </div>
-                          </div>
-                          <div className="col-span-2">
-                            <div className="h-4 bg-gray-200 rounded w-16 animate-pulse" />
-                          </div>
-                          <div className="col-span-2">
-                            <div className="h-4 bg-gray-200 rounded w-20 animate-pulse" />
-                          </div>
-                          <div className="col-span-2">
-                            <div className="h-4 bg-gray-200 rounded w-16 animate-pulse" />
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  : displayedProducts.map((product, index) => (
-                      <AnimatedListItem key={product.id} delay={0.1} index={index}>
-                        <div
-                          className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                          onClick={() => product.id && handleViewDetails(product.id)}
-                        >
-                        <div className="grid grid-cols-10 gap-4 items-center">
-                          {/* Site Details */}
-                          <div className="col-span-4 flex items-center space-x-3">
-                            <div className="w-12 h-12 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-                              <Image
-                                src={
-                                  product.media && product.media.length > 0
-                                    ? product.media[0].url
-                                    : "/abstract-geometric-sculpture.png"
-                                }
-                                alt={product.name || "Product image"}
-                                width={48}
-                                height={48}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement
-                                  target.src = "/abstract-geometric-sculpture.png"
-                                  target.className = "opacity-50"
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <h3 className="font-medium text-gray-900 line-clamp-1">{product.name}</h3>
-                              <p className="text-sm text-gray-500 line-clamp-1">
-                                {product.description || "No description"}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Type */}
-                          <div className="col-span-2">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              {product.type === "static" ? "Static" : "Digital"}
-                            </span>
-                          </div>
-
-                          {/* Location */}
-                          <div className="col-span-2">
-                            <div className="flex items-center text-sm text-gray-600">
-                              <MapPin size={14} className="mr-1 flex-shrink-0" />
-                              <span className="truncate">{product.specs_rental?.location || "Unknown"}</span>
-                            </div>
-                          </div>
-
-                          {/* Price */}
-                          <div className="col-span-2">
-                            <span className="text-sm font-medium text-green-700">
-                              ₱{Number(product.price).toLocaleString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </AnimatedListItem>
-                    ))}
-              </div>
-            </div>
-          )}
-
-          {/* Show empty state message when no products and not loading */}
-          {!loading && allProducts.length === 0 && userData?.company_id && (
-            <div className="text-center py-12">
-              <div className="text-gray-500 text-lg mb-2">No sites found</div>
-              <div className="text-gray-400 text-sm">Click the "Add Site" button below to create your first site.</div>
-            </div>
-          )}
-
-          {/* Show company setup message when no company_id */}
-          {!loading && !userData?.company_id && (
-            <div className="text-center py-12">
-              <div className="text-gray-500 text-lg mb-2">Welcome to your inventory!</div>
-              <div className="text-gray-400 text-sm">
-                Click the "Add Site" button below to set up your company and create your first site.
-              </div>
-            </div>
-          )}
-
-          {/* Pagination Controls - Only show if there are products or multiple pages */}
-          {(displayedProducts.length > 0 || totalPages > 1) && (
-            <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
-              <div className="text-sm text-gray-500 flex items-center">
-                {loadingCount ? (
-                  <div className="flex items-center">
-                    <Loader2 size={14} className="animate-spin mr-2" />
-                    <span>Calculating pages...</span>
-                  </div>
-                ) : (
-                  <span>
-                    Page {currentPage} of {totalPages} ({filteredProducts.length} items)
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToPreviousPage}
-                  disabled={currentPage === 1}
-                  className="h-8 w-8 p-0 bg-transparent"
-                >
-                  <ChevronLeft size={16} />
-                </Button>
-
-                {/* Page numbers - Hide on mobile */}
-                <div className="hidden sm:flex items-center gap-1">
-                  {getPageNumbers().map((page, index) =>
-                    page === "..." ? (
-                      <span key={`ellipsis-${index}`} className="px-2">
-                        ...
-                      </span>
-                    ) : (
-                      <Button
-                        key={`page-${page}`}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => goToPage(page as number)}
-                        className="h-8 w-8 p-0"
-                      >
-                        {page}
-                      </Button>
-                    ),
-                  )}
-                </div>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={goToNextPage}
-                  disabled={currentPage >= totalPages}
-                  className="h-8 w-8 p-0"
-                >
-                  <ChevronRight size={16} />
-                </Button>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
+      <InventoryContent
+        title="Inventory"
+        allProducts={allProducts}
+        filteredProducts={filteredProducts}
+        displayedProducts={displayedProducts}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        isSearching={isSearching}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        loading={loading}
+        loadingCount={loadingCount}
+        totalItems={totalItems}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        goToPage={goToPage}
+        goToPreviousPage={goToPreviousPage}
+        goToNextPage={goToNextPage}
+        getPageNumbers={getPageNumbers}
+        handleViewDetails={handleViewDetails}
+        handleEditClick={handleEditClick}
+        handleDeleteClick={handleDeleteClick}
+        handleAddClick={handleAddSiteClick}
+        userData={userData}
+        cardsRef={cardsRef}
+        cardElementsRef={cardElementsRef}
+        setCardRef={setCardRef}
+        AnimatedListItem={AnimatedListItem}
+        emptyStateMessage="No sites found"
+        emptyStateDescription="Click the Add Site button below to create your first site."
+        addButtonText="Add Site"
+      />
       {/* Floating Action Button */}
       <Button
         className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[#4169e1] hover:bg-[#1d0beb] shadow-lg"
@@ -1367,6 +1172,29 @@ export default function BusinessInventoryPage() {
                 />
               </div>
 
+              {/* Location Visibility */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Location Visibility:</Label>
+                <div className="flex gap-3">
+                  <Input
+                    type="text"
+                    placeholder="e.g., 100"
+                    className="flex-1 border-[#c4c4c4]"
+                    value={locationVisibility}
+                    onChange={(e) => handleFormattedNumberInput(e, setLocationVisibility)}
+                  />
+                  <Select value={locationVisibilityUnit} onValueChange={(value: string) => setLocationVisibilityUnit(value)}>
+                    <SelectTrigger className="w-20 border-[#c4c4c4]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ft">ft</SelectItem>
+                      <SelectItem value="m">m</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
               {/* Land Owner */}
               <div>
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Land Owner:</Label>
@@ -1407,22 +1235,22 @@ export default function BusinessInventoryPage() {
                   <div className="flex-1">
                     <Label className="text-[#4e4e4e] text-sm mb-1 block">Height:</Label>
                     <Input
-                      type="number"
+                      type="text"
                       placeholder="e.g., 10"
                       className="border-[#c4c4c4]"
                       value={height}
-                      onChange={(e) => setHeight(e.target.value)}
+                      onChange={(e) => handleFormattedNumberInput(e, setHeight)}
                     />
                   </div>
                   <span className="text-[#4e4e4e]">x</span>
                   <div className="flex-1">
                     <Label className="text-[#4e4e4e] text-sm mb-1 block">Width:</Label>
                     <Input
-                      type="number"
+                      type="text"
                       placeholder="e.g., 20"
                       className="border-[#c4c4c4]"
                       value={width}
-                      onChange={(e) => setWidth(e.target.value)}
+                      onChange={(e) => handleFormattedNumberInput(e, setWidth)}
                     />
                   </div>
                   <Select value={dimensionUnit} onValueChange={(value: "ft" | "m") => setDimensionUnit(value)}>
@@ -1444,11 +1272,11 @@ export default function BusinessInventoryPage() {
                 </Label>
                 <div className="flex gap-3">
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="e.g., 5"
                     className="flex-1 border-[#c4c4c4]"
                     value={elevation}
-                    onChange={(e) => setElevation(e.target.value)}
+                    onChange={(e) => handleFormattedNumberInput(e, setElevation)}
                   />
                   <Select value={elevationUnit} onValueChange={(value: "ft" | "m") => setElevationUnit(value)}>
                     <SelectTrigger className="w-20 border-[#c4c4c4]">
@@ -1503,11 +1331,11 @@ export default function BusinessInventoryPage() {
               <div>
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Monthly Traffic Count:</Label>
                 <Input
-                  type="number"
+                  type="text"
                   placeholder="e.g., 50000"
                   className="border-[#c4c4c4]"
                   value={dailyTraffic}
-                  onChange={(e) => setDailyTraffic(e.target.value)}
+                  onChange={(e) => handleFormattedNumberInput(e, setDailyTraffic)}
                 />
               </div>
 
@@ -1620,7 +1448,7 @@ export default function BusinessInventoryPage() {
                 </Label>
                 <div className="flex gap-3">
                   <Input
-                    type="number"
+                    type="text"
                     placeholder="e.g., 15000"
                     className="flex-1 border-[#c4c4c4]"
                     value={price}

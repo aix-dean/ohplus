@@ -41,6 +41,8 @@ import { useAuth } from "@/contexts/auth-context"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
 import { SpotsGrid } from "@/components/spots-grid"
+import { GoogleMap } from "@/components/GoogleMap"
+import SiteInformation from "@/components/SiteInformation"
 import { SpotSelectionDialog } from "@/components/spot-selection-dialog"
 
 const CalendarView: React.FC<{ bookedDates: Date[] }> = ({ bookedDates }) => {
@@ -398,10 +400,15 @@ function CustomNotification({
     </div>
   )
 }
-export default function ProductDetailPage({ params }: { params: { id: string } }) {
-  const router = useRouter()
-  const { userData } = useAuth()
-  const { toast } = useToast()
+export default function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+   const router = useRouter()
+   const { userData } = useAuth()
+   const { toast } = useToast()
+
+   // Diagnostic log for params
+   console.log('🔍 DEBUG: params type:', typeof params, 'params value:', params)
+   const paramsData = React.use(params)
+   const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
 
   // Helper functions for spots data
   const generateSpotsData = (cms: any, currentDayBookings: Booking[], reportsData: { [bookingId: string]: ReportData | null }) => {
@@ -570,11 +577,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
   useEffect(() => {
     async function fetchProduct() {
-      if (!params.id) return
+      if (!paramsData.id) return
 
       setLoading(true)
       try {
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
 
         if (productId === "new") {
           router.push("/sales/product/upload")
@@ -599,19 +606,19 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchProduct()
-  }, [params.id, router])
+  }, [paramsData.id, router])
 
   // Fetch quotation requests for this product
   useEffect(() => {
     const fetchQuotationRequests = async () => {
-      if (!params.id || params.id === "new") {
+      if (!paramsData.id || paramsData.id === "new") {
         setQuotationRequestsLoading(false)
         return
       }
 
       setQuotationRequestsLoading(true)
       try {
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
         const requests = await getQuotationRequestsByProductId(productId)
         setQuotationRequests(requests)
       } catch (error) {
@@ -622,16 +629,16 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchQuotationRequests()
-  }, [params.id])
+  }, [paramsData.id])
 
   // Fetch bookings for this product
   useEffect(() => {
     const fetchBookings = async () => {
-      if (!params.id || activeTab !== "booking-summary") return
+      if (!paramsData.id || activeTab !== "booking-summary") return
 
       setBookingsLoading(true)
       try {
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
         const bookingsQuery = query(
           collection(db, "booking"),
           where("product_id", "==", productId),
@@ -659,11 +666,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchBookings()
-  }, [params.id, bookingsPage, activeTab])
+  }, [paramsData.id, bookingsPage, activeTab])
 
   useEffect(() => {
     const fetchCostEstimates = async () => {
-      if (!params.id || params.id === "new" || !product || activeTab !== "ce") {
+      if (!paramsData.id || paramsData.id === "new" || !product || activeTab !== "ce") {
         setCostEstimatesLoading(false)
         return
       }
@@ -671,7 +678,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       setCostEstimatesLoading(true)
       try {
         const allCostEstimates = await getAllCostEstimates()
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
         const productName = product?.name || ""
         const productLocation =
           product?.type?.toLowerCase() === "rental"
@@ -700,11 +707,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchCostEstimates()
-  }, [params.id, product, costEstimatesPage, activeTab])
+  }, [paramsData.id, product, costEstimatesPage, activeTab])
 
   useEffect(() => {
     const fetchQuotations = async () => {
-      if (!params.id || params.id === "new" || !product || activeTab !== "quote") {
+      if (!paramsData.id || paramsData.id === "new" || !product || activeTab !== "quote") {
         setQuotationsLoading(false)
         return
       }
@@ -714,7 +721,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         const allQuotations = await getAllQuotations()
 
         // Filter quotations that have products referencing this product
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
         const productName = product?.name || ""
         const productLocation =
           product?.type?.toLowerCase() === "rental"
@@ -740,11 +747,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchQuotations()
-  }, [params.id, product, quotationsPage, activeTab])
+  }, [paramsData.id, product, quotationsPage, activeTab])
 
   useEffect(() => {
     const fetchJobOrders = async () => {
-      if (!params.id || params.id === "new" || !product || activeTab !== "job-order") {
+      if (!paramsData.id || paramsData.id === "new" || !product || activeTab !== "job-order") {
         setJobOrdersLoading(false)
         return
       }
@@ -754,7 +761,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         const allJobOrders = await getAllJobOrders()
 
         // Filter job orders that reference this product by site info
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
         const productName = product?.name || ""
         const productLocation =
           product?.type?.toLowerCase() === "rental"
@@ -780,7 +787,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchJobOrders()
-  }, [params.id, product, jobOrdersPage, activeTab])
+  }, [paramsData.id, product, jobOrdersPage, activeTab])
 
   // Reset pages when switching tabs
   useEffect(() => {
@@ -803,14 +810,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
   useEffect(() => {
     const fetchReports = async () => {
-      if (!params.id || params.id === "new" || activeTab !== "reports") {
+      if (!paramsData.id || paramsData.id === "new" || activeTab !== "reports") {
         setReportsLoading(false)
         return
       }
 
       setReportsLoading(true)
       try {
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
         const { reports: reportsData, total } = await getReportsByProductId(productId, reportsPage, itemsPerPage)
         setReports(reportsData)
         setReportsTotal(total)
@@ -822,15 +829,15 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchReports()
-  }, [params.id, reportsPage, activeTab])
+  }, [paramsData.id, reportsPage, activeTab])
 
   // Fetch screen schedules for spots content status
   useEffect(() => {
     const fetchScreenSchedules = async () => {
-      if (!params.id || params.id === "new") return
+      if (!paramsData.id || paramsData.id === "new") return
 
       try {
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
         const q = query(
           collection(db, "screen_schedule"),
           where("product_id", "==", productId),
@@ -848,16 +855,16 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
     }
 
     fetchScreenSchedules()
-  }, [params.id])
+  }, [paramsData.id])
 
   // Fetch current day's bookings for occupied/vacant calculation
   useEffect(() => {
     const fetchCurrentDayBookings = async () => {
-      if (!params.id || params.id === "new") return
+      if (!paramsData.id || paramsData.id === "new") return
 
       setCurrentDayBookingsLoading(true)
       try {
-        const productId = Array.isArray(params.id) ? params.id[0] : params.id
+        const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
         const today = new Date()
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
         const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
@@ -1272,11 +1279,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   }
 
   const fetchBookedDates = async () => {
-    if (!params.id) return
+    if (!paramsData.id) return
 
     setCalendarLoading(true)
     try {
-      const productId = Array.isArray(params.id) ? params.id[0] : params.id
+      const productId = Array.isArray(paramsData.id) ? paramsData.id[0] : paramsData.id
       const bookingsRef = collection(db, "booking")
       const q = query(bookingsRef, where("product_id", "==", productId))
       const querySnapshot = await getDocs(q)
@@ -1486,158 +1493,15 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       )}
 
       <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Sidebar - Site Information */}
-        <aside className="lg:col-span-1">
-          <Card className="bg-transparent border-none shadow-none">
-            <CardContent className="p-0">
-              {/* Site Image and Map */}
-              <div className="flex">
-                {/* Site Image */}
-                <div className="relative flex-1 aspect-square overflow-hidden">
-                  {product?.media && product.media.length > 0 ? (
-                    <>
-                      <Image
-                        src={product.media[activeImageIndex]?.url || "/placeholder.svg"}
-                        alt={product.name || "Site image"}
-                        fill
-                        className="object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/building-billboard.png"
-                          target.className = "object-cover opacity-50"
-                        }}
-                      />
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="absolute top-2 right-2 h-8 w-8 bg-white/80 backdrop-blur-sm border border-gray-200 shadow-md rounded-full"
-                        onClick={() => {
-                          setActiveImageIndex(0)
-                          setImageViewerOpen(true)
-                        }}
-                        aria-label="View image gallery"
-                      >
-                        <Maximize className="h-4 w-4" />
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="w-full h-full bg-gray-100 flex items-center text-center break-all min-w-0">
-                      <Image
-                        src="/building-billboard.png"
-                        alt="Site placeholder"
-                        fill
-                        className="object-cover opacity-50"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Map View */}
-                {(product?.type?.toLowerCase() === "rental" ? product.specs_rental?.location : product.light?.location) && (
-                  <div className="flex-1 aspect-square overflow-hidden">
-                    <GoogleMap
-                      location={product?.type?.toLowerCase() === "rental" ? product.specs_rental.location : product.light.location}
-                      className="w-full h-full"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Site Calendar Button */}
-              <div className="mt-2">
-                <Button
-                  variant="outline"
-                  className="w-full border-solid border-[#C4C4C4]"
-                  onClick={handleCalendarOpen}
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Site Calendar
-                </Button>
-              </div>
-
-
-
-              {/* Site Details */}
-              <div className="p-4 space-y-3">
-                {/* Site Name */}
-                <div>
-                  <div className="text-sm text-gray-900 mb-1">Site</div>
-                  <div className="text-base font-bold text-gray-900">
-                    {product?.name || "Not Set Site"}
-                  </div>
-                </div>
-                {/* Location */}
-                <div>
-                  <div className="text-sm text-gray-900 mb-1">Location</div>
-                  <div className="text-base font-bold text-gray-800">
-                    {product?.type?.toLowerCase() === "rental"
-                      ? product.specs_rental?.location || "Not Set"
-                      : product.light?.location || "Not Set"}
-                  </div>
-                </div>
-                {/* Geopoint */}
-                <div>
-                  <div className="text-sm text-gray-900 mb-1">Geopoint</div>
-                  <div className="text-base font-bold text-gray-800">
-                    {product?.specs_rental?.geopoint ? `${product.specs_rental.geopoint[0]}, ${product.specs_rental.geopoint[1]}` : "Not Set"}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-gray-900">Type</div>
-                    <div className="text-base font-bold text-gray-800">
-                      {Array.isArray(product?.categories) ? (product.categories.length > 0 ? product.categories.join(', ') : "Not Set") : (product?.categories ? product.categories : "Not Set")}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-900">Orientation</div>
-                    <div className="text-base font-bold text-gray-800">{product?.specs_rental?.land_owner || "Not specified"}</div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <div className="text-sm text-gray-900">Dimension</div>
-                    <div className="text-base font-bold text-gray-800">
-                      {product?.specs_rental?.height ? `${product.specs_rental.height} (H) x ${product.specs_rental.width || 'N/A'} (W)` : "Not specified"}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-gray-900">Elevation</div>
-                    <div className="text-base font-bold text-gray-800">
-                      {product?.specs_rental?.elevation || "Not specified"}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-900">Average Daily Traffic</div>
-                  <div className="text-base font-bold text-gray-800">
-                    {product?.specs_rental?.traffic_count || "Not specified"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-900">Site Orientation</div>
-                  <div className="text-base font-bold text-gray-800">{product?.specs_rental?.orientation || "Not specified"}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-900">Site Owner</div>
-                  <div className="text-base font-bold text-gray-800">
-                    {companyLoading ? "Loading..." : companyName || "Not Set"}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-900">Land Owner</div>
-                  <div className="text-base font-bold text-gray-800">{product?.specs_rental?.land_owner || "Not specified"}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-900">Partner</div>
-                  <div className="text-base font-bold text-gray-800">{product?.specs_rental?.partner || "Not specified"}</div>
-                </div>
-              </div>
-
-
-            </CardContent>
-          </Card>
-        </aside>
+        <SiteInformation
+          product={product}
+          activeImageIndex={activeImageIndex}
+          setActiveImageIndex={setActiveImageIndex}
+          setImageViewerOpen={setImageViewerOpen}
+          handleCalendarOpen={handleCalendarOpen}
+          companyLoading={companyLoading}
+          companyName={companyName}
+        />
 
                 {/* Right Content - Tabbed Interface */}
         <section className="lg:col-span-2">
@@ -1649,7 +1513,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 totalSpots={product.cms.loops_per_day || 18}
                 occupiedCount={calculateOccupiedSpots(product.cms)}
                 vacantCount={calculateVacantSpots(product.cms)}
-                productId={params.id}
+                productId={paramsData.id}
                 currentDate={currentDate}
                 router={router}
               />
@@ -1771,10 +1635,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+                
+              
 
+                 </Card>
+            </TabsContent>
             {/* CE Tab */}
             <TabsContent value="ce" className="mt-0">
               <Card className="rounded-xl shadow-sm border-none px-4">
@@ -1868,10 +1733,11 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       )}
                     </>
                   )}
-                </CardContent>
+                
+              
+
               </Card>
             </TabsContent>
-
             {/* Quote Tab */}
             <TabsContent value="quote" className="space-y-4">
               <div className="bg-white rounded-lg pb-4 px-4 overflow-x-auto">
