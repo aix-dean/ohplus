@@ -158,6 +158,20 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
   )
 }
 
+const formatLocationVisibility = (value: string | undefined): string => {
+  if (!value) return ''
+  const match = value.match(/^([\d,]+)(\s+.*)?$/)
+  if (match) {
+    const numStr = match[1].replace(/,/g, '')
+    const num = parseInt(numStr)
+    if (!isNaN(num)) {
+      const unit = match[2] || ''
+      return num.toLocaleString() + unit
+    }
+  }
+  return value
+}
+
 const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; onColorExtracted?: (color: string) => void; hasShadow?: boolean; onLogoChange?: (logoUrl: string) => void }> = ({ className, proposal, onColorExtracted, hasShadow = true, onLogoChange }) => {
   const { userData } = useAuth()
   const { toast } = useToast()
@@ -615,7 +629,7 @@ export default function ProposalDetailsPage() {
               dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
-              location_visibility: product.specs_rental?.location_visibility ? product.specs_rental.location_visibility.toLocaleString() : '',
+              location_visibility: product.specs_rental?.location_visibility ? `${product.specs_rental.location_visibility.toLocaleString()} ${product.specs_rental.location_visibility_unit || 'm'}`.trim() : '',
               srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A',
               additionalMessage: product.additionalMessage || '',
               additionalSpecs: (product as any).additionalSpecs || []
@@ -1138,11 +1152,26 @@ export default function ProposalDetailsPage() {
               updatedProduct.specs_rental = { ...updatedProduct.specs_rental, traffic_count: traffic }
             }
           }
-          if (editable.location_visibility) {
-            const visibilityStr = editable.location_visibility.replace(/[^\d]/g, '')
-            const visibility = parseInt(visibilityStr)
-            if (!isNaN(visibility) && updatedProduct.specs_rental) {
-              updatedProduct.specs_rental = { ...updatedProduct.specs_rental, location_visibility: visibility }
+          if ('location_visibility' in editable) {
+            const match = editable.location_visibility.match(/^([\d,]+)\s*(.*)$/)
+            if (match) {
+              const visibility = parseInt(match[1].replace(/,/g, ''))
+              const unit = match[2] || 'm'
+              if (!isNaN(visibility)) {
+                if (!updatedProduct.specs_rental) {
+                  updatedProduct.specs_rental = {}
+                }
+                updatedProduct.specs_rental.location_visibility = visibility
+                updatedProduct.specs_rental.location_visibility_unit = unit
+              } else if (updatedProduct.specs_rental && 'location_visibility' in updatedProduct.specs_rental) {
+                // Remove the field if it's invalid and existed
+                const { location_visibility, location_visibility_unit, ...rest } = updatedProduct.specs_rental
+                updatedProduct.specs_rental = rest
+              }
+            } else if (updatedProduct.specs_rental && 'location_visibility' in updatedProduct.specs_rental) {
+              // Remove the field if it's invalid and existed
+              const { location_visibility, location_visibility_unit, ...rest } = updatedProduct.specs_rental
+              updatedProduct.specs_rental = rest
             }
           }
           if (editable.dimension) {
@@ -2551,11 +2580,9 @@ export default function ProposalDetailsPage() {
                 <div className="flex-1">
                   {isEditMode ? (
                     <input
-                      value={editableProducts[product.id]?.location_visibility || ''}
+                      value={formatLocationVisibility(editableProducts[product.id]?.location_visibility)}
                       onChange={(e) => {
-                        const value = e.target.value.replace(/[^\d]/g, '') // Only allow digits
-                        const formatted = value ? parseInt(value).toLocaleString() : ''
-                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location_visibility: formatted } }))
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location_visibility: e.target.value } }))
                       }}
                       className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                     />
