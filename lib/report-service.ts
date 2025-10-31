@@ -24,6 +24,7 @@ export interface ReportData {
     location: string
     media_url: string
   }
+  siteName?: string
   companyId: string
   sellerId: string
   client: any
@@ -211,68 +212,13 @@ export async function getReports(options: {
   limit?: number
   companyId?: string
   status?: string
-  reportType?: string
-  searchQuery?: string
   lastDoc?: any
 }): Promise<{ reports: ReportData[], hasNextPage: boolean, lastDoc: any }> {
   try {
     console.log("getReports called with options:", options)
-    const { page = 1, limit: pageLimit = 10, companyId, status, reportType, searchQuery, lastDoc } = options
+    const { page = 1, limit: pageLimit = 10, companyId, status, lastDoc } = options
 
-    // For search queries, we need to fetch all and filter client-side
-    if (searchQuery && searchQuery.trim()) {
-      console.log(`Fetching all reports for search: "${searchQuery}"`)
-      let q = query(collection(db, "reports"), orderBy("created", "desc"))
-
-      if (companyId) {
-        q = query(q, where("companyId", "==", companyId))
-      }
-
-      const querySnapshot = await getDocs(q)
-      let allReports = querySnapshot.docs.map((doc) => {
-        const data = doc.data()
-        return {
-          id: doc.id,
-          ...data,
-          attachments: Array.isArray(data.attachments) ? data.attachments : [],
-        }
-      }) as ReportData[]
-
-      // Apply search filtering
-      const searchTerm = searchQuery.trim().toLowerCase()
-      allReports = allReports.filter(report =>
-        report.siteName?.toLowerCase().includes(searchTerm) ||
-        report.reportType?.toLowerCase().includes(searchTerm) ||
-        report.createdByName?.toLowerCase().includes(searchTerm) ||
-        report.id?.toLowerCase().includes(searchTerm) ||
-        report.report_id?.toLowerCase().includes(searchTerm) ||
-        report.client?.toLowerCase().includes(searchTerm)
-      )
-
-      // Apply status filtering
-      if (status && status !== "all") {
-        if (status === "published") {
-          allReports = allReports.filter(report => report.status !== "draft")
-        } else {
-          allReports = allReports.filter(report => report.status === status)
-        }
-      }
-
-      // Apply report type filtering
-      if (reportType && reportType !== "All") {
-        allReports = allReports.filter(report => report.reportType === reportType)
-      }
-
-      // Apply pagination
-      const offset = (page - 1) * pageLimit
-      const reports = allReports.slice(offset, offset + pageLimit)
-      const hasNextPage = allReports.length > offset + pageLimit
-
-      console.log(`Search results: ${allReports.length} total, ${reports.length} on page ${page}`)
-      return { reports, hasNextPage, lastDoc: null }
-    }
-
-    // For non-search: use server-side pagination
+    // Use server-side pagination for all queries (search is handled by Algolia)
     let q = query(collection(db, "reports"), orderBy("created", "desc"), limit(pageLimit + 1))
 
     if (companyId) {
@@ -286,11 +232,6 @@ export async function getReports(options: {
       } else {
         q = query(q, where("status", "==", status))
       }
-    }
-
-    // Apply report type filtering server-side
-    if (reportType && reportType !== "All") {
-      q = query(q, where("reportType", "==", reportType))
     }
 
     // Handle pagination cursor
