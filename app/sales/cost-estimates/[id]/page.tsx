@@ -232,6 +232,24 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [generatingPDFsForSend, setGeneratingPDFsForSend] = useState(false)
+  const [unitPriceInput, setUnitPriceInput] = useState("")
+
+  const formatNumberWithCommas = (num: number) => {
+    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  const formatNumberWithCommasForInput = (value: string) => {
+    // Split into integer and decimal parts
+    const parts = value.split('.')
+    const integerPart = parts[0]
+    const decimalPart = parts[1] || ''
+
+    // Format integer part with commas
+    const formattedInteger = parseInt(integerPart).toLocaleString('en-US')
+
+    // Return formatted integer with decimal part if it exists
+    return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger
+  }
 
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
 
@@ -307,6 +325,9 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         startDate: startDate,
         endDate: endDate
       })
+    } else if (fieldName === "unitPrice") {
+      setUnitPriceInput(formatNumberWithCommas(currentValue))
+      setTempValues({ ...tempValues, [fieldName]: currentValue })
     } else {
       setTempValues({ ...tempValues, [fieldName]: currentValue })
     }
@@ -559,45 +580,60 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
       // Generate new PDF after saving the cost estimate data
       console.log("[v0] Generating new PDF after saving changes")
 
-      // Prepare logo data URL if company logo exists
-      let logoDataUrl: string | null = null
-      if (companyData?.logo) {
-        try {
-          const logoResponse = await fetch(companyData.logo)
-          if (logoResponse.ok) {
-            const logoBlob = await logoResponse.blob()
-            logoDataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result as string)
-              reader.readAsDataURL(logoBlob)
-            })
+      try {
+        // Prepare logo data URL if company logo exists
+        let logoDataUrl: string | null = null
+        if (companyData?.logo) {
+          try {
+            const logoResponse = await fetch(companyData.logo)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              logoDataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.readAsDataURL(logoBlob)
+              })
+            }
+          } catch (error) {
+            console.error('Error fetching company logo:', error)
+            // Continue without logo if fetch fails
           }
-        } catch (error) {
-          console.error('Error fetching company logo:', error)
-          // Continue without logo if fetch fails
         }
+
+        const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, userData ? {
+          first_name: userData.first_name || undefined,
+          last_name: userData.last_name || undefined,
+          email: userData.email || undefined,
+          company_id: userData.company_id || undefined,
+        } : undefined, companyData ? {
+          name: companyData.name || "Company Name",
+          address: companyData.address,
+          phone: companyData.phone,
+          email: companyData.email,
+          website: companyData.website || companyData.company_website,
+        } : undefined)
+
+        // Update cost estimate with new PDF URL and password
+        await updateCostEstimate(updatedCostEstimate.id, { pdf: pdfUrl, password: password })
+
+        // Update state with the new data including PDF
+        const finalCostEstimate = { ...updatedCostEstimate, pdf: pdfUrl, password: password }
+        setEditableCostEstimate(finalCostEstimate)
+        setCostEstimate(finalCostEstimate)
+      } catch (pdfError) {
+        console.error("[v0] PDF generation failed, but cost estimate was saved successfully:", pdfError)
+        // Continue with the save process even if PDF generation fails
+        const finalCostEstimate = { ...updatedCostEstimate }
+        setEditableCostEstimate(finalCostEstimate)
+        setCostEstimate(finalCostEstimate)
+
+        // Show a warning toast about PDF generation failure
+        toast({
+          title: "Warning",
+          description: "Cost estimate saved successfully, but PDF generation failed. You can still download the PDF later.",
+          variant: "default",
+        })
       }
-
-      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, userData ? {
-        first_name: userData.first_name || undefined,
-        last_name: userData.last_name || undefined,
-        email: userData.email || undefined,
-        company_id: userData.company_id || undefined,
-      } : undefined, companyData ? {
-        name: companyData.name || "Company Name",
-        address: companyData.address,
-        phone: companyData.phone,
-        email: companyData.email,
-        website: companyData.website || companyData.company_website,
-      } : undefined)
-
-      // Update cost estimate with new PDF URL and password
-      await updateCostEstimate(updatedCostEstimate.id, { pdf: pdfUrl, password: password })
-
-      // Update state with the new data including PDF
-      const finalCostEstimate = { ...updatedCostEstimate, pdf: pdfUrl, password: password }
-      setEditableCostEstimate(finalCostEstimate)
-      setCostEstimate(finalCostEstimate)
 
       // Force a re-render by updating the key or triggering a state change
       setEditingField(null)
@@ -1850,21 +1886,37 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               {isEditing && editingField === "unitPrice" ? (
                 <div className="flex items-center gap-2 ml-1">
                   <Input
-                    type="number"
-                    value={tempValues.unitPrice || ""}
+                    type="text"
+                    value={unitPriceInput}
                     onChange={(e) => {
                       const value = e.target.value;
-                      const parsed = Number.parseFloat(value);
-                      if (!isNaN(parsed)) {
-                        updateTempValues("unitPrice", Number(parsed.toFixed(2)));
-                      } else if (value === "") {
-                        updateTempValues("unitPrice", 0);
+                      // Strip commas and validate
+                      const stripped = value.replace(/,/g, '');
+                      const regex = /^\d*\.?\d{0,2}$/;
+                      if (regex.test(stripped)) {
+                        const parsed = Number.parseFloat(stripped);
+                        if (!isNaN(parsed)) {
+                          updateTempValues("unitPrice", Number(parsed.toFixed(2)));
+                          // Automatically add commas if value >= 1000
+                          if (parsed >= 1000) {
+                            setUnitPriceInput(formatNumberWithCommasForInput(stripped));
+                          } else {
+                            setUnitPriceInput(stripped);
+                          }
+                        } else if (stripped === "") {
+                          updateTempValues("unitPrice", 0);
+                          setUnitPriceInput("");
+                        }
                       }
                     }}
                     className="w-32 h-6 text-sm"
                     placeholder={monthlyRate?.toString() || "0.00"}
-                    step="0.01"
-                    onBlur={() => setEditingField(null)}
+                    onBlur={() => {
+                      // Format the current value without decimals
+                      const current = tempValues.unitPrice || 0;
+                      setUnitPriceInput(current.toLocaleString('en-US'));
+                      setEditingField(null);
+                    }}
                   />
                   <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
                 </div>
@@ -1877,7 +1929,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                   onClick={() => isEditing && handleFieldEdit("unitPrice", tempValues.unitPrice || monthlyRate)}
                   title={isEditing ? "Click to edit lease rate" : ""}
                 >
-                  PHP {(tempValues.unitPrice || monthlyRate).toLocaleString("en-US", { minimumFractionDigits: 2 })} (Exclusive of VAT)
+                  PHP {(tempValues.unitPrice || monthlyRate).toLocaleString("en-US")} (Exclusive of VAT)
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </span>
               )}

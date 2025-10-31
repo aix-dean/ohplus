@@ -142,7 +142,17 @@ const getDateObject = (date: any): Date | undefined => {
 
 export async function POST(request: NextRequest) {
   console.log('[API_PDF] Received PDF generation request')
-  const { costEstimate, companyData, logoDataUrl, format = 'pdf', userData }: { costEstimate: CostEstimate; companyData: any; logoDataUrl: string | null; format?: 'pdf' | 'image'; userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string } } = await request.json()
+
+  let requestData
+  try {
+    requestData = await request.json()
+  } catch (parseError) {
+    console.error('[API_PDF] Failed to parse request JSON:', parseError)
+    return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 })
+  }
+
+  const { costEstimate, companyData, logoDataUrl, format = 'pdf', userData }: { costEstimate: CostEstimate; companyData: any; logoDataUrl: string | null; format?: 'pdf' | 'image'; userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string } } = requestData
+
   console.log('[API_PDF] Cost estimate ID:', costEstimate?.id)
   console.log('[API_PDF] Company data:', companyData?.name)
   console.log('[API_PDF] Logo data URL provided:', !!logoDataUrl)
@@ -150,10 +160,28 @@ export async function POST(request: NextRequest) {
   console.log('[API_PDF] Format:', format)
 
   try {
+    // Validate required data
+    if (!costEstimate) {
+      throw new Error('Cost estimate data is required')
+    }
+    if (!costEstimate.lineItems || costEstimate.lineItems.length === 0) {
+      throw new Error('Cost estimate must have line items')
+    }
+
     // Generate HTML content
     console.log('[API_PDF] Generating HTML content...')
-    const htmlContent = generateCostEstimateHTML(costEstimate, companyData, userData)
-    console.log('[API_PDF] HTML content generated, length:', htmlContent.length)
+    let htmlContent: string
+    try {
+      htmlContent = generateCostEstimateHTML(costEstimate, companyData, userData)
+      console.log('[API_PDF] HTML content generated, length:', htmlContent.length)
+
+      if (!htmlContent || htmlContent.length < 100) {
+        throw new Error('Generated HTML content is too short or empty')
+      }
+    } catch (htmlError) {
+      console.error('[API_PDF] Error generating HTML content:', htmlError)
+      throw new Error(`HTML generation failed: ${htmlError instanceof Error ? htmlError.message : 'Unknown error'}`)
+    }
 
     // Launch puppeteer with @sparticuz/chromium for serverless or local chromium for development
     console.log('[API_PDF] Launching Puppeteer browser...')
@@ -278,14 +306,14 @@ function generateCostEstimateHTML(
   const vatAmount = subtotal * vatRate
   const totalWithVat = subtotal + vatAmount
 
-  const monthlyRate = primaryRentalItem ? primaryRentalItem.unitPrice : 0
+  const monthlyRate = primaryRentalItem ? (typeof primaryRentalItem.unitPrice === 'number' ? primaryRentalItem.unitPrice : 0) : 0
 
   return `
   <!DOCTYPE html>
   <html>
   <head>
     <meta charset="UTF-8">
-    <title>${costEstimate.costEstimateNumber}</title>
+    <title>${costEstimate.costEstimateNumber || costEstimate.id || 'Cost Estimate'}</title>
     <style>
   @page {
   margin: 25mm 15mm 30mm 15mm; /* extra bottom space */
@@ -517,7 +545,7 @@ function generateCostEstimateHTML(
         <li>
           <div class="details-row">
             <div class="details-label">Lease rate per month:</div>
-            <div class="details-value">PHP ${monthlyRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Exclusive of VAT)</div>
+            <div class="details-value">PHP ${(monthlyRate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (Exclusive of VAT)</div>
           </div>
         </li>
       </ul>
@@ -532,7 +560,7 @@ function generateCostEstimateHTML(
     <div class="price-breakdown">
       <div class="price-row">
         <span>Lease rate per month</span>
-        <span>PHP ${(costEstimate.lineItems[0].unitPrice).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        <span>PHP ${(costEstimate.lineItems?.[0]?.unitPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row">
         <span>Contract duration</span>
