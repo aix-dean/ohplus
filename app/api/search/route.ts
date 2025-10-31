@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_APP_ID
       apiKey = process.env.ALGOLIA_COST_ESTIMATES_ADMIN_API_KEY
       finalIndexName = 'collectibles'
-    } else if (indexName === 'quotaions') {
+    } else if (indexName === 'quotations') {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_APP_ID
       apiKey = process.env.ALGOLIA_COST_ESTIMATES_ADMIN_API_KEY
       finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_QUOTATIONS_INDEX_NAME
