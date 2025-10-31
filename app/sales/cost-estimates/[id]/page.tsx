@@ -236,6 +236,25 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [userSignatureUrl, setUserSignatureUrl] = useState<string | null>(null)
   const [creatorUser, setCreatorUser] = useState<User | null>(null)
 
+  // Helper function to fetch current user's signature.updated date
+  const getCurrentUserSignatureDate = async (): Promise<Date | null> => {
+    if (!costEstimate?.createdBy) return null
+    try {
+      const userDocRef = doc(db, "iboard_users", costEstimate.createdBy)
+      const userDoc = await getDoc(userDocRef)
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        if (userData.signature && typeof userData.signature === 'object' && userData.signature.updated) {
+          return userData.signature.updated.toDate ? userData.signature.updated.toDate() : new Date(userData.signature.updated)
+        }
+      }
+      return null
+    } catch (error) {
+      console.error('Error fetching current user signature date:', error)
+      return null
+    }
+  }
+
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
 
     const siteGroups: { [siteName: string]: CostEstimateLineItem[] } = {}
@@ -924,12 +943,33 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     console.log("=== DEBUG SEND BUTTON ===")
     console.log("Current costEstimate.pdf:", costEstimate?.pdf, "Type:", typeof costEstimate?.pdf)
 
-    // Check if current cost estimate has PDF - if so, assume all related ones do too
+    // Check if current cost estimate has PDF and signature dates match
     if (costEstimate.pdf) {
-      console.log("✅ Skipping PDF generation - current estimate has PDF")
-      // Current estimate has PDF, assume all related estimates have PDFs too
-      setIsSendOptionsDialogOpen(true)
-      return
+      const currentSignatureDate = await getCurrentUserSignatureDate()
+      const storedSignatureDate = costEstimate.signature_date
+
+      let needsRegeneration = false
+
+      if (currentSignatureDate && storedSignatureDate) {
+        const currentDate = new Date(currentSignatureDate).getTime()
+        const storedDate = new Date(storedSignatureDate).getTime()
+
+        if (currentDate !== storedDate) {
+          console.log('[COST_ESTIMATE_SEND] Signature dates do not match, regenerating PDF')
+          needsRegeneration = true
+        } else {
+          console.log('[COST_ESTIMATE_SEND] Signature dates match, using existing PDF')
+        }
+      } else {
+        console.log('[COST_ESTIMATE_SEND] Missing signature date info, regenerating PDF')
+        needsRegeneration = true
+      }
+
+      if (!needsRegeneration) {
+        console.log("✅ Skipping PDF generation - signature dates match")
+        setIsSendOptionsDialogOpen(true)
+        return
+      }
     }
 
     console.log("⚠️ Generating PDFs...")
@@ -944,8 +984,22 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         for (let i = 0; i < relatedCostEstimates.length; i++) {
           const estimate = relatedCostEstimates[i]
 
-          // Check if PDF already exists
-          if (!estimate.pdf) {
+          // Check if PDF already exists and signature dates match
+          let needsRegeneration = !estimate.pdf
+          if (estimate.pdf) {
+            const currentSignatureDate = await getCurrentUserSignatureDate()
+            const storedSignatureDate = estimate.signature_date
+
+            if (currentSignatureDate && storedSignatureDate) {
+              const currentDate = new Date(currentSignatureDate).getTime()
+              const storedDate = new Date(storedSignatureDate).getTime()
+              needsRegeneration = currentDate !== storedDate
+            } else {
+              needsRegeneration = true
+            }
+          }
+
+          if (needsRegeneration) {
             // Prepare signature data URL if user signature exists
             let userSignatureDataUrl: string | null = null
             if (userSignatureUrl) {
@@ -971,7 +1025,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               try {
                 const userDocRef = doc(db, "iboard_users", estimate.createdBy)
                 const userDoc = await getDoc(userDocRef)
-    
+
                 if (userDoc.exists()) {
                   const userDataFetched = userDoc.data()
                   if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
@@ -982,7 +1036,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                 console.error('Error fetching signature date:', error)
               }
             }
-    
+
             // Generate PDF and get URL/password
             const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(estimate, userData ? {
               first_name: userData.first_name || undefined,
@@ -996,7 +1050,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               email: companyData.email,
               website: companyData.website || companyData.company_website,
             } : undefined, userSignatureDataUrl)
-      
+
             // Update the cost estimate with PDF URL and password
             await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password, signature_date: signatureDate })
             // Update the local state
@@ -1006,8 +1060,22 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         }
         setRelatedCostEstimates(updatedRelatedEstimates)
       } else {
-        // Single cost estimate - check if PDF exists before generating
-        if (!costEstimate.pdf) {
+        // Single cost estimate - check if PDF exists and signature dates match
+        let needsRegeneration = !costEstimate.pdf
+        if (costEstimate.pdf) {
+          const currentSignatureDate = await getCurrentUserSignatureDate()
+          const storedSignatureDate = costEstimate.signature_date
+
+          if (currentSignatureDate && storedSignatureDate) {
+            const currentDate = new Date(currentSignatureDate).getTime()
+            const storedDate = new Date(storedSignatureDate).getTime()
+            needsRegeneration = currentDate !== storedDate
+          } else {
+            needsRegeneration = true
+          }
+        }
+
+        if (needsRegeneration) {
           await generatePDFIfNeeded(costEstimate)
           generatedCount++
         }
@@ -1150,8 +1218,24 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   }
 
   const generatePDFIfNeeded = async (costEstimate: CostEstimate) => {
+    // Check if PDF exists and signature dates match
     if (costEstimate.pdf) {
-      return { pdfUrl: costEstimate.pdf, password: costEstimate.password }
+      const currentSignatureDate = await getCurrentUserSignatureDate()
+      const storedSignatureDate = costEstimate.signature_date
+
+      if (currentSignatureDate && storedSignatureDate) {
+        const currentDate = new Date(currentSignatureDate).getTime()
+        const storedDate = new Date(storedSignatureDate).getTime()
+
+        if (currentDate === storedDate) {
+          console.log('[PDF_GENERATE] Signature dates match, using existing PDF')
+          return { pdfUrl: costEstimate.pdf, password: costEstimate.password }
+        } else {
+          console.log('[PDF_GENERATE] Signature dates do not match, regenerating PDF')
+        }
+      } else {
+        console.log('[PDF_GENERATE] Missing signature date info, regenerating PDF')
+      }
     }
 
     try {
@@ -1243,13 +1327,34 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         // Check if PDF field has value
         let pdfUrl = freshCostEstimate.pdf
         let wasExisting = !!pdfUrl
-        if (!pdfUrl) {
+        if (pdfUrl) {
+          // If PDF exists, check signature dates
+          const currentSignatureDate = await getCurrentUserSignatureDate()
+          const storedSignatureDate = freshCostEstimate.signature_date
+
+          if (currentSignatureDate && storedSignatureDate) {
+            const currentDate = new Date(currentSignatureDate).getTime()
+            const storedDate = new Date(storedSignatureDate).getTime()
+
+            if (currentDate !== storedDate) {
+              console.log('[PDF_DOWNLOAD] Signature dates do not match, regenerating PDF')
+              const result = await generatePDFIfNeeded(freshCostEstimate)
+              pdfUrl = result.pdfUrl
+              wasExisting = false
+            } else {
+              console.log('[PDF_DOWNLOAD] Signature dates match, using existing PDF')
+            }
+          } else {
+            console.log('[PDF_DOWNLOAD] Missing signature date info, regenerating PDF')
+            const result = await generatePDFIfNeeded(freshCostEstimate)
+            pdfUrl = result.pdfUrl
+            wasExisting = false
+          }
+        } else {
           // Generate PDF if field is null or doesn't exist
           const result = await generatePDFIfNeeded(freshCostEstimate)
           pdfUrl = result.pdfUrl
           wasExisting = false
-        } else {
-          console.log('[PDF_DOWNLOAD] Using existing PDF URL from database:', pdfUrl)
         }
 
         if (!pdfUrl) {
