@@ -600,6 +600,24 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         }
       }
 
+      // Fetch signature date directly if not available from creatorUser
+      let signatureDate: Date | null = null
+      if (updatedCostEstimate.createdBy) {
+        try {
+          const userDocRef = doc(db, "iboard_users", updatedCostEstimate.createdBy)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching signature date:', error)
+        }
+      }
+
       const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, creatorUser ? {
         first_name: creatorUser.first_name || undefined,
         last_name: creatorUser.last_name || undefined,
@@ -613,8 +631,12 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         website: companyData.website || companyData.company_website,
       } : undefined, userSignatureDataUrl)
 
-      // Update cost estimate with new PDF URL and password
-      await updateCostEstimate(updatedCostEstimate.id, { pdf: pdfUrl, password: password })
+      // Update cost estimate with new PDF URL, password, and signature date
+      await updateCostEstimate(updatedCostEstimate.id, {
+        pdf: pdfUrl,
+        password: password,
+        signature_date: signatureDate
+      })
 
       // Update state with the new data including PDF
       const finalCostEstimate = { ...updatedCostEstimate, pdf: pdfUrl, password: password }
@@ -943,6 +965,24 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               }
             }
 
+            // Fetch signature date directly if not available from creatorUser
+            let signatureDate: Date | null = null
+            if (estimate.createdBy) {
+              try {
+                const userDocRef = doc(db, "iboard_users", estimate.createdBy)
+                const userDoc = await getDoc(userDocRef)
+    
+                if (userDoc.exists()) {
+                  const userDataFetched = userDoc.data()
+                  if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                    signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+                  }
+                }
+              } catch (error) {
+                console.error('Error fetching signature date:', error)
+              }
+            }
+    
             // Generate PDF and get URL/password
             const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(estimate, userData ? {
               first_name: userData.first_name || undefined,
@@ -956,9 +996,9 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               email: companyData.email,
               website: companyData.website || companyData.company_website,
             } : undefined, userSignatureDataUrl)
-
+      
             // Update the cost estimate with PDF URL and password
-            await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password })
+            await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password, signature_date: signatureDate })
             // Update the local state
             updatedRelatedEstimates[i] = { ...estimate, pdf: pdfUrl, password: password }
             generatedCount++
@@ -1134,6 +1174,24 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         }
       }
 
+      // Fetch signature date directly if not available from creatorUser
+      let signatureDate: Date | null = null
+      if (costEstimate.createdBy) {
+        try {
+          const userDocRef = doc(db, "iboard_users", costEstimate.createdBy)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching signature date:', error)
+        }
+      }
+
       const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, creatorUser ? {
         first_name: creatorUser.first_name || undefined,
         last_name: creatorUser.last_name || undefined,
@@ -1146,7 +1204,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         email: companyData.email,
         website: companyData.website || companyData.company_website,
       } : undefined, userSignatureDataUrl)
-      await updateCostEstimate(costEstimate.id, { pdf: pdfUrl, password: password })
+      await updateCostEstimate(costEstimate.id, { pdf: pdfUrl, password: password, signature_date: signatureDate })
       setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
       // Also update the relatedCostEstimates if this estimate is in there
       setRelatedCostEstimates(prev => prev.map(est =>
@@ -1514,6 +1572,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
         // Fetch user signature if available
         let userSignatureDataUrl: string | null = null
+        let signatureDate: Date | null = null
         if (historyItem.createdBy) {
           try {
             console.log('[HISTORY_PDF] Fetching user signature for createdBy:', historyItem.createdBy)
@@ -1543,6 +1602,10 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                   console.error('[HISTORY_PDF] Error converting signature to base64:', fetchError)
                 }
               }
+              // Also fetch signature date
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+              }
             }
           } catch (error) {
             console.error('[HISTORY_PDF] Error fetching user signature:', error)
@@ -1561,6 +1624,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             logoDataUrl,
             userSignatureDataUrl,
             creatorUser,
+            signatureDate: historyItem.signature_date || costEstimate?.signature_date,
           }),
         })
 
@@ -1587,7 +1651,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             email: companyData.email,
             website: companyData.website || companyData.company_website,
           } : undefined, userSignatureDataUrl)
-          await updateCostEstimate(historyItem.id, { pdf: pdfUrl })
+          await updateCostEstimate(historyItem.id, { pdf: pdfUrl, signature_date: signatureDate })
           console.log("PDF saved to cost estimate:", pdfUrl)
         } catch (saveError) {
           console.error("Error saving PDF to cost estimate:", saveError)

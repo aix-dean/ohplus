@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { ArrowLeft, Paperclip, Edit, Trash2, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { getCostEstimate, getCostEstimatesByPageId, updateCostEstimateStatus, generateAndUploadCostEstimatePDF } from "@/lib/cost-estimate-service"
+import { getCostEstimate, getCostEstimatesByPageId, updateCostEstimateStatus, generateAndUploadCostEstimatePDF, updateCostEstimate } from "@/lib/cost-estimate-service"
 import { useAuth } from "@/contexts/auth-context"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import { emailService, type EmailTemplate } from "@/lib/email-service"
@@ -80,9 +80,52 @@ export default function ComposeEmailPage() {
               first_name: currentUserData.first_name || user?.displayName?.split(" ")[0] || "",
               last_name: currentUserData.last_name || user?.displayName?.split(" ").slice(1).join(" ") || "",
               email: currentUserData.email || user?.email || "",
-              company_id: currentUserData.company_id,
+              company_id: currentUserData.company_id || undefined,
             }
           : undefined
+
+        // Fetch current user's signature once for all PDFs
+        let userSignatureDataUrl: string | null = null
+        let signatureDate: Date | null = null
+        if (user?.uid) {
+          try {
+            const { doc, getDoc } = await import("firebase/firestore")
+            const { db } = await import("@/lib/firebase")
+            const userDocRef = doc(db, "iboard_users", user.uid)
+            const userDoc = await getDoc(userDocRef)
+
+            if (userDoc.exists()) {
+              const userDataFetched = userDoc.data()
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+                const signatureUrl = userDataFetched.signature.url
+                console.log('[v0] Found current user signature URL:', signatureUrl)
+
+                // Convert signature image to base64 data URL
+                try {
+                  const response = await fetch(signatureUrl)
+                  if (response.ok) {
+                    const blob = await response.blob()
+                    const arrayBuffer = await blob.arrayBuffer()
+                    const base64 = Buffer.from(arrayBuffer).toString('base64')
+                    const mimeType = blob.type || 'image/png'
+                    userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                    console.log('[v0] Converted current user signature to base64 data URL')
+                  } else {
+                    console.warn('[v0] Failed to fetch current user signature image:', response.status)
+                  }
+                } catch (fetchError) {
+                  console.error('[v0] Error converting current user signature to base64:', fetchError)
+                }
+              }
+              // Also fetch signature date
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+              }
+            }
+          } catch (error) {
+            console.error('[v0] Error fetching current user signature:', error)
+          }
+        }
 
         // Load company logo if available
         let logoDataUrl: string | null = null
@@ -138,38 +181,20 @@ export default function ComposeEmailPage() {
             } catch (fetchError) {
               console.error("[v0] Error fetching main PDF from URL:", fetchError)
               // Fall back to generating PDF
-              const response = await fetch('/api/generate-cost-estimate-pdf', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  costEstimate: mainCostEstimate,
-                  companyData: companyDataParam,
-                  logoDataUrl,
-                  userData,
-                }),
+              const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(mainCostEstimate, userDataForPDF, companyDataParam, userSignatureDataUrl)
+
+              // Update cost estimate with PDF URL, password, and signature date
+              await updateCostEstimate(mainCostEstimate.id, {
+                pdf: pdfUrl,
+                password: password,
+                signature_date: signatureDate
               })
 
-              if (!response.ok) {
-                const errorText = await response.text()
-                console.error('API Error:', response.status, errorText)
-                throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
-              }
-
-              const blob = await response.blob()
-              mainPdfBase64 = await new Promise<string>((resolve) => {
-                const reader = new FileReader()
-                reader.onload = () => {
-                  const result = reader.result as string
-                  resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
-                }
-                reader.readAsDataURL(blob)
-              })
+              mainPdfBase64 = await fetchPDFAsBase64(pdfUrl)
               console.log("[v0] Main PDF generated as fallback")
             }
           } else {
-            // Generate PDF as before
+            // Generate PDF using the new service
             console.log("[v0] Main PDF generation request:", {
               hasLogoDataUrl: !!logoDataUrl,
               logoDataUrlLength: logoDataUrl?.length || 0,
@@ -177,34 +202,16 @@ export default function ComposeEmailPage() {
               hasCompanyLogo: !!companyDataParam?.logo,
             })
 
-            const response = await fetch('/api/generate-cost-estimate-pdf', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                costEstimate: mainCostEstimate,
-                companyData: companyDataParam,
-                logoDataUrl,
-                userData,
-              }),
+            const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(mainCostEstimate, userDataForPDF, companyDataParam, userSignatureDataUrl)
+
+            // Update cost estimate with PDF URL, password, and signature date
+            await updateCostEstimate(mainCostEstimate.id, {
+              pdf: pdfUrl,
+              password: password,
+              signature_date: signatureDate
             })
 
-            if (!response.ok) {
-              const errorText = await response.text()
-              console.error('API Error:', response.status, errorText)
-              throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
-            }
-
-            const blob = await response.blob()
-            mainPdfBase64 = await new Promise<string>((resolve) => {
-              const reader = new FileReader()
-              reader.onload = () => {
-                const result = reader.result as string
-                resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
-              }
-              reader.readAsDataURL(blob)
-            })
+            mainPdfBase64 = await fetchPDFAsBase64(pdfUrl)
             console.log("[v0] Main PDF generated successfully")
           }
 
@@ -244,38 +251,20 @@ export default function ComposeEmailPage() {
                   costEstimateNumber: uniqueCostEstimateNumber,
                 }
 
-                const response = await fetch('/api/generate-cost-estimate-pdf', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    costEstimate: modifiedCostEstimate,
-                    companyData: companyDataParam,
-                    logoDataUrl,
-                    userData,
-                  }),
+                const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(modifiedCostEstimate, userDataForPDF, companyDataParam, userSignatureDataUrl)
+
+                // Update cost estimate with PDF URL, password, and signature date
+                await updateCostEstimate(costEstimate.id, {
+                  pdf: pdfUrl,
+                  password: password,
+                  signature_date: signatureDate
                 })
 
-                if (!response.ok) {
-                  const errorText = await response.text()
-                  console.error('API Error:', response.status, errorText)
-                  throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
-                }
-
-                const blob = await response.blob()
-                pdfBase64 = await new Promise<string>((resolve) => {
-                  const reader = new FileReader()
-                  reader.onload = () => {
-                    const result = reader.result as string
-                    resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
-                  }
-                  reader.readAsDataURL(blob)
-                })
+                pdfBase64 = await fetchPDFAsBase64(pdfUrl)
                 console.log(`[v0] PDF ${i + 1} generated as fallback`)
               }
             } else {
-              // Generate PDF as before
+              // Generate PDF using the new service
               const modifiedCostEstimate = {
                 ...costEstimate,
                 costEstimateNumber: uniqueCostEstimateNumber,
@@ -288,34 +277,16 @@ export default function ComposeEmailPage() {
                 hasCompanyLogo: !!companyDataParam?.logo,
               })
 
-              const response = await fetch('/api/generate-cost-estimate-pdf', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  costEstimate: modifiedCostEstimate,
-                  companyData: companyDataParam,
-                  logoDataUrl,
-                  userData,
-                }),
+              const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(modifiedCostEstimate, userDataForPDF, companyDataParam, userSignatureDataUrl)
+
+              // Update cost estimate with PDF URL, password, and signature date
+              await updateCostEstimate(costEstimate.id, {
+                pdf: pdfUrl,
+                password: password,
+                signature_date: signatureDate
               })
 
-              if (!response.ok) {
-                const errorText = await response.text()
-                console.error('API Error:', response.status, errorText)
-                throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`)
-              }
-
-              const blob = await response.blob()
-              pdfBase64 = await new Promise<string>((resolve) => {
-                const reader = new FileReader()
-                reader.onload = () => {
-                  const result = reader.result as string
-                  resolve(result.split(',')[1]) // Remove data:application/pdf;base64, prefix
-                }
-                reader.readAsDataURL(blob)
-              })
+              pdfBase64 = await fetchPDFAsBase64(pdfUrl)
               console.log(`[v0] PDF ${i + 1} generated successfully`)
             }
 
