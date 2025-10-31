@@ -16,12 +16,35 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Users, Plus, Search, Edit, Trash2, UserCheck, MapPin, Phone, Mail } from "lucide-react"
+import { Users, Plus, Search, Edit, Trash2, UserCheck, MapPin, Phone, Mail, ChevronDown, List, Grid3X3, MoreHorizontal } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
 import { TeamFormDialog } from "@/components/team-form-dialog"
 import { getTeams, createTeam, updateTeam, deleteTeam, updateTeamStatus } from "@/lib/teams-service"
 import type { Team, CreateTeamData } from "@/lib/types/team"
+
+// Header Component
+function Component5({ className }: { className?: string }) {
+  return (
+    <div className={className}>
+      <div className="absolute bottom-0 left-0 right-[15.23%] top-0 bg-white">
+        <div className="absolute bottom-0 left-[84.77%] right-0 top-0 bg-blue-300/50" />
+        <button className="absolute inset-[52.54%_90.45%_17.8%_1.95%] cursor-pointer">
+          <p className="absolute inset-[52.54%_92.27%_20.34%_1.95%] font-black text-[16px] text-white not-italic leading-none">
+            Logistics
+          </p>
+          <ChevronDown className="absolute left-[8.18%] right-[90.45%] top-[31px] w-4 h-4" />
+        </button>
+        <p className="absolute inset-[54.24%_18.28%_25.42%_51.33%] font-normal text-[12px] text-right text-white not-italic leading-none">
+          10:00 am | Sep 23, 2025
+        </p>
+        <img src="/placeholder-user.jpg" alt="User" className="absolute left-[94.53%] right-[3.2%] top-[23px] w-[90px] h-[90px]" />
+        <img src="/icons/sms.png" alt="SMS" className="absolute left-[90.86%] right-[7.03%] top-[24px] w-[90px] h-[90px]" />
+        <img src="/icons/notification.png" alt="Notification" className="absolute left-[87.11%] right-[10.86%] top-[24px] w-[90px] h-[90px]" />
+      </div>
+    </div>
+  );
+}
 
 export default function TeamsPage() {
   const { userData } = useAuth()
@@ -187,207 +210,116 @@ export default function TeamsPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Users className="h-6 w-6" />
-            Teams & Personnel
-          </h1>
-          <p className="text-gray-600 mt-1">Manage logistics teams and their members</p>
+    <div className="relative w-full h-screen bg-white">
+      <Component5 className="absolute h-[59px] left-0 top-0 w-full" />
+
+      {/* Sidebar */}
+      <div className="absolute bg-blue-300/50 h-[661px] left-0 top-[59px] w-[220px]">
+        <div className="absolute bg-white/70 border-2 border-white rounded-[12.5px] h-[161.25px] left-[12.5px] top-[12.5px] w-[195px]">
+          <p className="absolute font-bold text-xs text-gray-700 left-[22.5px] top-[21.5px] w-[123.75px]">Updates Center</p>
+          <div className="absolute bg-white/80 rounded-[10px] shadow h-[31.875px] left-[22.5px] top-[42.63px] w-[169.375px]"></div>
+          <div className="absolute bg-white/80 rounded-[10px] shadow h-[31.875px] left-[22.5px] top-[77.63px] w-[169.375px]"></div>
+          <div className="absolute bg-white/80 rounded-[10px] shadow h-[31.875px] left-[22.5px] top-[112.63px] w-[169.375px]"></div>
         </div>
-        <Button onClick={() => setIsFormDialogOpen(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          Create Team
-        </Button>
-      </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search teams..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={(value: any) => setTypeFilter(value)}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="operations">Operations</SelectItem>
-                  <SelectItem value="maintenance">Maintenance</SelectItem>
-                  <SelectItem value="installation">Installation</SelectItem>
-                  <SelectItem value="delivery">Delivery</SelectItem>
-                  <SelectItem value="support">Support</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <div className="absolute h-[247.5px] left-[13px] top-[183px] w-[195px]">
+          <div className="absolute bg-white/70 border-2 border-white rounded-[12.5px] inset-0">
+            <p className="absolute font-bold text-xs text-gray-700 left-[65.06%] top-[3.03%]">To Go →</p>
+            <p className="absolute font-light text-xs text-gray-700 left-[7.05%] top-[90.15%]">To-do-list</p>
+            <div className="absolute bg-gray-300 h-[1px] left-[5.13%] right-[5.13%] top-[51.77%]"></div>
+            <p className="absolute font-bold text-xs text-gray-700 left-[65.06%] top-[44.19%]">To Do ←</p>
+            <p className="absolute font-light text-xs text-gray-700 left-[7.05%] top-[60.86%]">Service Assignments</p>
+            <p className="absolute font-light text-xs text-gray-700 left-[7.05%] top-[82.83%] font-bold">Crew and Personnel</p>
+            <p className="absolute font-light text-xs text-gray-700 left-[34.62%] top-[75.5%]">News and Weather</p>
+            <p className="absolute font-light text-xs text-gray-700 left-[31.41%] top-[68.18%]">Reports</p>
+            <p className="absolute font-light text-xs text-gray-700 left-[34.62%] top-[53.53%]">Job Orders</p>
+            <p className="absolute font-light text-xs text-gray-700 left-[31.41%] top-[28.28%]">Planner</p>
+            <p className="absolute font-light text-xs text-gray-700 left-[31.41%] top-[20.96%]">Bulletin Board</p>
+            <p className="absolute font-light text-xs text-gray-700 left-[45.51%] top-[13.64%]">Dashboard</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Teams Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredTeams.map((team) => (
-          <Card key={team.id} className="hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <CardTitle className="text-lg">{team.name}</CardTitle>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge className={getTeamTypeColor(team.teamType)}>{team.teamType}</Badge>
-                    <Badge className={getStatusColor(team.status)}>{team.status}</Badge>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEditingTeam(team)
-                      setIsFormDialogOpen(true)
-                    }}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setTeamToDelete(team)
-                      setDeleteDialogOpen(true)
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="text-sm text-gray-600 line-clamp-2">{team.description}</p>
-
-              <div className="space-y-2">
-                {team.leaderName && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <UserCheck className="h-4 w-4 text-gray-400" />
-                    <span>{team.leaderName}</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-sm">
-                  <MapPin className="h-4 w-4 text-gray-400" />
-                  <span>{team.location}</span>
-                </div>
-                {team.contactNumber && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Phone className="h-4 w-4 text-gray-400" />
-                    <span>{team.contactNumber}</span>
-                  </div>
-                )}
-                {team.email && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="h-4 w-4 text-gray-400" />
-                    <span>{team.email}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t">
-                <div className="text-sm text-gray-500"></div>
-                <Button variant="outline" size="sm" onClick={() => handleStatusToggle(team)}>
-                  {team.status === "active" ? "Deactivate" : "Activate"}
-                </Button>
-              </div>
-
-              {team.specializations.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-2">
-                  {team.specializations.slice(0, 3).map((spec) => (
-                    <Badge key={spec} variant="outline" className="text-xs">
-                      {spec}
-                    </Badge>
-                  ))}
-                  {team.specializations.length > 3 && (
-                    <Badge variant="outline" className="text-xs">
-                      +{team.specializations.length - 3} more
-                    </Badge>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+        <div className="absolute h-[129.375px] left-0 rounded-tl-[12.5px] rounded-tr-[12.5px] top-[531.63px] w-[220px]">
+          <img src="/ohliver-mascot.png" alt="Oscar" className="absolute left-[10px] top-[1.88px] w-[125.876px] h-[83.918px]" />
+          <p className="absolute font-bold text-xs text-white left-[38.13px] top-[1.88px] w-[123.75px]">Oscar's Intelligence</p>
+          <div className="absolute bg-white/20 rounded-[6.25px] h-[41.25px] left-[61.25px] top-[30px] w-[97.5px]"></div>
+          <div className="absolute bg-white/20 rounded-[6.25px] h-[8.75px] left-[61.25px] top-[76.25px] w-[97.5px]"></div>
+          <ChevronDown className="absolute left-[191.88px] top-[43.13px] w-[25px] h-[25px] rotate-[270deg]" />
+          <ChevronDown className="absolute left-[5px] top-[43.13px] w-[25px] h-[25px] rotate-[90deg]" />
+        </div>
       </div>
 
-      {filteredTeams.length === 0 && (
-        <Card className="text-center py-12">
-          <CardContent>
-            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No teams found</h3>
-            <p className="text-gray-500 mb-4">
-              {searchTerm || statusFilter !== "all" || typeFilter !== "all"
-                ? "Try adjusting your filters"
-                : "Get started by creating your first team"}
-            </p>
-            {!searchTerm && statusFilter === "all" && typeFilter === "all" && (
-              <Button onClick={() => setIsFormDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Team
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      {/* Main Content */}
+      <div className="absolute bg-gray-50 h-[661px] left-[221px] top-[59px] right-0">
+        <p className="absolute font-bold text-base text-gray-700 left-[30px] top-[24px] w-[315px]">Crew and Personnel</p>
 
-      {/* Team Form Dialog */}
+        <div className="absolute bg-white border border-gray-300 rounded-[15px] h-[22px] left-[30px] top-[54px] w-[257px] flex items-center">
+          <Search className="ml-2 w-3 h-3 opacity-30" />
+          <Input
+            placeholder="Search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="ml-2 border-none bg-transparent text-xs text-gray-400 h-4"
+          />
+        </div>
+
+        <Button
+          onClick={() => setIsFormDialogOpen(true)}
+          className="absolute bg-white border-2 border-gray-300 rounded-[5px] h-[24px] left-[926px] top-[21px] w-[103px] text-xs font-medium text-gray-700"
+        >
+          Add New Team
+        </Button>
+
+        <List className="absolute left-[958px] top-[59.34px] w-[19.276px] h-[19.276px] opacity-30" />
+        <Grid3X3 className="absolute left-[981.49px] top-[55.73px] w-[26.505px] h-[26.505px] opacity-30" />
+
+        <div className="absolute left-[30px] top-[99px] right-[30px] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredTeams.map((team) => (
+            <Card key={team.id} className="bg-white rounded-[10px] shadow w-full max-w-[201px] h-[265px] relative">
+              <CardContent className="p-4 flex flex-col items-center">
+                <img src="/placeholder-user.jpg" alt={team.name} className="w-[150px] h-[150px] rounded mb-4" />
+                <p className="font-bold text-xs text-gray-700 mb-1">{team.name}</p>
+                <p className="font-semibold text-xs text-gray-700 mb-1">{team.leaderName || 'No Leader'}</p>
+                <p className="font-light text-xs text-gray-700 mb-1">{team.location || 'No Location'}</p>
+                <p className="font-light text-xs text-gray-700 mb-2">{team.teamType}</p>
+                <Badge className={`${getStatusColor(team.status)} text-xs`}>{team.status}</Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute top-2 right-2 p-1"
+                  onClick={() => {
+                    setEditingTeam(team);
+                    setIsFormDialogOpen(true);
+                  }}
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
       <TeamFormDialog
         open={isFormDialogOpen}
-        onOpenChange={(open) => {
-          setIsFormDialogOpen(open)
-          if (!open) setEditingTeam(null)
-        }}
+        onOpenChange={setIsFormDialogOpen}
         onSubmit={editingTeam ? handleUpdateTeam : handleCreateTeam}
-        team={editingTeam}
         loading={formLoading}
+        team={editingTeam}
       />
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Team</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{teamToDelete?.name}"? This action cannot be undone and will also remove
-              all team members.
+              Are you sure you want to delete this team? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteTeam}
-              disabled={deleteLoading}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {deleteLoading ? "Deleting..." : "Delete Team"}
+            <AlertDialogAction onClick={handleDeleteTeam} disabled={deleteLoading}>
+              {deleteLoading ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
