@@ -17,6 +17,10 @@ import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { PlusCircle, CheckCircle, Loader2, ChevronDown, Search } from "lucide-react"
 import { ClientDialog } from "./client-dialog"
 import { cn } from "@/lib/utils"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import type { Booking } from "@/lib/booking-service"
+import { getLatestReportsByBookingIds, type ReportData } from "@/lib/report-service"
 
 interface Spot {
   id: string
@@ -38,7 +42,6 @@ interface SpotSelectionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   products: any[]
-  spotsData: Record<string, ProductSpotsData>
   currentDate: string
   selectedDate: string
   type: "quotation" | "cost-estimate"
@@ -53,7 +56,6 @@ export function SpotSelectionDialog({
   open,
   onOpenChange,
   products,
-  spotsData,
   currentDate,
   selectedDate,
   type,
@@ -65,6 +67,8 @@ export function SpotSelectionDialog({
 }: SpotSelectionDialogProps) {
   const [selectedSpots, setSelectedSpots] = useState<Record<string, number[]>>({})
   const [loading, setLoading] = useState(false)
+  const [spotsData, setSpotsData] = useState<Record<string, ProductSpotsData>>({})
+  const [spotsDataLoading, setSpotsDataLoading] = useState(false)
   const { userData } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
@@ -92,6 +96,121 @@ export function SpotSelectionDialog({
       }
     }
   }, [open, preSelectedClient])
+
+  // Fetch spots data when dialog opens
+  useEffect(() => {
+    const fetchSpotsData = async () => {
+      if (!open || products.length === 0) return
+
+      setSpotsDataLoading(true)
+      try {
+        const newSpotsData: Record<string, ProductSpotsData> = {}
+
+        for (const product of products) {
+          const productId = product.id
+
+          // Check if spots data is stored in localStorage
+          const storedSpotsData = localStorage.getItem(`spotsData-${productId}`)
+          if (storedSpotsData) {
+            try {
+              const spots = JSON.parse(storedSpotsData)
+              const totalSpots = product.cms?.loops_per_day || 18
+              const occupiedCount = spots.filter((spot: any) => spot.status === 'occupied').length
+              const vacantCount = totalSpots - occupiedCount
+
+              newSpotsData[productId] = {
+                spots,
+                totalSpots,
+                occupiedCount,
+                vacantCount,
+                currentDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+              }
+              continue
+            } catch (error) {
+              console.error("Error parsing stored spots data:", error)
+            }
+          }
+
+          // Fetch current day's bookings
+          const today = new Date()
+          const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+          const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59)
+
+          const bookingsQuery = query(
+            collection(db, "booking"),
+            where("product_id", "==", productId),
+            where("status", "in", ["RESERVED", "COMPLETED"])
+          )
+
+          const querySnapshot = await getDocs(bookingsQuery)
+          const currentDayBookings: Booking[] = []
+
+          querySnapshot.forEach((doc) => {
+            const booking = { id: doc.id, ...doc.data() } as Booking
+
+            // Check if booking covers today
+            if (booking.start_date && booking.end_date) {
+              const startDate = booking.start_date.toDate()
+              const endDate = booking.end_date.toDate()
+
+              if (startDate <= endOfDay && endDate >= startOfDay) {
+                currentDayBookings.push(booking)
+              }
+            }
+          })
+
+          // Fetch reports data for current day bookings
+          let reportsData: { [bookingId: string]: ReportData | null } = {}
+          if (currentDayBookings.length > 0) {
+            const bookingIds = currentDayBookings.map(booking => booking.id)
+            reportsData = await getLatestReportsByBookingIds(bookingIds)
+          }
+
+          // Generate spots data
+          const spots = []
+          const totalSpots = product.cms?.loops_per_day || 18
+          const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
+
+          for (let i = 1; i <= totalSpots; i++) {
+            // Check if this spot has bookings today
+            const isOccupied = currentDayBookings.some(booking =>
+              booking.spot_numbers?.includes(i)
+            )
+            const booking = currentDayBookings.find(b => b.spot_numbers?.includes(i))
+            const report = booking ? reportsData[booking.id] : null
+
+            spots.push({
+              id: `spot-${i}`,
+              number: i,
+              status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
+              clientName: isOccupied ? (booking?.client?.name || clientNames[(i - 1) % clientNames.length]) : undefined,
+              imageUrl: isOccupied ? (report?.siteImageUrl || "/placeholder.svg") : undefined,
+            })
+          }
+
+          const occupiedCount = spots.filter(spot => spot.status === 'occupied').length
+          const vacantCount = totalSpots - occupiedCount
+
+          newSpotsData[productId] = {
+            spots,
+            totalSpots,
+            occupiedCount,
+            vacantCount,
+            currentDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          }
+        }
+
+        setSpotsData(newSpotsData)
+      } catch (error) {
+        console.error("Error fetching spots data:", error)
+        setSpotsData({})
+      } finally {
+        setSpotsDataLoading(false)
+      }
+    }
+
+    fetchSpotsData()
+  }, [open, products])
 
   // Fetch clients for dashboard client selection
   useEffect(() => {
@@ -223,20 +342,20 @@ export function SpotSelectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden pr-4">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden pr-4">
         <DialogHeader>
           <DialogTitle>
-            Select Spot/s for {type === "cost-estimate" ? "Cost Estimate" : "Quotation"}
+            Create {type === "cost-estimate" ? "Cost Estimate" : "Quotation"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col h-full max-h-[calc(90vh-8rem)] max-w-3xl pr-12">
+        <div className="flex flex-col h-full max-h-[calc(90vh-8rem)] max-w-5xl pr-12">
           {/* Client Selection - Only show when not hidden */}
           {!hideClientSelection && (
             <div className="mb-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Select Client</label>
-                <div className="relative" ref={clientSearchRef}>
+              <div className="flex items-center gap-4">
+                <label className="text-[12px] font-semibold text-gray-700 whitespace-nowrap">Client:</label>
+                <div className="relative w-[40%]" ref={clientSearchRef}>
                   <Input
                     placeholder="Choose a client..."
                     value={
@@ -326,6 +445,9 @@ export function SpotSelectionDialog({
 
           {/* Spots Grid with Selection */}
           <div className="flex-1 overflow-y-auto">
+            <div className="mb-4">
+              <label className="block text-[13px] font-semibold text-gray-700">Select a spot/s</label>
+            </div>
             <div className="space-y-6">
               {products.map((product) => {
                 const productSpotsData = spotsData[product.id]
@@ -336,7 +458,24 @@ export function SpotSelectionDialog({
 
                 return (
                   <div key={product.id} className="bg-[#ECECEC] rounded-[13.8px] p-4 space-y-4">
-                    <h3 className="text-lg font-semibold">{product.name}</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">{product.name}</h3>
+                      <div className="flex items-center gap-6 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">Total Spots:</span>
+                          <span className="text-gray-700">{totalSpots}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">Total Occupied:</span>
+                          <span className="text-cyan-600 font-medium">{occupiedCount} ({Math.round((occupiedCount / totalSpots) * 100)}%)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">Total Vacant:</span>
+                          <span className="font-bold text-gray-700">{vacantCount} ({Math.round((vacantCount / totalSpots) * 100)}%)</span>
+                        </div>
+                        <span className="text-blue-600">as of {new Date(currentDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                      </div>
+                    </div>
                     <SpotsGrid
                       spots={spots}
                       totalSpots={totalSpots}

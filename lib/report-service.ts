@@ -28,6 +28,7 @@ export interface ReportData {
   client_email?: string
   joNumber?: string
   joType?: string
+  booking_id?: string
   bookingDates: {
     start: Timestamp
     end: Timestamp
@@ -571,6 +572,44 @@ export async function postReport(reportData: ReportData): Promise<string> {
     throw error
   }
 }
+export async function getLatestReportsByBookingIds(bookingIds: string[]): Promise<{ [bookingId: string]: ReportData | null }> {
+  try {
+    const reportsMap: { [bookingId: string]: ReportData | null } = {}
+
+    // Initialize all bookingIds with null
+    bookingIds.forEach(id => {
+      reportsMap[id] = null
+    })
+
+    // Fetch reports for each booking ID
+    const promises = bookingIds.map(async (bookingId) => {
+      const q = query(
+        collection(db, "reports"),
+        where("booking_id", "==", bookingId),
+        orderBy("created", "desc"),
+        limit(1)
+      )
+      const querySnapshot = await getDocs(q)
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0]
+        const data = doc.data()
+        reportsMap[bookingId] = {
+          id: doc.id,
+          ...data,
+          attachments: Array.isArray(data.attachments) ? data.attachments : [],
+        } as ReportData
+      }
+    })
+
+    await Promise.all(promises)
+
+    return reportsMap
+  } catch (error) {
+    console.error("Error fetching latest reports by booking IDs:", error)
+    throw error
+  }
+}
+
 
 // Get sent emails for a report
 export async function getSentEmailsForReport(reportId: string): Promise<any[]> {

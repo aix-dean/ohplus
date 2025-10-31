@@ -34,13 +34,14 @@ import { getQuotationRequestsByProductId, type QuotationRequest } from "@/lib/fi
 import { getAllCostEstimates, type CostEstimate } from "@/lib/cost-estimate-service"
 import { getAllQuotations, type Quotation } from "@/lib/quotation-service"
 import { getAllJobOrders, type JobOrder } from "@/lib/job-order-service"
-import { getReportsByProductId, type ReportData } from "@/lib/report-service"
+import { getReportsByProductId, getLatestReportsByBookingIds, type ReportData } from "@/lib/report-service"
 import type { Booking } from "@/lib/booking-service"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/contexts/auth-context"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
 import { collection, query, where, orderBy, getDocs } from "firebase/firestore"
 import { SpotsGrid } from "@/components/spots-grid"
+import { SpotSelectionDialog } from "@/components/spot-selection-dialog"
 
 const CalendarView: React.FC<{ bookedDates: Date[] }> = ({ bookedDates }) => {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -112,7 +113,7 @@ const CalendarView: React.FC<{ bookedDates: Date[] }> = ({ bookedDates }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-6">
         {months.map((monthDate, monthIndex) => {
           const days = generateMonthDays(monthDate)
           const monthName = monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
@@ -124,7 +125,7 @@ const CalendarView: React.FC<{ bookedDates: Date[] }> = ({ bookedDates }) => {
               {/* Day headers */}
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                  <div key={day} className="text-center text-sm font-medium text-gray-500 py-2">
+                  <div key={day} className="text-center text-xs sm:text-sm font-medium text-gray-500 py-2">
                     {day}
                   </div>
                 ))}
@@ -160,7 +161,7 @@ const CalendarView: React.FC<{ bookedDates: Date[] }> = ({ bookedDates }) => {
         })}
       </div>
 
-      <div className="flex items-center justify-center gap-6 text-sm">
+      <div className="flex items-center text-center break-all min-w-0 gap-6 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-red-100 border border-red-200 rounded"></div>
           <span>Booked</span>
@@ -254,7 +255,7 @@ const GoogleMap = React.memo(({ location, className }: { location: string; class
 
   if (mapError) {
     return (
-      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
+      <div className={`bg-gray-100 rounded-lg flex items-center text-center break-all min-w-0 ${className}`}>
         <div className="text-center text-gray-500">
           <p className="text-sm">Map unavailable</p>
           <p className="text-xs mt-1">{location}</p>
@@ -267,7 +268,7 @@ const GoogleMap = React.memo(({ location, className }: { location: string; class
     <div className={`relative ${className}`}>
       <div ref={mapRef} className="w-full h-full" />
       {!mapLoaded && (
-        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center">
+        <div className="absolute inset-0 bg-gray-100 flex items-center text-center break-all min-w-0">
           <div className="text-center">
             <Loader2 className="h-6 w-6 animate-spin text-gray-400 mx-auto mb-2" />
             <p className="text-sm text-gray-500">Loading map...</p>
@@ -374,17 +375,17 @@ function CustomNotification({
       >
         <div className="flex-shrink-0">
           {type === "success" ? (
-            <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+            <div className="w-5 h-5 rounded-full bg-green-500 flex items-center text-center break-all min-w-0">
               <Check className="w-3 h-3 text-white" />
             </div>
           ) : (
-            <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
+            <div className="w-5 h-5 rounded-full bg-red-500 flex items-center text-center break-all min-w-0">
               <X className="w-3 h-3 text-white" />
             </div>
           )}
         </div>
         <div className="flex-1">
-          <p className="text-sm font-medium">{message}</p>
+          <p className="text-xs sm:text-sm font-medium">{message}</p>
         </div>
         <button
           onClick={onClose}
@@ -403,7 +404,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const { toast } = useToast()
 
   // Helper functions for spots data
-  const generateSpotsData = (cms: any, currentDayBookings: Booking[]) => {
+  const generateSpotsData = (cms: any, currentDayBookings: Booking[], reportsData: { [bookingId: string]: ReportData | null }) => {
     const totalSpots = cms.loops_per_day || 18
     const spots = []
 
@@ -427,12 +428,36 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
       const booking = currentDayBookings.find(b => b.spot_numbers?.includes(i))
       const schedule = screenSchedules.find(s => s.spot_number === i && s.active)
 
+      // Get image URL from report attachments
+      let imageUrl: string | undefined
+      if (booking && reportsData[booking.id]) {
+        const report = reportsData[booking.id]
+        console.log(`Spot ${i}: Found report for booking ${booking.id}:`, report)
+        if (report && report.attachments && report.attachments.length > 0) {
+          // Find attachment with label "After"
+          const afterAttachment = report.attachments.find(att => att.label === "After")
+          console.log(`Spot ${i}: After attachment:`, afterAttachment)
+          if (afterAttachment) {
+            imageUrl = afterAttachment.fileUrl
+          } else {
+            // Use first attachment if no "After" label
+            imageUrl = report.attachments[0].fileUrl
+            console.log(`Spot ${i}: Using first attachment:`, imageUrl)
+          }
+        } else {
+          console.log(`Spot ${i}: No attachments in report`)
+        }
+      } else {
+        console.log(`Spot ${i}: No booking or report found for booking ${booking?.id}`)
+      }
+      console.log(`Spot ${i}: Final imageUrl:`, imageUrl)
+
       spots.push({
         id: `spot-${i}`,
         number: i,
         status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
         clientName: isOccupied ? (booking?.client?.name || schedule?.title || clientNames[(i - 1) % clientNames.length]) : undefined,
-        imageUrl: isOccupied ? (schedule?.media || "/placeholder.svg") : undefined,
+        imageUrl,
       })
     }
 
@@ -509,8 +534,14 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const [screenSchedules, setScreenSchedules] = useState<any[]>([])
   const [currentDayBookings, setCurrentDayBookings] = useState<Booking[]>([])
   const [currentDayBookingsLoading, setCurrentDayBookingsLoading] = useState(false)
+  const [reportsData, setReportsData] = useState<{ [bookingId: string]: ReportData | null }>({})
   const [companyName, setCompanyName] = useState<string>("")
   const [companyLoading, setCompanyLoading] = useState(false)
+  const [isSpotSelectionDialogOpen, setIsSpotSelectionDialogOpen] = useState(false)
+  const [spotSelectionProducts, setSpotSelectionProducts] = useState<any[]>([])
+  const [spotSelectionSpotsData, setSpotSelectionSpotsData] = useState<Record<string, any>>({})
+  const [spotSelectionCurrentDate, setSpotSelectionCurrentDate] = useState("")
+  const [spotSelectionType, setSpotSelectionType] = useState<"quotation" | "cost-estimate">("quotation")
 
   const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 
@@ -535,6 +566,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const hideNotification = () => {
     setNotification((prev) => ({ ...prev, show: false }))
   }
+
 
   useEffect(() => {
     async function fetchProduct() {
@@ -855,6 +887,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         })
 
         setCurrentDayBookings(currentDayBookingsData)
+
       } catch (error) {
         console.error("Error fetching current day bookings:", error)
       } finally {
@@ -864,6 +897,30 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
     fetchCurrentDayBookings()
   }, [params.id])
+
+  // Fetch latest reports for current day bookings
+  useEffect(() => {
+    const fetchReportsForBookings = async () => {
+      if (!currentDayBookings || currentDayBookings.length === 0) {
+        console.log("No current day bookings, setting empty reportsData")
+        setReportsData({})
+        return
+      }
+
+      try {
+        const bookingIds = currentDayBookings.map(booking => booking.id)
+        console.log("Fetching reports for booking IDs:", bookingIds)
+        const reportsMap = await getLatestReportsByBookingIds(bookingIds)
+        console.log("Fetched reports map:", reportsMap)
+        setReportsData(reportsMap)
+      } catch (error) {
+        console.error("Error fetching reports for bookings:", error)
+        setReportsData({})
+      }
+    }
+
+    fetchReportsForBookings()
+  }, [currentDayBookings])
   useEffect(() => {
     const fetchCompanyName = async () => {
       if (!product?.company_id) {
@@ -1320,7 +1377,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
   const currentContent = getCurrentContent(product)
 
   return (
-    <div className="container mx-auto px-4 pt-2 pb-6">
+    <div className="mx-auto px-4 pt-2 pb-6">
       {/* Notification */}
       <CustomNotification
         show={notification.show}
@@ -1338,38 +1395,78 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-600 mr-2">Create:</span>
+          <span className="text-xs sm:text-sm font-medium text-gray-600 mr-2">Create:</span>
           <Button
             variant="outline"
-            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
+            className="bg-white border-[#C4C4C4] text-[#333333] hover:bg-gray-50"
             onClick={() => router.push(`/sales/dashboard?tab=proposals&productId=${params.id}`)}
           >
             Proposal
           </Button>
           <Button
             variant="outline"
-            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
-            onClick={() => router.push(`/sales/dashboard?tab=ce&productId=${params.id}`)}
+            className="bg-white border-[#C4C4C4] text-[#333333] hover:bg-gray-50"
+            onClick={() => {
+              if (product?.content_type?.toLowerCase() === "digital") {
+                setSpotSelectionType("cost-estimate")
+                setSpotSelectionProducts([product])
+                const spotsData: Record<string, any> = {}
+                const currentDate = new Date().toISOString().split('T')[0]
+                const spotData = generateSpotsData(product.cms, currentDayBookings, reportsData)
+                spotsData[product.id || ''] = {
+                  spots: spotData,
+                  totalSpots: product.cms.loops_per_day || 18,
+                  occupiedCount: calculateOccupiedSpots(product.cms),
+                  vacantCount: calculateVacantSpots(product.cms),
+                  currentDate,
+                }
+                setSpotSelectionSpotsData(spotsData)
+                setSpotSelectionCurrentDate(currentDate)
+                setIsSpotSelectionDialogOpen(true)
+              } else {
+                router.push(`/sales/dashboard?tab=ce&productId=${params.id}`)
+              }
+            }}
           >
             Cost Estimate
           </Button>
           <Button
             variant="outline"
-            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
-            onClick={() => router.push(`/sales/dashboard?tab=quotations&productId=${params.id}`)}
+            className="bg-white border-[#C4C4C4] text-[#333333] hover:bg-gray-50"
+            onClick={() => {
+              if (product?.content_type?.toLowerCase() === "digital") {
+                setSpotSelectionType("quotation")
+                setSpotSelectionProducts([product])
+                const spotsData: Record<string, any> = {}
+                const currentDate = new Date().toISOString().split('T')[0]
+                const spotData = generateSpotsData(product.cms, currentDayBookings, reportsData)
+                spotsData[product.id || ''] = {
+                  spots: spotData,
+                  totalSpots: product.cms.loops_per_day || 18,
+                  occupiedCount: calculateOccupiedSpots(product.cms),
+                  vacantCount: calculateVacantSpots(product.cms),
+                  currentDate,
+                }
+                setSpotSelectionSpotsData(spotsData)
+                setSpotSelectionCurrentDate(currentDate)
+                setIsSpotSelectionDialogOpen(true)
+              } else {
+                router.push(`/sales/dashboard?tab=quotations&productId=${params.id}`)
+              }
+            }}
           >
             Quotation
           </Button>
           <Button
             variant="outline"
-            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
+            className="bg-white border-[#C4C4C4] text-[#333333] hover:bg-gray-50"
             onClick={() => router.push(`/sales/job-orders/select-quotation?productId=${params.id}`)}
           >
             Job Order
           </Button>
           <Button
             variant="outline"
-            className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50"
+            className="bg-white border-[#C4C4C4] text-[#333333] hover:bg-gray-50"
             onClick={() => setMarketplaceDialogOpen(true)}
           >
             Marketplace
@@ -1424,7 +1521,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                       </Button>
                     </>
                   ) : (
-                    <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                    <div className="w-full h-full bg-gray-100 flex items-center text-center break-all min-w-0">
                       <Image
                         src="/building-billboard.png"
                         alt="Site placeholder"
@@ -1450,7 +1547,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
               <div className="mt-2">
                 <Button
                   variant="outline"
-                  className="w-full border-solid"
+                  className="w-full border-solid border-[#C4C4C4]"
                   onClick={handleCalendarOpen}
                 >
                   <Calendar className="h-4 w-4 mr-2" />
@@ -1548,7 +1645,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
           {product && product.content_type?.toLowerCase() === "digital" && product.cms && (
             <div className="mb-6">
               <SpotsGrid
-                spots={generateSpotsData(product.cms, currentDayBookings)}
+                spots={generateSpotsData(product.cms, currentDayBookings, reportsData)}
                 totalSpots={product.cms.loops_per_day || 18}
                 occupiedCount={calculateOccupiedSpots(product.cms)}
                 vacantCount={calculateVacantSpots(product.cms)}
@@ -1561,20 +1658,19 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
             
             
 
-            <div className="text-sm text-gray-600 mb-4 text-right">Total: {getTabCount(activeTab)}</div>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <div>
-                <TabsList className="grid w-fit grid-cols-5">
-                <TabsTrigger value="booking-summary">Booking Summary</TabsTrigger>
-                <TabsTrigger value="ce">CE</TabsTrigger>
-                <TabsTrigger value="quote">Quote</TabsTrigger>
-                <TabsTrigger value="job-order">Job Order</TabsTrigger>
-                <TabsTrigger value="reports">Reports</TabsTrigger>
+                <TabsList className="flex flex-wrap justify-start bg-transparent border-none p-0 gap-0">
+                <TabsTrigger value="booking-summary" className="bg-white border-2 border-[#DFDFDF] text-[#DFDFDF] rounded-none h-auto min-h-9 px-2 py-2 whitespace-normal text-center data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-[#C4C4C4]">Booking Summary</TabsTrigger>
+                <TabsTrigger value="ce" className="bg-white border-2 border-[#DFDFDF] text-[#DFDFDF] rounded-none h-auto min-h-9 px-2 py-2 whitespace-normal text-center data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-[#C4C4C4]">Cost Estimates</TabsTrigger>
+                <TabsTrigger value="quote" className="bg-white border-2 border-[#DFDFDF] text-[#DFDFDF] rounded-none h-auto min-h-9 px-2 py-2 whitespace-normal text-center data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-[#C4C4C4]">Quotations</TabsTrigger>
+                <TabsTrigger value="job-order" className="bg-white border-2 border-[#DFDFDF] text-[#DFDFDF] rounded-none h-auto min-h-9 px-2 py-2 whitespace-normal text-center data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-[#C4C4C4]">Job Orders</TabsTrigger>
+                <TabsTrigger value="reports" className="bg-white border-2 border-[#DFDFDF] text-[#DFDFDF] rounded-none h-auto min-h-9 px-2 py-2 whitespace-normal text-center data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:border-[#C4C4C4]">Reports</TabsTrigger>
               </TabsList>
             </div>
 
             <TabsContent value="booking-summary" className="mt-0">
-              <Card className="rounded-xl shadow-sm border border-gray-200">
+              <Card className="rounded-xl shadow-sm border-none px-4">
                 <CardContent className="p-0">
                   {bookingsLoading ? (
                     <div className="text-center py-8">
@@ -1587,18 +1683,18 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                     </div>
                   ) : (
                     <div>
-                      <div className="grid grid-cols-7 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-                        <div>Date</div>
-                        <div>Project ID</div>
-                        <div>Client</div>
-                        <div>Content</div>
-                        <div>Price</div>
-                        <div>Total</div>
-                        <div>Status</div>
+                      <div className="grid grid-cols-7 gap-4 p-4 bg-white border-b border-gray-200 text-xs sm:text-sm font-medium text-gray-700">
+                        <div className="flex items-center text-center break-all min-w-0">Date</div>
+                        <div className="flex items-center text-center break-all min-w-0">Reservation ID</div>
+                        <div className="flex items-center text-center break-all min-w-0">Client</div>
+                        <div className="flex items-center text-center break-all min-w-0">Project Name</div>
+                        <div className="flex items-center text-center break-all min-w-0">Price</div>
+                        <div className="flex items-center text-center break-all min-w-0">Total</div>
+                        <div className="flex items-center text-center break-all min-w-0">Status</div>
                       </div>
 
-                      <div className="divide-y divide-gray-100">
-                        {bookings.map((booking) => {
+                      <div className="space-y-2 pb-4 overflow-x-auto">
+                        {bookings.map((booking, index) => {
                           const getStatusLabel = (status: string) => {
                             switch (status?.toUpperCase()) {
                               case "COMPLETED":
@@ -1613,31 +1709,30 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                           const getStatusBadge = (status: string) => {
                             const label = getStatusLabel(status)
                             if (label === "Completed") {
-                              return <Badge className="bg-green-100 text-green-800 border-green-200">Completed</Badge>
+                              return <div className="text-[#30C71D]">Completed</div>
                             } else if (label === "Ongoing") {
-                              return <Badge className="bg-red-100 text-red-800 border-red-200">Ongoing</Badge>
+                              return <div className="text-[#00D0FF]">Ongoing</div>
                             } else {
-                              return <Badge variant="outline">{label}</Badge>
+                              return <div variant="outline">{label}</div>
                             }
                           }
 
                           return (
-                            <div key={booking.id} className="grid grid-cols-7 gap-4 p-4 text-sm">
-                              <div className="text-gray-600">
+                            <div key={booking.id} className={`grid grid-cols-7 gap-4 p-4 text-xs sm:text-sm bg-[#F6F9FF] border-2 border-[#B8D9FF] rounded-[10px] hover:bg-gray-50 cursor-pointer transition-colors ${index === 0 ? 'mt-4' : ''}`} onClick={() => router.push(`/sales/reservation/${booking.id}`)}>
+                              <div className="flex items-center text-center break-all min-w-0 text-gray-600">
                                 {booking.start_date ? formatFirebaseDate(booking.start_date) : "N/A"} to
                                 <br />
                                 {booking.end_date ? formatFirebaseDate(booking.end_date) : "N/A"}
                               </div>
-                              <div className="text-gray-900 font-medium">{booking.reservation_id || booking.id}</div>
-                              <div className="text-gray-900">{booking.client?.name || "N/A"}</div>
-                              <div className="text-gray-900">{booking.project_name || booking.product_name || "N/A"}</div>
-                              <div className="text-red-600 font-medium">
-                                ₱{booking.costDetails?.pricePerMonth?.toLocaleString() || "0"}
+                              <div className="flex items-center text-center break-all min-w-0 text-gray-900">{booking.reservation_id || booking.id}</div>
+                              <div className="flex items-center text-center break-all min-w-0 text-gray-900">{booking.client?.name || "N/A"}</div>
+                              <div className="flex items-center text-center break-all min-w-0 text-gray-900">{booking.project_name || booking.product_name || "N/A"}</div>
+                              <div className="flex items-center text-center break-all min-w-0 text-gray-900">
+                                ₱{booking.costDetails?.pricePerMonth?.toLocaleString() || "0"}/month
                                 <br />
-                                <span className="text-xs">/month</span>
                               </div>
-                              <div className="text-red-600 font-bold">₱{booking.total_cost?.toLocaleString() || "0"}</div>
-                              <div>
+                              <div className="flex items-center text-center break-all min-w-0 text-gray-900">₱{booking.total_cost?.toLocaleString() || "0"}</div>
+                              <div className="flex items-center text-center break-all min-w-0">
                                 {getStatusBadge(booking.status)}
                               </div>
                             </div>
@@ -1682,8 +1777,8 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             {/* CE Tab */}
             <TabsContent value="ce" className="mt-0">
-              <Card className="rounded-xl shadow-sm border border-gray-200">
-                <CardContent className="p-0">
+              <Card className="rounded-xl shadow-sm border-none px-4">
+                <CardContent className="pb-4 overflow-x-auto">
                   {costEstimatesLoading ? (
                     <div className="p-8">
                       <div className="space-y-4">
@@ -1704,40 +1799,38 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   ) : costEstimates.length === 0 ? (
                     <div className="p-8 text-center">
                       <FileText className="h-10 w-10 text-gray-400 mx-auto mb-3" />
-                      <h3 className="text-sm font-medium text-gray-900 mb-1">No CE records</h3>
+                      <h3 className="text-xs sm:text-sm font-medium text-gray-900 mb-1">No CE records</h3>
                       <p className="text-sm text-gray-500">No cost estimates have been created for this site yet.</p>
                     </div>
                   ) : (
                     <>
-                      <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-                        <div>Date</div>
-                        <div>Project ID</div>
-                        <div>Type</div>
-                        <div>Client</div>
-                        <div>Status</div>
-                        <div>Price</div>
+                      <div className="grid grid-cols-5 gap-4 p-4 bg-white border-b border-gray-200 text-xs sm:text-sm font-medium text-gray-700">
+                        <div className="flex items-center text-center break-all min-w-0">Date</div>
+                        <div className="flex items-center text-center break-all min-w-0">Cost Estimate ID</div>
+                        <div className="flex items-center text-center break-all min-w-0">Client</div>
+                        <div className="flex items-center text-center break-all min-w-0">Status</div>
+                        <div className="flex items-center text-center break-all min-w-0">Price</div>
                       </div>
-                      <div className="divide-y divide-gray-100">
-                        {costEstimates.map((estimate) => (
+                      <div className="space-y-2 pb-4 overflow-x-auto">
+                        {costEstimates.map((estimate, index) => (
                           <div
                             key={estimate.id}
-                            className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                            className={`grid grid-cols-5 gap-4 p-4 text-xs sm:text-sm bg-[#F6F9FF] border-2 border-[#B8D9FF] rounded-[10px] hover:bg-gray-50 cursor-pointer transition-colors ${index === 0 ? 'mt-4' : ''}`}
                             onClick={() => router.push(`/sales/cost-estimates/${estimate.id}`)}
                           >
-                            <div className="text-gray-600">{formatDate(estimate.createdAt)}</div>
-                            <div className="text-gray-900 font-medium">
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-600">{formatDate(estimate.createdAt)}</div>
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-900 font-medium break-all">
                               {estimate.costEstimateNumber || estimate.id.slice(-8)}
                             </div>
-                            <div className="text-gray-600">Cost Estimate</div>
-                            <div className="text-gray-900">
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-900">
                               {estimate.client?.company || estimate.client?.name || "Not Set Client"}
                             </div>
-                            <div>
+                            <div className="flex items-center text-center break-all min-w-0">
                               <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
                                 {estimate.status || "Draft"}
                               </Badge>
                             </div>
-                            <div className="text-red-600 font-medium">
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-900">
                               ₱{estimate.totalAmount?.toLocaleString() || "0"}/month
                             </div>
                           </div>
@@ -1781,10 +1874,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             {/* Quote Tab */}
             <TabsContent value="quote" className="space-y-4">
-              <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Quotations</h3>
-                </div>
+              <div className="bg-white rounded-lg pb-4 px-4 overflow-x-auto">
                 {quotationsLoading ? (
                   <div className="p-8 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -1796,32 +1886,30 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-6 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-                      <div>Date</div>
-                      <div>Project ID</div>
-                      <div>Type</div>
-                      <div>Client</div>
-                      <div>Status</div>
-                      <div>Price</div>
+                    <div className="grid grid-cols-5 gap-4 p-4 bg-white border-b border-gray-200 text-xs sm:text-sm font-medium text-gray-700">
+                      <div className="flex items-center text-center break-all min-w-0">Date</div>
+                      <div className="flex items-center text-center break-all min-w-0">Quotation ID</div>
+                      <div className="flex items-center text-center break-all min-w-0">Client</div>
+                      <div className="flex items-center text-center break-all min-w-0">Status</div>
+                      <div className="flex items-center text-center break-all min-w-0">Price</div>
                     </div>
-                    <div className="divide-y divide-gray-100">
-                      {quotations.map((quotation) => {
+                    <div className="space-y-2 pb-4 overflow-x-auto">
+                      {quotations.map((quotation, index) => {
                         const statusConfig = getQuotationStatusConfig(quotation.status)
                         return (
                           <div
                             key={quotation.id}
-                            className="grid grid-cols-6 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                            className={`grid grid-cols-5 gap-4 p-4  text-xs sm:text-sm bg-[#F6F9FF] border-2 border-[#B8D9FF] rounded-[10px] hover:bg-gray-50 cursor-pointer transition-colors ${index === 0 ? 'mt-4' : ''}`}
                             onClick={() => router.push(`/sales/quotations/${quotation.id}`)}
                           >
-                            <div className="text-gray-600">{quotation.created ? formatFirebaseDate(quotation.created) : "N/A"}</div>
-                            <div className="text-gray-900 font-medium">
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-600">{quotation.created ? formatFirebaseDate(quotation.created) : "N/A"}</div>
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-900">
                               {quotation.quotation_number || quotation.id?.slice(-8) || "N/A"}
                             </div>
-                            <div className="text-gray-600">Quotation</div>
-                            <div className="text-gray-900">
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-900">
                               {quotation.client_name || "Not Set Client"}
                             </div>
-                            <div>
+                            <div className="flex items-center text-center break-all min-w-0">
                               <span
                                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusConfig.color}`}
                               >
@@ -1829,7 +1917,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                                 {statusConfig.label}
                               </span>
                             </div>
-                            <div className="text-red-600 font-medium">₱{quotation.total_amount?.toLocaleString() || "0"}/month</div>
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-900">₱{quotation.total_amount?.toLocaleString() || "0"}/month</div>
                           </div>
                         )
                       })}
@@ -1871,10 +1959,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             {/* Job Order Tab */}
             <TabsContent value="job-order" className="space-y-4">
-              <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Job Orders</h3>
-                </div>
+              <div className="bg-white rounded-lg pb-4 px-4 overflow-x-auto">
                 {jobOrdersLoading ? (
                   <div className="p-8 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -1886,32 +1971,30 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-5 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-                      <div>Date</div>
-                      <div>Project ID</div>
-                      <div>Type</div>
-                      <div>Client</div>
-                      <div>Status</div>
+                    <div className="grid grid-cols-4 gap-4 p-4 bg-white border-b border-gray-200 text-xs sm:text-sm font-medium text-gray-700">
+                      <div className="flex items-center text-center break-all min-w-0">Date</div>
+                      <div className="flex items-center text-center break-all min-w-0">Job Order ID</div>
+                      <div className="flex items-center text-center break-all min-w-0">Client</div>
+                      <div className="flex items-center text-center break-all min-w-0">Status</div>
                     </div>
-                    <div className="divide-y divide-gray-100">
-                      {jobOrders.map((jobOrder) => {
+                    <div className="space-y-2 pb-4 overflow-x-auto">
+                      {jobOrders.map((jobOrder, index) => {
                         const statusConfig = getJobOrderStatusConfig(jobOrder.status)
 
                         return (
                           <div
                             key={jobOrder.id}
-                            className="grid grid-cols-5 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                            className={`grid grid-cols-4 gap-4 p-4 text-xs sm:text-sm bg-[#F6F9FF] border-2 border-[#B8D9FF] rounded-[10px] hover:bg-gray-50 cursor-pointer transition-colors ${index === 0 ? 'mt-4' : ''}`}
                             onClick={() => router.push(`/sales/job-orders/${jobOrder.id}`)}
                           >
-                            <div className="text-gray-600">{jobOrder.created ? formatFirebaseDate(jobOrder.created) : "N/A"}</div>
-                            <div className="text-gray-900 font-medium">
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-600">{jobOrder.created ? formatFirebaseDate(jobOrder.created) : "N/A"}</div>
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-900">
                               {jobOrder.joNumber || jobOrder.id.slice(-8)}
                             </div>
-                            <div className="text-gray-600">Job Order</div>
-                            <div className="text-gray-900">
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-900">
                               {jobOrder.clientName || "Not Set Client"}
                             </div>
-                            <div>
+                            <div className="flex items-center text-center break-all min-w-0">
                               <span
                                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusConfig.color}`}
                               >
@@ -1960,10 +2043,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
             {/* Reports Tab */}
             <TabsContent value="reports" className="space-y-4">
-              <div className="bg-white rounded-lg border border-gray-200">
-                <div className="p-4 border-b border-gray-200">
-                  <h3 className="text-lg font-semibold text-gray-900">Reports</h3>
-                </div>
+              <div className="bg-white rounded-lg pb-4 px-4 overflow-x-auto">
                 {reportsLoading ? (
                   <div className="p-8 text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -1975,29 +2055,29 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                   </div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-5 gap-4 p-4 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
-                      <div>Date</div>
-                      <div>Report ID</div>
-                      <div>Type</div>
-                      <div>Client</div>
-                      <div>Status</div>
+                    <div className="grid grid-cols-5 gap-4 p-4 bg-white border-b border-gray-200 text-xs sm:text-sm font-medium text-gray-700">
+                      <div className="flex items-center text-center break-all min-w-0">Date</div>
+                      <div className="flex items-center text-center break-all min-w-0">Report ID</div>
+                      <div className="flex items-center text-center break-all min-w-0">Type</div>
+                      <div className="flex items-center text-center break-all min-w-0">Client</div>
+                      <div className="flex items-center text-center break-all min-w-0">Status</div>
                     </div>
-                    <div className="divide-y divide-gray-100">
-                      {reports.map((report) => (
+                    <div className="space-y-2 pb-4 overflow-x-auto">
+                      {reports.map((report, index) => (
                         <div
                           key={report.id}
-                          className="grid grid-cols-5 gap-4 p-4 text-sm hover:bg-gray-50 cursor-pointer transition-colors"
+                          className={`grid grid-cols-5 gap-4 p-4 text-xs sm:text-sm bg-[#F6F9FF] border-2 border-[#B8D9FF] rounded-[10px] hover:bg-gray-50 cursor-pointer transition-colors ${index === 0 ? 'mt-4' : ''}`}
                           onClick={() => router.push(`/sales/reports/${report.id}`)}
                         >
-                          <div className="text-gray-600">{report.created ? formatFirebaseDate(report.created) : "N/A"}</div>
-                          <div className="text-gray-900 font-medium">
+                          <div className="flex items-center text-center break-all min-w-0 text-gray-600">{report.created ? formatFirebaseDate(report.created) : "N/A"}</div>
+                          <div className="flex items-center text-center break-all min-w-0 text-gray-900">
                             {report.report_id || report.id?.slice(-8) || "N/A"}
                           </div>
-                          <div className="text-gray-600">{report.reportType || "Not Set"}</div>
-                          <div className="text-gray-900">
+                          <div className="flex items-center text-center break-all min-w-0 text-gray-600">{report.reportType || "Not Set"}</div>
+                          <div className="flex items-center text-center break-all min-w-0 text-gray-900">
                             {report.client || "Not Set Client"}
                           </div>
-                          <div>
+                          <div className="flex items-center text-center break-all min-w-0">
                             <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-200">
                               {report.status || "Draft"}
                             </Badge>
@@ -2052,7 +2132,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
 
           <div className="space-y-4">
             {calendarLoading ? (
-              <div className="flex items-center justify-center py-12">
+              <div className="flex items-center text-center break-all min-w-0 py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                 <span className="ml-2 text-gray-600">Loading calendar...</span>
               </div>
@@ -2148,7 +2228,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 </div>
               </>
             ) : (
-              <div className="aspect-[4/3] w-full rounded-lg bg-gray-100 flex items-center justify-center">
+              <div className="aspect-[4/3] w-full rounded-lg bg-gray-100 flex items-center text-center break-all min-w-0">
                 <div className="text-center text-gray-500">
                   <ImageIcon className="h-12 w-12 mx-auto mb-2" />
                   <p>No images available</p>
@@ -2178,7 +2258,7 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                 className="flex flex-col items-center p-4 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
                 aria-label={`Connect to ${marketplace.name}`}
               >
-                <div className="w-24 h-24 rounded-xl flex items-center justify-center mb-2 bg-white">
+                <div className="w-24 h-24 rounded-xl flex items-center text-center break-all min-w-0 mb-2 bg-white">
                   <Image
                     src={marketplace.logo || "/placeholder.svg"}
                     alt={`${marketplace.name} logo`}
@@ -2187,12 +2267,22 @@ export default function ProductDetailPage({ params }: { params: { id: string } }
                     className="object-contain rounded-lg"
                   />
                 </div>
-                <span className="text-sm font-medium">{marketplace.name}</span>
+                <span className="text-xs sm:text-sm font-medium">{marketplace.name}</span>
               </button>
             ))}
           </div>
         </DialogContent>
       </Dialog>
+
+      <SpotSelectionDialog
+        open={isSpotSelectionDialogOpen}
+        onOpenChange={setIsSpotSelectionDialogOpen}
+        products={spotSelectionProducts}
+        currentDate={spotSelectionCurrentDate}
+        selectedDate={spotSelectionCurrentDate}
+        type={spotSelectionType}
+        nonDynamicSites={[]}
+      />
     </div>
   )
 }

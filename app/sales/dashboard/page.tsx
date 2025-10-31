@@ -2433,7 +2433,6 @@ function SalesDashboardContent() {
           open={isSpotSelectionDialogOpen}
           onOpenChange={setIsSpotSelectionDialogOpen}
           products={spotSelectionProducts}
-          spotsData={spotSelectionSpotsData}
           currentDate={spotSelectionCurrentDate}
           selectedDate={spotSelectionCurrentDate}
           type={ceMode ? "cost-estimate" : "quotation"}

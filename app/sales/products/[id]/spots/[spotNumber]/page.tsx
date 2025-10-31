@@ -265,8 +265,8 @@ useEffect(() => {
 
         // Check if booking covers today
         if (booking.start_date && booking.end_date) {
-          const startDate = booking.start_date.toDate ? booking.start_date.toDate() : new Date(booking.start_date)
-          const endDate = booking.end_date.toDate ? booking.end_date.toDate() : new Date(booking.end_date)
+          const startDate = booking.start_date.toDate()
+          const endDate = booking.end_date.toDate()
 
           if (startDate <= endOfDay && endDate >= startOfDay) {
             currentDayBookingsData.push(booking)
@@ -284,6 +284,7 @@ useEffect(() => {
 
   fetchCurrentDayBookings()
 }, [productId])
+
 
 
   const handleBack = () => {
@@ -418,32 +419,6 @@ useEffect(() => {
   const canGoLeft = false
   const canGoRight = false
 
-  // Generate spots data for the dialog
-  const generateSpotsData = (currentDayBookings: Booking[]) => {
-    const spots = []
-
-    // Sample client names for demonstration
-    const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
-
-    for (let i = 1; i <= totalSpots; i++) {
-      // Check if this spot has bookings today
-      const isOccupied = currentDayBookings.some(booking => 
-        booking.spot_numbers?.includes(i)
-      )
-      const booking = currentDayBookings.find(b => b.spot_numbers?.includes(i))
-      const schedule = spotSchedules.find(s => s.spot_number === i && s.active)
-
-      spots.push({
-        id: `spot-`,
-        number: i,
-        status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
-        clientName: isOccupied ? (booking?.client?.name || schedule?.title || clientNames[(i - 1) % clientNames.length]) : undefined,
-        imageUrl: isOccupied ? (schedule?.media || "/placeholder.svg") : undefined,
-      })
-    }
-
-    return spots
-  }
 
   const calculateOccupiedSpots = () => {
     // Count unique spot numbers from current day's bookings
@@ -683,15 +658,6 @@ useEffect(() => {
         open={spotSelectionDialogOpen}
         onOpenChange={setSpotSelectionDialogOpen}
         products={product ? [product] : []}
-        spotsData={product ? {
-          [product.id || '']: {
-            spots: generateSpotsData(currentDayBookings),
-            totalSpots,
-            occupiedCount: calculateOccupiedSpots(),
-            vacantCount: calculateVacantSpots(),
-            currentDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-          }
-        } : {}}
         currentDate={new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
         selectedDate={selectedDate}
         type={spotSelectionType}

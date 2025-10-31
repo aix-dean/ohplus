@@ -38,11 +38,11 @@ export function SpotsGrid({ spots, totalSpots, occupiedCount, vacantCount, produ
     {spots.map((spot) => (
       <div
         key={spot.id}
-        className="flex-shrink-0 w-[110px] h-[197px] bg-white rounded-[14px] shadow-[-1px_3px_7px_-1px_rgba(0,0,0,0.25)] border border-gray-200 overflow-hidden relative cursor-pointer hover:shadow-lg transition-shadow"
+        className="relative flex-shrink-0 w-[110px] h-[197px] bg-white p-1.5 rounded-[14px] shadow-[-1px_3px_7px_-1px_rgba(0,0,0,0.25)] border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-shadow flex flex-col"
         onClick={() => onSpotToggle ? onSpotToggle(spot.number) : handleSpotClick(spot.number)}
       >
         {onSpotToggle && (
-          <div className="absolute top-2 left-2 z-10">
+          <div className="absolute top-1 left-1 z-10">
             <Checkbox
               checked={selectedSpots?.includes(spot.number) || false}
               onChange={() => onSpotToggle(spot.number)}
@@ -52,20 +52,39 @@ export function SpotsGrid({ spots, totalSpots, occupiedCount, vacantCount, produ
         )}
 
         {/* Image Section */}
-        <div className="absolute inset-0">
+        <div className="flex-1 p-1 rounded-[10px] bg-white flex justify-center relative overflow-hidden">
           {spot.imageUrl ? (
-            <div className="w-full h-full bg-white flex items-center justify-center">
-              <span className="text-gray-400 text-xs">Image</span>
-            </div>
+            <>
+              {console.log(`Rendering image for spot ${spot.number}:`, spot.imageUrl)}
+              <Image
+                src={spot.imageUrl}
+                alt={`Spot ${spot.number} report image`}
+                fill
+                className="object-cover"
+                onError={(e) => {
+                  console.log(`Image failed to load for spot ${spot.number}:`, spot.imageUrl)
+                  const target = e.target as HTMLImageElement
+                  target.style.display = 'none'
+                  const parent = target.parentElement
+                  if (parent) {
+                    const fallback = document.createElement('span')
+                    fallback.className = 'text-gray-400 text-xs'
+                    fallback.textContent = `Spot ${spot.number}`
+                    parent.appendChild(fallback)
+                  }
+                }}
+              />
+            </>
           ) : (
-            <div className="w-full h-full bg-white flex items-center justify-center">
-              <span className="text-gray-400 text-xs">No image</span>
-            </div>
+            <>
+              {console.log(`No imageUrl for spot ${spot.number}`)}
+              <span className="text-gray-400 text-xs">Spot {spot.number}</span>
+            </>
           )}
         </div>
 
         {/* Content Section */}
-        <div className="absolute inset-0 flex flex-col justify-end p-[10px]">
+        <div className="flex flex-col p-1 bg-white">
           {/* Spot Number */}
           <div className="text-[11px] font-semibold text-black">
             {spot.number}/{totalSpots}
@@ -79,7 +98,7 @@ export function SpotsGrid({ spots, totalSpots, occupiedCount, vacantCount, produ
           </div>
 
           {/* Client Name */}
-          <div className={`text-[11px] font-semibold ${
+          <div className={`text-[11px] font-semibold truncate ${
             spot.status === "occupied" ? "text-black" : "text-[#a1a1a1]"
           }`}>
             {spot.clientName || "Filler Content 1"}
