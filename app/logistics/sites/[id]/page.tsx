@@ -24,7 +24,6 @@ import {
   ArrowLeft,
   MoreVertical,
   Edit,
-  Bell,
   Sun,
   Play,
   ChevronDown,
@@ -256,6 +255,7 @@ export default function SiteDetailsPage({ params }: Props) {
     condition: ''
   })
   const [maintenanceHistoryDialogOpen, setMaintenanceHistoryDialogOpen] = useState(false)
+  const [comingSoonDialogOpen, setComingSoonDialogOpen] = useState(false)
   const [maintenanceHistory, setMaintenanceHistory] = useState<ServiceAssignment[]>([])
   const [maintenanceHistoryLoading, setMaintenanceHistoryLoading] = useState(false)
   const [isCreatingSA, setIsCreatingSA] = useState(false)
@@ -266,14 +266,89 @@ export default function SiteDetailsPage({ params }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { userData } = useAuth()
 
-   const [illuminationOn, setIlluminationOn] = useState(false)
-   const [illuminationMode, setIlluminationMode] = useState("Manual")
- 
-   const handleCalendarOpen = () => {
-     setIsCalendarOpen(true)
-   }
- 
-   // Fetch product data and job orders
+  // Custom CSS for checkboxes
+  const checkboxStyles = `
+    .custom-checkbox {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 1rem;
+      height: 1rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.25rem;
+      background-color: #d1d5db;
+      position: relative;
+      cursor: pointer;
+    }
+    .custom-checkbox:checked {
+      background-color: #22c55e;
+      border-color: #22c55e;
+    }
+    .custom-checkbox:checked::after {
+      content: '✓';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    .custom-checkbox:focus {
+      outline: 2px solid #22c55e;
+      outline-offset: 2px;
+    }
+  `
+
+  // Custom CSS for switch
+  const switchStyles = `
+    .custom-switch {
+      position: relative;
+      display: inline-flex;
+      height: 2rem;
+      width: 4rem;
+      shrink: 0;
+      cursor: pointer;
+      border-radius: 9999px;
+      border: 2px solid;
+      transition: all 0.2s ease-in-out;
+    }
+    .custom-switch[data-state="checked"] {
+      background-color: #22c55e;
+      border-color: #22c55e;
+    }
+    .custom-switch[data-state="unchecked"] {
+      background-color: #d1d5db;
+      border-color: #d1d5db;
+    }
+    .custom-switch span {
+      pointer-events: none;
+      display: block;
+      height: 1.25rem;
+      width: 1.25rem;
+      border-radius: 9999px;
+      background-color: white;
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      transition: transform 0.2s ease-in-out;
+    }
+    .custom-switch[data-state="checked"] span {
+      transform: translateX(2rem);
+    }
+    .custom-switch[data-state="unchecked"] span {
+      transform: translateX(0.25rem);
+    }
+  `
+
+  const [compliance, setCompliance] = useState({
+    lease_agreement: false,
+    mayors_permit: false,
+    bir_registration: false,
+    structural_approval: false,
+  })
+
+  const [illuminationOn, setIlluminationOn] = useState(true)
+  const [illuminationMode, setIlluminationMode] = useState("Manual")
+
+  // Fetch product data and job orders
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -319,7 +394,21 @@ export default function SiteDetailsPage({ params }: Props) {
     }
 
     fetchData()
-  }, [resolvedParams.id])
+  }, [params.id])
+
+  // Initialize compliance and illumination state from product data
+  useEffect(() => {
+    if (product?.compliance) {
+      setCompliance({
+        lease_agreement: product.compliance.lease_agreement || false,
+        mayors_permit: product.compliance.mayors_permit || false,
+        bir_registration: product.compliance.bir_registration || false,
+        structural_approval: product.compliance.structural_approval || false,
+      })
+    }
+    // Ensure illumination defaults to on state
+    setIlluminationOn(true)
+  }, [product])
 
   const handleCreateServiceAssignment = () => {
     setIsCreatingSA(true)
@@ -495,6 +584,21 @@ export default function SiteDetailsPage({ params }: Props) {
     fetchMaintenanceHistory()
   }
 
+  const handleComplianceChange = async (field: keyof typeof compliance) => {
+    const newCompliance = { ...compliance, [field]: !compliance[field] }
+    setCompliance(newCompliance)
+    // Update product data
+    try {
+      await updateProduct(product.id, { compliance: newCompliance } as any)
+      // Update local product state
+      setProduct({ ...product, compliance: newCompliance })
+    } catch (error) {
+      console.error('Error updating compliance:', error)
+      // Revert on error
+      setCompliance(compliance)
+    }
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto py-4">
@@ -570,7 +674,8 @@ export default function SiteDetailsPage({ params }: Props) {
   const isFromDisplayHealth = view === "display-health"
 
   return (
-    <div className="container mx-auto py-4 space-y-4">
+    <div className="container py-4 space-y-4">
+      <style dangerouslySetInnerHTML={{ __html: checkboxStyles + switchStyles }} />
 
       {/* Header */}
       <div className="flex justify-between items-center">
@@ -593,7 +698,7 @@ export default function SiteDetailsPage({ params }: Props) {
           </h2>
         </div>
         <div className="flex gap-2">
-          <span className="mr-4 text-gray-700 font-medium text-xs">
+          <span className="mr-4 text-gray-700 font-medium text-xs mt-1">
             Create:
           </span>
           <button
@@ -635,7 +740,7 @@ export default function SiteDetailsPage({ params }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Site Information */}
         <div className="lg:col-span-1 space-y-4">
-          <div className="space-y-4">
+          <div className="space-y-2">
             {/* Site Image and Map */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
               {/* Site Image - Left Side */}
@@ -644,7 +749,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   src={thumbnailUrl || "/placeholder.svg"}
                   alt={product.name}
                   fill
-                  className="object-cover rounded-md"
+                  className="object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
                     target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
@@ -653,7 +758,7 @@ export default function SiteDetailsPage({ params }: Props) {
               </div>
 
               {/* Google Map - Right Side */}
-              <div className="relative aspect-square w-full bg-gray-100 rounded-md overflow-hidden">
+              <div className="relative aspect-square w-full bg-gray-100 overflow-hidden">
                 <GoogleMap location={location} className="w-full h-full" />
               </div>
             </div>
@@ -731,7 +836,7 @@ export default function SiteDetailsPage({ params }: Props) {
                           <b>JO#{jobOrder.joNumber}</b>
                         </p>
                         <p className="m-0 truncate">from SALES-{jobOrder.requestedBy}</p>
-                        <p className="m-0">Sent on {formatFirebaseDate(jobOrder.created)}</p>
+                        <p className="m-0 text-[10px]">Sent on {formatFirebaseDate(jobOrder.created)}</p>
                       </div>
                       <div className="absolute top-[22.94px] left-[18.82px] w-[36.4px] h-[36.4px] bg-gray-300 rounded-full flex items-center justify-center">
                         <Image className="w-full relative max-w-full overflow-hidden max-h-full object-cover" width={36.4} height={36.4} sizes="100vw" alt="JO" src={`/icons/suitcase.png`} />
@@ -742,7 +847,7 @@ export default function SiteDetailsPage({ params }: Props) {
               )}
             </CardContent>
           </Card>
-          <div className="px-6 pb-2">
+          <div className="">
             <Tabs defaultValue="gen-info" className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="gen-info">Gen. Info</TabsTrigger>
@@ -751,611 +856,359 @@ export default function SiteDetailsPage({ params }: Props) {
                 <TabsTrigger value="reports">Reports</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="gen-info" className="mt-4 space-y-4">
-              
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle
-                className="text-lg flex items-center"
-                style={{
-                  fontFamily: 'Inter',
-                  fontWeight: 600,
-                  fontSize: '22px',
-                  lineHeight: '120%',
-                  letterSpacing: '0%',
-                  color: '#000000'
-                }}
-              >
-                <Sun className="h-4 w-4 mr-2" />
-                Illumination
-              </CardTitle>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </CardHeader>
-            {/* Tab Navigation */}
-
-            <CardContent className="pl-4 pb-4 relative">
-              <div className="flex flex-col space-y-4">
-                <div className="flex items-start space-x-4">
-                  <Image className="w-[62px] h-[62px] object-contain" width={62} height={62} sizes="100vw" alt="" src="/placeholder.svg" />
-                  <div className="flex flex-col">
-                    <b className="leading-[100%] inline-block w-40 h-3 text-sm font-semibold">Switch:</b>
-                    <div className="leading-[100%] inline-block w-[211px] h-3.5 text-sm">6:00pm to 12:00pm</div>
-                  </div>
-                </div>
-
-                <div className="flex space-x-8">
-                  <div className="leading-[132%] font-semibold inline-block w-[69px] text-sm">
-                    <p className="m-0">Upper:</p>
-                    <p className="m-0">Bottom:</p>
-                  </div>
-                  <div className="leading-[132%] inline-block w-[134px] text-sm">
-                    <p className="m-0">{product.specs_rental?.illumination_upper_lighting_specs || "4 Metal Halides"}</p>
-                    <p className="m-0">{product.specs_rental?.illumination_bottom_lighting_specs || "4 Metal Halides"}</p>
-                  </div>
-                </div>
-
-                <div className="flex space-x-8">
-                  <div className="leading-[132%] font-semibold inline-block w-[107px] text-sm">
-                    <p className="m-0">Side (Left):</p>
-                    <p className="m-0">Side (Right):</p>
-                  </div>
-                  <div className="leading-[132%] inline-block w-[134px] text-sm">
-                    <p className="m-0">{product.specs_rental?.illumination_left_lighting_specs || "5 Metal Halides"}</p>
-                    <p className="m-0">{product.specs_rental?.illumination_right_lighting_specs || "5 Metal Halides"}</p>
-                  </div>
-                </div>
-
-                <div className="leading-[132%] inline-block w-full text-sm">
-                  <span className="font-semibold">Average Monthly Electrical Consumption: </span>
-                  <span>{product.specs_rental?.power_consumption_monthly || "557"} kWh/month</span>
-                </div>
-
-                <div className="flex justify-end mt-4">
-                  <button className="w-[203px] h-[47px] bg-white border rounded-[5px] shadow-sm font-medium text-[20px] leading-none tracking-normal text-center hover:bg-gray-50">
-                    Index Card
-                  </button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-                {/* Illumination - Show only for Static sites - Full width */}
-                {isStatic && (
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle className="text-base flex items-center">
-                        <Sun className="h-4 w-4 mr-2" />
-                        Illumination
-                      </CardTitle>
-                      <div className="flex items-center space-x-2">
-                        <Switch />
-                        <Bell className="h-4 w-4 text-gray-500" />
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                setAlarmDialogOpen(true)
-                              }}
-                            >
-                              <Bell className="mr-2 h-4 w-4" />
-                              Alarm Settings
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      <div className="space-y-4 -mt-2">
-                        {/* Date and Time Section */}
-                        <div className="text-sm">
-                          <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
-                          <div className="text-gray-600 text-xs">Lights ON @ 6:00pm everyday</div>
+              <TabsContent value="gen-info" className="">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>General Information</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-1">
+                      {/* Illumination */}
+                      <div>
+                        <div className="flex flex-row items-center justify-between px-4">
+                          <div
+                            className="text-lg flex items-center"
+                            style={{
+                              fontFamily: 'Inter',
+                              fontWeight: 700,
+                              fontSize: '16px',
+                              lineHeight: '100%',
+                              letterSpacing: '0%',
+                              color: '#333'
+                            }}
+                          >
+                            <Sun className="h-4 w-4 mr-2" />
+                            Illumination
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
+                        <div className="p-4">
+                          <div className="flex flex-col space-y-4">
+                            <div className="flex items-start space-x-4">
+                              <div className="flex flex-col items-center space-y-2">
+                                <Switch
+                                  checked={illuminationOn}
+                                  onCheckedChange={(checked) => {
+                                    if (!checked) {
+                                      // Show "Coming Soon" dialog when trying to turn off
+                                      setComingSoonDialogOpen(true)
+                                      return
+                                    }
+                                    setIlluminationOn(checked)
+                                    // Update product data
+                                    updateProduct(product.id, { illumination: { ...product.illumination, on: checked } } as any)
+                                      .then(() => {
+                                        setProduct({ ...product, illumination: { ...product.illumination, on: checked } })
+                                      })
+                                      .catch((error) => {
+                                        console.error('Error updating illumination:', error)
+                                        setIlluminationOn(!checked) // Revert on error
+                                      })
+                                  }}
+                                  className="custom-switch"
+                                />
+                                <span className="text-xs text-gray-600">{illuminationOn ? 'ON' : 'OFF'}</span>
+                              </div>
+                              <div className="flex flex-col">
+                                <b className="leading-[100%] inline-block w-40 h-3 text-sm font-semibold">Switch:</b>
+                                <div className="leading-[100%] inline-block w-[211px] h-3.5 text-sm pt-2">6:00pm to 12:00pm</div>
+                              </div>
+                            </div>
 
-                        {/* Illumination Specifications */}
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <span className="font-medium text-gray-700">Upper:</span>
-                              <div className="text-blue-600">
-                                {product.specs_rental?.illumination_upper_lighting_specs || "0 - metal halides"}
+
+                            <div className="flex">
+                              <div style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }} className="inline-block w-[107px]">
+                                
+                                 <p className="m-0">Upper:</p>
+                                <p className="m-0">Bottom:</p>
+                                <p className="m-0">Side (Left):</p>
+                                <p className="m-0">Side (Right):</p>
+                              </div>
+                              <div style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }} className="inline-block w-[134px]">
+                                
+                                <p className="m-0">{product.specs_rental?.illumination_upper_lighting_specs || "4 Metal Halides"}</p>
+                                <p className="m-0">{product.specs_rental?.illumination_bottom_lighting_specs || "4 Metal Halides"}</p>
+                                <p className="m-0">{product.specs_rental?.illumination_left_lighting_specs || "5 Metal Halides"}</p>
+                                <p className="m-0">{product.specs_rental?.illumination_right_lighting_specs || "5 Metal Halides"}</p>
                               </div>
                             </div>
-                            <div>
-                              <span className="font-medium text-gray-700">Lower:</span>
-                              <div className="text-blue-600">
-                                {product.specs_rental?.illumination_bottom_lighting_specs || "0 - metal halides"}
+
+                            <div className="flex justify-between items-center">
+                              <div style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                                <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Average Monthly Electrical Consumption: </span>
+                                <span>{product.specs_rental?.power_consumption_monthly || "557"} kWh/month</span>
                               </div>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">Side (Left):</span>
-                              <div className="text-blue-600">
-                                {product.specs_rental?.illumination_left_lighting_specs || "0 - metal halides"}
-                              </div>
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">Side (Right):</span>
-                              <div className="text-blue-600">
-                                {product.specs_rental?.illumination_right_lighting_specs || "0 - metal halides"}
-                              </div>
+                              <button
+                                onClick={() => setComingSoonDialogOpen(true)}
+                                className="w-[93.971px] h-[23.493px] flex-shrink-0 border border-[#C4C4C4] bg-white rounded-[6.024px] text-center font-medium hover:bg-gray-50"
+                                style={{
+                                  color: '#333',
+                                  fontFamily: 'Inter',
+                                  fontSize: '12px',
+                                  fontStyle: 'normal',
+                                  fontWeight: 500,
+                                  lineHeight: '100%'
+                                }}
+                              >
+                                Index Card
+                              </button>
                             </div>
                           </div>
                         </div>
+                      </div>
 
-                        {/* Power Consumption */}
-                        <div className="border-t pt-3">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-1 text-sm">
-                              <div>
-                                <span className="font-medium">Power Consumption:</span>{" "}
-                                <span className="text-green-600">150 kWh/month</span>
-                              </div>
-                              <div>
-                                <span className="font-medium">Average Power Consumption:</span>{" "}
-                                <span className="text-blue-600">160 kWh /over last 3 months</span>
-                              </div>
+                      {/* Divider */}
+                      <hr className="border-gray-300" />
+
+                      {/* Structure */}
+                      <div>
+                        <div className="flex flex-row items-center justify-between px-4">
+                          <div>
+                            <span style={{
+                              fontFamily: 'Inter',
+                              fontWeight: 700,
+                              fontSize: '16px',
+                              lineHeight: '100%',
+                              letterSpacing: '0%',
+                              color: '#333',
+                              transform: 'translate(0px, 0px)' // Add transform for position control
+                            }}>
+                              Structure
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={handleStructureEdit}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                        <div className="px-4 pb-4">
+                          <div className="">
+                            <div>
+                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Color:</span>{" "}
+                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                                {product.structure?.color || "Not Available"}
+                              </span>
                             </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="bg-transparent"
-                              onClick={() => setIlluminationIndexCardDialogOpen(true)}
-                            >
-                              View Index Card
-                            </Button>
+                            <div>
+                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Contractor:</span>{" "}
+                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                                {product.structure?.contractor || "Not Available"}
+                              </span>
+                            </div>
+                            <div>
+                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Last Maintenance:</span>{" "}
+                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                                {formatFirebaseDate(product.structure?.last_maintenance) || "Not Available"}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
 
-                {/* Site Data Grid - Updated layout without Illumination */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Display - Show only for Dynamic sites */}
-                  {isDynamic && (
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="text-base flex items-center">
-                          <Sun className="h-4 w-4 mr-2" />
-                          Display
-                        </CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                      </CardHeader>
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          <div className="text-sm">
-                            <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
-                            <div className="text-gray-600 text-xs">
-                              <span className="font-medium">Operating Time:</span> 6:00 pm to 11:00 pm
-                            </div>
+                      {/* Divider */}
+                      <hr className="border-gray-300" />
+
+                      {/* Compliance */}
+                      <div>
+                        <div className="flex flex-row items-center justify-between px-4">
+                          <div
+                            className="text-base flex items-center"
+                            style={{
+                              fontFamily: 'Inter',
+                              fontWeight: 700,
+                              fontSize: '16px',
+                              lineHeight: '100%',
+                              letterSpacing: '0%',
+                              color: '#333'
+                            }}
+                          >
+                            <Shield className="h-4 w-4 mr-2" />
+                            Compliance{" "}
                           </div>
-
-                          <div className="space-y-1 text-sm">
-                            <div>
-                              <span className="font-medium">Brightness:</span>
-                              <div className="text-xs text-gray-600 ml-2">
-                                7:00 am-3:00 pm (20%)
-                                <br />
-                                3:00 pm-11:00 pm (100%)
-                              </div>
-                            </div>
-                            <div>
-                              <span className="font-medium">Spots in a loop:</span> 10 spots
-                            </div>
-                            <div>
-                              <span className="font-medium">Service Life:</span> 3 years, 8 months, and 10 days
-                            </div>
-                            <div>
-                              <span className="font-medium">Power Consumption:</span> 150 kWh/month
-                            </div>
-                            <div>
-                              <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
-                            </div>
+                          <div className="flex items-center space-x-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => console.log("Edit compliance clicked")}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-4 w-full bg-transparent"
-                          onClick={() => setDisplayIndexCardDialogOpen(true)}
-                        >
-                          View Index Card
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Compliance - Always show */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle
-                        className="text-base flex items-center"
-                        style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '22px',
-                          lineHeight: '120%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}
-                      >
-                        <Shield className="h-4 w-4 mr-2" />
-                        Compliance{" "}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      <div className="flex flex-col space-y-3" style={{ transform: 'translateX(35px) translateY(-20px)' }}>
-                        <div className="flex items-center space-x-2">
-                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.lease_agreement ? '✅' : '☐'}</span>
-                          <label
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '18px',
-                              lineHeight: '132%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            Lease Agreement
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.mayors_permit ? '✅' : '☐'}</span>
-                          <label
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '18px',
-                              lineHeight: '132%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            Mayor's Permit
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.bir_registration ? '✅' : '☐'}</span>
-                          <label
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '18px',
-                              lineHeight: '132%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            BIR Registration
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.structural_approval ? '✅' : '☐'}</span>
-                          <label
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '18px',
-                              lineHeight: '132%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            Structural Approval
-                          </label>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Structure - Always show */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle>
-                        <span style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '20px',
-                          lineHeight: '100%',
-                          letterSpacing: '0%',
-                          transform: 'translate(0px, 0px)' // Add transform for position control
-                        }}>
-                          Structure
-                        </span>
-                      </CardTitle>
-                      <div className="flex items-center space-x-2">
-                        <Bell className="h-4 w-4 text-gray-500" />
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={handleStructureEdit}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      <div className="space-y-4" style={{ transform: 'translateY(-30px) translateX(15px)' }}>
-                        <div style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '18px',
-                          lineHeight: '132%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}>
-                          <span>Color:</span>{" "}
-                          <span style={{
-                            fontFamily: 'Inter',
-                            fontWeight: 400,
-                            fontSize: '18px',
-                            lineHeight: '132%',
-                            letterSpacing: '0%',
-                            color: '#333333'
-                          }}>
-                            {product.structure?.color || "Not Available"}
-                          </span>
-                        </div>
-                        <div style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '18px',
-                          lineHeight: '132%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}>
-                          <span>Contractor:</span>{" "}
-                          <span style={{
-                            fontFamily: 'Inter',
-                            fontWeight: 400,
-                            fontSize: '18px',
-                            lineHeight: '132%',
-                            letterSpacing: '0%',
-                            color: '#333333'
-                          }}>
-                            {product.structure?.contractor || "Not Available"}
-                          </span>
-                        </div>
-                        <div style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '18px',
-                          lineHeight: '132%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}>
-                          <span>Condition:</span>{" "}
-                          <span style={{
-                            fontFamily: 'Inter',
-                            fontWeight: 400,
-                            fontSize: '18px',
-                            lineHeight: '132%',
-                            letterSpacing: '0%',
-                            color: '#333333'
-                          }}>
-                            {product.structure?.condition || "Not Available"}
-                          </span>
-                        </div>
-                        <div style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '18px',
-                          lineHeight: '132%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}>
-                          <span>Last Maintenance:</span>{" "}
-                          <span style={{
-                            fontFamily: 'Inter',
-                            fontWeight: 400,
-                            fontSize: '18px',
-                            lineHeight: '132%',
-                            letterSpacing: '0%',
-                            color: '#333333'
-                          }}>
-                            {formatFirebaseDate(product.structure?.last_maintenance) || "Not Available"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mt-3">
-                        <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setBlueprintDialogOpen(true)}>
-                          View Blueprint
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={handleViewHistory}>
-                          <History className="h-4 w-4 mr-2" />
-                          View History
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Content and Crew - Single row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Content */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle
-                        className="text-base flex items-center"
-                        style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '22px',
-                          lineHeight: '120%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        Content
-                      </CardTitle>
-                      <div className="flex items-center space-x-2">
-                        <Bell className="h-4 w-4 text-gray-500" />
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => console.log("Edit content clicked")}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      {product.content_schedule && product.content_schedule.length > 0 ? (
-                        <div className="space-y-2 text-sm">
-                          {product.content_schedule.map((content: { start_date: any; end_date: any; name: string }, index: number) => (
-                            <div key={index}>
-                              <span className="font-medium">
-                                {formatFirebaseDate(content.start_date)} - {formatFirebaseDate(content.end_date)}:
-                              </span>{" "}
-                              {content.name}
+                        <div className="px-4 pt-2 pb-4">
+                          <div className="flex flex-col space-y-3">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id="lease_agreement"
+                                checked={compliance.lease_agreement}
+                                onChange={() => handleComplianceChange('lease_agreement')}
+                                className="custom-checkbox"
+                              />
+                              <label
+                                htmlFor="lease_agreement"
+                                style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}
+                              >
+                                Lease Agreement
+                              </label>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm">No content scheduled</div>
-                      )}
-                      <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
-                        <History className="h-4 w-4 mr-2" />
-                        View History
-                      </Button>
-                    </CardContent>
-                  </Card>
-
-                  {/* Crew */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle
-                        className="text-base flex items-center"
-                        style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '22px',
-                          lineHeight: '120%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}
-                      >
-                        <Users className="h-4 w-4 mr-2" />
-                        Personnel
-                      </CardTitle>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => console.log("Edit crew clicked")}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      <div className="space-y-2 text-sm">
-                        <div>
-                          <span
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '16px',
-                              lineHeight: '120%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            Security:
-                          </span>{" "}
-                          <span
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 400,
-                              fontSize: '16px',
-                              lineHeight: '120%',
-                              letterSpacing: '0%',
-                              color: '#333333'
-                            }}
-                          >
-                            {product.specs_rental?.security || ""}
-                          </span>
-                        </div>
-                        <div>
-                          <span
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '16px',
-                              lineHeight: '120%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            Caretaker:
-                          </span>{" "}
-                          <span
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 400,
-                              fontSize: '16px',
-                              lineHeight: '120%',
-                              letterSpacing: '0%',
-                              color: '#333333'
-                            }}
-                          >
-                            {product.specs_rental?.caretaker || ""}
-                          </span>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id="mayors_permit"
+                                checked={compliance.mayors_permit}
+                                onChange={() => handleComplianceChange('mayors_permit')}
+                                className="custom-checkbox"
+                              />
+                              <label
+                                htmlFor="mayors_permit"
+                                style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}
+                              >
+                                Mayor's Permit
+                              </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id="bir_registration"
+                                checked={compliance.bir_registration}
+                                onChange={() => handleComplianceChange('bir_registration')}
+                                className="custom-checkbox"
+                              />
+                              <label
+                                htmlFor="bir_registration"
+                                style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}
+                              >
+                                BIR Registration
+                              </label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id="structural_approval"
+                                checked={compliance.structural_approval}
+                                onChange={() => handleComplianceChange('structural_approval')}
+                                className="custom-checkbox"
+                              />
+                              <label
+                                htmlFor="structural_approval"
+                                style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}
+                              >
+                                Structural Approval
+                              </label>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <Button variant="outline" size="sm" className="mt-3 bg-transparent">
-                        <History className="h-4 w-4 mr-2" />
-                        View History
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
+
+                      {/* Divider */}
+                      <hr className="border-gray-300" />
+
+                      {/* Personnel */}
+                      <div>
+                        <div className="flex flex-row items-center justify-between px-4">
+                          <div
+                            className="text-base flex items-center"
+                            style={{
+                              fontFamily: 'Inter',
+                              fontWeight: 700,
+                              fontSize: '16px',
+                              lineHeight: '100%',
+                              letterSpacing: '0%',
+                              color: '#333'
+                            }}
+                          >
+                            <Users className="h-4 w-4 mr-2" />
+                            Personnel
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => console.log("Edit crew clicked")}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </div>
+                        <div className="px-4 pb-4">
+                          {product.personnel && product.personnel.length > 0 ? (
+                            <Table className="border-none [&_tr]:border-none [&_td]:border-none [&_td]:py-1 [&_td]:pr-1 [&_td]:pl-0 [&_th]:border-none [&_th]:p-0 [&_tr]:hover:bg-transparent border-collapse" style={{ borderSpacing: '0 0' }}>
+                              <TableHeader>
+                                <TableRow className="h-8">
+                                  <TableHead style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Name</TableHead>
+                                  <TableHead style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Position</TableHead>
+                                  <TableHead style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Contact</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {product.personnel.map((person: any, index: number) => (
+                                  <TableRow key={index}>
+                                    <TableCell style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                                      {person.name || ""}
+                                    </TableCell>
+                                    <TableCell style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                                      {person.position || ""}
+                                    </TableCell>
+                                    <TableCell style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                                      {person.contact || ""}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          ) : (
+                            <div className="text-center py-4 text-gray-500">
+                              <p style={{ color: '#666', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                                No personnel information available
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
-              <TabsContent value="content-history" className="mt-4">
+              <TabsContent value="content-history" className="">
                 <Card>
                   <CardHeader>
                     <CardTitle>Content History</CardTitle>
@@ -1368,7 +1221,7 @@ export default function SiteDetailsPage({ params }: Props) {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="service-assignments" className="mt-4">
+              <TabsContent value="service-assignments" className="">
                 <Card>
                   <CardHeader>
                     <CardTitle>Service Assignments</CardTitle>
@@ -1381,7 +1234,7 @@ export default function SiteDetailsPage({ params }: Props) {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="reports" className="mt-4">
+              <TabsContent value="reports" className="">
                 <Card>
                   <CardHeader>
                     <CardTitle>Reports</CardTitle>
@@ -1720,6 +1573,23 @@ export default function SiteDetailsPage({ params }: Props) {
               className="flex-1 bg-blue-600 hover:bg-blue-700"
             >
               Apply
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Coming Soon Dialog */}
+      <Dialog open={comingSoonDialogOpen} onOpenChange={setComingSoonDialogOpen}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-center">Coming Soon</DialogTitle>
+          </DialogHeader>
+          <div className="text-center py-4">
+            <p className="text-gray-700">This feature is coming soon!</p>
+          </div>
+          <div className="flex justify-center">
+            <Button onClick={() => setComingSoonDialogOpen(false)} className="w-full">
+              OK
             </Button>
           </div>
         </DialogContent>
