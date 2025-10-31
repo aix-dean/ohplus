@@ -172,6 +172,19 @@ const formatLocationVisibility = (value: string | undefined): string => {
   return value
 }
 
+const formatLocationVisibilityInput = (value: string): string => {
+  const match = value.match(/^([\d,]+)(\s+.*)?$/)
+  if (match) {
+    const numStr = match[1].replace(/,/g, '')
+    const num = parseInt(numStr)
+    if (!isNaN(num)) {
+      const unit = match[2] || ''
+      return num.toLocaleString() + unit
+    }
+  }
+  return value
+}
+
 const CompanyLogo: React.FC<{ className?: string; proposal?: Proposal | null; onColorExtracted?: (color: string) => void; hasShadow?: boolean; onLogoChange?: (logoUrl: string) => void }> = ({ className, proposal, onColorExtracted, hasShadow = true, onLogoChange }) => {
   const { userData } = useAuth()
   const { toast } = useToast()
@@ -2582,7 +2595,8 @@ export default function ProposalDetailsPage() {
                     <input
                       value={editableProducts[product.id]?.location_visibility || ''}
                       onChange={(e) => {
-                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location_visibility: e.target.value } }))
+                        const formatted = formatLocationVisibilityInput(e.target.value)
+                        setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location_visibility: formatted } }))
                       }}
                       className="font-normal text-[18px] border-2 border-[#c4c4c4] border-dashed rounded px-1 outline-none w-full"
                     />
