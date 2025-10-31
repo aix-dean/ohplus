@@ -2572,7 +2572,7 @@ export default function ProposalDetailsPage() {
             ) : null}
 
             {/* Location Visibility Row */}
-            {isEditMode || fieldVisibility[product.id]?.location_visibility !== false ? (
+            {isEditMode || (product.specs_rental?.location_visibility && fieldVisibility[product.id]?.location_visibility !== false) ? (
               <div className="flex mb-2">
                 <div className="w-[200px] pr-4 text-left">
                   <p className="font-bold text-[18px]">Location Visibility:</p>
@@ -2580,7 +2580,7 @@ export default function ProposalDetailsPage() {
                 <div className="flex-1">
                   {isEditMode ? (
                     <input
-                      value={formatLocationVisibility(editableProducts[product.id]?.location_visibility)}
+                      value={editableProducts[product.id]?.location_visibility || ''}
                       onChange={(e) => {
                         setEditableProducts(prev => ({ ...prev, [product.id]: { ...prev[product.id], location_visibility: e.target.value } }))
                       }}
