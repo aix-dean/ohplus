@@ -12,6 +12,7 @@ import { createDirectCostEstimate } from "@/lib/cost-estimate-service"
 import { createDirectQuotation } from "@/lib/quotation-service"
 import { useRouter } from "next/navigation"
 import { SpotsGrid } from "./spots-grid"
+import { Skeleton } from "@/components/ui/skeleton"
 import { useDebounce } from "@/hooks/use-debounce"
 import { getPaginatedClients, type Client } from "@/lib/client-service"
 import { PlusCircle, CheckCircle, Loader2, ChevronDown, Search } from "lucide-react"
@@ -83,6 +84,30 @@ export function SpotSelectionDialog({
   const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
   const [selectedClientForProposal, setSelectedClientForProposal] = useState<any>(preSelectedClient || null)
 
+  // Skeleton component for spots grid loading
+  const SpotsGridSkeleton = () => (
+    <div className="flex gap-[13.758px] overflow-x-scroll pb-4 w-full pr-4">
+      {Array.from({ length: 18 }, (_, i) => (
+        <div
+          key={i}
+          className="relative flex-shrink-0 w-[110px] h-[197px] bg-white p-1.5 rounded-[14px] shadow-[-1px_3px_7px_-1px_rgba(0,0,0,0.25)] border border-gray-200 overflow-hidden flex flex-col"
+        >
+          {/* Image Section Skeleton */}
+          <div className="flex-1 p-1 rounded-[10px] bg-gray-100 flex justify-center items-center">
+            <Skeleton className="w-full h-full rounded-[10px]" />
+          </div>
+
+          {/* Content Section Skeleton */}
+          <div className="flex flex-col p-1 bg-white space-y-1">
+            <Skeleton className="h-3 w-8" />
+            <Skeleton className="h-3 w-12" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
   // Reset selection when dialog opens
   useEffect(() => {
     if (open) {
@@ -109,27 +134,27 @@ export function SpotSelectionDialog({
         for (const product of products) {
           const productId = product.id
 
-          // Check if spots data is stored in localStorage
-          const storedSpotsData = localStorage.getItem(`spotsData-${productId}`)
-          if (storedSpotsData) {
-            try {
-              const spots = JSON.parse(storedSpotsData)
-              const totalSpots = product.cms?.loops_per_day || 18
-              const occupiedCount = spots.filter((spot: any) => spot.status === 'occupied').length
-              const vacantCount = totalSpots - occupiedCount
+          // Temporarily disable localStorage caching to ensure fresh data with images
+          // const storedSpotsData = localStorage.getItem(`spotsData-${productId}`)
+          // if (storedSpotsData) {
+          //   try {
+          //     const spots = JSON.parse(storedSpotsData)
+          //     const totalSpots = product.cms?.loops_per_day || 18
+          //     const occupiedCount = spots.filter((spot: any) => spot.status === 'occupied').length
+          //     const vacantCount = totalSpots - occupiedCount
 
-              newSpotsData[productId] = {
-                spots,
-                totalSpots,
-                occupiedCount,
-                vacantCount,
-                currentDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-              }
-              continue
-            } catch (error) {
-              console.error("Error parsing stored spots data:", error)
-            }
-          }
+          //     newSpotsData[productId] = {
+          //       spots,
+          //       totalSpots,
+          //       occupiedCount,
+          //       vacantCount,
+          //       currentDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          //     }
+          //     continue
+          //   } catch (error) {
+          //     console.error("Error parsing stored spots data:", error)
+          //   }
+          // }
 
           // Fetch current day's bookings
           const today = new Date()
@@ -179,12 +204,36 @@ export function SpotSelectionDialog({
             const booking = currentDayBookings.find(b => b.spot_numbers?.includes(i))
             const report = booking ? reportsData[booking.id] : null
 
+            // Get image URL from report attachments
+            let imageUrl: string | undefined
+            if (booking && reportsData[booking.id]) {
+              const report = reportsData[booking.id]
+              console.log(`Spot ${i}: Found report for booking ${booking.id}:`, report)
+              if (report && report.attachments && report.attachments.length > 0) {
+                // Find attachment with label "After" (case insensitive)
+                const afterAttachment = report.attachments.find(att => att.label?.toLowerCase() === "after")
+                console.log(`Spot ${i}: After attachment:`, afterAttachment)
+                if (afterAttachment) {
+                  imageUrl = afterAttachment.fileUrl
+                } else {
+                  // Use first attachment if no "After" label
+                  imageUrl = report.attachments[0].fileUrl
+                  console.log(`Spot ${i}: Using first attachment:`, imageUrl)
+                }
+              } else {
+                console.log(`Spot ${i}: No attachments in report`)
+              }
+            } else {
+              console.log(`Spot ${i}: No booking or report found for booking ${booking?.id}`)
+            }
+            console.log(`Spot ${i}: Final imageUrl:`, imageUrl)
+
             spots.push({
               id: `spot-${i}`,
               number: i,
               status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
               clientName: isOccupied ? (booking?.client?.name || clientNames[(i - 1) % clientNames.length]) : undefined,
-              imageUrl: isOccupied ? (report?.siteImageUrl || "/placeholder.svg") : undefined,
+              imageUrl,
             })
           }
 
@@ -451,42 +500,51 @@ export function SpotSelectionDialog({
             <div className="space-y-6">
               {products.map((product) => {
                 const productSpotsData = spotsData[product.id]
-                if (!productSpotsData) return null
-
-                const { spots, totalSpots, occupiedCount, vacantCount, currentDate } = productSpotsData
-                const productSelectedSpots = selectedSpots[product.id] || []
 
                 return (
                   <div key={product.id} className="bg-[#ECECEC] rounded-[13.8px] p-4 space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold">{product.name}</h3>
-                      <div className="flex items-center gap-6 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">Total Spots:</span>
-                          <span className="text-gray-700">{totalSpots}</span>
+                      {spotsDataLoading ? (
+                        <div className="flex items-center gap-6 text-sm">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-4 w-32" />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">Total Occupied:</span>
-                          <span className="text-cyan-600 font-medium">{occupiedCount} ({Math.round((occupiedCount / totalSpots) * 100)}%)</span>
+                      ) : productSpotsData ? (
+                        <div className="flex items-center gap-6 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">Total Spots:</span>
+                            <span className="text-gray-700">{productSpotsData.totalSpots}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">Total Occupied:</span>
+                            <span className="text-cyan-600 font-medium">{productSpotsData.occupiedCount} ({Math.round((productSpotsData.occupiedCount / productSpotsData.totalSpots) * 100)}%)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">Total Vacant:</span>
+                            <span className="font-bold text-gray-700">{productSpotsData.vacantCount} ({Math.round((productSpotsData.vacantCount / productSpotsData.totalSpots) * 100)}%)</span>
+                          </div>
+                          <span className="text-blue-600">as of {new Date(productSpotsData.currentDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">Total Vacant:</span>
-                          <span className="font-bold text-gray-700">{vacantCount} ({Math.round((vacantCount / totalSpots) * 100)}%)</span>
-                        </div>
-                        <span className="text-blue-600">as of {new Date(currentDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                      </div>
+                      ) : null}
                     </div>
-                    <SpotsGrid
-                      spots={spots}
-                      totalSpots={totalSpots}
-                      occupiedCount={occupiedCount}
-                      vacantCount={vacantCount}
-                      currentDate={currentDate}
-                      selectedSpots={productSelectedSpots}
-                      onSpotToggle={(spotNumber) => handleSpotToggle(product.id, spotNumber)}
-                      showSummary={false}
-                      bg={false}
-                    />
+                    {spotsDataLoading ? (
+                      <SpotsGridSkeleton />
+                    ) : productSpotsData ? (
+                      <SpotsGrid
+                        spots={productSpotsData.spots}
+                        totalSpots={productSpotsData.totalSpots}
+                        occupiedCount={productSpotsData.occupiedCount}
+                        vacantCount={productSpotsData.vacantCount}
+                        currentDate={productSpotsData.currentDate}
+                        selectedSpots={selectedSpots[product.id] || []}
+                        onSpotToggle={(spotNumber) => handleSpotToggle(product.id, spotNumber)}
+                        showSummary={false}
+                        bg={false}
+                      />
+                    ) : null}
                   </div>
                 )
               })}

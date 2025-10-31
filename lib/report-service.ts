@@ -590,11 +590,6 @@ export async function getLatestReportsByBookingIds(bookingIds: string[]): Promis
   try {
     const reportsMap: { [bookingId: string]: ReportData | null } = {}
 
-    // Initialize all bookingIds with null
-    bookingIds.forEach(id => {
-      reportsMap[id] = null
-    })
-
     // Fetch reports for each booking ID
     const promises = bookingIds.map(async (bookingId) => {
       const q = query(
@@ -607,16 +602,24 @@ export async function getLatestReportsByBookingIds(bookingIds: string[]): Promis
       if (!querySnapshot.empty) {
         const doc = querySnapshot.docs[0]
         const data = doc.data()
-        reportsMap[bookingId] = {
-          id: doc.id,
-          ...data,
-          attachments: Array.isArray(data.attachments) ? data.attachments : [],
-        } as ReportData
+        return {
+          bookingId,
+          report: {
+            id: doc.id,
+            ...data,
+            attachments: Array.isArray(data.attachments) ? data.attachments : [],
+          } as ReportData
+        }
       }
+      return { bookingId, report: null }
     })
 
-    await Promise.all(promises)
+    const results = await Promise.all(promises)
 
+    // Build the reports map from results
+    results.forEach(({ bookingId, report }) => {
+      reportsMap[bookingId] = report
+    })
     return reportsMap
   } catch (error) {
     console.error("Error fetching latest reports by booking IDs:", error)

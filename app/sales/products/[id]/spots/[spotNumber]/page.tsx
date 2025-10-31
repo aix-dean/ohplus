@@ -558,8 +558,8 @@ useEffect(() => {
                   const report = reportsData[booking.id]
                   console.log(`Spot ${currentSpotNumber}: Found report for booking ${booking.id}:`, report)
                   if (report && report.attachments && report.attachments.length > 0) {
-                    // Find attachment with label "After"
-                    const afterAttachment = report.attachments.find(att => att.label === "After")
+                    // Find attachment with label "After" (case insensitive)
+                    const afterAttachment = report.attachments.find(att => att.label?.toLowerCase() === "after")
                     console.log(`Spot ${currentSpotNumber}: After attachment:`, afterAttachment)
                     if (afterAttachment) {
                       imageUrl = afterAttachment.fileUrl
