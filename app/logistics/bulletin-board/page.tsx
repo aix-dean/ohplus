@@ -7,8 +7,10 @@ import { collection, query, where, orderBy, limit, startAfter, getDocs, doc, get
 import { db } from "@/lib/firebase"
 import type { Product } from "@/lib/firebase-service"
 import { searchBookings } from "@/lib/algolia-service"
-import { getLatestReportsPerBooking } from "@/lib/report-service"
+import { getReportsPerBooking } from "@/lib/report-service"
+import { getLatestServiceAssignmentsPerBooking } from "@/lib/firebase-service"
 import type { ReportData } from "@/lib/report-service"
+import type { ServiceAssignment } from "@/lib/firebase-service"
 import { formatDateShort } from "@/lib/utils"
 import { BulletinBoardContent } from "@/components/BulletinBoardContent"
 
@@ -34,8 +36,10 @@ export default function LogisticsBulletinBoardPage() {
 
   const [projectNames, setProjectNames] = useState<{ [productId: string]: string }>({})
   const [bookingIds, setBookingIds] = useState<{ [productId: string]: string }>({})
-  const [reports, setReports] = useState<{ [reservationId: string]: ReportData }>({})
+  const [reports, setReports] = useState<{ [bookingId: string]: ReportData[] }>({})
   const [reportsLoading, setReportsLoading] = useState(true)
+  const [serviceAssignments, setServiceAssignments] = useState<{ [bookingId: string]: ServiceAssignment }>({})
+  const [serviceAssignmentsLoading, setServiceAssignmentsLoading] = useState(true)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(9)
@@ -242,7 +246,7 @@ export default function LogisticsBulletinBoardPage() {
 
       try {
         setReportsLoading(true)
-        const latestReports = await getLatestReportsPerBooking(userData.company_id)
+        const latestReports = await getReportsPerBooking(userData.company_id)
         setReports(latestReports)
       } catch (error) {
         console.error("Error fetching reports:", error)
@@ -262,7 +266,7 @@ export default function LogisticsBulletinBoardPage() {
       )
 
       const unsubscribe = onSnapshot(reportsQuery, (snapshot) => {
-        const latestReports: { [reservationId: string]: ReportData } = {}
+        const latestReports: { [bookingId: string]: ReportData[] } = {}
 
         snapshot.docs.forEach((doc) => {
           const data = doc.data()
@@ -272,9 +276,12 @@ export default function LogisticsBulletinBoardPage() {
             attachments: Array.isArray(data.attachments) ? data.attachments : [],
           } as ReportData
 
-          // Only keep the latest report for each reservation_id
-          if (report.reservation_id && !latestReports[report.reservation_id]) {
-            latestReports[report.reservation_id] = report
+          // Add all reports for each booking_id
+          if (report.booking_id) {
+            if (!latestReports[report.booking_id]) {
+              latestReports[report.booking_id] = []
+            }
+            latestReports[report.booking_id].push(report)
           }
         })
 
@@ -283,6 +290,27 @@ export default function LogisticsBulletinBoardPage() {
 
       return () => unsubscribe()
     }
+  }, [userData?.company_id])
+
+  useEffect(() => {
+    const fetchServiceAssignments = async () => {
+      if (!userData?.company_id) {
+        setServiceAssignmentsLoading(false)
+        return
+      }
+
+      try {
+        setServiceAssignmentsLoading(true)
+        const latestAssignments = await getLatestServiceAssignmentsPerBooking(userData.company_id)
+        setServiceAssignments(latestAssignments)
+      } catch (error) {
+        console.error("Error fetching service assignments:", error)
+      } finally {
+        setServiceAssignmentsLoading(false)
+      }
+    }
+
+    fetchServiceAssignments()
   }, [userData?.company_id])
 
 
@@ -300,9 +328,10 @@ export default function LogisticsBulletinBoardPage() {
         totalPages={totalPages}
         handleNextPage={handleNextPage}
         handlePreviousPage={handlePreviousPage}
-        reports={Object.fromEntries(Object.entries(reports).map(([k, v]) => [k, [v]]))}
+        reports={reports}
         reportsLoading={reportsLoading}
-        projectNames={projectNames}
+        serviceAssignments={Object.fromEntries(Object.entries(serviceAssignments).map(([k, v]) => [k, [v]]))}
+        serviceAssignmentsLoading={serviceAssignmentsLoading}
       />
     </div>
   )

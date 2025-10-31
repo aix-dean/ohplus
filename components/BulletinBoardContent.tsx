@@ -1,6 +1,6 @@
 import { Pagination } from "@/components/ui/pagination"
 import { BookingCard } from "./BookingCard"
-import type { Product } from "@/lib/firebase-service"
+import type { Product, ServiceAssignment } from "@/lib/firebase-service"
 import type { ReportData } from "@/lib/report-service"
 
 interface Booking {
@@ -36,9 +36,10 @@ interface BulletinBoardContentProps {
   totalPages: number
   handleNextPage: () => void
   handlePreviousPage: () => void
-  reports: { [reservationId: string]: ReportData[] }
+  reports: { [bookingId: string]: ReportData[] }
   reportsLoading: boolean
-  projectNames: { [productId: string]: string }
+  serviceAssignments: { [bookingId: string]: ServiceAssignment[] }
+  serviceAssignmentsLoading: boolean
 }
 
 export const BulletinBoardContent = ({
@@ -62,7 +63,8 @@ export const BulletinBoardContent = ({
   handlePreviousPage,
   reports,
   reportsLoading,
-  projectNames,
+  serviceAssignments,
+  serviceAssignmentsLoading,
 }: BulletinBoardContentProps) => {
   return (
     <div className={containerClassName}>
@@ -132,7 +134,8 @@ export const BulletinBoardContent = ({
                     product={product}
                     reports={reports}
                     reportsLoading={reportsLoading}
-                    projectNames={projectNames}
+                    serviceAssignments={serviceAssignments}
+                    serviceAssignmentsLoading={serviceAssignmentsLoading}
                     linkPrefix={linkPrefix}
                     latestJoIds={latestJoIds}
                     onClick={onClick}

@@ -7,7 +7,7 @@ import { ArrowLeft, Calendar, User, Building, Loader2, AlertCircle, FileText } f
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
-import { getProductById, type Product } from "@/lib/firebase-service"
+import { getProductById, getLatestServiceAssignmentsPerBooking, type Product, type ServiceAssignment } from "@/lib/firebase-service"
 import { bookingService, type Booking } from "@/lib/booking-service"
 import Image from "next/image"
 import { CreateReportDialog } from "@/components/create-report-dialog"
@@ -42,6 +42,8 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
   const [error, setError] = useState<string | null>(null)
   const [product, setProduct] = useState<Product | null>(null)
   const [reports, setReports] = useState<ReportData[]>([])
+  const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
+  const [campaignName, setCampaignName] = useState<string>("")
   const [bulletinEntries, setBulletinEntries] = useState<BulletinEntry[]>([])
   const [bulletinLoading, setBulletinLoading] = useState(false)
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
@@ -78,12 +80,12 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
 
   useEffect(() => {
     const fetchReports = async () => {
-      if (!booking?.reservation_id) return
+      if (!booking?.id) return
 
       try {
         const reportsQuery = query(
           collection(db, "reports"),
-          where("reservation_id", "==", booking.reservation_id),
+          where("booking_id", "==", booking.id),
           orderBy("created", "desc")
         )
 
@@ -106,7 +108,7 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
       // Set up real-time listener for reports
       const reportsQuery = query(
         collection(db, "reports"),
-        where("reservation_id", "==", booking.reservation_id),
+        where("booking_id", "==", booking.id),
         orderBy("created", "desc")
       )
 
@@ -122,6 +124,36 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
 
       return () => unsubscribe()
     }
+  }, [booking])
+
+  useEffect(() => {
+    const fetchServiceAssignments = async () => {
+      if (!booking?.id) return
+
+      try {
+        const assignmentsRef = collection(db, "service_assignments")
+        const q = query(assignmentsRef, where("booking_id", "==", booking.id))
+        const querySnapshot = await getDocs(q)
+
+        const assignments: ServiceAssignment[] = []
+        querySnapshot.forEach((doc) => {
+          assignments.push({ id: doc.id, ...doc.data() } as ServiceAssignment)
+        })
+
+        setServiceAssignments(assignments)
+
+        // Get campaign name from the first assignment (if any)
+        if (assignments.length > 0) {
+          setCampaignName(assignments[0].campaignName || "")
+        } else {
+          setCampaignName("")
+        }
+      } catch (error) {
+        console.error("Error fetching service assignments:", error)
+      }
+    }
+
+    fetchServiceAssignments()
   }, [booking])
 
   // Mock project monitoring data - in a real app, this would come from your database
@@ -280,11 +312,11 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
               reports.map((report) => (
                 <div key={report.id} className="p-4 grid grid-cols-6 gap-3 text-sm hover:bg-gray-50">
                   <div className="font-medium">
-                    {report.created ? new Date(report.created.toDate ? report.created.toDate() : report.created).toLocaleDateString() : "N/A"}
+                    {report.created ? new Date(report.created.toDate ? report.created.toDate() : (report.created as any)).toLocaleDateString() : "N/A"}
                   </div>
                   <div>{report.createdByName || report.createdBy || "Unknown"}</div>
-                  <div>Logistics</div>
-                  <div>{booking?.project_name || "N/A"}</div>
+                  <div>{report.category || "N/A"}</div>
+                  <div>{campaignName || "N/A"}</div>
                   <div>{report.reportType || "Report"} submitted</div>
                   <div>
                     {report.attachments && report.attachments.length > 0 ? (

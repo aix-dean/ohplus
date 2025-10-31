@@ -3,7 +3,7 @@ import Link from "next/link"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { formatDateShort } from "@/lib/utils"
-import type { Product } from "@/lib/firebase-service"
+import type { Product, ServiceAssignment } from "@/lib/firebase-service"
 import type { ReportData } from "@/lib/report-service"
 
 interface Booking {
@@ -23,16 +23,17 @@ interface Booking {
 interface BookingCardProps {
   booking: Booking
   product?: Product
-  reports: { [reservationId: string]: ReportData[] }
+  reports: { [bookingId: string]: ReportData[] }
   reportsLoading: boolean
-  projectNames: { [productId: string]: string }
+  serviceAssignments: { [bookingId: string]: ServiceAssignment[] }
+  serviceAssignmentsLoading: boolean
   linkPrefix?: string
   latestJoIds?: { [productId: string]: string }
   onClick?: (product: Product) => void
 }
 
-export const BookingCard = ({ booking, product, reports, reportsLoading, projectNames, linkPrefix = "/logistics/bulletin-board", latestJoIds = {}, onClick }: BookingCardProps) => {
-  const reportList = reports[booking.reservation_id || booking.id] || []
+export const BookingCard = ({ booking, product, reports, reportsLoading, serviceAssignments, serviceAssignmentsLoading, linkPrefix = "/logistics/bulletin-board", latestJoIds = {}, onClick }: BookingCardProps) => {
+  const reportList = reports[booking.id] || []
 
   return (
     <div
@@ -89,12 +90,12 @@ export const BookingCard = ({ booking, product, reports, reportsLoading, project
           <p className="text-[14px] font-semibold text-black mb-1">{booking.reservation_id || booking.id}</p>
           {onClick ? (
             <p className="text-[24px] font-semibold text-black mb-2 truncate cursor-pointer hover:text-blue-600 transition-colors">
-              {projectNames[booking.product_id || ''] || booking.project_name || "No Project Name"}
+              {booking.project_name}
             </p>
           ) : (
             <Link href={`${linkPrefix}/${latestJoIds[booking.id] || booking.id}`}>
               <p className="text-[24px] font-semibold text-black mb-2 truncate cursor-pointer hover:text-blue-600 transition-colors">
-                {projectNames[booking.product_id || ''] || booking.project_name || "No Project Name"}
+                {booking.project_name}
               </p>
             </Link>
           )}
@@ -112,13 +113,13 @@ export const BookingCard = ({ booking, product, reports, reportsLoading, project
             <Skeleton className="h-3 w-1/2" />
           </div>
         ) : reportList.length > 0 ? (
-          <div className="space-y-1 pl-4">
-            {reportList.slice(0, 3).map((report, index) => (
-              <p key={index} className="text-[13px] text-black font-light">
-                {formatDateShort(report.created || report.updated || report.date)} - {report.descriptionOfWork || report.status}
-              </p>
-            ))}
-          </div>
+           <div className="space-y-1 pl-4">
+             {reportList.slice(0, 3).map((report, index) => (
+               <p key={index} className="text-[13px] text-black font-light">
+                 {formatDateShort(report.created || report.updated || report.date)} - {report.descriptionOfWork || report.status}
+               </p>
+             ))}
+           </div>
         ) : (
           <p className="text-[13px] text-gray-500 pl-4">No Activities yet</p>
         )}

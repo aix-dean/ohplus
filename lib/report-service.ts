@@ -16,19 +16,20 @@ import {
 import { db } from "./firebase"
 
 export interface ReportData {
-  id?: string
-  report_id?: string
-  siteId: string
-  siteName: string
-  siteCode?: string
-  companyId: string
-  sellerId: string
-  client: string
-  clientId: string
-  client_email?: string
-  joNumber?: string
-  joType?: string
-  reservation_id?: string
+   id?: string
+   report_id?: string
+   siteId: string
+   siteName: string
+   siteCode?: string
+   companyId: string
+   sellerId: string
+   client: string
+   clientId: string
+   client_email?: string
+   joNumber?: string
+   joType?: string
+   reservation_id?: string
+   booking_id?: string
   bookingDates: {
     start: Timestamp
     end: Timestamp
@@ -143,6 +144,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
       joNumber: reportData.joNumber,
       joType: reportData.joType,
       reservation_id: reportData.reservation_id,
+      booking_id: reportData.booking_id,
       bookingDates: {
         start: reportData.bookingDates.start,
         end: reportData.bookingDates.end,
@@ -574,12 +576,12 @@ export async function postReport(reportData: ReportData): Promise<string> {
   }
 }
 
-export async function getLatestReportsPerBooking(companyId: string): Promise<{ [reservationId: string]: ReportData }> {
+export async function getReportsPerBooking(companyId: string): Promise<{ [bookingId: string]: ReportData[] }> {
   try {
     const q = query(collection(db, "reports"), where("companyId", "==", companyId), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
 
-    const reportsByBooking: { [reservationId: string]: ReportData } = {}
+    const reportsByBooking: { [bookingId: string]: ReportData[] } = {}
 
     querySnapshot.docs.forEach((doc) => {
       const data = doc.data()
@@ -589,9 +591,12 @@ export async function getLatestReportsPerBooking(companyId: string): Promise<{ [
         attachments: Array.isArray(data.attachments) ? data.attachments : [],
       } as ReportData
 
-      // Only keep the latest report for each reservation_id
-      if (report.reservation_id && !reportsByBooking[report.reservation_id]) {
-        reportsByBooking[report.reservation_id] = report
+      // Add all reports for each booking_id
+      if (report.booking_id) {
+        if (!reportsByBooking[report.booking_id]) {
+          reportsByBooking[report.booking_id] = []
+        }
+        reportsByBooking[report.booking_id].push(report)
       }
     })
 

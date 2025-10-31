@@ -112,7 +112,8 @@ describe('BookingCard', () => {
     product: mockProduct,
     reports: mockReports,
     reportsLoading: false,
-    projectNames: { 'product-1': 'Test Project' },
+    serviceAssignments: {},
+    serviceAssignmentsLoading: false,
     linkPrefix: '/test',
     latestJoIds: {},
   }
@@ -132,19 +133,8 @@ describe('BookingCard', () => {
     expect(screen.getByText('RES-123')).toBeInTheDocument()
   })
 
-  it('shows project name from projectNames prop when available', () => {
+  it('shows project name from booking', () => {
     render(<BookingCard {...defaultProps} />)
-
-    expect(screen.getByText('Test Project')).toBeInTheDocument()
-  })
-
-  it('shows project name from booking when projectNames not available', () => {
-    const propsWithoutProjectNames = {
-      ...defaultProps,
-      projectNames: {},
-    }
-
-    render(<BookingCard {...propsWithoutProjectNames} />)
 
     expect(screen.getByText('Test Project')).toBeInTheDocument()
   })

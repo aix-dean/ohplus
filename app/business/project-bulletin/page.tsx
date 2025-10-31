@@ -6,9 +6,11 @@ import { useEffect, useState } from "react"
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { BulletinBoardContent } from "@/components/BulletinBoardContent"
-import { getLatestReportsPerBooking } from "@/lib/report-service"
+import { getReportsPerBooking } from "@/lib/report-service"
+import { getLatestServiceAssignmentsPerBooking } from "@/lib/firebase-service"
 import type { Product } from "@/lib/firebase-service"
 import type { ReportData } from "@/lib/report-service"
+import type { ServiceAssignment } from "@/lib/firebase-service"
 
 interface Booking {
   id: string
@@ -33,8 +35,10 @@ export default function ProjectMonitoringPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(9)
   const [totalPages, setTotalPages] = useState(1)
-  const [reports, setReports] = useState<{ [reservationId: string]: ReportData }>({})
+  const [reports, setReports] = useState<{ [bookingId: string]: ReportData[] }>({})
   const [reportsLoading, setReportsLoading] = useState(true)
+  const [serviceAssignments, setServiceAssignments] = useState<{ [bookingId: string]: ServiceAssignment }>({})
+  const [serviceAssignmentsLoading, setServiceAssignmentsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
 
 
@@ -127,7 +131,7 @@ export default function ProjectMonitoringPage() {
 
       try {
         setReportsLoading(true)
-        const latestReports = await getLatestReportsPerBooking(userData.company_id)
+        const latestReports = await getReportsPerBooking(userData.company_id)
         setReports(latestReports)
       } catch (error) {
         console.error("Error fetching reports:", error)
@@ -139,6 +143,27 @@ export default function ProjectMonitoringPage() {
     fetchReports()
   }, [userData?.company_id])
 
+  useEffect(() => {
+    const fetchServiceAssignments = async () => {
+      if (!userData?.company_id) {
+        setServiceAssignmentsLoading(false)
+        return
+      }
+
+      try {
+        setServiceAssignmentsLoading(true)
+        const latestAssignments = await getLatestServiceAssignmentsPerBooking(userData.company_id)
+        setServiceAssignments(latestAssignments)
+      } catch (error) {
+        console.error("Error fetching service assignments:", error)
+      } finally {
+        setServiceAssignmentsLoading(false)
+      }
+    }
+
+    fetchServiceAssignments()
+  }, [userData?.company_id])
+
 
 
   const bookingData = bookings.map((b) => ({
@@ -147,7 +172,7 @@ export default function ProjectMonitoringPage() {
     reservation_id: b.reservation_id,
     project_name: b.project_name,
   }))
-  const reportsData = Object.fromEntries(Object.entries(reports).map(([k, v]) => [k, [v]]))
+  const reportsData = reports
 
   return (
     <BulletinBoardContent
@@ -169,7 +194,8 @@ export default function ProjectMonitoringPage() {
       handlePreviousPage={handlePreviousPage}
       reports={reportsData}
       reportsLoading={reportsLoading}
-      projectNames={{}}
+      serviceAssignments={Object.fromEntries(Object.entries(serviceAssignments).map(([k, v]) => [k, [v]]))}
+      serviceAssignmentsLoading={serviceAssignmentsLoading}
     />
   )
 }

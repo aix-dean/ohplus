@@ -92,7 +92,8 @@ describe('BulletinBoardContent', () => {
     handlePreviousPage: vi.fn(),
     reports: mockReports,
     reportsLoading: false,
-    projectNames: {},
+    serviceAssignments: {},
+    serviceAssignmentsLoading: false,
   }
 
   it('renders title when showTitle is true', () => {

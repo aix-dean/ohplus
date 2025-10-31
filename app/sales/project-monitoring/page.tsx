@@ -15,8 +15,10 @@ import { DateRangeCalendarDialog } from "@/components/date-range-calendar-dialog
 import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
 import { useDebounce } from "@/hooks/use-debounce"
 import { BulletinBoardContent } from "@/components/BulletinBoardContent"
-import { getLatestReportsPerBooking } from "@/lib/report-service"
+import { getReportsPerBooking } from "@/lib/report-service"
+import { getLatestServiceAssignmentsPerBooking } from "@/lib/firebase-service"
 import type { ReportData } from "@/lib/report-service"
+import type { ServiceAssignment } from "@/lib/firebase-service"
 
 interface JobOrderCount {
   [productId: string]: number
@@ -70,8 +72,10 @@ export default function ProjectMonitoringPage() {
   const [jobOrderCounts, setJobOrderCounts] = useState<JobOrderCount>({})
   const [latestJoNumbers, setLatestJoNumbers] = useState<{ [productId: string]: string }>({})
   const [latestJoIds, setLatestJoIds] = useState<{ [productId: string]: string }>({})
-  const [reports, setReports] = useState<{ [reservationId: string]: ReportData }>({})
+  const [reports, setReports] = useState<{ [bookingId: string]: ReportData[] }>({})
   const [reportsLoading, setReportsLoading] = useState(true)
+  const [serviceAssignments, setServiceAssignments] = useState<{ [bookingId: string]: ServiceAssignment }>({})
+  const [serviceAssignmentsLoading, setServiceAssignmentsLoading] = useState(true)
   const [projectNames, setProjectNames] = useState<{ [productId: string]: string }>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isDialogLoading, setIsDialogLoading] = useState(false)
@@ -381,7 +385,7 @@ export default function ProjectMonitoringPage() {
 
        try {
          setReportsLoading(true)
-         const latestReports = await getLatestReportsPerBooking(userData.company_id)
+         const latestReports = await getReportsPerBooking(userData.company_id)
          setReports(latestReports)
        } catch (error) {
          console.error("Error fetching reports:", error)
@@ -391,6 +395,27 @@ export default function ProjectMonitoringPage() {
      }
 
      fetchReports()
+   }, [userData?.company_id])
+ 
+   useEffect(() => {
+     const fetchServiceAssignments = async () => {
+       if (!userData?.company_id) {
+         setServiceAssignmentsLoading(false)
+         return
+       }
+ 
+       try {
+         setServiceAssignmentsLoading(true)
+         const latestAssignments = await getLatestServiceAssignmentsPerBooking(userData.company_id)
+         setServiceAssignments(latestAssignments)
+       } catch (error) {
+         console.error("Error fetching service assignments:", error)
+       } finally {
+         setServiceAssignmentsLoading(false)
+       }
+     }
+ 
+     fetchServiceAssignments()
    }, [userData?.company_id])
 
    useEffect(() => {
@@ -473,7 +498,7 @@ export default function ProjectMonitoringPage() {
      reservation_id: b.reservation_id,
      project_name: b.project_name,
    }))
-   const reportsData = Object.fromEntries(Object.entries(reports).map(([k, v]) => [k, [v]]))
+   const reportsData = reports
  
    return (
     <div className="p-6 bg-[#fafafa] min-h-screen" role="main" aria-labelledby="project-bulletin-title">
@@ -604,7 +629,8 @@ export default function ProjectMonitoringPage() {
             handlePreviousPage={handlePreviousPage}
             reports={reportsData}
             reportsLoading={false}
-            projectNames={projectNames}
+            serviceAssignments={Object.fromEntries(Object.entries(serviceAssignments).map(([k, v]) => [k, [v]]))}
+            serviceAssignmentsLoading={serviceAssignmentsLoading}
           />
         ) : (
           <div className="text-center py-12" role="status" aria-live="polite">
