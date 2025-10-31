@@ -57,7 +57,6 @@ const handleFormattedNumberInput = (e: React.ChangeEvent<HTMLInputElement>, setV
 
 export default function BusinessProductDetailPage() {
   const params = useParams()
-  const resolvedParams = use(params)
   const router = useRouter()
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -102,11 +101,11 @@ export default function BusinessProductDetailPage() {
 
   useEffect(() => {
     async function fetchProduct() {
-      if (!resolvedParams.id) return
+      if (!params.id) return
 
       setLoading(true)
       try {
-        const productId = Array.isArray(resolvedParams.id) ? resolvedParams.id[0] : resolvedParams.id
+        const productId = Array.isArray(params.id) ? params.id[0] : params.id
 
         const productDoc = await getDoc(doc(db, "products", productId))
 
@@ -123,7 +122,7 @@ export default function BusinessProductDetailPage() {
     }
 
     fetchProduct()
-  }, [params.id])
+  }, [params])
 
   // Update price unit based on site type
   useEffect(() => {
