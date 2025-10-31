@@ -2,6 +2,9 @@ import React from 'react'
 import { vi } from 'vitest'
 import '@testing-library/jest-dom'
 
+// Make React available globally for React 19 compatibility
+;(globalThis as any).React = React
+
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -77,4 +80,17 @@ vi.mock('@/components/ui/skeleton', () => ({
 vi.mock('lucide-react', () => ({
   CalendarIcon: () => React.createElement('div', { 'data-testid': 'calendar-icon' }),
   Loader2: () => React.createElement('div', { 'data-testid': 'loader-icon' }),
+  ArrowLeft: () => React.createElement('div', { 'data-testid': 'arrow-left-icon' }),
+  Search: () => React.createElement('div', { 'data-testid': 'search-icon' }),
+  MoreVertical: () => React.createElement('div', { 'data-testid': 'more-vertical-icon' }),
+  X: () => React.createElement('div', { 'data-testid': 'x-icon' }),
+  Plus: () => React.createElement('div', { 'data-testid': 'plus-icon' }),
+  Printer: () => React.createElement('div', { 'data-testid': 'printer-icon' }),
+  Eye: () => React.createElement('div', { 'data-testid': 'eye-icon' }),
+  Trash2: () => React.createElement('div', { 'data-testid': 'trash2-icon' }),
+  History: () => React.createElement('div', { 'data-testid': 'history-icon' }),
+  Copy: () => React.createElement('div', { 'data-testid': 'copy-icon' }),
+  Edit: () => React.createElement('div', { 'data-testid': 'edit-icon' }),
+  Upload: () => React.createElement('div', { 'data-testid': 'upload-icon' }),
+  Paperclip: () => React.createElement('div', { 'data-testid': 'paperclip-icon' }),
 }))

@@ -106,6 +106,32 @@ class EmailService {
     }
   }
 
+  async getEmailsByFilters(companyId: string, reportId?: string, emailType?: string): Promise<Email[]> {
+    try {
+      let q = query(collection(db, this.emailsCollection), where("company_id", "==", companyId), where("status", "==", "sent"), orderBy("created", "desc"))
+
+      if (reportId) {
+        q = query(collection(db, this.emailsCollection), where("company_id", "==", companyId), where("reportId", "==", reportId), where("status", "==", "sent"), orderBy("created", "desc"))
+      }
+
+      const querySnapshot = await getDocs(q)
+      let emails = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Email[]
+
+      // Filter by emailType if provided (e.g., based on template or other fields)
+      if (emailType) {
+        emails = emails.filter(email => email.templateId?.includes(emailType) || email.reportId)
+      }
+
+      return emails
+    } catch (error) {
+      console.error("Error getting emails by filters:", error)
+      throw new Error("Failed to get emails")
+    }
+  }
+
   async updateEmail(emailId: string, updates: Partial<Email>): Promise<void> {
     try {
       // Clean undefined values

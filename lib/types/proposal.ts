@@ -119,6 +119,7 @@ export type Proposal = {
         type?: boolean
         traffic?: boolean
         srp?: boolean
+        additionalMessage?: boolean
       }
     }
     client: ProposalClient

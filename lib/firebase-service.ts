@@ -74,6 +74,8 @@ async function indexServiceAssignment(serviceAssignment: ServiceAssignment) {
       alarmTime: serviceAssignment.alarmTime,
       created: serviceAssignment.created?.toISOString() || '',
       company_id: serviceAssignment.company_id || '',
+      reservation_number: serviceAssignment.reservation_number || '',
+      booking_id: serviceAssignment.booking_id || '',
     }
 
     await serviceAssignmentsIndex.saveObject(algoliaObject)
@@ -247,6 +249,8 @@ export interface ServiceAssignment {
   created: any
   updated: any
   company_id?: string
+  reservation_number?: string
+  booking_id?: string
 }
 
 // Booking interface
@@ -1251,6 +1255,8 @@ export async function updateServiceAssignment(
           alarmTime: updatedData.alarmTime,
           created: updatedData.created?.toDate(),
           updated: new Date(),
+          reservation_number: updatedData.reservation_number || '',
+          booking_id: updatedData.booking_id || '',
           company_id: updatedData.company_id || '',
         } as ServiceAssignment
 
@@ -2195,6 +2201,21 @@ export async function getOccupancyData(companyId: string, currentDate: Date = ne
   }
 }
 
+// ContentMedia interface
+export interface ContentMedia {
+  id?: string
+  category_id: string
+  title?: string
+  thumbnail?: string
+  media: Array<{
+    url: string
+    type: string
+    isVideo: boolean
+  }>
+  created?: any
+  updated?: any
+}
+
 // Get service assignments filtered by company_id and department
 export async function getServiceAssignmentsByDepartment(company_id: string, department: string): Promise<ServiceAssignment[]> {
   try {
@@ -2216,6 +2237,61 @@ export async function getServiceAssignmentsByDepartment(company_id: string, depa
     return assignments
   } catch (error) {
     console.error("Error fetching service assignments by department:", error)
+    return []
+  }
+}
+
+// Get latest video from content_media by category_id
+export async function getLatestVideoByCategory(categoryId: string): Promise<string | null> {
+  try {
+    const contentMediaRef = collection(db, "content_media")
+    const q = query(
+      contentMediaRef,
+      where("category_id", "==", categoryId),
+      orderBy("created", "desc"),
+      limit(1)
+    )
+
+    const querySnapshot = await getDocs(q)
+
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0]
+      const contentMedia = { id: doc.id, ...doc.data() } as ContentMedia
+
+      // Extract video URL from media[0].url
+      if (contentMedia.media && contentMedia.media.length > 0 && contentMedia.media[0].url) {
+        return contentMedia.media[0].url
+      }
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching latest video by category:", error)
+    return null
+  }
+}
+
+// Get news items from content_media by category_id
+export async function getNewsItemsByCategory(categoryId: string, limitCount = 5): Promise<ContentMedia[]> {
+  try {
+    const contentMediaRef = collection(db, "content_media")
+    const q = query(
+      contentMediaRef,
+      where("category_id", "==", categoryId),
+      orderBy("created", "desc"),
+      limit(limitCount)
+    )
+
+    const querySnapshot = await getDocs(q)
+    const newsItems: ContentMedia[] = []
+
+    querySnapshot.forEach((doc) => {
+      newsItems.push({ id: doc.id, ...doc.data() } as ContentMedia)
+    })
+
+    return newsItems
+  } catch (error) {
+    console.error("Error fetching news items by category:", error)
     return []
   }
 }

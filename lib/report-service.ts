@@ -57,6 +57,7 @@ export interface ReportData {
   tags: string[]
   assignedTo?: string
   // Product information
+  pdf?: string
   product?: {
     id: string
     name: string
@@ -73,6 +74,9 @@ export interface ReportData {
   delayDays?: string
   // Site image URL
   siteImageUrl?: string
+  logistics_report?: string
+  reservation_number?: string
+  booking_id?: string
 }
 
 // Helper function to clean data by removing undefined values recursively
@@ -202,6 +206,16 @@ export async function createReport(reportData: ReportData): Promise<string> {
     if (reportData.descriptionOfWork && reportData.descriptionOfWork.trim() !== "") {
       finalReportData.descriptionOfWork = reportData.descriptionOfWork.trim()
     }
+    // Add service assignment specific fields
+    if (reportData.reservation_number && reportData.reservation_number.trim() !== "") {
+      finalReportData.reservation_number = reportData.reservation_number.trim()
+    }
+
+    if (reportData.booking_id && reportData.booking_id.trim() !== "") {
+      finalReportData.booking_id = reportData.booking_id.trim()
+    }
+
+    console.log("Final report data to be saved:", finalReportData)
 
     console.log("Final report data to be saved:", finalReportData)
 
@@ -644,6 +658,43 @@ export async function getSentEmailsForReport(reportId: string): Promise<any[]> {
     return emails
   } catch (error) {
     console.error("Error fetching sent emails for report:", error)
+    return []
+  }
+}
+
+// Get all sent emails for a company
+export async function getSentEmailsForCompany(companyId: string): Promise<any[]> {
+  try {
+    if (!db) {
+      throw new Error("Firestore not initialized")
+    }
+
+    const emailsRef = collection(db, "emails")
+    const q = query(
+      emailsRef,
+      where("company_id", "==", companyId),
+      where("email_type", "==", "report"),
+      where("status", "==", "sent"),
+      orderBy("sentAt", "desc")
+    )
+
+    const querySnapshot = await getDocs(q)
+    const emails: any[] = []
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      emails.push({
+        id: doc.id,
+        ...data,
+        sentAt: data.sentAt instanceof Timestamp ? data.sentAt.toDate() : new Date(data.sentAt),
+        created: data.created instanceof Timestamp ? data.created.toDate() : new Date(data.created),
+        updated: data.updated instanceof Timestamp ? data.updated.toDate() : new Date(data.updated),
+      })
+    })
+
+    return emails
+  } catch (error) {
+    console.error("Error fetching sent emails for company:", error)
     return []
   }
 }

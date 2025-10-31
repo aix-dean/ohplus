@@ -844,11 +844,116 @@ export async function generateAndUploadQuotationPDF(
   quotation: Quotation,
   companyData?: any,
   logoDataUrl?: string | null,
-  userData?: any
+  userData?: any,
+  userSignatureDataUrl?: string | null
 ): Promise<{ pdfUrl: string; password: string }> {
   try {
     // Generate password
     const password = generateQuotationPassword()
+
+    // Always fetch fresh company data and logo to ensure consistency
+    let logoDataUrlFinal = logoDataUrl
+    let finalUserSignatureDataUrl: string | null = userSignatureDataUrl || null
+    let finalCompanyData = companyData
+
+    console.log('[QUOTATION_PDF] Company ID from userData or quotation:', userData?.company_id || quotation.company_id)
+    console.log('[QUOTATION_PDF] User signature data URL provided:', !!userSignatureDataUrl)
+
+    // Fetch user signature if not provided and available
+    if (!finalUserSignatureDataUrl && quotation.created_by) {
+      try {
+        console.log('[QUOTATION_PDF] Fetching user signature for createdBy:', quotation.created_by)
+        const userDocRef = doc(db, "iboard_users", quotation.created_by)
+        const userDoc = await getDoc(userDocRef)
+
+        if (userDoc.exists()) {
+          const userDataFetched = userDoc.data()
+          if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+            const signatureUrl = userDataFetched.signature.url
+            console.log('[QUOTATION_PDF] Found user signature URL:', signatureUrl)
+
+            // Convert signature image to base64 data URL like logoDataUrl
+            try {
+              const response = await fetch(signatureUrl)
+              if (response.ok) {
+                const blob = await response.blob()
+                const arrayBuffer = await blob.arrayBuffer()
+                const base64 = Buffer.from(arrayBuffer).toString('base64')
+                const mimeType = blob.type || 'image/png'
+                finalUserSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                console.log('[QUOTATION_PDF] Converted signature to base64 data URL')
+              } else {
+                console.warn('[QUOTATION_PDF] Failed to fetch signature image:', response.status)
+              }
+            } catch (fetchError) {
+              console.error('[QUOTATION_PDF] Error converting signature to base64:', fetchError)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[QUOTATION_PDF] Error fetching user signature:', error)
+      }
+    }
+
+    // Always try to fetch company data and logo from database
+    const companyId = userData?.company_id || quotation.company_id
+    if (companyId) {
+      console.log('[QUOTATION_PDF] Fetching company data for ID:', companyId)
+      try {
+        const companyDoc = await getDoc(doc(db, "companies", companyId))
+        if (companyDoc.exists()) {
+          const companyInfo = companyDoc.data()
+          console.log('[QUOTATION_PDF] Company data found:', companyInfo.name)
+
+          // Merge provided companyData with fresh database data
+          finalCompanyData = {
+            name: finalCompanyData?.name || companyInfo.name || "Company Name",
+            address: finalCompanyData?.address || companyInfo.address,
+            phone: finalCompanyData?.phone || companyInfo.phone || companyInfo.telephone || companyInfo.contact_number,
+            email: finalCompanyData?.email || companyInfo.email,
+            website: finalCompanyData?.website || companyInfo.website || companyInfo.company_website,
+          }
+
+          // Always fetch logo from database
+          if (companyInfo?.logo) {
+            console.log('[QUOTATION_PDF] Fetching company logo from:', companyInfo.logo)
+            const logoResponse = await fetch(companyInfo.logo)
+            if (logoResponse.ok) {
+              const logoBlob = await logoResponse.blob()
+              const logoArrayBuffer = await logoBlob.arrayBuffer()
+              const logoBase64 = Buffer.from(logoArrayBuffer).toString('base64')
+              const mimeType = logoBlob.type || 'image/png'
+              logoDataUrlFinal = `data:${mimeType};base64,${logoBase64}`
+              console.log('[QUOTATION_PDF] Logo fetched and converted to base64, length:', logoBase64.length)
+            } else {
+              console.warn('[QUOTATION_PDF] Failed to fetch logo, status:', logoResponse.status)
+            }
+          } else {
+            console.log('[QUOTATION_PDF] No logo found in company data')
+          }
+        } else {
+          console.warn('[QUOTATION_PDF] Company document not found for ID:', companyId)
+        }
+      } catch (error) {
+        console.error('[QUOTATION_PDF] Error fetching company data and logo:', error)
+        // Continue with provided data if fetch fails
+      }
+    }
+
+    // Ensure we have company data
+    if (!finalCompanyData) {
+      console.log('[QUOTATION_PDF] Using default company data')
+      finalCompanyData = {
+        name: "Company Name",
+        address: undefined,
+        phone: undefined,
+        email: undefined,
+        website: undefined,
+      }
+    }
+
+    console.log('[QUOTATION_PDF] Final company data:', finalCompanyData.name)
+    console.log('[QUOTATION_PDF] Logo data URL available:', !!logoDataUrlFinal)
 
     // Prepare quotation data for API (convert Timestamps to serializable format)
     const serializableQuotation = {
@@ -868,9 +973,10 @@ export async function generateAndUploadQuotationPDF(
       },
       body: JSON.stringify({
         quotation: serializableQuotation,
-        companyData,
-        logoDataUrl,
+        companyData: finalCompanyData,
+        logoDataUrl: logoDataUrlFinal,
         userData,
+        userSignatureDataUrl: finalUserSignatureDataUrl,
       }),
     })
 

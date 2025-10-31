@@ -73,7 +73,9 @@ export interface Booking {
   updated: any // Firestore timestamp
   user_id: string
   quotation_id: string // Added based on context
+  quotation_number?: string // Added quotation number from original quotation
   isCollectibles?: boolean // Indicates if collectibles have been created for this booking
+  items?: any // Added items field to store quotation items
 }
 
 export interface SalesRecord {
@@ -111,6 +113,7 @@ export interface PaginationOptions {
 export interface FilterOptions {
   type?: string
   status?: string
+  product_id?: string
 }
 
 export interface PaginatedResult<T> {
@@ -225,6 +228,8 @@ export class BookingService {
         updated: serverTimestamp(),
         user_id: userId,
         quotation_id: quotation.id,
+        quotation_number: quotation.quotation_number,
+        items: quotation.items,
       }
 
       // Only add product_name if it exists
@@ -433,20 +438,22 @@ export class BookingService {
     companyId: string,
     options?: PaginationOptions,
     filters?: FilterOptions,
-  ): Promise<Booking[]> {
+  ): Promise<{ bookings: Booking[], lastDoc: DocumentSnapshot | null }> {
     try {
       const bookingsRef = collection(db, "booking")
       let q = query(bookingsRef, where("company_id", "==", companyId), orderBy("created", "desc"))
 
-      // Apply filters - default to RESERVED status for collectibles
+      // Apply filters
       if (filters?.status) {
         q = query(q, where("status", "==", filters.status))
-      } else {
-        q = query(q, where("status", "==", "RESERVED"))
       }
 
       if (filters?.type) {
         q = query(q, where("type", "==", filters.type))
+      }
+
+      if (filters?.product_id) {
+        q = query(q, where("product_id", "==", filters.product_id))
       }
 
       if (options) {
@@ -466,7 +473,9 @@ export class BookingService {
         } as Booking)
       })
 
-      return bookings
+      const lastDoc = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
+
+      return { bookings, lastDoc }
     } catch (error) {
       console.error("Error fetching collectibles bookings:", error)
       throw error
@@ -478,11 +487,9 @@ export class BookingService {
       const bookingsRef = collection(db, "booking")
       let q = query(bookingsRef, where("company_id", "==", companyId))
 
-      // Apply filters - default to RESERVED status for collectibles
+      // Apply filters
       if (filters?.status) {
         q = query(q, where("status", "==", filters.status))
-      } else {
-        q = query(q, where("status", "==", "RESERVED"))
       }
 
       if (filters?.type) {
@@ -496,6 +503,18 @@ export class BookingService {
       throw error
     }
   }
+  async getTotalBookingsCount(companyId: string): Promise<number> {
+    try {
+      const bookingsRef = collection(db, "booking")
+      const q = query(bookingsRef, where("company_id", "==", companyId))
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.size
+    } catch (error) {
+      console.error("Error fetching total bookings count:", error)
+      throw error
+    }
+  }
+
 
   async getPaginatedCollectibles(
     companyId: string,
@@ -503,7 +522,7 @@ export class BookingService {
     filters?: FilterOptions,
   ): Promise<PaginatedResult<Booking>> {
     try {
-      const [totalCount, bookings] = await Promise.all([
+      const [totalCount, { bookings }] = await Promise.all([
         this.getCollectiblesCount(companyId, filters),
         this.getCollectiblesBookings(companyId, options, filters),
       ])
@@ -522,8 +541,6 @@ export class BookingService {
       // Apply same filters to last query
       if (filters?.status) {
         lastQuery = query(lastQuery, where("status", "==", filters.status))
-      } else {
-        lastQuery = query(lastQuery, where("status", "==", "RESERVED"))
       }
 
       if (filters?.type) {
