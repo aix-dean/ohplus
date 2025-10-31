@@ -315,9 +315,13 @@ export default function LogisticsBulletinBoardPage() {
 
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen">
       <BulletinBoardContent
         title="Bulletin Board"
+        showTitle={true}
+        showSearch={true}
+        containerClassName="bg-neutral-50 min-h-screen px-4 py-6"
+        paginationClassName="flex justify-end mt-4 pb-4"
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         loading={loading}

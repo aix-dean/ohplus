@@ -82,21 +82,9 @@ export const BulletinBoardContent = ({
               className="w-[190px] h-6 px-3 py-1 border border-gray-400 rounded text-sm text-gray-500 bg-white"
             />
           </div>
-          <div className="ml-auto flex gap-2 opacity-30">
-            <svg width="19" height="19" viewBox="0 0 19 19" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2.5 4.5h14v10h-14zM6.5 1.5v3M12.5 1.5v3M2.5 8.5h14" stroke="currentColor" strokeWidth="1"/>
-            </svg>
-            <svg width="27" height="27" viewBox="0 0 27 27" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="1" y="1" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-              <rect x="10" y="1" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-              <rect x="19" y="1" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-              <rect x="1" y="10" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-              <rect x="10" y="10" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-              <rect x="19" y="10" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-              <rect x="1" y="19" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-              <rect x="10" y="19" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-              <rect x="19" y="19" width="7" height="7" stroke="currentColor" strokeWidth="1"/>
-            </svg>
+          <div className="ml-auto flex gap-2 opacity-30 items-center">
+            <img src="/icons/listview.png" alt="List view" style={{ width: '19.276px', height: '19.276px', flexShrink: 0, aspectRatio: '19.28/19.28' }} />
+            <img src="/icons/cardview.png" alt="Card view" style={{ width: '26.505px', height: '26.505px', flexShrink: 0, aspectRatio: '26.50/26.50' }} />
           </div>
         </div>
       )}

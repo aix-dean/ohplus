@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { useEffect, useState } from "react"
-import { collection, query, where, orderBy, getDocs, doc, getDoc } from "firebase/firestore"
+import { collection, query, where, orderBy, getDocs, doc, getDoc, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { BulletinBoardContent } from "@/components/BulletinBoardContent"
 import { getReportsPerBooking } from "@/lib/report-service"
@@ -141,6 +141,40 @@ export default function ProjectMonitoringPage() {
     }
 
     fetchReports()
+
+    // Set up real-time listener for reports
+    if (userData?.company_id) {
+      const reportsQuery = query(
+        collection(db, "reports"),
+        where("companyId", "==", userData.company_id),
+        orderBy("created", "desc")
+      )
+
+      const unsubscribe = onSnapshot(reportsQuery, (snapshot) => {
+        const latestReports: { [bookingId: string]: ReportData[] } = {}
+
+        snapshot.docs.forEach((doc) => {
+          const data = doc.data()
+          const report: ReportData = {
+            id: doc.id,
+            ...data,
+            attachments: Array.isArray(data.attachments) ? data.attachments : [],
+          } as ReportData
+
+          // Add all reports for each booking_id
+          if (report.booking_id) {
+            if (!latestReports[report.booking_id]) {
+              latestReports[report.booking_id] = []
+            }
+            latestReports[report.booking_id].push(report)
+          }
+        })
+
+        setReports(latestReports)
+      })
+
+      return () => unsubscribe()
+    }
   }, [userData?.company_id])
 
   useEffect(() => {
@@ -176,11 +210,11 @@ export default function ProjectMonitoringPage() {
 
   return (
     <BulletinBoardContent
-      title="Project Bulletin"
+      title="Bulletin Board"
       showTitle={true}
       showSearch={true}
       containerClassName="bg-neutral-50 min-h-screen px-4 py-6"
-      paginationClassName="flex justify-center mt-4 pb-4"
+      paginationClassName="flex justify-end mt-4 pb-4"
       linkPrefix="/business/project-bulletin/details"
       searchTerm={searchTerm}
       setSearchTerm={setSearchTerm}
