@@ -2538,7 +2538,7 @@ export function ProductCard({
       >
       <div className="h-[218px] bg-gray-300 relative rounded-t-2xl">
         <Image
-          src={thumbnailUrl || "/placeholder.svg"}
+          src={product.media && product.media.length > 0 ? product.media[0].url : "/placeholder.svg"}
           alt={product.name || "Product image"}
           fill
           className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
@@ -2575,7 +2575,7 @@ export function ProductCard({
       </div>
     </div>
   </div>
-) : (
+   ) : (
     <div
       className={cn(
         "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border",
@@ -2586,7 +2586,7 @@ export function ProductCard({
     >
       <div className="h-[218px] bg-gray-300 relative rounded-t-2xl">
         <Image
-          src={thumbnailUrl || "/placeholder.svg"}
+          src={product.media && product.media.length > 0 ? product.media[0].url : "/placeholder.svg"}
           alt={product.name || "Product image"}
           fill
           className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
@@ -2622,61 +2622,7 @@ export function ProductCard({
         </div>
       </div>
     </div>
-  </div>
-) : (
-    <div
-      className={cn(
-        "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border",
-        isSelected ? "border-green-500" : "border-gray-200",
-        selectionMode ? "hover:border-green-300" : "",
-      )}
-      onClick={handleClick}
-    >
-      <div className="h-[218px] bg-gray-100 relative rounded-t-2xl">
-        {product.media && product.media.length > 0 ? (
-          <Image
-            src={product.media[0].url}
-            alt={product.name || "Product image"}
-            fill
-            className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
-            onError={(e) => {
-              const target = e.target as HTMLImageElement
-              target.src = "/abstract-geometric-sculpture.png"
-              target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
-            }}
-          />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center text-gray-500 font-medium">
-            NO IMAGE
-          </div>
-        )}
-
-        {/* Selection indicator */}
-        {selectionMode && (
-          <div className="absolute top-3 left-3 z-10">
-            <div
-              className={cn(
-                "w-6 h-6 rounded-full border-2 flex items-center justify-center",
-                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
-              )}
-            >
-              {isSelected && <CheckCircle2 size={16} className="text-white" />}
-            </div>
-          </div>
-        )}
-
-      </div>
-
-      <div className="p-4">
-        <div className="space-y-2">
-          <div className="text-sm text-gray-500 font-medium">{siteCode || "N/A"}</div>
-          <div className="text-sm text-black font-medium">{product.name}</div>
-          <div className="text-sm text-black font-medium truncate">{location}</div>
-          <div className="text-sm text-black font-medium">{formattedPrice}</div>
-        </div>
-      </div>
-    </div>
-  )
+)
 }
 
 
