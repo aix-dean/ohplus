@@ -5,10 +5,12 @@ export function ActionButtons({
   onSaveAsDraft,
   onSubmit,
   loading,
+  generatingPDF,
 }: {
   onSaveAsDraft: () => Promise<void>;
   onSubmit: () => Promise<void>;
   loading: boolean;
+  generatingPDF: boolean;
 }) {
   return (
     <div
@@ -31,9 +33,9 @@ export function ActionButtons({
         <Button variant="ghost" onClick={onSaveAsDraft} disabled={loading} style={{  height: '27px', color: 'var(--Standard-Font-Color, #333)', textAlign: 'center', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: 700, lineHeight: '100%', textDecorationLine: 'underline', textDecorationStyle: 'solid', textDecorationSkipInk: 'auto', textDecorationThickness: 'auto', textUnderlineOffset: 'auto', textUnderlinePosition: 'from-font', padding: 0 }}>
           Save as Draft
         </Button>
-        <Button onClick={onSubmit} disabled={loading} style={{ width: '126px', height: '27px', flexShrink: 0, borderRadius: '10px', background: '#1D0BEB', color: 'var(--Color, #FFF)', textAlign: 'center', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: 700, lineHeight: '100%' }}>
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {loading ? "Creating SA..." : "Generate SA"}
+        <Button onClick={onSubmit} disabled={loading || generatingPDF} style={{ width: '126px', height: '27px', flexShrink: 0, borderRadius: '10px', background: '#1D0BEB', color: 'var(--Color, #FFF)', textAlign: 'center', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: 700, lineHeight: '100%' }}>
+          {(loading || generatingPDF) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {generatingPDF ? "Generating ..." : loading ? "Creating SA..." : "Generate SA"}
         </Button>
       </div>
     </div>

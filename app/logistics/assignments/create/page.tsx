@@ -34,7 +34,7 @@ import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
 import { useToast } from "@/hooks/use-toast"
 
-import { generateServiceAssignmentHTMLPDF } from "@/lib/pdf-service"
+import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
 import { JobOrderSelectionDialog } from "@/components/logistics/assignments/create/JobOrderSelectionDialog"
 import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
@@ -535,8 +535,8 @@ export default function CreateServiceAssignmentPage() {
         created: new Date(),
       }
 
-      // Generate PDF using HTML-based approach
-      const pdfBase64 = await generateServiceAssignmentHTMLPDF(
+      // Generate PDF using the new PDF function
+      const pdfBase64 = await generateServiceAssignmentPDF(
         pdfAssignmentData,
         true // returnBase64
       )
@@ -545,7 +545,7 @@ export default function CreateServiceAssignmentPage() {
         throw new Error('Failed to generate PDF')
       }
 
-      // Store minimal assignment data in session storage (avoid quota issues)
+      // Store minimal assignment data in local storage (avoid quota issues)
       const assignmentData = {
         saNumber,
         projectSiteName: selectedProduct?.name || "",
@@ -590,10 +590,10 @@ export default function CreateServiceAssignmentPage() {
         },
       };
 
-      sessionStorage.setItem('serviceAssignmentData', JSON.stringify(assignmentData));
+      localStorage.setItem('serviceAssignmentData', JSON.stringify(assignmentData));
 
       // Navigate to view-pdf page with the exact URL format
-      router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=Df4wxbfrO5EnAbml0r2I`);
+      router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=${jobOrderId || 'Df4wxbfrO5EnAbml0r2I'}`);
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast({
@@ -859,10 +859,10 @@ export default function CreateServiceAssignmentPage() {
 
       if (action === "print") {
         // Generate PDF and open in new window for printing
-        await generateServiceAssignmentHTMLPDF(serviceAssignmentData, false)
+        await generateServiceAssignmentPDF(serviceAssignmentData, false)
       } else {
         // Download PDF
-        await generateServiceAssignmentHTMLPDF(serviceAssignmentData, false)
+        await generateServiceAssignmentPDF(serviceAssignmentData, false)
       }
     } catch (error) {
       console.error("Error generating PDF:", error)
@@ -980,6 +980,7 @@ export default function CreateServiceAssignmentPage() {
         onSaveAsDraft={handleSaveDraft}
         onSubmit={handleSubmit}
         loading={loading}
+        generatingPDF={generatingPDF}
         companyId={userData?.company_id || null}
         productId={formData.projectSite}
         formData={formData}

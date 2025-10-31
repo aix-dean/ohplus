@@ -14,7 +14,8 @@ import { useAuth } from "@/contexts/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { GenericSuccessDialog } from "@/components/generic-success-dialog";
 import { getTeamById } from "@/lib/teams-service";
-import { generateServiceAssignmentHTMLPDF } from "@/lib/pdf-service";
+import { CompanyService } from "@/lib/company-service";
+import { generateServiceAssignmentPDF } from "@/lib/pdf-service";
 
 export default function ViewPDFPage() {
    const { id } = useParams();
@@ -38,17 +39,21 @@ export default function ViewPDFPage() {
   useEffect(() => {
     const loadPDF = async () => {
       console.log('[PDF Loading] Starting PDF generation process');
+      console.log('[PDF Loading] Current URL params - id:', id, 'isPreview:', isPreview);
+      console.log('[PDF Loading] Local storage keys:', Object.keys(localStorage));
       setLoading(true);
       setError(null);
 
       try {
-        // Enhanced sessionStorage validation
-        const assignmentDataString = sessionStorage.getItem('serviceAssignmentData');
-        console.log('[PDF Loading] Retrieved sessionStorage data:', assignmentDataString ? 'Found' : 'Not found');
+        // Enhanced localStorage validation
+        const assignmentDataString = localStorage.getItem('serviceAssignmentData');
+        console.log('[PDF Loading] Retrieved localStorage data:', assignmentDataString ? 'Found' : 'Not found');
+        console.log('[PDF Loading] Data length:', assignmentDataString?.length || 0);
 
         if (!assignmentDataString) {
-          const errorMsg = 'Assignment data not found in session storage. Please create a service assignment first.';
+          const errorMsg = 'Assignment data not found in local storage. Please create a service assignment first.';
           console.error('[PDF Loading] Error:', errorMsg);
+          console.error('[PDF Loading] Available localStorage keys:', Object.keys(localStorage));
           setError(errorMsg);
           setLoading(false);
           return;
@@ -57,51 +62,157 @@ export default function ViewPDFPage() {
         let assignmentData;
         try {
           assignmentData = JSON.parse(assignmentDataString);
-          console.log('[PDF Loading] Successfully parsed assignment data:', assignmentData);
+          console.log('[PDF Loading] Successfully parsed assignment data');
+          console.log('[PDF Loading] Parsed data keys:', Object.keys(assignmentData));
+          console.log('[PDF Loading] SA Number:', assignmentData.saNumber);
+          console.log('[PDF Loading] Project Site:', assignmentData.projectSiteName);
         } catch (parseError) {
           const errorMsg = 'Invalid assignment data format in session storage.';
           console.error('[PDF Loading] JSON parse error:', parseError);
+          console.error('[PDF Loading] Raw data preview:', assignmentDataString?.substring(0, 200));
           setError(errorMsg);
           setLoading(false);
           return;
         }
 
-        // Comprehensive data validation
-        const requiredFields = ['saNumber', 'projectSiteName', 'serviceType', 'assignedTo'];
-        const missingFields = requiredFields.filter(field => !assignmentData[field]);
+        // Data validation with fallback defaults for required fields
+        console.log('[PDF Loading] Validating and setting defaults for required fields');
 
-        if (missingFields.length > 0) {
-          const errorMsg = `Missing required fields: ${missingFields.join(', ')}`;
-          console.error('[PDF Loading] Validation error:', errorMsg);
-          setError(errorMsg);
-          setLoading(false);
-          return;
+        // Provide default values for required fields if missing
+        if (!assignmentData.saNumber) {
+          assignmentData.saNumber = `SA-${Date.now()}`;
+          console.log('[PDF Loading] Set default saNumber:', assignmentData.saNumber);
         }
 
-        // Validate date fields
-        if (assignmentData.startDate && isNaN(new Date(assignmentData.startDate).getTime())) {
-          console.warn('[PDF Loading] Invalid startDate, setting to null');
-          assignmentData.startDate = null;
+        if (!assignmentData.projectSiteName) {
+          assignmentData.projectSiteName = 'Project Site Name';
+          console.log('[PDF Loading] Set default projectSiteName:', assignmentData.projectSiteName);
         }
-        if (assignmentData.endDate && isNaN(new Date(assignmentData.endDate).getTime())) {
-          console.warn('[PDF Loading] Invalid endDate, setting to null');
-          assignmentData.endDate = null;
+
+        if (!assignmentData.serviceType) {
+          assignmentData.serviceType = 'General Service';
+          console.log('[PDF Loading] Set default serviceType:', assignmentData.serviceType);
         }
-        if (assignmentData.alarmDate && isNaN(new Date(assignmentData.alarmDate).getTime())) {
-          console.warn('[PDF Loading] Invalid alarmDate, setting to null');
-          assignmentData.alarmDate = null;
+
+        if (!assignmentData.assignedTo) {
+          assignmentData.assignedTo = 'Unassigned';
+          console.log('[PDF Loading] Set default assignedTo:', assignmentData.assignedTo);
+        }
+
+        // Ensure optional fields have proper defaults
+        assignmentData.projectSiteLocation = assignmentData.projectSiteLocation || '';
+        assignmentData.assignedToName = assignmentData.assignedToName || '';
+        assignmentData.serviceDuration = assignmentData.serviceDuration || '';
+        assignmentData.priority = assignmentData.priority || 'Normal';
+        assignmentData.equipmentRequired = assignmentData.equipmentRequired || '';
+        assignmentData.materialSpecs = assignmentData.materialSpecs || '';
+        assignmentData.crew = assignmentData.crew || '';
+        assignmentData.gondola = assignmentData.gondola || '';
+        assignmentData.technology = assignmentData.technology || '';
+        assignmentData.sales = assignmentData.sales || '';
+        assignmentData.remarks = assignmentData.remarks || '';
+        assignmentData.alarmTime = assignmentData.alarmTime || '';
+        assignmentData.attachments = assignmentData.attachments || [];
+        assignmentData.serviceExpenses = assignmentData.serviceExpenses || [];
+
+        console.log('[PDF Loading] Data validation and defaults completed');
+
+        // Validate and set default date fields
+        if (!assignmentData.startDate || isNaN(new Date(assignmentData.startDate).getTime())) {
+          console.warn('[PDF Loading] Invalid or missing startDate, setting to current date');
+          assignmentData.startDate = new Date().toISOString();
+        }
+        if (!assignmentData.endDate || isNaN(new Date(assignmentData.endDate).getTime())) {
+          console.warn('[PDF Loading] Invalid or missing endDate, setting to 7 days from start');
+          const startDate = new Date(assignmentData.startDate);
+          const endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 7);
+          assignmentData.endDate = endDate.toISOString();
+        }
+        if (!assignmentData.alarmDate || isNaN(new Date(assignmentData.alarmDate).getTime())) {
+          console.warn('[PDF Loading] Invalid or missing alarmDate, setting to start date');
+          assignmentData.alarmDate = assignmentData.startDate;
         }
 
         console.log('[PDF Loading] Data validation passed, proceeding to PDF generation');
 
-        // Regenerate PDF from stored assignment data with enhanced error handling
+        // Generate PDF using server-side API
         try {
-          console.log('[PDF Loading] Calling generateServiceAssignmentHTMLPDF');
-          const pdfBase64 = await generateServiceAssignmentHTMLPDF(assignmentData, true);
-          console.log('[PDF Loading] PDF generation completed, result:', pdfBase64 ? 'Success' : 'Failed');
+          console.log('[PDF Loading] Calling server-side PDF generation API');
+
+          // Fetch company data for PDF generation
+          let companyData = null;
+          if (userData?.company_id) {
+            try {
+              companyData = await CompanyService.getCompanyData(userData.company_id);
+              console.log('[PDF Loading] Company data fetched:', companyData?.name);
+            } catch (companyError) {
+              console.warn('[PDF Loading] Failed to fetch company data:', companyError);
+            }
+          }
+
+          // Prepare assignment data for API
+          const apiAssignmentData = {
+            saNumber: assignmentData.saNumber,
+            projectSiteName: assignmentData.projectSiteName,
+            projectSiteLocation: assignmentData.projectSiteLocation || '',
+            serviceType: assignmentData.serviceType,
+            assignedTo: assignmentData.assignedTo,
+            assignedToName: assignmentData.assignedToName || '',
+            serviceDuration: assignmentData.serviceDuration,
+            priority: assignmentData.priority || '',
+            equipmentRequired: assignmentData.equipmentRequired || '',
+            materialSpecs: assignmentData.materialSpecs || '',
+            crew: assignmentData.crew,
+            gondola: assignmentData.gondola || '',
+            technology: assignmentData.technology || '',
+            sales: assignmentData.sales || '',
+            remarks: assignmentData.remarks || '',
+            startDate: assignmentData.startDate ? new Date(assignmentData.startDate) : null,
+            endDate: assignmentData.endDate ? new Date(assignmentData.endDate) : null,
+            alarmDate: assignmentData.alarmDate ? new Date(assignmentData.alarmDate) : null,
+            alarmTime: assignmentData.alarmTime || '',
+            attachments: assignmentData.attachments || [],
+            serviceExpenses: assignmentData.serviceExpenses || [],
+            status: "Sent",
+            created: new Date(),
+            requestedBy: {
+              name: userData?.first_name && userData?.last_name
+                ? `${userData.first_name} ${userData.last_name}`
+                : user?.displayName || "Unknown User",
+              department: "LOGISTICS",
+            },
+          };
+
+          console.log('[PDF Loading] Sending request to /api/generate-service-assignment-pdf');
+
+          const response = await fetch('/api/generate-service-assignment-pdf', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              assignment: apiAssignmentData,
+              companyData: companyData,
+              logoDataUrl: null, // Logo handling can be added later if needed
+              format: 'pdf',
+              userData: userData,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          // Get PDF as ArrayBuffer and convert to base64
+          const pdfBuffer = await response.arrayBuffer();
+          const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
+
+          console.log('[PDF Loading] PDF generation completed, base64 length:', pdfBase64.length);
 
           if (pdfBase64 && pdfBase64.length > 0) {
-            console.log('[PDF Loading] Setting PDF data, length:', pdfBase64.length);
+            console.log('[PDF Loading] Setting PDF data, first 50 chars:', pdfBase64.substring(0, 50));
             setPdfData(pdfBase64);
           } else {
             const errorMsg = 'PDF generation returned empty result. Please check assignment data and try again.';
@@ -109,22 +220,72 @@ export default function ViewPDFPage() {
             setError(errorMsg);
           }
         } catch (pdfError) {
-          console.error('[PDF Loading] PDF generation error:', pdfError);
-          let errorMsg = 'Failed to generate PDF. ';
+          console.error('[PDF Loading] Server-side PDF generation failed, attempting client-side fallback:', pdfError);
 
-          if (pdfError instanceof Error) {
-            if (pdfError.message.includes('html2canvas')) {
-              errorMsg += 'HTML rendering failed. This may be due to browser compatibility issues.';
-            } else if (pdfError.message.includes('canvas')) {
-              errorMsg += 'Canvas rendering failed. Please refresh the page and try again.';
+          // Fallback to client-side PDF generation using jsPDF
+          try {
+            console.log('[PDF Loading] Attempting client-side PDF generation fallback');
+
+            // Prepare assignment data for client-side generation
+            const clientAssignmentData = {
+              saNumber: assignmentData.saNumber,
+              projectSiteName: assignmentData.projectSiteName,
+              projectSiteLocation: assignmentData.projectSiteLocation || '',
+              serviceType: assignmentData.serviceType,
+              assignedTo: assignmentData.assignedTo,
+              assignedToName: assignmentData.assignedToName || '',
+              serviceDuration: assignmentData.serviceDuration,
+              priority: assignmentData.priority || '',
+              equipmentRequired: assignmentData.equipmentRequired || '',
+              materialSpecs: assignmentData.materialSpecs || '',
+              crew: assignmentData.crew,
+              gondola: assignmentData.gondola || '',
+              technology: assignmentData.technology || '',
+              sales: assignmentData.sales || '',
+              remarks: assignmentData.remarks || '',
+              startDate: assignmentData.startDate ? new Date(assignmentData.startDate) : null,
+              endDate: assignmentData.endDate ? new Date(assignmentData.endDate) : null,
+              alarmDate: assignmentData.alarmDate ? new Date(assignmentData.alarmDate) : null,
+              alarmTime: assignmentData.alarmTime || '',
+              attachments: assignmentData.attachments || [],
+              serviceExpenses: assignmentData.serviceExpenses || [],
+              status: "Sent",
+              created: new Date(),
+              requestedBy: {
+                name: userData?.first_name && userData?.last_name
+                  ? `${userData.first_name} ${userData.last_name}`
+                  : user?.displayName || "Unknown User",
+                department: "LOGISTICS",
+              },
+            };
+
+            // Generate PDF using client-side jsPDF
+            const pdfBase64 = await generateServiceAssignmentPDF(clientAssignmentData, true);
+
+            if (pdfBase64 && pdfBase64.length > 0) {
+              console.log('[PDF Loading] Client-side PDF generation successful, base64 length:', pdfBase64.length);
+              setPdfData(pdfBase64);
             } else {
-              errorMsg += pdfError.message;
+              throw new Error('Client-side PDF generation returned empty result');
             }
-          } else {
-            errorMsg += 'An unexpected error occurred during PDF generation.';
-          }
+          } catch (fallbackError) {
+            console.error('[PDF Loading] Client-side fallback also failed:', fallbackError);
+            let errorMsg = 'Failed to generate PDF. ';
 
-          setError(errorMsg);
+            if (pdfError instanceof Error) {
+              if (pdfError.message.includes('Failed to fetch')) {
+                errorMsg += 'Network error. Please check your connection and try again.';
+              } else if (pdfError.message.includes('HTTP')) {
+                errorMsg += pdfError.message;
+              } else {
+                errorMsg += pdfError.message;
+              }
+            } else {
+              errorMsg += 'An unexpected error occurred during PDF generation.';
+            }
+
+            setError(errorMsg);
+          }
         }
       } catch (err) {
         console.error('[PDF Loading] Unexpected error:', err);
@@ -146,16 +307,16 @@ export default function ViewPDFPage() {
 
       setCreatingAssignment(true);
       try {
-        // Retrieve assignment data from session storage
-        const assignmentDataString = sessionStorage.getItem('serviceAssignmentData');
+        // Retrieve assignment data from local storage
+        const assignmentDataString = localStorage.getItem('serviceAssignmentData');
         if (!assignmentDataString) {
-          throw new Error('Assignment data not found in session storage');
+          throw new Error('Assignment data not found in local storage');
         }
 
         const assignmentData = JSON.parse(assignmentDataString);
 
        // Fetch team name if assignedTo is a team ID
-       let assignedToValue = assignmentData.assignedTo || assignmentData.crew;
+       let assignedToValue = assignmentData.assignedTo || assignmentData.crew || 'Unassigned';
        if (assignmentData.assignedTo && assignmentData.assignedTo !== assignmentData.crew && userData?.company_id) {
          try {
            const team = await getTeamById(assignmentData.assignedTo, userData.company_id);
@@ -164,6 +325,7 @@ export default function ViewPDFPage() {
            }
          } catch (error) {
            console.error("Error fetching team:", error);
+           // Keep the original assignedTo value as fallback
          }
        }
 
@@ -174,20 +336,20 @@ export default function ViewPDFPage() {
        await uploadBytes(pdfRef, pdfBlob);
        const pdfUrl = await getDownloadURL(pdfRef);
 
-       // Create service assignment data
+       // Create service assignment data with defaults
        const firestoreAssignmentData = {
          saNumber: assignmentData.saNumber,
-         projectSiteId: assignmentData.projectSiteId,
-         projectSiteName: assignmentData.projectSiteName || '',
+         projectSiteId: assignmentData.projectSiteId || '',
+         projectSiteName: assignmentData.projectSiteName || 'Project Site Name',
          projectSiteLocation: assignmentData.projectSiteLocation || '',
          serviceType: assignmentData.serviceType,
          assignedTo: assignedToValue,
          assignedToName: assignmentData.assignedToName || '',
-         serviceDuration: assignmentData.serviceDuration,
-         priority: assignmentData.priority || '',
+         serviceDuration: assignmentData.serviceDuration || '',
+         priority: assignmentData.priority || 'Normal',
          equipmentRequired: assignmentData.equipmentRequired || '',
          materialSpecs: assignmentData.materialSpecs || '',
-         crew: assignmentData.crew,
+         crew: assignmentData.crew || '',
          gondola: assignmentData.gondola || '',
          technology: assignmentData.technology || '',
          sales: assignmentData.sales || '',
@@ -244,16 +406,16 @@ export default function ViewPDFPage() {
 
      setCreatingAssignment(true);
      try {
-       // Retrieve assignment data from session storage
-       const assignmentDataString = sessionStorage.getItem('serviceAssignmentData');
+       // Retrieve assignment data from local storage
+       const assignmentDataString = localStorage.getItem('serviceAssignmentData');
        if (!assignmentDataString) {
-         throw new Error('Assignment data not found in session storage');
+         throw new Error('Assignment data not found in local storage');
        }
 
        const assignmentData = JSON.parse(assignmentDataString);
 
        // Fetch team name if assignedTo is a team ID
-       let assignedToValue = assignmentData.assignedTo || assignmentData.crew;
+       let assignedToValue = assignmentData.assignedTo || assignmentData.crew || 'Unassigned';
        if (assignmentData.assignedTo && assignmentData.assignedTo !== assignmentData.crew && userData?.company_id) {
          try {
            const team = await getTeamById(assignmentData.assignedTo, userData.company_id);
@@ -262,6 +424,7 @@ export default function ViewPDFPage() {
            }
          } catch (error) {
            console.error("Error fetching team:", error);
+           // Keep the original assignedTo value as fallback
          }
        }
 
@@ -275,17 +438,17 @@ export default function ViewPDFPage() {
        // Create service assignment data with draft status
        const draftAssignmentData = {
          saNumber: assignmentData.saNumber,
-         projectSiteId: assignmentData.projectSiteId,
-         projectSiteName: assignmentData.projectSiteName || '',
+         projectSiteId: assignmentData.projectSiteId || '',
+         projectSiteName: assignmentData.projectSiteName || 'Project Site Name',
          projectSiteLocation: assignmentData.projectSiteLocation || '',
          serviceType: assignmentData.serviceType,
          assignedTo: assignedToValue,
          assignedToName: assignmentData.assignedToName || '',
-         serviceDuration: assignmentData.serviceDuration,
-         priority: assignmentData.priority || '',
+         serviceDuration: assignmentData.serviceDuration || '',
+         priority: assignmentData.priority || 'Normal',
          equipmentRequired: assignmentData.equipmentRequired || '',
          materialSpecs: assignmentData.materialSpecs || '',
-         crew: assignmentData.crew,
+         crew: assignmentData.crew || '',
          gondola: assignmentData.gondola || '',
          technology: assignmentData.technology || '',
          sales: assignmentData.sales || '',
@@ -451,13 +614,32 @@ export default function ViewPDFPage() {
           </div>
         ) : pdfData ? (
             <div className="w-[210mm] min-h-[297mm] bg-white shadow-md rounded-sm overflow-hidden">
+              {(() => {
+                console.log('[PDF Loading] Rendering iframe with data length:', pdfData.length);
+                console.log('[PDF Loading] PDF data starts with:', pdfData.substring(0, 50));
+                console.log('[PDF Loading] PDF data ends with:', pdfData.substring(pdfData.length - 50));
+                return null;
+              })()}
               <iframe
                 src={`data:application/pdf;base64,${pdfData}#zoom=96&navpanes=0&sidebar=0&scrollbar=0`}
                 className="w-full h-full min-h-[297mm]"
                 title="PDF Viewer"
+                onLoad={() => console.log('[PDF Loading] Iframe loaded successfully')}
+                onError={(e) => {
+                  console.error('[PDF Loading] Iframe failed to load:', e);
+                  console.error('[PDF Loading] PDF data that failed:', pdfData.substring(0, 100));
+                  setError('Failed to display PDF. The generated PDF data may be corrupted.');
+                }}
               />
             </div>
-          ) : null}
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-gray-500 mb-4">No PDF data available</p>
+                <Button onClick={() => router.back()}>Go Back</Button>
+              </div>
+            </div>
+          )}
       </div>
     </div>
 

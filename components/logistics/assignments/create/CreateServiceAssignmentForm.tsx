@@ -159,6 +159,7 @@ export function CreateServiceAssignmentForm({
   onSaveAsDraft,
   onSubmit,
   loading,
+  generatingPDF,
   companyId,
   productId,
   formData,
@@ -181,6 +182,7 @@ export function CreateServiceAssignmentForm({
   onSaveAsDraft: () => Promise<void>;
   onSubmit: () => Promise<void>;
   loading: boolean;
+  generatingPDF: boolean;
   companyId: string | null;
   productId: string;
   formData: FormData;
@@ -247,7 +249,7 @@ export function CreateServiceAssignmentForm({
           updateExpense={updateExpense}
           calculateTotal={calculateTotal}
         />
-        <ActionButtons onSaveAsDraft={onSaveAsDraft} onSubmit={onSubmit} loading={loading} />
+        <ActionButtons onSaveAsDraft={onSaveAsDraft} onSubmit={onSubmit} loading={loading} generatingPDF={generatingPDF} />
       </div>
 
       <JobOrderSelectionDialog
