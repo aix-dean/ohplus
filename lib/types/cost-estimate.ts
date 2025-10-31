@@ -52,5 +52,6 @@ export interface CostEstimate {
   }
   pdf?: string // PDF URL field
   password?: string // 8-digit password field
+  signature_date?: Date | null // Date when the signature was last updated
 }
 

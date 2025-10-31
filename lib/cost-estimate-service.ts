@@ -309,7 +309,7 @@ export async function createDirectCostEstimate(
           total: calculatedTotalPrice,
           category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
           notes: `Location: ${site.location}`,
-          image: site.image || undefined, // Added image field to line items
+          image: site.image || "", // Added image field to line items
           content_type: site.content_type ? site.content_type.charAt(0).toUpperCase() + site.content_type.slice(1) : "", // Added content_type field to match quotation structure
           specs: site.specs_rental, // Added specs field to match quotation structure
         })
@@ -620,6 +620,7 @@ export async function getAllCostEstimates(): Promise<CostEstimate[]> {
         template: data.template || undefined,
         pdf: data.pdf || undefined,
         password: data.password || undefined,
+        signature_date: safeToDate(data.signature_date),
       } as CostEstimate
     })
   } catch (error) {
@@ -858,7 +859,7 @@ export async function createMultipleCostEstimates(
         total: calculatedTotalPrice,
         category: site.type === "LED" ? "LED Billboard Rental" : "Static Billboard Rental",
         notes: `Location: ${site.location}`,
-        image: site.image || undefined, // Added image field to line items for multiple cost estimates
+        image: site.image || "", // Added image field to line items for multiple cost estimates
         specs: site.specs_rental, // Added specs field to match quotation structure
         content_type: site.content_type ? site.content_type.charAt(0).toUpperCase() + site.content_type.slice(1) : "", // Added content_type field to match quotation structure
       })
@@ -1060,13 +1061,14 @@ export async function generateAndUploadCostEstimatePDF(
   userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string },
   companyData?: {name: string, address?: any, phone?: string, email?: string, website?: string},
   userSignatureDataUrl?: string | null,
-): Promise<{ pdfUrl: string; password: string }> {
+): Promise<{ pdfUrl: string; password: string; signatureDate?: Date | null }> {
   console.log('[PDF_GENERATE] Starting PDF generation and upload for cost estimate:', costEstimate.id)
   try {
     // Always fetch fresh company data and logo to ensure consistency
     let logoDataUrl = null
     let finalUserSignatureDataUrl: string | null = userSignatureDataUrl || null
     let finalCompanyData = companyData
+    let signatureDate: Date | null = null
 
     console.log('[PDF_GENERATE] Company ID from userData or costEstimate:', userData?.company_id || costEstimate.company_id)
     console.log('[PDF_GENERATE] User signature data URL provided:', !!userSignatureDataUrl)
@@ -1100,6 +1102,12 @@ export async function generateAndUploadCostEstimatePDF(
             } catch (fetchError) {
               console.error('[PDF_GENERATE] Error converting signature to base64:', fetchError)
             }
+          }
+
+          // Capture signature.updated timestamp
+          if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+            signatureDate = safeToDate(userDataFetched.signature.updated)
+            console.log('[PDF_GENERATE] Captured signature updated date:', signatureDate)
           }
         }
       } catch (error) {
@@ -1180,7 +1188,8 @@ export async function generateAndUploadCostEstimatePDF(
         logoDataUrl,
         userSignatureDataUrl: finalUserSignatureDataUrl,
         format: 'pdf',
-        userData
+        userData,
+        signatureDate
       }),
     })
 
@@ -1257,7 +1266,7 @@ export async function generateAndUploadCostEstimatePDF(
       // Don't throw here, continue with the process
     }
 
-    return { pdfUrl, password }
+    return { pdfUrl, password, signatureDate }
   } catch (error) {
     console.error("[PDF_GENERATE] Error generating and uploading cost estimate PDF:", error)
     throw error

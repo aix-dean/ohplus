@@ -38,7 +38,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { format } from "date-fns"
-import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy, getCostEstimate } from "@/lib/cost-estimate-service" // Import CostEstimate service
+import { getCostEstimatesByCreatedBy, getPaginatedCostEstimatesByCreatedBy, getCostEstimate, generateAndUploadCostEstimatePDF, updateCostEstimate } from "@/lib/cost-estimate-service" // Import CostEstimate service
 import type { CostEstimate, CostEstimateStatus, CostEstimateLineItem } from "@/lib/types/cost-estimate" // Import CostEstimate type
 import { generateCostEstimatePDF, printCostEstimatePDF, generateCostEstimatePDFBlob } from "@/lib/cost-estimate-pdf-service"
 import { useResponsive } from "@/hooks/use-responsive"
@@ -239,7 +239,7 @@ function CostEstimatesPageContent() {
     router.push(`/sales/cost-estimates/${costEstimateId}`)
   }
 
-  const handleDownloadPDF = async (costEstimate: CostEstimate, userData) => {
+  const handleDownloadPDF = async (costEstimate: CostEstimate, userData: any) => {
     try {
       // Fetch the full cost estimate data first
       const costEstimateId = costEstimate.id || (costEstimate as any).objectID
@@ -248,8 +248,123 @@ function CostEstimatesPageContent() {
         throw new Error("Cost estimate not found")
       }
 
-      // Generate PDF using the same function as the detail page
-      await generateCostEstimatePDF(fullCostEstimate, undefined, false, false, userData)
+      // Check if PDF already exists
+      if (fullCostEstimate.pdf) {
+        // If PDF exists, download it directly
+        const response = await fetch(fullCostEstimate.pdf)
+        if (!response.ok) {
+          throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`)
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${fullCostEstimate.costEstimateNumber || fullCostEstimate.id}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+
+        // Revoke blob URL after a short delay
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url)
+        }, 2000)
+
+        toast({
+          title: "Success",
+          description: "PDF downloaded successfully",
+        })
+      } else {
+        // Show generating toast
+        toast({
+          title: "Generating PDF",
+          description: "Please wait while we generate your PDF...",
+        })
+
+        // If no PDF exists, generate it and save to database
+        // Fetch user signature from iboard_users collection
+        let userSignatureDataUrl: string | null = null
+        let signatureDate: Date | null = null
+        if (fullCostEstimate.createdBy) {
+          try {
+            const { doc, getDoc } = await import("firebase/firestore")
+            const { db } = await import("@/lib/firebase")
+            const userDocRef = doc(db, "iboard_users", fullCostEstimate.createdBy)
+            const userDoc = await getDoc(userDocRef)
+
+            if (userDoc.exists()) {
+              const userDataFetched = userDoc.data()
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+                const signatureUrl = userDataFetched.signature.url
+                console.log('[LIST_PDF] Found user signature URL:', signatureUrl)
+
+                // Convert signature image to base64 data URL
+                try {
+                  const response = await fetch(signatureUrl)
+                  if (response.ok) {
+                    const blob = await response.blob()
+                    const arrayBuffer = await blob.arrayBuffer()
+                    const base64 = Buffer.from(arrayBuffer).toString('base64')
+                    const mimeType = blob.type || 'image/png'
+                    userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                    console.log('[LIST_PDF] Converted signature to base64 data URL')
+                  } else {
+                    console.warn('[LIST_PDF] Failed to fetch signature image:', response.status)
+                  }
+                } catch (fetchError) {
+                  console.error('[LIST_PDF] Error converting signature to base64:', fetchError)
+                }
+              }
+              // Also fetch signature date
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+              }
+            }
+          } catch (error) {
+            console.error('[LIST_PDF] Error fetching user signature:', error)
+          }
+        }
+
+        // Generate and upload PDF, then save to database
+        const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(fullCostEstimate, userData ? {
+          first_name: userData.first_name || undefined,
+          last_name: userData.last_name || undefined,
+          email: userData.email || undefined,
+          company_id: userData.company_id || undefined,
+        } : undefined, undefined, userSignatureDataUrl)
+
+        // Update cost estimate with PDF URL, password, and signature date
+        await updateCostEstimate(fullCostEstimate.id, {
+          pdf: pdfUrl,
+          password: password,
+          signature_date: signatureDate
+        })
+
+        // Download the newly generated PDF
+        const response = await fetch(pdfUrl)
+        if (!response.ok) {
+          throw new Error(`Failed to download PDF: ${response.status} ${response.statusText}`)
+        }
+
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${fullCostEstimate.costEstimateNumber || fullCostEstimate.id}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+
+        // Revoke blob URL after a short delay
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url)
+        }, 2000)
+
+        toast({
+          title: "Success",
+          description: "PDF generated and downloaded successfully",
+        })
+      }
     } catch (error) {
       console.error("Error downloading PDF:", error)
       alert("Failed to download PDF. Please try again.")
@@ -261,109 +376,108 @@ function CostEstimatesPageContent() {
     setGeneratingPDFs((prev) => new Set(prev).add(costEstimateId))
 
     try {
-      // Get the full cost estimate data
+      // Get the full cost estimate data including the pdf field
       const fullCostEstimate = await getCostEstimate(costEstimateId)
       if (!fullCostEstimate) {
         throw new Error("Cost estimate not found")
       }
 
-      // Fetch company data
-      let companyData = null
-      if (userData?.company_id) {
-        try {
-          const { doc, getDoc } = await import("firebase/firestore")
-          const { db } = await import("@/lib/firebase")
-          const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
-          if (companyDoc.exists()) {
-            const data = companyDoc.data()
-            companyData = {
-              id: companyDoc.id,
-              name: data.name || data.company_name || "",
-              company_location: data.company_location || data.address || "",
-              address: data.address || "",
-              company_website: data.company_website || data.website || "",
-              photo_url: data.photo_url || data.logo_url || null,
-              contact_person: data.contact_person || "",
-              email: data.email || "",
-              phone: data.phone || data.telephone || "",
-              social_media: data.social_media || {},
-              created_by: data.created_by,
-            }
+      // Check if PDF already exists in the cost estimate document
+      if (fullCostEstimate.pdf) {
+        // If PDF exists, open it directly for printing
+        const printWindow = window.open(fullCostEstimate.pdf)
+        if (printWindow) {
+          printWindow.onload = () => {
+            printWindow.print()
           }
-        } catch (error) {
-          console.error("Error fetching company data:", error)
+        } else {
+          console.error("Failed to open print window")
         }
-      }
 
-      // Prepare logo data URL if company logo exists
-      let logoDataUrl = null
-      if (companyData?.photo_url) {
-        try {
-          const logoResponse = await fetch(companyData.photo_url)
-          if (logoResponse.ok) {
-            const logoBlob = await logoResponse.blob()
-            logoDataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result as string)
-              reader.readAsDataURL(logoBlob)
-            })
-          }
-        } catch (error) {
-          console.error('Error fetching company logo:', error)
-          // Continue without logo if fetch fails
-        }
-      }
-
-      // Prepare cost estimate data for API (convert Timestamps to serializable format)
-      const serializableCostEstimate = {
-        ...fullCostEstimate,
-        createdAt: (fullCostEstimate as any).createdAt?.toDate ? (fullCostEstimate as any).createdAt.toDate().toISOString() : fullCostEstimate.createdAt?.toISOString(),
-        updatedAt: (fullCostEstimate as any).updatedAt?.toDate ? (fullCostEstimate as any).updatedAt.toDate().toISOString() : fullCostEstimate.updatedAt?.toISOString(),
-        startDate: (fullCostEstimate as any).startDate?.toDate ? (fullCostEstimate as any).startDate.toDate().toISOString() : fullCostEstimate.startDate?.toISOString(),
-        endDate: (fullCostEstimate as any).endDate?.toDate ? (fullCostEstimate as any).endDate.toDate().toISOString() : fullCostEstimate.endDate?.toISOString(),
-        validUntil: (fullCostEstimate as any).validUntil?.toDate ? (fullCostEstimate as any).validUntil.toDate().toISOString() : fullCostEstimate.validUntil?.toISOString(),
-      }
-
-      // Call the generate-cost-estimate-pdf API
-      const response = await fetch('/api/generate-cost-estimate-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          costEstimate: serializableCostEstimate,
-          companyData,
-          logoDataUrl,
-          userData,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to generate PDF: ${response.statusText}`)
-      }
-
-      const buffer = await response.arrayBuffer()
-      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
-      const pdfUrl = URL.createObjectURL(pdfBlob)
-
-      // Open PDF in new window and trigger print
-      const printWindow = window.open(pdfUrl)
-      if (printWindow) {
-        printWindow.onload = () => {
-          printWindow.print()
-          // Clean up the URL after printing
-          printWindow.onafterprint = () => {
-            URL.revokeObjectURL(pdfUrl)
-          }
-        }
+        toast({
+          title: "Success",
+          description: "PDF opened for printing",
+        })
       } else {
-        console.error("Failed to open print window")
-        URL.revokeObjectURL(pdfUrl)
+        // Show generating toast
+        toast({
+          title: "Generating PDF",
+          description: "Please wait while we generate your PDF for printing...",
+        })
+
+        // If no PDF exists, generate it and save to database (same as download)
+        // Fetch user signature from iboard_users collection
+        let userSignatureDataUrl: string | null = null
+        let signatureDate: Date | null = null
+        if (fullCostEstimate.createdBy) {
+          try {
+            const { doc, getDoc } = await import("firebase/firestore")
+            const { db } = await import("@/lib/firebase")
+            const userDocRef = doc(db, "iboard_users", fullCostEstimate.createdBy)
+            const userDoc = await getDoc(userDocRef)
+
+            if (userDoc.exists()) {
+              const userDataFetched = userDoc.data()
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+                const signatureUrl = userDataFetched.signature.url
+                console.log('[LIST_PRINT] Found user signature URL:', signatureUrl)
+
+                // Convert signature image to base64 data URL
+                try {
+                  const response = await fetch(signatureUrl)
+                  if (response.ok) {
+                    const blob = await response.blob()
+                    const arrayBuffer = await blob.arrayBuffer()
+                    const base64 = Buffer.from(arrayBuffer).toString('base64')
+                    const mimeType = blob.type || 'image/png'
+                    userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                    console.log('[LIST_PRINT] Converted signature to base64 data URL')
+                  } else {
+                    console.warn('[LIST_PRINT] Failed to fetch signature image:', response.status)
+                  }
+                } catch (fetchError) {
+                  console.error('[LIST_PRINT] Error converting signature to base64:', fetchError)
+                }
+              }
+              // Also fetch signature date
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+              }
+            }
+          } catch (error) {
+            console.error('[LIST_PRINT] Error fetching user signature:', error)
+          }
+        }
+
+        // Generate and upload PDF, then save to database
+        const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(fullCostEstimate, userData ? {
+          first_name: userData.first_name || undefined,
+          last_name: userData.last_name || undefined,
+          email: userData.email || undefined,
+          company_id: userData.company_id || undefined,
+        } : undefined, undefined, userSignatureDataUrl)
+
+        // Update cost estimate with PDF URL, password, and signature date
+        await updateCostEstimate(fullCostEstimate.id, {
+          pdf: pdfUrl,
+          password: password,
+          signature_date: signatureDate
+        })
+
+        // Open PDF in new window and trigger print
+        const printWindow = window.open(pdfUrl)
+        if (printWindow) {
+          printWindow.onload = () => {
+            printWindow.print()
+          }
+        } else {
+          console.error("Failed to open print window")
+        }
       }
 
       toast({
         title: "Success",
-        description: "Cost estimate PDF opened for printing",
+        description: "PDF generated and opened for printing",
       })
     } catch (error: any) {
       console.error("Error generating PDF:", error)
@@ -530,12 +644,209 @@ function CostEstimatesPageContent() {
     }
   }
 
-  const handleShareCostEstimate = (costEstimateId: string) => {
-    // Navigate to detail page and trigger share there
-    // This ensures the cost estimate is rendered and can be shared properly
-    setSelectedCostEstimateForShare(costEstimateId)
+  const handleShareCostEstimate = async (costEstimate: CostEstimate) => {
+    // Check if this cost estimate has a page_id (multi-site)
+    const costEstimateId = costEstimate.id || (costEstimate as any).objectID
+    const fullCostEstimate = await getCostEstimate(costEstimateId)
+    if (!fullCostEstimate) {
+      toast({
+        title: "Error",
+        description: "Cost estimate not found",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // If this is a multi-site cost estimate (has page_id), check/generate PDFs for all related cost estimates
+    if (fullCostEstimate.page_id) {
+      // Get all related cost estimates by page_id
+      const { getCostEstimatesByPageId } = await import("@/lib/cost-estimate-service")
+      const relatedCostEstimates = await getCostEstimatesByPageId(fullCostEstimate.page_id)
+
+      // Check if any PDFs need to be generated
+      const needsGeneration = relatedCostEstimates.some(estimate => !estimate.pdf)
+
+      if (needsGeneration) {
+        // Show generating toast
+        toast({
+          title: "Generating PDFs",
+          description: "Please wait while we prepare all cost estimates for sharing...",
+        })
+
+        try {
+          // Fetch the current user's signature once for all PDFs
+          let userSignatureDataUrl: string | null = null
+          let signatureDate: Date | null = null
+          if (user?.uid) {
+            try {
+              const { doc, getDoc } = await import("firebase/firestore")
+              const { db } = await import("@/lib/firebase")
+              const userDocRef = doc(db, "iboard_users", user.uid)
+              const userDoc = await getDoc(userDocRef)
+
+              if (userDoc.exists()) {
+                const userDataFetched = userDoc.data()
+                if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+                  const signatureUrl = userDataFetched.signature.url
+                  console.log('[LIST_SHARE_MULTI] Found current user signature URL:', signatureUrl)
+
+                  // Convert signature image to base64 data URL
+                  try {
+                    const response = await fetch(signatureUrl)
+                    if (response.ok) {
+                      const blob = await response.blob()
+                      const arrayBuffer = await blob.arrayBuffer()
+                      const base64 = Buffer.from(arrayBuffer).toString('base64')
+                      const mimeType = blob.type || 'image/png'
+                      userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                      console.log('[LIST_SHARE_MULTI] Converted current user signature to base64 data URL')
+                    } else {
+                      console.warn('[LIST_SHARE_MULTI] Failed to fetch current user signature image:', response.status)
+                    }
+                  } catch (fetchError) {
+                    console.error('[LIST_SHARE_MULTI] Error converting current user signature to base64:', fetchError)
+                  }
+                }
+                // Also fetch signature date
+                if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                  signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+                }
+              }
+            } catch (error) {
+              console.error('[LIST_SHARE_MULTI] Error fetching current user signature:', error)
+            }
+          }
+
+          // Generate PDFs for all cost estimates that don't have one
+          const updatedRelatedEstimates = [...relatedCostEstimates]
+          let generatedCount = 0
+
+          for (let i = 0; i < relatedCostEstimates.length; i++) {
+            const estimate = relatedCostEstimates[i]
+
+            // Check if PDF already exists
+            if (!estimate.pdf) {
+              // Generate and upload PDF using the current user's signature for all PDFs
+              const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(estimate, userData ? {
+                first_name: userData.first_name || undefined,
+                last_name: userData.last_name || undefined,
+                email: userData.email || undefined,
+                company_id: userData.company_id || undefined,
+              } : undefined, undefined, userSignatureDataUrl)
+
+              // Update the cost estimate with PDF URL and password
+              await updateCostEstimate(estimate.id, {
+                pdf: pdfUrl,
+                password: password,
+                signature_date: signatureDate
+              })
+
+              // Update the local state
+              updatedRelatedEstimates[i] = { ...estimate, pdf: pdfUrl, password: password }
+              generatedCount++
+            }
+          }
+
+          toast({
+            title: "Success",
+            description: `PDFs generated successfully (${generatedCount} generated). Opening share dialog...`,
+          })
+        } catch (error) {
+          console.error("Error generating PDFs for share:", error)
+          toast({
+            title: "Error",
+            description: "Failed to generate PDFs. Please try again.",
+            variant: "destructive",
+          })
+          return
+        }
+      }
+    } else {
+      // Single cost estimate - check if PDF exists, if not generate it
+      if (!fullCostEstimate.pdf) {
+        // Show generating toast
+        toast({
+          title: "Generating PDF",
+          description: "Please wait while we prepare your cost estimate for sharing...",
+        })
+
+        try {
+          // Fetch user signature from iboard_users collection
+          let userSignatureDataUrl: string | null = null
+          let signatureDate: Date | null = null
+          if (fullCostEstimate.createdBy) {
+            try {
+              const { doc, getDoc } = await import("firebase/firestore")
+              const { db } = await import("@/lib/firebase")
+              const userDocRef = doc(db, "iboard_users", fullCostEstimate.createdBy)
+              const userDoc = await getDoc(userDocRef)
+
+              if (userDoc.exists()) {
+                const userDataFetched = userDoc.data()
+                if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+                  const signatureUrl = userDataFetched.signature.url
+                    console.log('[LIST_SHARE] Found user signature URL:', signatureUrl)
+
+                    // Convert signature image to base64 data URL
+                    try {
+                      const response = await fetch(signatureUrl)
+                      if (response.ok) {
+                        const blob = await response.blob()
+                        const arrayBuffer = await blob.arrayBuffer()
+                        const base64 = Buffer.from(arrayBuffer).toString('base64')
+                        const mimeType = blob.type || 'image/png'
+                        userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                        console.log('[LIST_SHARE] Converted signature to base64 data URL')
+                      } else {
+                        console.warn('[LIST_SHARE] Failed to fetch signature image:', response.status)
+                      }
+                    } catch (fetchError) {
+                      console.error('[LIST_SHARE] Error converting signature to base64:', fetchError)
+                    }
+                  }
+                  // Also fetch signature date
+                  if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                    signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+                  }
+                }
+              } catch (error) {
+                console.error('[LIST_SHARE] Error fetching user signature:', error)
+              }
+            }
+
+            // Generate and upload PDF, then save to database
+            const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(fullCostEstimate, userData ? {
+              first_name: userData.first_name || undefined,
+              last_name: userData.last_name || undefined,
+              email: userData.email || undefined,
+              company_id: userData.company_id || undefined,
+            } : undefined, undefined, userSignatureDataUrl)
+
+            // Update cost estimate with PDF URL, password, and signature date
+            await updateCostEstimate(fullCostEstimate.id, {
+              pdf: pdfUrl,
+              password: password,
+              signature_date: signatureDate
+            })
+
+            toast({
+              title: "Success",
+              description: "PDF generated successfully. Opening share dialog...",
+            })
+          } catch (error) {
+            console.error("Error generating PDF for share:", error)
+            toast({
+              title: "Error",
+              description: "Failed to generate PDF. Please try again.",
+              variant: "destructive",
+            })
+            return
+          }
+        }
+      }
+
+    setSelectedCostEstimateForShare(costEstimate)
     setShareDialogOpen(true)
-    
   }
 
 

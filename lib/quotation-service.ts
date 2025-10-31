@@ -183,6 +183,7 @@ export async function updateQuotation(
 
     if (updatedData.pdf !== undefined) updateData.pdf = updatedData.pdf
     if (updatedData.password !== undefined) updateData.password = updatedData.password
+    if (updatedData.signature_date !== undefined) updateData.signature_date = updatedData.signature_date
 
     if (updatedData.items !== undefined) {
       updateData.items = updatedData.items

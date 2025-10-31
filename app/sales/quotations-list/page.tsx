@@ -729,6 +729,34 @@ export default function QuotationsListPage() {
         throw new Error("Quotation not found")
       }
 
+      // Check if PDF already exists
+      if (quotation.pdf) {
+        // If PDF exists, download it directly
+        try {
+          const response = await fetch(quotation.pdf)
+          if (response.ok) {
+            const blob = await response.blob()
+            const url = URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            URL.revokeObjectURL(url)
+
+            toast({
+              title: "Success",
+              description: "Quotation PDF downloaded successfully",
+            })
+            return
+          }
+        } catch (fetchError) {
+          console.error('Error fetching existing PDF:', fetchError)
+          // Fall back to generating PDF
+        }
+      }
+
       // Prepare logo data URL if company logo exists
       let logoDataUrl = null
       if (companyData?.photo_url) {
@@ -748,47 +776,81 @@ export default function QuotationsListPage() {
         }
       }
 
-      // Prepare quotation data for API (convert Timestamps to serializable format)
-      const serializableQuotation = {
-        ...quotation,
-        created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
-        updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
-        valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
-        start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
-        end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+      // Fetch current user's signature for PDF generation
+      let userSignatureDataUrl: string | null = null
+      let signatureDate: Date | null = null
+      if (user?.uid) {
+        try {
+          const { doc, getDoc } = await import("firebase/firestore")
+          const { db } = await import("@/lib/firebase")
+          const userDocRef = doc(db, "iboard_users", user.uid)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+              const signatureUrl = userDataFetched.signature.url
+              console.log('[LIST_DOWNLOAD] Found current user signature URL:', signatureUrl)
+
+              // Convert signature image to base64 data URL
+              try {
+                const response = await fetch(signatureUrl)
+                if (response.ok) {
+                  const blob = await response.blob()
+                  const arrayBuffer = await blob.arrayBuffer()
+                  const base64 = Buffer.from(arrayBuffer).toString('base64')
+                  const mimeType = blob.type || 'image/png'
+                  userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                  console.log('[LIST_DOWNLOAD] Converted current user signature to base64 data URL')
+                } else {
+                  console.warn('[LIST_DOWNLOAD] Failed to fetch current user signature image:', response.status)
+                }
+              } catch (fetchError) {
+                console.error('[LIST_DOWNLOAD] Error converting current user signature to base64:', fetchError)
+              }
+            }
+            // Also fetch signature date
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('[LIST_DOWNLOAD] Error fetching current user signature:', error)
+        }
       }
 
-      // Call the generate-quotation-pdf API
-      const response = await fetch('/api/generate-quotation-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          quotation: serializableQuotation,
-          companyData,
-          logoDataUrl,
-          userData,
-        }),
+      // Generate and upload PDF using the service
+      const { generateAndUploadQuotationPDF } = await import("@/lib/quotation-service")
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, userData ? {
+        first_name: userData.first_name || undefined,
+        last_name: userData.last_name || undefined,
+        email: userData.email || undefined,
+        company_id: userData.company_id || undefined,
+      } : undefined, companyData, userSignatureDataUrl)
+
+      // Update quotation with PDF URL, password, and signature date
+      const { updateDoc, doc } = await import("firebase/firestore")
+      const { db } = await import("@/lib/firebase")
+      await updateDoc(doc(db, "quotations", quotationId), {
+        pdf: pdfUrl,
+        password: password,
+        signature_date: signatureDate
       })
 
+      // Download the generated PDF
+      const response = await fetch(pdfUrl)
       if (!response.ok) {
-        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+        throw new Error(`Failed to download generated PDF: ${response.statusText}`)
       }
 
-      const buffer = await response.arrayBuffer()
-      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
-
-      // Create download link
-      const url = URL.createObjectURL(pdfBlob)
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
       link.download = `${quotation.quotation_number || quotation.id || 'quotation'}.pdf`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-
-      // Clean up the URL
       URL.revokeObjectURL(url)
 
       toast({
@@ -815,10 +877,46 @@ export default function QuotationsListPage() {
     setGeneratingPDFs((prev) => new Set(prev).add(quotationId))
 
     try {
-      // Get the full quotation data
+      // Get the full quotation data including the pdf field
       const quotation = await getQuotationById(quotationId)
       if (!quotation) {
         throw new Error("Quotation not found")
+      }
+
+      // Check if PDF already exists in the quotation document
+      if (quotation.pdf) {
+        // If PDF exists, open it for printing directly
+        try {
+          const response = await fetch(quotation.pdf)
+          if (response.ok) {
+            const blob = await response.blob()
+            const pdfUrl = URL.createObjectURL(blob)
+
+            // Open PDF in new window and trigger print
+            const printWindow = window.open(pdfUrl)
+            if (printWindow) {
+              printWindow.onload = () => {
+                printWindow.print()
+                // Clean up the URL after printing
+                printWindow.onafterprint = () => {
+                  URL.revokeObjectURL(pdfUrl)
+                }
+              }
+            } else {
+              console.error("Failed to open print window")
+              URL.revokeObjectURL(pdfUrl)
+            }
+
+            toast({
+              title: "Success",
+              description: "Quotation PDF opened for printing",
+            })
+            return
+          }
+        } catch (fetchError) {
+          console.error('Error fetching existing PDF for printing:', fetchError)
+          // Fall back to generating PDF
+        }
       }
 
       // Prepare logo data URL if company logo exists
@@ -840,53 +938,125 @@ export default function QuotationsListPage() {
         }
       }
 
-      // Prepare quotation data for API (convert Timestamps to serializable format)
-      const serializableQuotation = {
-        ...quotation,
-        created: quotation.created?.toDate ? quotation.created.toDate().toISOString() : quotation.created,
-        updated: quotation.updated?.toDate ? quotation.updated.toDate().toISOString() : quotation.updated,
-        valid_until: quotation.valid_until?.toDate ? quotation.valid_until.toDate().toISOString() : quotation.valid_until,
-        start_date: quotation.start_date?.toDate ? quotation.start_date.toDate().toISOString() : quotation.start_date,
-        end_date: quotation.end_date?.toDate ? quotation.end_date.toDate().toISOString() : quotation.end_date,
+      // Fetch current user's signature for PDF generation
+      let userSignatureDataUrl: string | null = null
+      let signatureDate: Date | null = null
+      if (user?.uid) {
+        try {
+          const { doc, getDoc } = await import("firebase/firestore")
+          const { db } = await import("@/lib/firebase")
+          const userDocRef = doc(db, "iboard_users", user.uid)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+              const signatureUrl = userDataFetched.signature.url
+              console.log('[LIST_PRINT] Found current user signature URL:', signatureUrl)
+
+              // Convert signature image to base64 data URL
+              try {
+                const response = await fetch(signatureUrl)
+                if (response.ok) {
+                  const blob = await response.blob()
+                  const arrayBuffer = await blob.arrayBuffer()
+                  const base64 = Buffer.from(arrayBuffer).toString('base64')
+                  const mimeType = blob.type || 'image/png'
+                  userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                  console.log('[LIST_PRINT] Converted current user signature to base64 data URL')
+                } else {
+                  console.warn('[LIST_PRINT] Failed to fetch current user signature image:', response.status)
+                }
+              } catch (fetchError) {
+                console.error('[LIST_PRINT] Error converting current user signature to base64:', fetchError)
+              }
+            }
+            // Also fetch signature date
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('[LIST_PRINT] Error fetching current user signature:', error)
+        }
       }
 
-      // Call the generate-quotation-pdf API
-      const response = await fetch('/api/generate-quotation-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          quotation: serializableQuotation,
-          companyData,
-          logoDataUrl,
-          userData,
-        }),
+      // Show generating toast
+      toast({
+        title: "Generating PDF",
+        description: "Please wait while we prepare your quotation...",
       })
 
+      // Show generating toast
+      toast({
+        title: "Generating PDF",
+        description: "Please wait while we prepare your quotation...",
+      })
+
+      // Show generating toast
+      toast({
+        title: "Generating PDF",
+        description: "Please wait while we prepare your quotation...",
+      })
+
+      // Generate and upload PDF using the service
+      const { generateAndUploadQuotationPDF } = await import("@/lib/quotation-service")
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, userData ? {
+        first_name: userData.first_name || undefined,
+        last_name: userData.last_name || undefined,
+        email: userData.email || undefined,
+        company_id: userData.company_id || undefined,
+      } : undefined, companyData, userSignatureDataUrl)
+
+      // Update quotation with PDF URL, password, and signature date
+      const { updateDoc, doc } = await import("firebase/firestore")
+      const { db } = await import("@/lib/firebase")
+      await updateDoc(doc(db, "quotations", quotationId), {
+        pdf: pdfUrl,
+        password: password,
+        signature_date: signatureDate
+      })
+
+      // Show success toast
+      toast({
+        title: "PDF Generated",
+        description: "Your quotation PDF has been prepared successfully.",
+      })
+
+      // Show success toast
+      toast({
+        title: "PDF Generated",
+        description: "Your quotation PDF has been prepared successfully.",
+      })
+
+      // Show success toast
+      toast({
+        title: "PDF Generated",
+        description: "Your quotation PDF has been prepared successfully.",
+      })
+
+      // Open the generated PDF for printing
+      const response = await fetch(pdfUrl)
       if (!response.ok) {
-        throw new Error(`Failed to generate PDF: ${response.statusText}`)
+        throw new Error(`Failed to fetch generated PDF for printing: ${response.statusText}`)
       }
 
-      const buffer = await response.arrayBuffer()
-
-
-      const pdfBlob = new Blob([buffer], { type: 'application/pdf' })
-      const pdfUrl = URL.createObjectURL(pdfBlob)
+      const blob = await response.blob()
+      const pdfUrlForPrint = URL.createObjectURL(blob)
 
       // Open PDF in new window and trigger print
-      const printWindow = window.open(pdfUrl)
+      const printWindow = window.open(pdfUrlForPrint)
       if (printWindow) {
         printWindow.onload = () => {
           printWindow.print()
           // Clean up the URL after printing
           printWindow.onafterprint = () => {
-            URL.revokeObjectURL(pdfUrl)
+            URL.revokeObjectURL(pdfUrlForPrint)
           }
         }
       } else {
         console.error("Failed to open print window")
-        URL.revokeObjectURL(pdfUrl)
+        URL.revokeObjectURL(pdfUrlForPrint)
       }
 
       toast({
@@ -896,7 +1066,7 @@ export default function QuotationsListPage() {
     } catch (error: any) {
       console.error("Error generating PDF:", error)
       toast({
-        title: "Download Failed",
+        title: "Print Failed",
         description: error.message || "Failed to generate PDF. Please try again.",
         variant: "destructive",
       })
@@ -1006,10 +1176,234 @@ export default function QuotationsListPage() {
     }
   }
 
-  const handleShareQuotation = (quotationId: string) => {
-    // Navigate to detail page and trigger share there
-    // This ensures the quotation is rendered and can be shared properly
-    router.push(`/sales/quotations/${quotationId}?action=share`)
+  const handleShareQuotation = async (quotationId: string) => {
+    // Get the full quotation data first
+    const quotation = await getQuotationById(quotationId)
+    if (!quotation) {
+      toast({
+        title: "Error",
+        description: "Quotation not found",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Check if this is a multi-page quotation (has page_id)
+    if (quotation.page_id) {
+      // Get all related quotations by page_id
+      const { getQuotationsByPageId } = await import("@/lib/quotation-service")
+      const relatedQuotations = await getQuotationsByPageId(quotation.page_id)
+
+      // Check if any PDFs need to be generated
+      const needsGeneration = relatedQuotations.some(q => !q.pdf)
+
+      if (needsGeneration) {
+        // Show generating toast
+        toast({
+          title: "Generating PDFs",
+          description: "Please wait while we prepare all quotations for sharing...",
+        })
+
+        try {
+          // Fetch the current user's signature once for all PDFs
+          let userSignatureDataUrl: string | null = null
+          let signatureDate: Date | null = null
+          if (user?.uid) {
+            try {
+              const { doc, getDoc } = await import("firebase/firestore")
+              const { db } = await import("@/lib/firebase")
+              const userDocRef = doc(db, "iboard_users", user.uid)
+              const userDoc = await getDoc(userDocRef)
+
+              if (userDoc.exists()) {
+                const userDataFetched = userDoc.data()
+                if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+                  const signatureUrl = userDataFetched.signature.url
+                  console.log('[LIST_SHARE_MULTI] Found current user signature URL:', signatureUrl)
+
+                  // Convert signature image to base64 data URL
+                  try {
+                    const response = await fetch(signatureUrl)
+                    if (response.ok) {
+                      const blob = await response.blob()
+                      const arrayBuffer = await blob.arrayBuffer()
+                      const base64 = Buffer.from(arrayBuffer).toString('base64')
+                      const mimeType = blob.type || 'image/png'
+                      userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                      console.log('[LIST_SHARE_MULTI] Converted current user signature to base64 data URL')
+                    } else {
+                      console.warn('[LIST_SHARE_MULTI] Failed to fetch current user signature image:', response.status)
+                    }
+                  } catch (fetchError) {
+                    console.error('[LIST_SHARE_MULTI] Error converting current user signature to base64:', fetchError)
+                  }
+                }
+                // Also fetch signature date
+                if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                  signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+                }
+              }
+            } catch (error) {
+              console.error('[LIST_SHARE_MULTI] Error fetching current user signature:', error)
+            }
+          }
+
+          // Generate PDFs for all quotations that don't have one
+          const updatedRelatedQuotations = [...relatedQuotations]
+          let generatedCount = 0
+
+          for (let i = 0; i < relatedQuotations.length; i++) {
+            const q = relatedQuotations[i]
+
+            // Check if PDF already exists
+            if (!q.pdf) {
+              // Generate and upload PDF using the current user's signature for all PDFs
+              const { generateAndUploadQuotationPDF } = await import("@/lib/quotation-service")
+              const { pdfUrl, password } = await generateAndUploadQuotationPDF(q, userData ? {
+                first_name: userData.first_name || undefined,
+                last_name: userData.last_name || undefined,
+                email: userData.email || undefined,
+                company_id: userData.company_id || undefined,
+              } : undefined, companyData, userSignatureDataUrl)
+
+              // Update the quotation with PDF URL and password
+              const { updateDoc, doc } = await import("firebase/firestore")
+              const { db } = await import("@/lib/firebase")
+              await updateDoc(doc(db, "quotations", q.id!), {
+                pdf: pdfUrl,
+                password: password,
+                signature_date: signatureDate
+              })
+
+              // Update the local state
+              updatedRelatedQuotations[i] = { ...q, pdf: pdfUrl, password: password }
+              generatedCount++
+            }
+          }
+
+          toast({
+            title: "Success",
+            description: `PDFs generated successfully (${generatedCount} generated). Opening share dialog...`,
+          })
+        } catch (error) {
+          console.error("Error generating PDFs for share:", error)
+          toast({
+            title: "Error",
+            description: "Failed to generate PDFs. Please try again.",
+            variant: "destructive",
+          })
+          return
+        }
+      }
+    } else {
+      // Single quotation - check if PDF exists, if not generate it
+      if (!quotation.pdf) {
+        // Show generating toast
+        toast({
+          title: "Generating PDF",
+          description: "Please wait while we prepare your quotation for sharing...",
+        })
+
+        try {
+          // Prepare logo data URL if company logo exists
+          let logoDataUrl = null
+          if (companyData?.photo_url) {
+            try {
+              const logoResponse = await fetch(companyData.photo_url)
+              if (logoResponse.ok) {
+                const logoBlob = await logoResponse.blob()
+                logoDataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader()
+                reader.onload = () => resolve(reader.result as string)
+                reader.readAsDataURL(logoBlob)
+              })
+              }
+            } catch (error) {
+              console.error('Error fetching company logo:', error)
+              // Continue without logo if fetch fails
+            }
+          }
+
+          // Fetch current user's signature for PDF generation
+          let userSignatureDataUrl: string | null = null
+          let signatureDate: Date | null = null
+          if (user?.uid) {
+            try {
+              const { doc, getDoc } = await import("firebase/firestore")
+              const { db } = await import("@/lib/firebase")
+              const userDocRef = doc(db, "iboard_users", user.uid)
+              const userDoc = await getDoc(userDocRef)
+
+              if (userDoc.exists()) {
+                const userDataFetched = userDoc.data()
+                if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+                  const signatureUrl = userDataFetched.signature.url
+                  console.log('[LIST_SHARE] Found current user signature URL:', signatureUrl)
+
+                  // Convert signature image to base64 data URL
+                  try {
+                    const response = await fetch(signatureUrl)
+                    if (response.ok) {
+                      const blob = await response.blob()
+                      const arrayBuffer = await blob.arrayBuffer()
+                      const base64 = Buffer.from(arrayBuffer).toString('base64')
+                      const mimeType = blob.type || 'image/png'
+                      userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                      console.log('[LIST_SHARE] Converted current user signature to base64 data URL')
+                    } else {
+                      console.warn('[LIST_SHARE] Failed to fetch current user signature image:', response.status)
+                    }
+                  } catch (fetchError) {
+                    console.error('[LIST_SHARE] Error converting current user signature to base64:', fetchError)
+                  }
+                }
+                // Also fetch signature date
+                if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                  signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+                }
+              }
+            } catch (error) {
+              console.error('[LIST_SHARE] Error fetching current user signature:', error)
+            }
+          }
+
+          // Generate and upload PDF using the service
+          const { generateAndUploadQuotationPDF } = await import("@/lib/quotation-service")
+          const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, userData ? {
+            first_name: userData.first_name || undefined,
+            last_name: userData.last_name || undefined,
+            email: userData.email || undefined,
+            company_id: userData.company_id || undefined,
+          } : undefined, companyData, userSignatureDataUrl)
+
+          // Update quotation with PDF URL, password, and signature date
+          const { updateDoc, doc } = await import("firebase/firestore")
+          const { db } = await import("@/lib/firebase")
+          await updateDoc(doc(db, "quotations", quotationId), {
+            pdf: pdfUrl,
+            password: password,
+            signature_date: signatureDate
+          })
+
+          toast({
+            title: "Success",
+            description: "PDF generated successfully. Opening share dialog...",
+          })
+        } catch (error) {
+          console.error("Error generating PDF for share:", error)
+          toast({
+            title: "Error",
+            description: "Failed to generate PDF. Please try again.",
+            variant: "destructive",
+          })
+          return
+        }
+      }
+    }
+
+    // Set the selected quotation for share and open the dialog directly
+    setSelectedQuotationForShare(quotation)
+    setShareDialogOpen(true)
   }
 
 
@@ -1551,7 +1945,7 @@ export default function QuotationsListPage() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              onClick={() => handlePrintQuotationWindow(quotation.id)}
+                              onClick={() => handlePrintQuotation(quotation.id)}
                               disabled={generatingPDFs.has(quotation.id)}
                             >
                               {generatingPDFs.has(quotation.id) ? (
