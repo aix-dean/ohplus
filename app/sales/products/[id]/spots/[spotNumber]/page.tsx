@@ -18,6 +18,7 @@ import { db } from "@/lib/firebase"
 import { createDirectCostEstimate } from "@/lib/cost-estimate-service"
 import { createDirectQuotation } from "@/lib/quotation-service"
 import type { Booking } from "@/lib/booking-service"
+import { getLatestReportsByBookingIds, type ReportData } from "@/lib/report-service"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { SpotSelectionDialog } from "@/components/spot-selection-dialog"
 
@@ -41,6 +42,7 @@ export default function SpotDetailsPage() {
   const [spotSelectionType, setSpotSelectionType] = useState<"quotation" | "cost-estimate">("quotation")
   const [currentDayBookings, setCurrentDayBookings] = useState<Booking[]>([])
   const [currentDayBookingsLoading, setCurrentDayBookingsLoading] = useState(false)
+  const [reportsData, setReportsData] = useState<{ [bookingId: string]: ReportData | null }>({})
   const calendarRef = useRef<HTMLDivElement>(null)
   const currentMonthRef = useRef<HTMLDivElement>(null)
 
@@ -285,6 +287,29 @@ useEffect(() => {
   fetchCurrentDayBookings()
 }, [productId])
 
+  // Fetch latest reports for current day bookings
+  useEffect(() => {
+    const fetchReportsForBookings = async () => {
+      if (!currentDayBookings || currentDayBookings.length === 0) {
+        console.log("No current day bookings, setting empty reportsData")
+        setReportsData({})
+        return
+      }
+
+      try {
+        const bookingIds = currentDayBookings.map(booking => booking.id)
+        console.log("Fetching reports for booking IDs:", bookingIds)
+        const reportsMap = await getLatestReportsByBookingIds(bookingIds)
+        console.log("Fetched reports map:", reportsMap)
+        setReportsData(reportsMap)
+      } catch (error) {
+        console.error("Error fetching reports for bookings:", error)
+        setReportsData({})
+      }
+    }
+
+    fetchReportsForBookings()
+  }, [currentDayBookings])
 
 
   const handleBack = () => {
@@ -527,14 +552,44 @@ useEffect(() => {
                 const booking = currentDayBookings.find(b => b.spot_numbers?.includes(currentSpotNumber))
                 const isCurrentSpot = i + 1 === spotNumber
                 const hasContent = spotSchedule && spotSchedule.spot_number === spotNumber
+                // Get image URL from report attachments
+                let imageUrl: string | undefined
+                if (booking && reportsData[booking.id]) {
+                  const report = reportsData[booking.id]
+                  console.log(`Spot ${currentSpotNumber}: Found report for booking ${booking.id}:`, report)
+                  if (report && report.attachments && report.attachments.length > 0) {
+                    // Find attachment with label "After"
+                    const afterAttachment = report.attachments.find(att => att.label === "After")
+                    console.log(`Spot ${currentSpotNumber}: After attachment:`, afterAttachment)
+                    if (afterAttachment) {
+                      imageUrl = afterAttachment.fileUrl
+                    } else {
+                      // Use first attachment if no "After" label
+                      imageUrl = report.attachments[0].fileUrl
+                      console.log(`Spot ${currentSpotNumber}: Using first attachment:`, imageUrl)
+                    }
+                  } else {
+                    console.log(`Spot ${currentSpotNumber}: No attachments in report`)
+                  }
+                } else {
+                  console.log(`Spot ${currentSpotNumber}: No booking or report found for booking ${booking?.id}`)
+                }
+                console.log(`Spot ${currentSpotNumber}: Final imageUrl:`, imageUrl)
 
                 return (
                   <div
-                    className="flex-shrink-0 w-[160px] min-h-[280px] bg-white rounded-[14px] shadow-[-1px_3px_7px_-1px_rgba(0,0,0,0.25)] border border-gray-200 overflow-hidden relative cursor-pointer hover:shadow-lg transition-shadow"
+                    className="flex-shrink-0 w-[160px] min-h-[280px] bg-white rounded-[13px] shadow-[-1px_3px_7px_-1px_rgba(0,0,0,0.25)] border border-gray-200 overflow-hidden flex flex-col cursor-pointer hover:shadow-lg transition-shadow"
                   >
                     {/* Image Section */}
-                    <div className="absolute inset-0 opacity-50">
-                      {spotSchedule?.media ? (
+                    <div className="h-[200px] relative mx-2 mt-2 rounded-[13px] overflow-hidden">
+                      {imageUrl ? (
+                        <Image
+                          src={imageUrl}
+                          alt={`Spot ${i + 1}`}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : spotSchedule?.media ? (
                         <Image
                           src={spotSchedule.media}
                           alt={`Spot ${i + 1}`}
@@ -549,7 +604,7 @@ useEffect(() => {
                     </div>
 
                     {/* Content Section */}
-                    <div className="absolute inset-0 flex flex-col justify-end p-[10px]">
+                    <div className="flex flex-col p-[13px] flex-1">
                       {/* Spot Number */}
                       <div className="text-[11px] font-semibold text-black">
                         {i + 1}/{totalSpots}
