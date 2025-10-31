@@ -642,7 +642,7 @@ export default function ProposalDetailsPage() {
               dimension: `${product.specs_rental?.height ? `${product.specs_rental.height}ft (H)` : ''}${product.specs_rental?.height && product.specs_rental?.width ? ' x ' : ''}${product.specs_rental?.width ? `${product.specs_rental.width}ft (W)` : ''}${!product.specs_rental?.height && !product.specs_rental?.width ? 'N/A' : ''}`,
               type: product.categories && product.categories.length > 0 ? product.categories[0] : 'N/A',
               traffic: product.specs_rental?.traffic_count ? product.specs_rental.traffic_count.toLocaleString() : 'N/A',
-              location_visibility: product.specs_rental?.location_visibility ? `${product.specs_rental.location_visibility.toLocaleString()} ${product.specs_rental.location_visibility_unit || 'm'}`.trim() : '',
+              location_visibility: product.specs_rental?.location_visibility ? `${product.specs_rental.location_visibility.toLocaleString()} ${product.specs_rental.location_visibility_unit || 'm'}`.trim() : '0 m',
               srp: product.price ? `₱${product.price.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per month` : 'N/A',
               additionalMessage: product.additionalMessage || '',
               additionalSpecs: (product as any).additionalSpecs || []
@@ -1339,10 +1339,9 @@ export default function ProposalDetailsPage() {
   }
 
   const handleCancelEdit = () => {
-    // Restore original values
+    // Restore logo values
     setLogoDimensions({ ...originalLogoDimensions })
     setLogoPosition({ ...originalLogoPosition })
-    setEditableProducts(JSON.parse(JSON.stringify(originalEditableProducts))) // Restore original editable products
     // Clear pending changes
     setEditableLogo("")
     setPendingSiteImages({})
