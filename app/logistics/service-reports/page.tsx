@@ -9,7 +9,6 @@ import { useRouter } from "next/navigation"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { Pagination } from "@/components/ui/pagination"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -28,8 +27,6 @@ export default function ServiceReportsPage() {
   const [totalOverall, setTotalOverall] = useState(0)
   const itemsPerPage = 10
 
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [postedReportId, setPostedReportId] = useState<string>("")
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleString())
 
   const router = useRouter()
@@ -85,16 +82,6 @@ export default function ServiceReportsPage() {
     }
   }, [searchQuery])
 
-  useEffect(() => {
-    // Check if we just posted a report
-    const lastPostedReportId = sessionStorage.getItem("lastPostedReportId")
-    if (lastPostedReportId) {
-      setPostedReportId(lastPostedReportId)
-      setShowSuccessDialog(true)
-      // Clear the session storage
-      sessionStorage.removeItem("lastPostedReportId")
-    }
-  }, [])
 
   const fetchReports = async (page: number = 1) => {
     setLoading(true)
@@ -369,8 +356,6 @@ export default function ServiceReportsPage() {
         />
       )}
 
-      {/* Report Post Success Dialog */}
-      <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />
     </div>
   )
 }
