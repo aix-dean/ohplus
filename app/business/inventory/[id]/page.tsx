@@ -411,12 +411,12 @@ export default function BusinessProductDetailPage() {
       setValidationErrors([])
 
       // Show info about required fields
-      setTimeout(() => {
-        toast({
-          title: "Required Fields",
-          description: "Fields marked with * are required: Site Name, Location, and Price.",
-        })
-      }, 500)
+      // setTimeout(() => {
+      //   toast({
+      //     title: "Required Fields",
+      //     description: "Fields marked with * are required: Site Name, Location, and Price.",
+      //   })
+      // }, 500)
     }
   }
 
