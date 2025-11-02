@@ -1,329 +1,563 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useRouter } from "next/navigation"
+import { getTeams, createTeam, updateTeam } from "@/lib/teams-service"
+import type { Team } from "@/lib/types/team"
+import { Pagination } from "@/components/ui/pagination"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Users, Plus, Search, Edit, Trash2, UserCheck, MapPin, Phone, Mail, ChevronDown, List, Grid3X3, MoreHorizontal } from "lucide-react"
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useAuth } from "@/contexts/auth-context"
-import { toast } from "sonner"
-import { TeamFormDialog } from "@/components/team-form-dialog"
-import { getTeams, createTeam, updateTeam, deleteTeam, updateTeamStatus } from "@/lib/teams-service"
-import type { Team, CreateTeamData } from "@/lib/types/team"
+import { useToast } from "@/hooks/use-toast"
 
-// Header Component
-function Component5({ className }: { className?: string }) {
-  return (
-    <div className={className}>
-      <div className="absolute bottom-0 left-0 right-[15.23%] top-0 bg-white">
-        <div className="absolute bottom-0 left-[84.77%] right-0 top-0 bg-blue-300/50" />
-        <button className="absolute inset-[52.54%_90.45%_17.8%_1.95%] cursor-pointer">
-          <p className="absolute inset-[52.54%_92.27%_20.34%_1.95%] font-black text-[16px] text-white not-italic leading-none">
-            Logistics
-          </p>
-          <ChevronDown className="absolute left-[8.18%] right-[90.45%] top-[31px] w-4 h-4" />
-        </button>
-        <p className="absolute inset-[54.24%_18.28%_25.42%_51.33%] font-normal text-[12px] text-right text-white not-italic leading-none">
-          10:00 am | Sep 23, 2025
-        </p>
-        <img src="/placeholder-user.jpg" alt="User" className="absolute left-[94.53%] right-[3.2%] top-[23px] w-[90px] h-[90px]" />
-        <img src="/icons/sms.png" alt="SMS" className="absolute left-[90.86%] right-[7.03%] top-[24px] w-[90px] h-[90px]" />
-        <img src="/icons/notification.png" alt="Notification" className="absolute left-[87.11%] right-[10.86%] top-[24px] w-[90px] h-[90px]" />
-      </div>
-    </div>
-  );
-}
+const imgMagnifyingGlass2 = "http://localhost:3845/assets/87240337af8d03b498dfc56870ac33cc3a3bd565.png";
+const imgDots = "http://localhost:3845/assets/33379aff6c0a74a8b123f21d0a65f44e6551bc89.png";
+const imgView = "http://localhost:3845/assets/0749c4cdf6563984269df11dc651353020c70a52.png";
+const imgGrid = "http://localhost:3845/assets/33500d326bcb1d4701b9cf02f2f063b8e9ed2f2a.png";
 
 export default function TeamsPage() {
-  const { userData } = useAuth()
+  const { user, userData } = useAuth()
+  const { toast } = useToast()
+  const router = useRouter()
   const [teams, setTeams] = useState<Team[]>([])
-  const [filteredTeams, setFilteredTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all")
-  const [typeFilter, setTypeFilter] = useState<
-    "all" | "operations" | "maintenance" | "installation" | "delivery" | "support"
-  >("all")
-
-  // Dialog states
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(9)
+  const [isAddTeamDialogOpen, setIsAddTeamDialogOpen] = useState(false)
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
-  const [formLoading, setFormLoading] = useState(false)
-
-  // Delete dialog states
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null)
-  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [selectedAvatar, setSelectedAvatar] = useState<string>("")
+  const [formData, setFormData] = useState({
+    crewName: "",
+    crewHead: "",
+    contactNumber: ""
+  })
+  const [isCreating, setIsCreating] = useState(false)
+  const [menuOpen, setMenuOpen] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   useEffect(() => {
-    loadTeams()
-  }, [])
+    const fetchTeams = async () => {
+      if (!userData?.company_id) {
+        setLoading(false)
+        return
+      }
 
+      try {
+        const data = await getTeams(userData.company_id)
+        setTeams(data)
+      } catch (error) {
+        console.error("Error fetching teams:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    if (userData?.company_id) {
+      fetchTeams()
+    }
+  }, [userData?.company_id])
+
+  // Reset to page 1 when search term changes
   useEffect(() => {
-    filterTeams()
-  }, [teams, searchTerm, statusFilter, typeFilter])
+    setCurrentPage(1)
+  }, [searchTerm])
 
-  const loadTeams = async () => {
-    try {
-      setLoading(true)
-      const teamsData = await getTeams(userData?.company_id || undefined)
-      setTeams(teamsData)
-    } catch (error) {
-      console.error("Error loading teams:", error)
-      toast.error("Failed to load teams")
-    } finally {
-      setLoading(false)
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuOpen && !(event.target as Element).closest('.dropdown-menu')) {
+        setMenuOpen(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [menuOpen])
+
+  const filteredTeams = teams.filter(team =>
+    team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (team.leaderName && team.leaderName.toLowerCase().includes(searchTerm.toLowerCase()))
+  )
+
+  // Pagination logic
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedTeams = filteredTeams.slice(startIndex, endIndex)
+  const totalPages = Math.ceil(filteredTeams.length / itemsPerPage)
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage((prev) => prev + 1)
     }
   }
 
-  const filterTeams = () => {
-    let filtered = teams
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (team) =>
-          team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          team.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          team.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          team.leaderName?.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage((prev) => prev - 1)
     }
-
-    // Status filter
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((team) => team.status === statusFilter)
-    }
-
-    // Type filter
-    if (typeFilter !== "all") {
-      filtered = filtered.filter((team) => team.teamType === typeFilter)
-    }
-
-    setFilteredTeams(filtered)
-  }
-
-  const handleCreateTeam = async (data: CreateTeamData) => {
-    if (!userData?.uid) {
-      toast.error("User not authenticated")
-      return
-    }
-
-    try {
-      setFormLoading(true)
-      await createTeam(data, userData.uid)
-      toast.success("Team created successfully")
-      setIsFormDialogOpen(false)
-      loadTeams()
-    } catch (error) {
-      console.error("Error creating team:", error)
-      toast.error("Failed to create team")
-    } finally {
-      setFormLoading(false)
-    }
-  }
-
-  const handleUpdateTeam = async (data: CreateTeamData) => {
-    if (!editingTeam) return
-
-    try {
-      setFormLoading(true)
-      await updateTeam(editingTeam.id, data, userData?.company_id || undefined)
-      toast.success("Team updated successfully")
-      setIsFormDialogOpen(false)
-      setEditingTeam(null)
-      loadTeams()
-    } catch (error) {
-      console.error("Error updating team:", error)
-      toast.error("Failed to update team")
-    } finally {
-      setFormLoading(false)
-    }
-  }
-
-  const handleDeleteTeam = async () => {
-    if (!teamToDelete) return
-
-    try {
-      setDeleteLoading(true)
-      await deleteTeam(teamToDelete.id, userData?.company_id || undefined)
-      toast.success("Team deleted successfully")
-      setDeleteDialogOpen(false)
-      setTeamToDelete(null)
-      loadTeams()
-    } catch (error) {
-      console.error("Error deleting team:", error)
-      toast.error("Failed to delete team")
-    } finally {
-      setDeleteLoading(false)
-    }
-  }
-
-  const handleStatusToggle = async (team: Team) => {
-    try {
-      const newStatus = team.status === "active" ? "inactive" : "active"
-      await updateTeamStatus(team.id, newStatus, userData?.company_id || undefined)
-      toast.success(`Team ${newStatus === "active" ? "activated" : "deactivated"} successfully`)
-      loadTeams()
-    } catch (error) {
-      console.error("Error updating team status:", error)
-      toast.error("Failed to update team status")
-    }
-  }
-
-  const getTeamTypeColor = (type: string) => {
-    const colors = {
-      operations: "bg-blue-100 text-blue-800",
-      maintenance: "bg-yellow-100 text-yellow-800",
-      installation: "bg-green-100 text-green-800",
-      delivery: "bg-purple-100 text-purple-800",
-      support: "bg-orange-100 text-orange-800",
-    }
-    return colors[type as keyof typeof colors] || "bg-gray-100 text-gray-800"
-  }
-
-  const getStatusColor = (status: string) => {
-    return status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-        <div className="flex items-center space-x-2">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="text-lg">Loading teams...</span>
-        </div>
+      <div className="relative w-full h-screen bg-white flex items-center justify-center">
+        <div>Loading teams...</div>
       </div>
     )
   }
 
   return (
-    <div className="relative w-full h-screen bg-white">
-      <Component5 className="absolute h-[59px] left-0 top-0 w-full" />
-
-      {/* Sidebar */}
-      <div className="absolute bg-blue-300/50 h-[661px] left-0 top-[59px] w-[220px]">
-        <div className="absolute bg-white/70 border-2 border-white rounded-[12.5px] h-[161.25px] left-[12.5px] top-[12.5px] w-[195px]">
-          <p className="absolute font-bold text-xs text-gray-700 left-[22.5px] top-[21.5px] w-[123.75px]">Updates Center</p>
-          <div className="absolute bg-white/80 rounded-[10px] shadow h-[31.875px] left-[22.5px] top-[42.63px] w-[169.375px]"></div>
-          <div className="absolute bg-white/80 rounded-[10px] shadow h-[31.875px] left-[22.5px] top-[77.63px] w-[169.375px]"></div>
-          <div className="absolute bg-white/80 rounded-[10px] shadow h-[31.875px] left-[22.5px] top-[112.63px] w-[169.375px]"></div>
-        </div>
-
-        <div className="absolute h-[247.5px] left-[13px] top-[183px] w-[195px]">
-          <div className="absolute bg-white/70 border-2 border-white rounded-[12.5px] inset-0">
-            <p className="absolute font-bold text-xs text-gray-700 left-[65.06%] top-[3.03%]">To Go →</p>
-            <p className="absolute font-light text-xs text-gray-700 left-[7.05%] top-[90.15%]">To-do-list</p>
-            <div className="absolute bg-gray-300 h-[1px] left-[5.13%] right-[5.13%] top-[51.77%]"></div>
-            <p className="absolute font-bold text-xs text-gray-700 left-[65.06%] top-[44.19%]">To Do ←</p>
-            <p className="absolute font-light text-xs text-gray-700 left-[7.05%] top-[60.86%]">Service Assignments</p>
-            <p className="absolute font-light text-xs text-gray-700 left-[7.05%] top-[82.83%] font-bold">Crew and Personnel</p>
-            <p className="absolute font-light text-xs text-gray-700 left-[34.62%] top-[75.5%]">News and Weather</p>
-            <p className="absolute font-light text-xs text-gray-700 left-[31.41%] top-[68.18%]">Reports</p>
-            <p className="absolute font-light text-xs text-gray-700 left-[34.62%] top-[53.53%]">Job Orders</p>
-            <p className="absolute font-light text-xs text-gray-700 left-[31.41%] top-[28.28%]">Planner</p>
-            <p className="absolute font-light text-xs text-gray-700 left-[31.41%] top-[20.96%]">Bulletin Board</p>
-            <p className="absolute font-light text-xs text-gray-700 left-[45.51%] top-[13.64%]">Dashboard</p>
+    <div className="min-h-screen bg-white p-4 md:p-6 lg:p-8" style={{ marginTop: '-32px' }}>
+      <div className="max-w-7xl" style={{ marginLeft: '-25px', marginRight: 'auto' }}>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-700" style={{ transform: 'translate(0px, -30px)' }}>
+            Crew and Personnel
+          </h1>
+          <div className="flex flex-col items-end gap-2" >
+            <button
+              onClick={() => {
+                setEditingTeam(null)
+                setFormData({ crewName: "", crewHead: "", contactNumber: "" })
+                setSelectedAvatar("")
+                setIsAddTeamDialogOpen(true)
+              }}
+              className="bg-white border border-gray-400 rounded-lg px-4 py-2 text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              style={{ transform: 'translate(255px, 0px)' }}
+            >
+              Add New Team
+            </button>
+            <div className="flex items-center gap-2" style={{ transform: 'translate(220px, 3px)' }}>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`w-6 h-6 ${viewMode === 'list' ? '' : 'opacity-30'}`}
+              >
+                <img alt="List view" src={imgView} className="w-full h-full" />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`w-8 h-8 ${viewMode === 'grid' ? '' : 'opacity-30'}`}
+              >
+                <img alt="Grid view" src={imgGrid} className="w-full h-full" />
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="absolute h-[129.375px] left-0 rounded-tl-[12.5px] rounded-tr-[12.5px] top-[531.63px] w-[220px]">
-          <img src="/ohliver-mascot.png" alt="Oscar" className="absolute left-[10px] top-[1.88px] w-[125.876px] h-[83.918px]" />
-          <p className="absolute font-bold text-xs text-white left-[38.13px] top-[1.88px] w-[123.75px]">Oscar's Intelligence</p>
-          <div className="absolute bg-white/20 rounded-[6.25px] h-[41.25px] left-[61.25px] top-[30px] w-[97.5px]"></div>
-          <div className="absolute bg-white/20 rounded-[6.25px] h-[8.75px] left-[61.25px] top-[76.25px] w-[97.5px]"></div>
-          <ChevronDown className="absolute left-[191.88px] top-[43.13px] w-[25px] h-[25px] rotate-[270deg]" />
-          <ChevronDown className="absolute left-[5px] top-[43.13px] w-[25px] h-[25px] rotate-[90deg]" />
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="absolute bg-gray-50 h-[661px] left-[221px] top-[59px] right-0">
-        <p className="absolute font-bold text-base text-gray-700 left-[30px] top-[24px] w-[315px]">Crew and Personnel</p>
-
-        <div className="absolute bg-white border border-gray-300 rounded-[15px] h-[22px] left-[30px] top-[54px] w-[257px] flex items-center">
-          <Search className="ml-2 w-3 h-3 opacity-30" />
-          <Input
-            placeholder="Search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="ml-2 border-none bg-transparent text-xs text-gray-400 h-4"
-          />
+        {/* Search Bar */}
+        <div className="relative mb-8 max-w-md" style={{ transform: 'translate(0px, -55px)' }}>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-xs bg-white border border-gray-400 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <div className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 opacity-30">
+              <img alt="" src={imgMagnifyingGlass2} className="w-full h-full" />
+            </div>
+          </div>
         </div>
 
-        <Button
-          onClick={() => setIsFormDialogOpen(true)}
-          className="absolute bg-white border-2 border-gray-300 rounded-[5px] h-[24px] left-[926px] top-[21px] w-[103px] text-xs font-medium text-gray-700"
-        >
-          Add New Team
-        </Button>
+        {/* Team Display */}
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" style={{ transform: 'translate(0px, -55px)', columnGap: '-25px', rowGap: '20px' }}>
+            {paginatedTeams.map((team) => (
+            <div
+              key={team.id}
+              className="bg-white rounded-lg p-4 hover:shadow-2xl transition-shadow cursor-pointer"
+              style={{ width: '300px', height: '360px', flexShrink: 0, boxShadow: '-4px 4px 8px rgba(0,0,0,0.1)' }}
+              onClick={(e) => {
+                // Prevent navigation if clicking on dropdown menu
+                if (!(e.target as Element).closest('.dropdown-menu')) {
+                  router.push(`/logistics/teams/${team.id}`)
+                }
+              }}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="text-base md:text-lg font-bold text-gray-700 truncate">
+                  {team.name}
+                </h3>
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setMenuOpen(menuOpen === team.id ? null : team.id)
+                    }}
+                    className="opacity-50 hover:opacity-100 transition-opacity"
+                  >
+                    <div className="w-5 h-5">
+                      <img alt="" src={imgDots} className="w-full h-full" />
+                    </div>
+                  </button>
 
-        <List className="absolute left-[958px] top-[59.34px] w-[19.276px] h-[19.276px] opacity-30" />
-        <Grid3X3 className="absolute left-[981.49px] top-[55.73px] w-[26.505px] h-[26.505px] opacity-30" />
+                  {menuOpen === team.id && (
+                      <div className="dropdown-menu absolute left-6 top-0 z-10 w-32 bg-white border border-gray-400 rounded-md shadow-lg" style={{ transform: 'translate(-150px, 0px)' }}>
+                      <button
+                        onClick={() => {
+                          // Handle edit
+                          setEditingTeam(team)
+                          setFormData({
+                            crewName: team.name,
+                            crewHead: team.leaderName || "",
+                            contactNumber: team.contactNumber || ""
+                          })
+                          // Extract avatar from description
+                          const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
+                          setSelectedAvatar(avatarMatch ? avatarMatch[1] : "")
+                          setIsAddTeamDialogOpen(true)
+                          setMenuOpen(null)
+                        }}
+                        className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-md"
+                      >
+                        Edit
+                      </button>
+                      <div className="border-t border-gray-200"></div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await updateTeam(team.id, { deleted: true } as any, userData?.company_id || undefined)
+                            // Refresh teams list
+                            const updatedTeams = await getTeams(userData?.company_id || undefined)
+                            setTeams(updatedTeams)
+                            setMenuOpen(null)
+                            toast({
+                              title: "Team deleted",
+                              description: "The team has been successfully deleted.",
+                            })
+                          } catch (error) {
+                            console.error('Error deleting team:', error)
+                            alert('Failed to delete team. Please try again.')
+                          }
+                        }}
+                        className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 last:rounded-b-md"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-        <div className="absolute left-[30px] top-[99px] right-[30px] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredTeams.map((team) => (
-            <Card key={team.id} className="bg-white rounded-[10px] shadow w-full max-w-[201px] h-[265px] relative">
-              <CardContent className="p-4 flex flex-col items-center">
-                <img src="/placeholder-user.jpg" alt={team.name} className="w-[150px] h-[150px] rounded mb-4" />
-                <p className="font-bold text-xs text-gray-700 mb-1">{team.name}</p>
-                <p className="font-semibold text-xs text-gray-700 mb-1">{team.leaderName || 'No Leader'}</p>
-                <p className="font-light text-xs text-gray-700 mb-1">{team.location || 'No Location'}</p>
-                <p className="font-light text-xs text-gray-700 mb-2">{team.teamType}</p>
-                <Badge className={`${getStatusColor(team.status)} text-xs`}>{team.status}</Badge>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-2 right-2 p-1"
-                  onClick={() => {
-                    setEditingTeam(team);
-                    setIsFormDialogOpen(true);
+              <div className="flex flex-col items-center mb-2">
+                <div className="w-48 h-48 md:w-52 md:h-52 bg-transparent border-none outline-none flex items-center justify-center" style={{ border: 'none', outline: 'none' }}>
+                  {(() => {
+                    const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
+                    const avatar = avatarMatch ? avatarMatch[1] : null
+                    return avatar ? (
+                      <img
+                        src={`/icons/${avatar}`}
+                        alt={`${team.name} avatar`}
+                        className="w-full h-full"
+                        style={{ outline: 'none', border: 'none' }}
+                      />
+                    ) : (
+                      <span className="text-2xl md:text-3xl text-gray-500 font-bold">
+                        {team.name.charAt(0)}
+                      </span>
+                    )
+                  })()}
+                </div>
+              </div>
+
+              <div className="space-y-0">
+                <p className="text-base font-semibold text-gray-700 truncate">
+                  {team.leaderName || 'No Leader'}
+                </p>
+                <p className="text-base text-gray-600">
+                  {team.contactNumber || 'N/A'}
+                </p>
+                <p className="text-base text-gray-600">
+                  Team Head
+                </p>
+              </div>
+            </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-t-lg" style={{ transform: 'translate(0px, -55px)', width: '1499px', height: '566px' }}>
+            {/* Table Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <div className="flex items-center space-x-8">
+                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1" style={{ transform: 'translate(100px, 0px)' }}>Crew Name</div>
+                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1" style={{ transform: 'translate(220px, 0px)' }}>Crew Head</div>
+                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1 whitespace-nowrap" style={{ transform: 'translate(350px, 0px)' }}>Contact Number</div>
+              </div>
+              <div className="w-16 text-center text-sm font-semibold text-gray-700">Actions</div>
+            </div>
+
+            {/* Table Rows */}
+            <div className="space-y-1 px-6 py-2">
+              {paginatedTeams.map((team) => (
+                <div
+                  key={team.id}
+                  className="flex items-center justify-between bg-white border-2 border-blue-200 rounded-lg h-16 px-4 cursor-pointer"
+                  onClick={(e) => {
+                    // Prevent navigation if clicking on dropdown menu
+                    if (!(e.target as Element).closest('.dropdown-menu')) {
+                      router.push(`/logistics/teams/${team.id}`)
+                    }
                   }}
                 >
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="flex items-center space-x-8">
+                    <div className="text-sm text-gray-700 text-left min-w-0 flex-1" style={{ transform: 'translate(95px, 0px)' }}>{team.name}</div>
+                    <div className="text-sm text-gray-700 text-left min-w-0 flex-1 whitespace-nowrap" style={{ transform: 'translate(190px, 0px)' }}>{team.leaderName || 'No Leader'}</div>
+                    <div className="text-sm text-gray-700 text-left min-w-0 flex-1" style={{ transform: 'translate(312px, 0px)' }}>{team.contactNumber || 'N/A'}</div>
+                  </div>
+                  <div className="w-16 flex justify-center relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setMenuOpen(menuOpen === team.id ? null : team.id)
+                      }}
+                      className="opacity-50 hover:opacity-100 transition-opacity"
+                    >
+                      <div className="w-4 h-4">
+                        <img alt="" src={imgDots} className="w-full h-full" />
+                      </div>
+                    </button>
+
+                    {menuOpen === team.id && (
+                      <div className="dropdown-menu absolute left-0 top-full z-10 w-32 bg-white border border-gray-400 rounded-md shadow-lg" style={{ transform: 'translate(-100%, 0px)' }}>
+                        <button
+                          onClick={() => {
+                            setEditingTeam(team)
+                            setFormData({
+                              crewName: team.name,
+                              crewHead: team.leaderName || "",
+                              contactNumber: team.contactNumber || ""
+                            })
+                            const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
+                            setSelectedAvatar(avatarMatch ? avatarMatch[1] : "")
+                            setIsAddTeamDialogOpen(true)
+                            setMenuOpen(null)
+                          }}
+                          className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-md"
+                        >
+                          Edit
+                        </button>
+                        <div className="border-t border-gray-200"></div>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await updateTeam(team.id, { deleted: true } as any, userData?.company_id || undefined)
+                              const updatedTeams = await getTeams(userData?.company_id || undefined)
+                              setTeams(updatedTeams)
+                              setMenuOpen(null)
+                              toast({
+                                title: "Team deleted",
+                                description: "The team has been successfully deleted.",
+                              })
+                            } catch (error) {
+                              console.error('Error deleting team:', error)
+                              alert('Failed to delete team. Please try again.')
+                            }
+                          }}
+                          className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 last:rounded-b-md"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {filteredTeams.length > itemsPerPage && (
+          <div className="flex justify-end mt-4">
+            <Pagination
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              totalItems={paginatedTeams.length}
+              totalOverall={filteredTeams.length}
+              onNextPage={handleNextPage}
+              onPreviousPage={handlePreviousPage}
+              hasMore={currentPage < totalPages}
+            />
+          </div>
+        )}
+
+        {filteredTeams.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">No teams found</p>
+          </div>
+        )}
       </div>
 
-      <TeamFormDialog
-        open={isFormDialogOpen}
-        onOpenChange={setIsFormDialogOpen}
-        onSubmit={editingTeam ? handleUpdateTeam : handleCreateTeam}
-        loading={formLoading}
-        team={editingTeam}
-      />
+      {/* Add Team Dialog */}
+      <Dialog open={isAddTeamDialogOpen} onOpenChange={setIsAddTeamDialogOpen}>
+        <DialogContent className="sm:max-w-[386px] h-[442px] p-0">
+          <div className="p-6">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-gray-800">
+                {editingTeam ? 'Edit Team' : '+Add a Team'}
+              </DialogTitle>
+            </DialogHeader>
 
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Team</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this team? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTeam} disabled={deleteLoading}>
-              {deleteLoading ? 'Deleting...' : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <div className="space-y-4 mt-4">
+              {/* Form Fields */}
+              <div className="space-y-3">
+                <div className="flex items-center">
+                  <label className="w-24 text-sm font-semibold text-gray-700">Crew Name:</label>
+                  <input
+                    type="text"
+                    placeholder="Crew Name"
+                    value={formData.crewName}
+                    onChange={(e) => setFormData(prev => ({ ...prev, crewName: e.target.value }))}
+                    className="flex-1 h-5 px-2 py-1 text-sm text-black placeholder:text-gray-400 border border-gray-400 rounded focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center">
+                  <label className="w-24 text-sm font-semibold text-gray-700">Crew Head:</label>
+                  <input
+                    type="text"
+                    placeholder="Crew Head"
+                    value={formData.crewHead}
+                    onChange={(e) => setFormData(prev => ({ ...prev, crewHead: e.target.value }))}
+                    className="flex-1 h-5 px-2 py-1 text-sm text-black placeholder:text-gray-400 border border-gray-400 rounded focus:outline-none"
+                  />
+                </div>
+                <div className="flex items-center">
+                  <label className="w-24 text-sm font-semibold text-gray-700">Contact #:</label>
+                  <input
+                    type="tel"
+                    placeholder="Contact #"
+                    value={formData.contactNumber}
+                    onChange={(e) => {
+                      const numericValue = e.target.value.replace(/\D/g, '')
+                      setFormData(prev => ({ ...prev, contactNumber: numericValue }))
+                    }}
+                    className="flex-1 h-5 px-2 py-1 text-sm text-black placeholder:text-gray-400 border border-gray-400 rounded focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Avatar Selection */}
+              <div>
+                <p className="text-sm font-semibold text-gray-700 mb-3">Select an avatar:</p>
+                <div className="grid grid-cols-4 gap-3">
+                  {Array.from({ length: 8 }, (_, i) => (
+                    <button
+                      key={i + 1}
+                      onClick={() => setSelectedAvatar(`person${i + 1}.svg`)}
+                      className={`w-16 h-16 rounded-full border-2 overflow-hidden ${
+                        selectedAvatar === `person${i + 1}.svg`
+                          ? 'border-blue-500'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <img
+                        src={`/icons/person${i + 1}.svg`}
+                        alt={`Avatar ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex justify-end gap-4 mt-10" style={{ transform: 'translate(0px, 30px)'}}>
+                <button
+                  onClick={() => {
+                    setIsAddTeamDialogOpen(false)
+                    setEditingTeam(null)
+                    setFormData({ crewName: "", crewHead: "", contactNumber: "" })
+                    setSelectedAvatar("")
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-400 rounded-lg hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!user?.uid || !userData?.company_id) {
+                      alert("Authentication required")
+                      return
+                    }
+
+                    if (!formData.crewName.trim()) {
+                      alert("Team name is required")
+                      return
+                    }
+
+                    setIsCreating(true)
+                    try {
+                      console.log('Saving team - editingTeam:', editingTeam)
+                      if (editingTeam) {
+                        // Update existing team
+                        console.log('Updating team:', editingTeam.id)
+                        const updateData = {
+                          name: formData.crewName,
+                          description: `Team led by ${formData.crewHead || 'TBD'}${selectedAvatar ? `|avatar:${selectedAvatar}` : ''}`,
+                          leaderName: formData.crewHead,
+                          contactNumber: formData.contactNumber,
+                        }
+                        await updateTeam(editingTeam.id, updateData as any, userData.company_id)
+
+                        toast({
+                          title: "Team updated",
+                          description: "The team has been successfully updated.",
+                        })
+                      } else {
+                        console.log('Creating new team')
+                        // Create new team
+                        const teamData = {
+                          name: formData.crewName,
+                          description: `Team led by ${formData.crewHead || 'TBD'}${selectedAvatar ? `|avatar:${selectedAvatar}` : ''}`,
+                          teamType: "operations" as const,
+                          leaderName: formData.crewHead,
+                          specializations: [],
+                          location: "TBD",
+                          contactNumber: formData.contactNumber,
+                          company_id: userData.company_id,
+                        }
+
+                        await createTeam(teamData, user.uid)
+
+                        toast({
+                          title: "Team created",
+                          description: "The team has been successfully created.",
+                        })
+                      }
+
+                      // Refresh teams list
+                      const updatedTeams = await getTeams(userData.company_id)
+                      setTeams(updatedTeams)
+
+                      setIsAddTeamDialogOpen(false)
+                      setEditingTeam(null)
+                      setFormData({ crewName: "", crewHead: "", contactNumber: "" })
+                      setSelectedAvatar("")
+                    } catch (error) {
+                      console.error(`Error ${editingTeam ? 'updating' : 'creating'} team:`, error)
+                      alert(`Failed to ${editingTeam ? 'update' : 'create'} team. Please try again.`)
+                    } finally {
+                      setIsCreating(false)
+                    }
+                  }}
+                  disabled={isCreating}
+                  className="px-6 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ transform: 'translate(0px, 0px)' }}
+                >
+                  {isCreating ? "Creating..." : "Save"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
+

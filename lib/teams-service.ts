@@ -27,10 +27,15 @@ export async function getTeams(companyId?: string): Promise<Team[]> {
       teamsQuery = query(
         teamsCollection,
         where("company_id", "==", companyId),
+        where("deleted", "!=", true),
         orderBy("createdAt", "desc")
       )
     } else {
-      teamsQuery = query(teamsCollection, orderBy("createdAt", "desc"))
+      teamsQuery = query(
+        teamsCollection,
+        where("deleted", "!=", true),
+        orderBy("createdAt", "desc")
+      )
     }
 
     const snapshot = await getDocs(teamsQuery)
@@ -116,6 +121,7 @@ export async function createTeam(teamData: CreateTeamData, createdBy: string): P
     const docRef = await addDoc(teamsCollection, {
       ...teamData,
       status: "active",
+      deleted: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy,

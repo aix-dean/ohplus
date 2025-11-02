@@ -408,7 +408,7 @@ export function SideNavigation() {
                   { title: "Job Orders", href: "/logistics/job-orders", icon: ClipboardList },
                   { title: "Reports", href: "/logistics/service-reports", icon: BarChart3 },
                   { title: "Fleet", href: "/logistics/fleet", icon: Truck },
-                  { title: "Teams and Personnel", href: "/logistics/teams", icon: Users },
+                  { title: "Crew and Personnel", href: "/logistics/teams", icon: Users },
                   { title: "News and Weather", href: "/logistics/weather", icon: CloudRain },
                   { title: "To-do-list", href: "/logistics/todo-list", icon: ClipboardList },
                 ].map((item) => {
