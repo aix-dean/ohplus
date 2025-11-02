@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,6 +20,7 @@ import type { Product } from "@/lib/firebase-service";
 import type { Team } from "@/lib/types/team";
 import { useToast } from "@/hooks/use-toast";
 import { JobOrderSelectionDialog } from './JobOrderSelectionDialog';
+import { uploadFileToFirebaseStorage } from "@/lib/firebase-service";
 
 /*
 // New component for displaying Job Order details JO#: change
@@ -127,7 +128,7 @@ interface FormData {
   endDate: Date | null;
   alarmDate: Date | null;
   alarmTime: string;
-  attachments: { name: string; type: string; file?: File }[];
+  attachments: { name: string; type: string; file?: File; url?: string }[];
   serviceCost: {
     crewFee: string;
     overtimeFee: string;
@@ -168,6 +169,9 @@ export function ServiceAssignmentCard({
   const [selectedJobOrder, setSelectedJobOrder] = useState<JobOrder | null>(jobOrderData); // State to hold selected job order data
   const [currentTime, setCurrentTime] = useState(""); // State for current time display
   const [showJobOrderSelectionDialog, setShowJobOrderSelectionDialog] = useState(false); // State for JobOrderSelectionDialog
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null); // State for uploaded image URL
+  const [isUploading, setIsUploading] = useState(false); // State for upload loading
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for hidden file input
   const { toast } = useToast(); // Use the toast hook
 
   // Determine the current product ID to display (from form data, job order, or prop)
@@ -279,7 +283,7 @@ export function ServiceAssignmentCard({
     // Auto-fill form fields with job order data
     handleInputChange("serviceType", jobOrder.joType || "");
     handleInputChange("remarks", jobOrder.remarks || "");
-    handleInputChange("campaignName", jobOrder.message || "");
+    handleInputChange("campaignName", jobOrder.siteName || "");
 
     // Set materialSpecs from job order data
     handleInputChange("materialSpecs", jobOrder.materialSpec || "");
@@ -336,6 +340,65 @@ export function ServiceAssignmentCard({
     }
     // Re-open the job order selection dialog
     setShowJobOrderSelectionDialog(true);
+  };
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (optional, e.g., max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Upload to Firebase Storage
+      const path = `service-assignments/${saNumber}/`;
+      const downloadURL = await uploadFileToFirebaseStorage(file, path);
+
+      // Update state and form data
+      setUploadedImageUrl(downloadURL);
+      handleInputChange("attachments", [{
+        name: file.name,
+        type: file.type,
+        url: downloadURL,
+      }]);
+
+      toast({
+        title: "Upload successful",
+        description: "Image uploaded successfully.",
+      });
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   return (
@@ -466,11 +529,12 @@ export function ServiceAssignmentCard({
               </Label>
               <Input
                 id="campaignName"
-                placeholder="Enter campaign name"
+                placeholder="Campaign name from job order"
                 value={formData.campaignName || ""}
                 onChange={(e) => handleInputChange("campaignName", e.target.value)}
                 className="flex-1"
-                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}
+                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#F5F5F5' }}
+                readOnly
                 required
               />
             </div>
@@ -627,19 +691,46 @@ export function ServiceAssignmentCard({
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {(() => {
-                    const imgSrc = selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl || "/logistics-sa-create-dl.png";
-                    return (
-                      <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
-                        <img
-                          src={imgSrc}
-                          alt="Attachment"
-                          className={`rounded-md object-cover ${imgSrc === '/logistics-sa-create-dl.png' ? 'w-[24.33px] h-[24.33px]' : 'w-[69.962px] h-[69.962px]'}`}
-                        />
-                        {imgSrc === '/logistics-sa-create-dl.png' && <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8' }}>Upload</p>}
-                      </div>
-                    );
-                  })()}
+                  {uploadedImageUrl ? (
+                    <div className="relative shadow-sm w-[70px] h-[70px]">
+                      <img
+                        src={uploadedImageUrl}
+                        alt="Uploaded Attachment"
+                        className="w-[70px] h-[70px] rounded-md object-cover"
+                      />
+                      <button
+                        onClick={() => {
+                          setUploadedImageUrl(null);
+                          handleInputChange("attachments", []);
+                        }}
+                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      className={`w-[70px] h-[70px] flex flex-col justify-center items-center cursor-pointer ${isUploading ? 'opacity-50' : ''}`}
+                      style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}
+                      onClick={() => !isUploading && fileInputRef.current?.click()}
+                    >
+                      <img
+                        alt="Attachment"
+                        className="rounded-md object-cover w-[24.33px] h-[24.33px]"
+                        src="/logistics-sa-create-dl.png"
+                      />
+                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8' }}>
+                        {isUploading ? 'Uploading...' : 'Upload'}
+                      </p>
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
                 </div>
               )}
             </div>

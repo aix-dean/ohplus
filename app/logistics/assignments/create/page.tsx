@@ -242,7 +242,7 @@ export default function CreateServiceAssignmentPage() {
       projectSite: productId,
       serviceType: fetchedJobOrder.joType ? fetchedJobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
       remarks: fetchedJobOrder.remarks || fetchedJobOrder.jobDescription || "",
-      campaignName: fetchedJobOrder.campaignName || "",
+      campaignName: fetchedJobOrder.siteName || "",
       startDate: parseDateSafely(fetchedJobOrder.dateRequested),
       endDate: parseDateSafely(fetchedJobOrder.deadline),
       // You might want to pre-fill other fields like assignedTo, crew, etc.

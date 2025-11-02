@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Check, ArrowLeft } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, serverTimestamp, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -16,6 +16,23 @@ import { GenericSuccessDialog } from "@/components/generic-success-dialog";
 import { getTeamById } from "@/lib/teams-service";
 import { CompanyService } from "@/lib/company-service";
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service";
+
+interface CompanyData {
+  id: string
+  name?: string
+  company_location?: any
+  address?: any
+  company_website?: string
+  website?: string
+  logo?: string
+  contact_person?: string
+  email?: string
+  phone?: string
+  social_media?: any
+  created_by?: string
+  created?: Date
+  updated?: Date
+}
 
 // Chunked base64 conversion to handle large PDFs efficiently
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
@@ -29,6 +46,83 @@ const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   }
 
   return btoa(result)
+}
+
+const fetchCompanyData = async (user: any, userData: any): Promise<CompanyData | null> => {
+  if (!user?.uid || !userData) return null
+
+  try {
+    let companyDoc = null
+    let companyDataResult = null
+
+    // First, try to find company by company_id if it exists in userData
+    if (userData?.company_id) {
+      try {
+        const companyDocRef = doc(db, "companies", userData.company_id)
+        const companyDocSnap = await getDoc(companyDocRef)
+
+        if (companyDocSnap.exists()) {
+          companyDoc = companyDocSnap
+          companyDataResult = companyDocSnap.data()
+        }
+      } catch (error) {
+        console.error("Error fetching company by company_id:", error)
+      }
+    }
+
+    // If no company found by company_id, try other methods
+    if (!companyDoc) {
+      // Try to find company by created_by field
+      let companiesQuery = query(collection(db, "companies"), where("created_by", "==", user.uid))
+      let companiesSnapshot = await getDocs(companiesQuery)
+
+      // If no company found by created_by, try to find by email or other identifiers
+      if (companiesSnapshot.empty && user.email) {
+        companiesQuery = query(collection(db, "companies"), where("email", "==", user.email))
+        companiesSnapshot = await getDocs(companiesQuery)
+      }
+
+      // If still no company found, try to find by contact_person email
+      if (companiesSnapshot.empty && user.email) {
+        companiesQuery = query(collection(db, "companies"), where("contact_person", "==", user.email))
+        companiesSnapshot = await getDocs(companiesQuery)
+      }
+
+      if (!companiesSnapshot.empty) {
+        companyDoc = companiesSnapshot.docs[0]
+        companyDataResult = companyDoc.data()
+      }
+    }
+
+    if (companyDoc && companyDataResult) {
+      const company: CompanyData = {
+        id: companyDoc.id,
+        name: companyDataResult.name,
+        company_location: companyDataResult.company_location || companyDataResult.address,
+        address: companyDataResult.address,
+        company_website: companyDataResult.company_website || companyDataResult.website,
+        logo: companyDataResult.logo,
+        contact_person: companyDataResult.contact_person,
+        email: companyDataResult.email,
+        phone: companyDataResult.phone,
+        social_media: companyDataResult.social_media || {},
+        created_by: companyDataResult.created_by,
+        created: companyDataResult.created?.toDate
+          ? companyDataResult.created.toDate()
+          : companyDataResult.created_at?.toDate(),
+        updated: companyDataResult.updated?.toDate
+          ? companyDataResult.updated.toDate()
+          : companyDataResult.updated_at?.toDate(),
+      }
+
+      return company
+    } else {
+      return null
+    }
+  } catch (error) {
+    console.error("Error fetching company data:", error)
+    return null
+  }
 }
 
 export default function ViewPDFPage() {
@@ -48,6 +142,7 @@ export default function ViewPDFPage() {
      message: "Service Assignment has been sent successfully.",
      confirmButtonText: "OK"
    });
+   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
    const isPreview = id === 'preview';
    const jobOrderId = searchParams.get('jobOrderId') || 'Df4wxbfrO5EnAbml0r2I';
 
@@ -152,19 +247,17 @@ export default function ViewPDFPage() {
         console.log('[PDF Loading] Data validation passed, proceeding to PDF generation');
 
         // Generate PDF using server-side API
-        try {
-          console.log('[PDF Loading] Calling server-side PDF generation API');
+         try {
+           console.log('[PDF Loading] Calling server-side PDF generation API');
 
-          // Fetch company data for PDF generation
-          let companyData = null;
-          if (userData?.company_id) {
-            try {
-              companyData = await CompanyService.getCompanyData(userData.company_id);
-              console.log('[PDF Loading] Company data fetched:', companyData?.name);
-            } catch (companyError) {
-              console.warn('[PDF Loading] Failed to fetch company data:', companyError);
-            }
-          }
+           // Fetch company data for PDF generation
+           let fetchedCompanyData = null;
+           try {
+             fetchedCompanyData = await fetchCompanyData(user, userData);
+             console.log('[PDF Loading] Company data fetched:', fetchedCompanyData?.name);
+           } catch (companyError) {
+             console.warn('[PDF Loading] Failed to fetch company data:', companyError);
+           }
 
           // Prepare assignment data for API
           const apiAssignmentData = {
@@ -182,6 +275,7 @@ export default function ViewPDFPage() {
             gondola: assignmentData.gondola || '',
             technology: assignmentData.technology || '',
             sales: assignmentData.sales || '',
+            campaignName: assignmentData.campaignName || '',
             remarks: assignmentData.remarks || '',
             startDate: assignmentData.startDate ? new Date(assignmentData.startDate) : null,
             endDate: assignmentData.endDate ? new Date(assignmentData.endDate) : null,
@@ -208,7 +302,7 @@ export default function ViewPDFPage() {
             },
             body: JSON.stringify({
               assignment: apiAssignmentData,
-              companyData: companyData,
+              companyData: fetchedCompanyData,
               logoDataUrl: null, // Logo handling can be added later if needed
               format: 'pdf',
               userData: userData,
@@ -264,6 +358,7 @@ export default function ViewPDFPage() {
               gondola: assignmentData.gondola || '',
               technology: assignmentData.technology || '',
               sales: assignmentData.sales || '',
+              campaignName: assignmentData.campaignName || '',
               remarks: assignmentData.remarks || '',
               startDate: assignmentData.startDate ? new Date(assignmentData.startDate) : null,
               endDate: assignmentData.endDate ? new Date(assignmentData.endDate) : null,
@@ -330,6 +425,12 @@ export default function ViewPDFPage() {
 
     loadPDF();
   }, []);
+
+  useEffect(() => {
+    if (user && userData) {
+      fetchCompanyData(user, userData).then(setCompanyData)
+    }
+  }, [user, userData])
 
   const handleConfirmAndCreate = async () => {
       if (!user) return;

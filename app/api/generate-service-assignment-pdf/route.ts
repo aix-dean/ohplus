@@ -3,6 +3,7 @@ import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import { generateServiceAssignmentHTMLSimple } from '@/lib/pdf-service'
 import { PDFDocument, PDFName } from 'pdf-lib'
+import { getTeamById } from '@/lib/teams-service'
 
 // Service Assignment interface for PDF generation
 interface ServiceAssignmentPDFData {
@@ -121,6 +122,23 @@ export async function POST(request: NextRequest) {
     if (!assignment.assignedTo) {
       return NextResponse.json({ error: 'Assigned to is required' }, { status: 400 })
     }
+
+    // Resolve crew name from crew ID if not provided
+    if ((!assignment.crewName || assignment.crewName.trim() === '') && assignment.crew) {
+      try {
+        console.log('[API_PDF_SA] Fetching crew name for crew ID:', assignment.crew)
+        const team = await getTeamById(assignment.crew)
+        if (team) {
+          assignment.crewName = team.name
+          console.log('[API_PDF_SA] Resolved crew name:', assignment.crewName)
+        } else {
+          console.log('[API_PDF_SA] Team not found for crew ID:', assignment.crew)
+        }
+      } catch (error) {
+        console.error('[API_PDF_SA] Error fetching team name:', error)
+      }
+    }
+
     // Generate HTML content
     console.log('[API_PDF_SA] Generating HTML content...')
     const htmlContent = await generateServiceAssignmentHTMLSimple(assignment)
