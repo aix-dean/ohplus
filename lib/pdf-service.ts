@@ -6,6 +6,7 @@ import type { ReportData } from "@/lib/report-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { PDFDocument, PDFName } from 'pdf-lib'
 
 // Helper function to load image and convert to base64
 export async function loadImageAsBase64(url: string): Promise<string | null> {
@@ -123,6 +124,29 @@ function safeToDate(dateValue: any): Date {
     return dateValue.toDate()
   }
   return new Date() // fallback to current date
+}
+
+// Helper function to set PDF viewer preferences including initial zoom
+async function setPDFViewerPreferences(pdfBytes: Uint8Array, zoom: number = 1.25): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.load(pdfBytes)
+
+  // Get the first page
+  const pages = pdfDoc.getPages()
+  if (pages.length > 0) {
+    const firstPage = pages[0]
+
+    // Create a GoTo action with zoom
+    const action = pdfDoc.context.obj({
+      Type: PDFName.of('Action'),
+      S: PDFName.of('GoTo'),
+      D: [firstPage.ref, PDFName.of('XYZ'), null, null, zoom]
+    })
+
+    // Set OpenAction on catalog
+    pdfDoc.catalog.set(PDFName.of('OpenAction'), action)
+  }
+
+  return await pdfDoc.save()
 }
 
 async function logProposalPDFGenerated(proposalId: string, userId: string, userName: string): Promise<void> {
@@ -295,10 +319,12 @@ interface ServiceAssignmentPDFData {
   equipmentRequired: string
   materialSpecs: string
   crew: string
+  crewName?: string
   illuminationNits?: string
   gondola: string
   technology: string
   sales: string
+  campaignName?: string
   remarks: string
   requestedBy: {
     name: string
@@ -736,11 +762,23 @@ export async function generateServiceAssignmentDetailsPDF(
       pdf.text("No service expenses recorded", margin, yPosition)
     }
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `service-assignment-${assignmentData.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Service Assignment Details PDF:", error)
@@ -783,12 +821,12 @@ export async function generateServiceAssignmentPDF(
 
     // Add white text for header
     pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(20)
+    pdf.setFontSize(16)
     pdf.setFont("helvetica", "bold")
     pdf.text("SERVICE ASSIGNMENT", margin, 15)
 
     // Add logistics badge
-    pdf.setFontSize(10)
+    pdf.setFontSize(8)
     pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
 
     yPosition = 35
@@ -1033,13 +1071,26 @@ export async function generateServiceAssignmentPDF(
     pdf.setFont("helvetica", "bold")
     pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
       // Return base64 string for email attachment
-      return pdf.output("datauristring").split(",")[1]
+      const base64 = Buffer.from(modifiedPdfBytes).toString('base64')
+      return base64
     } else {
       // Save the PDF for download
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `service-assignment-${serviceAssignment.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Service Assignment PDF:", error)
@@ -1364,13 +1415,25 @@ export async function generateJobOrderPDF(jobOrder: JobOrder, returnBase64 = fal
     pdf.setFont("helvetica", "bold")
     pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
       // Return base64 string for email attachment
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
       // Save the PDF for download
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `job-order-${jobOrder.joNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Job Order PDF:", error)
@@ -1632,11 +1695,23 @@ try {
       }
     }
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `proposal-${(proposal.title || "proposal").replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating PDF:", error)
@@ -1816,7 +1891,8 @@ export async function generateCostEstimatePDF(
       throw new Error("No sites selected for PDF generation")
     }
 
-    sitesToProcess.forEach(async (siteName, siteIndex) => {
+    for (const siteName of sitesToProcess) {
+      const siteIndex = sitesToProcess.indexOf(siteName)
       if (siteIndex > 0) {
         pdf.addPage()
         yPosition = margin
@@ -2074,23 +2150,23 @@ export async function generateCostEstimatePDF(
       pdf.text(representativeName, margin, yPosition)
       console.log(
         "[v0] Adding client name:",
-        costEstimate?.clientName || "Client Name",
+        costEstimate?.client?.name || "Client Name",
         "at:",
         margin + contentWidth / 2,
         yPosition,
       )
-      pdf.text(costEstimate?.clientName || "Client Name", margin + contentWidth / 2, yPosition)
+      pdf.text(costEstimate?.client?.name || "Client Name", margin + contentWidth / 2, yPosition)
       yPosition += 5
 
       pdf.setFont("helvetica", "normal")
       console.log(
         "[v0] Adding client company:",
-        costEstimate?.clientCompany || "Client Company",
+        costEstimate?.client?.company || "Client Company",
         "at:",
         margin + contentWidth / 2,
         yPosition,
       )
-      pdf.text(costEstimate?.clientCompany || "Client Company", margin + contentWidth / 2, yPosition)
+      pdf.text(costEstimate?.client?.company || "Client Company", margin + contentWidth / 2, yPosition)
       yPosition += 8
 
       pdf.setFontSize(7)
@@ -2103,10 +2179,14 @@ export async function generateCostEstimatePDF(
 
       console.log("[v0] Final yPosition after signature section:", yPosition)
       console.log("[v0] Page dimensions - width:", pageWidth, "height:", pageHeight)
-    })
+    }
+
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
 
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
       const baseFileName = (costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()
       const sitesSuffix =
@@ -2120,7 +2200,15 @@ export async function generateCostEstimatePDF(
       const fileName = `cost-estimate-${baseFileName}${sitesSuffix}-${Date.now()}.pdf`
 
       console.log("[v0] Attempting to download PDF:", fileName)
-      pdf.save(fileName)
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
       console.log("[v0] PDF download triggered successfully")
     }
   } catch (error) {
@@ -2722,11 +2810,23 @@ export async function generateReportPDF(
     })
     pdf.text(`This report was automatically generated on ${currentDate}.`, pageWidth - margin - 70, footerY)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `report-${report.id}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating report PDF:", error)
@@ -2810,9 +2910,7 @@ export async function generateServiceAssignmentHTMLPDF(
       </head>
       <body style="margin:0; padding:0;">
         <div style="width: 794px; height: 1123px; position: relative">
-          <div style="width: 507px; height: 31px; left: 55px; top: 93px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 21px; font-family: Inter; font-weight: 700; line-height: 21px; word-wrap: break-word">Golden Touch Imaging Specialist</div>
           <div style="width: 507px; height: 31px; left: 138px; top: 1023px; position: absolute; text-align: center; color: var(--LIGHTER-BLACK, #333333); font-size: 13px; font-family: Inter; font-weight: 400; line-height: 13px; word-wrap: break-word">Golden Touch Imaging Specialist<br/>721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines</div>
-          <div style="width: 449px; height: 18px; left: 55px; top: 120px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 13px; font-family: Inter; font-weight: 400; line-height: 13px; word-wrap: break-word">+63 917 849 1054 | 721 Gen Solano St., San Miguel, Manila</div>
           <div style="width: 78px; height: 18px; left: 55px; top: 170px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Recipient</div>
           <div style="width: 254px; height: 27px; left: 55px; top: 197px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 26px; font-family: Inter; font-weight: 700; line-height: 26px; word-wrap: break-word">${serviceAssignment.assignedToName || serviceAssignment.assignedTo}</div>
           <div style="width: 190px; height: 18px; left: 534px; top: 239px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Issued on ${serviceAssignment.created ? new Date(serviceAssignment.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
@@ -2822,7 +2920,7 @@ export async function generateServiceAssignmentHTMLPDF(
           <div style="width: 115px; height: 18px; left: 67px; top: 358px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Site Address</div>
           <div style="width: 307px; height: 18px; left: 269px; top: 358px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.projectSiteLocation}</div>
           <div style="width: 132px; height: 18px; left: 67px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Campaign Name</div>
-          <div style="width: 241px; height: 18px; left: 269px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Eyes on Your Fries</div>
+          <div style="width: 241px; height: 18px; left: 269px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${assignment.campaignName || "N/A"}</div>
           <div style="width: 115px; height: 18px; left: 67px; top: 420px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Service Type</div>
           <div style="width: 210px; height: 18px; left: 269px; top: 420px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 700; line-height: 15px; word-wrap: break-word">${serviceAssignment.serviceType}</div>
           <div style="width: 115px; height: 18px; left: 67px; top: 451px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Material Specs</div>
@@ -2996,21 +3094,24 @@ export async function generateServiceAssignmentHTMLPDF(
       pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
       console.log("[DEBUG] Image added to PDF successfully")
 
-      const base64Result = pdf.output("datauristring").split(",")[1]
-      console.log("[DEBUG] PDF base64 generated, length:", base64Result.length)
-
-      // Validate base64 result
-      if (!base64Result || base64Result.length === 0) {
-        throw new Error('PDF base64 output is empty')
-      }
+      // Apply PDF viewer preferences for initial zoom
+      const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+      const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
 
       if (returnBase64) {
         console.log("[DEBUG] Returning base64 string")
-        return base64Result
+        return Buffer.from(modifiedPdfBytes).toString('base64')
       } else {
+        const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
         const fileName = `service-assignment-${serviceAssignment.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-        console.log("[DEBUG] Saving PDF as file:", fileName)
-        pdf.save(fileName)
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
       }
     } catch (canvasError) {
       console.error("[DEBUG] Error with html2canvas:", canvasError)
@@ -3293,11 +3394,23 @@ export async function generateServiceAssignmentCreatePDF(
     pdf.setFont("helvetica", "bold")
     pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `service-assignment-create-${saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Service Assignment Create PDF:", error)
@@ -3351,19 +3464,19 @@ export async function generateServiceAssignmentFallbackPDF(
 
     // Add white text for header
     pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(20)
+    pdf.setFontSize(16)
     pdf.setFont("helvetica", "bold")
     pdf.text("SERVICE ASSIGNMENT", margin, 15)
 
     // Add logistics badge
-    pdf.setFontSize(10)
+    pdf.setFontSize(8)
     pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
 
     yPosition = 35
     pdf.setTextColor(0, 0, 0)
 
     // Service Assignment Title and Number
-    pdf.setFontSize(24)
+    pdf.setFontSize(18)
     pdf.setFont("helvetica", "bold")
     pdf.text(`SA# ${serviceAssignment.saNumber}`, margin, yPosition)
     yPosition += 10
@@ -3384,11 +3497,11 @@ export async function generateServiceAssignmentFallbackPDF(
 
     const statusColor = getStatusColor(serviceAssignment.status)
     pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2])
-    pdf.rect(margin, yPosition, 25, 8, "F")
+    pdf.rect(margin, yPosition, 20, 6, "F")
     pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(10)
+    pdf.setFontSize(8)
     pdf.setFont("helvetica", "bold")
-    pdf.text(serviceAssignment.status.toUpperCase(), margin + 2, yPosition + 5)
+    pdf.text(serviceAssignment.status.toUpperCase(), margin + 2, yPosition + 4)
     pdf.setTextColor(0, 0, 0)
     yPosition += 20
 
@@ -3586,18 +3699,401 @@ export async function generateServiceAssignmentFallbackPDF(
     pdf.setFont("helvetica", "bold")
     pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
       // Return base64 string for email attachment
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
       // Save the PDF for download
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `service-assignment-${serviceAssignment.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Service Assignment Fallback PDF:", error)
     throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
+}
+
+export async function generateServiceAssignmentHTMLSimple(
+  assignment: ServiceAssignmentPDFData,
+): Promise<string> {
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Service Assignment - ${assignment.saNumber}</title>
+      <style>
+        body {
+           font-family: 'Helvetica', 'Arial', sans-serif;
+           margin: 0;
+           padding: 0;
+           background-color: #ffffff;
+           color: #000000;
+           line-height: 1.4;
+           display: flex;
+           justify-content: center;
+           align-items: center;
+           min-height: 100vh;
+         }
+
+         .container {
+           width: 595px;
+           height: 842px;
+           margin: auto;
+         }
+
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding: 16px;
+          padding-bottom: 8px;
+        }
+
+        .header-left {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+
+        .company-logo {
+          width: 60px;
+          height: 32px;
+        }
+
+        .company-name {
+          font-size: 16px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .company-contact {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .header-right {
+          text-align: right;
+        }
+
+        .tagged-jo-label {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .tagged-jo-number {
+          font-size: 14px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .recipient-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding-left: 16px;
+          padding-right: 16px;
+          padding-top: 8px;
+          padding-bottom: 8px;
+        }
+
+        .recipient-left {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .recipient-label {
+          font-size: 12px;
+          color: #6b7280;
+          margin-bottom: 4px;
+        }
+
+        .recipient-name {
+          font-size: 20px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .recipient-dept {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 4px 0 0 0;
+        }
+
+        .recipient-right {
+          text-align: right;
+        }
+
+        .sa-badge {
+          background-color: #2196f3;
+          color: white;
+          padding: 8px 16px;
+          font-size: 20px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 130px;
+          height: 33px;
+          flex-shrink: 0;
+          margin-bottom: 8px;
+        }
+
+        .issued-date {
+          font-size: 12px;
+          color: #6b7280;
+          margin-top: 8px;
+        }
+
+        .info-section {
+          padding-left: 16px;
+          padding-right: 16px;
+          padding-top: 8px;
+          padding-bottom: 16px;
+        }
+
+        .info-header {
+          background-color: #2196f3;
+          color: #ffffff;
+          padding: 12px 16px;
+          font-size: 16px;
+          font-weight: 700;
+          line-height: 1;
+          margin-bottom: 0;
+        }
+
+        .info-table {
+          width: 100%;
+          border-collapse: collapse;
+          height: 253px;
+        }
+
+        .info-table tr {
+          border: 1px solid #d1d5db;
+        }
+
+        .info-table td {
+          padding: 4px 16px;
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .info-table td:first-child {
+          background-color: #ffffff;
+          width: 33.33%;
+          border-right: 1px solid #d1d5db;
+        }
+
+        .info-table td:nth-child(2) {
+          font-weight: 700;
+        }
+
+        .attachments-section {
+          padding-left: 24px;
+          padding-right: 24px;
+          padding-bottom: 24px;
+        }
+
+        .attachments-label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #333333;
+          line-height: 1;
+          margin-bottom: 16px;
+        }
+
+        .attachments-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 24px;
+        }
+
+        .attachment-box {
+          width: 200px;
+          height: 200px;
+          border: 1px solid #d1d5db;
+        }
+
+        .prepared-by-section {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+        }
+
+        .prepared-by-label {
+          font-size: 12px;
+          color: #6b7280;
+          margin-bottom: 8px;
+        }
+
+        .signature-box {
+          width: 152px;
+          height: 91px;
+          border: 1px solid #d1d5db;
+          margin-bottom: 16px;
+        }
+
+        .prepared-by-name {
+          font-size: 20px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+          text-align: right;
+          margin-top: 16px;
+        }
+
+        .prepared-by-dept {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 4px 0 0 0;
+          text-align: right;
+        }
+
+        .footer {
+          background-color: #ffffff;
+          padding: 16px 24px;
+          text-align: center;
+        }
+
+        .footer-company {
+          font-size: 12px;
+          font-weight: 600;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .footer-address {
+          font-size: 12px;
+          color: #9ca3af;
+          margin: 4px 0 0 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <!-- Header -->
+        <div class="header">
+          <div class="header-left">
+            <img src="/placeholder.svg?height=32&width=60" alt="Company Logo" class="company-logo" />
+            <p class="company-name">Golden Touch Imaging Specialist</p>
+            <p class="company-contact">721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines</p>
+          </div>
+          <div class="header-right">
+            <p class="tagged-jo-label">Tagged JO</p>
+            <p class="tagged-jo-number">JO#${assignment.saNumber.slice(-4)}</p>
+          </div>
+        </div>
+
+        <!-- Recipient Section -->
+        <div class="recipient-section">
+          <div class="recipient-left">
+            <p class="recipient-label">Recipient</p>
+            <h2 class="recipient-name">
+              ${assignment.assignedToName || assignment.assignedTo}
+            </h2>
+            <p class="recipient-dept">${assignment.requestedBy?.department || "Production"}</p>
+          </div>
+          <div class="recipient-right">
+            <div class="sa-badge">
+              SA#${assignment.saNumber}
+            </div>
+            <p class="issued-date">Issued on ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+          </div>
+        </div>
+
+        <!-- Service Assignment Information Table -->
+        <div class="info-section">
+          <div class="info-header">
+            Service Assignment Information
+          </div>
+          <table class="info-table">
+            <tbody>
+              <tr>
+                <td>Site Name</td>
+                <td>${assignment.projectSiteName}</td>
+              </tr>
+              <tr>
+                <td>Site Address</td>
+                <td>${assignment.projectSiteLocation}</td>
+              </tr>
+              <tr>
+                <td>Campaign Name</td>
+                <td>${assignment.campaignName || "N/A"}</td>
+              </tr>
+              <tr>
+                <td>Service Type</td>
+                <td>${assignment.serviceType}</td>
+              </tr>
+              <tr>
+                <td>Material Specs</td>
+                <td>${assignment.materialSpecs}</td>
+              </tr>
+              <tr>
+                <td>Service Start Date</td>
+                <td>${assignment.startDate ? new Date(assignment.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
+              </tr>
+              <tr>
+                <td>Service End Date</td>
+                <td>${assignment.endDate ? new Date(assignment.endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
+              </tr>
+              <tr>
+                <td>Crew</td>
+                <td>${assignment.crewName || assignment.crew}</td>
+              </tr>
+              <tr>
+                <td>Remarks</td>
+                <td>${assignment.remarks}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="attachments-section">
+          <p class="attachments-label">
+            Attachments:
+          </p>
+          <div class="attachments-content">
+            <div class="attachment-box"></div>
+            <div class="prepared-by-section">
+              <p class="prepared-by-label">Prepared By</p>
+              <div class="signature-box"></div>
+              <p class="prepared-by-name">${assignment.requestedBy?.name || "User"}</p>
+              <p class="prepared-by-dept">${assignment.requestedBy?.department || "Logistics Team"}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+          <p class="footer-company">Golden Touch Imaging Specialist</p>
+          <p class="footer-address">
+            721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
 }
 
 export async function generateServiceAssignmentHTML(

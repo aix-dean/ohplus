@@ -17,6 +17,20 @@ import { getTeamById } from "@/lib/teams-service";
 import { CompanyService } from "@/lib/company-service";
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service";
 
+// Chunked base64 conversion to handle large PDFs efficiently
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer)
+  const chunkSize = 8192 // Process in 8KB chunks to avoid stack overflow
+  let result = ''
+
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.slice(i, i + chunkSize)
+    result += String.fromCharCode.apply(null, Array.from(chunk))
+  }
+
+  return btoa(result)
+}
+
 export default function ViewPDFPage() {
    const { id } = useParams();
    const searchParams = useSearchParams();
@@ -208,7 +222,7 @@ export default function ViewPDFPage() {
 
           // Get PDF as ArrayBuffer and convert to base64
           const pdfBuffer = await response.arrayBuffer();
-          const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(pdfBuffer)));
+          const pdfBase64 = arrayBufferToBase64(pdfBuffer);
 
           console.log('[PDF Loading] PDF generation completed, base64 length:', pdfBase64.length);
 

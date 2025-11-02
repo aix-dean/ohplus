@@ -38,6 +38,7 @@ import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
 import { JobOrderSelectionDialog } from "@/components/logistics/assignments/create/JobOrderSelectionDialog"
 import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
+import { CompanyService } from "@/lib/company-service"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { storage } from "@/lib/firebase"
 
@@ -447,6 +448,20 @@ export default function CreateServiceAssignmentPage() {
     }))
   }
 
+  // Chunked base64 conversion to handle large PDFs efficiently
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer)
+    const chunkSize = 8192 // Process in 8KB chunks to avoid stack overflow
+    let result = ''
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.slice(i, i + chunkSize)
+      result += String.fromCharCode.apply(null, Array.from(chunk))
+    }
+
+    return btoa(result)
+  }
+
   // Handle form submission (now navigates to PDF preview without creating assignment)
   const handleSubmit = async () => {
     if (!user) return
@@ -515,9 +530,11 @@ export default function CreateServiceAssignmentPage() {
         equipmentRequired: formData.equipmentRequired,
         materialSpecs: formData.materialSpecs,
         crew: formData.crew,
+        crewName: selectedTeam?.name || "",
         gondola: formData.gondola,
         technology: formData.technology,
         sales: formData.sales,
+        campaignName: formData.campaignName,
         remarks: formData.remarks,
         requestedBy: {
           name: userData?.first_name && userData?.last_name
@@ -535,11 +552,38 @@ export default function CreateServiceAssignmentPage() {
         created: new Date(),
       }
 
-      // Generate PDF using the new PDF function
-      const pdfBase64 = await generateServiceAssignmentPDF(
-        pdfAssignmentData,
-        true // returnBase64
-      )
+      // Fetch company data for PDF generation
+      const companyData = userData?.company_id ? await CompanyService.getCompanyData(userData.company_id) : null
+
+      // Get logo URL (simplified - using company logo if available)
+      let logoDataUrl = null
+      if (companyData?.logo) {
+        logoDataUrl = companyData.logo
+      }
+
+      // Generate PDF using server-side API
+      const response = await fetch('/api/generate-service-assignment-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assignment: pdfAssignmentData,
+          companyData,
+          logoDataUrl,
+          format: 'pdf',
+          userData,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to generate PDF')
+      }
+
+      // Get PDF as ArrayBuffer and convert to base64
+      const pdfBuffer = await response.arrayBuffer()
+      const pdfBase64 = arrayBufferToBase64(pdfBuffer)
 
       if (!pdfBase64) {
         throw new Error('Failed to generate PDF')
@@ -558,9 +602,11 @@ export default function CreateServiceAssignmentPage() {
         equipmentRequired: formData.equipmentRequired,
         materialSpecs: formData.materialSpecs,
         crew: formData.crew,
+        crewName: selectedTeam?.name || "",
         gondola: formData.gondola,
         technology: formData.technology,
         sales: formData.sales,
+        campaignName: formData.campaignName,
         remarks: formData.remarks,
         requestedBy: {
           name: userData?.first_name && userData?.last_name
@@ -579,7 +625,6 @@ export default function CreateServiceAssignmentPage() {
         // Additional data needed for assignment creation
         projectSiteId: formData.projectSite,
         message: formData.message,
-        campaignName: formData.campaignName,
         jobOrderId: jobOrderData?.id || null,
         userData: {
           uid: user.uid,
@@ -591,6 +636,7 @@ export default function CreateServiceAssignmentPage() {
       };
 
       localStorage.setItem('serviceAssignmentData', JSON.stringify(assignmentData));
+      localStorage.setItem('serviceAssignmentPDF', pdfBase64);
 
       // Navigate to view-pdf page with the exact URL format
       router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=${jobOrderId || 'Df4wxbfrO5EnAbml0r2I'}`);
@@ -825,20 +871,24 @@ export default function CreateServiceAssignmentPage() {
 
       // Create service assignment data structure for PDF
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
+      const selectedTeam = teams.find((t) => t.id === formData.crew)
       const serviceAssignmentData = {
         saNumber,
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: formData.assignedTo,
+        assignedTo: selectedTeam?.name || formData.assignedTo,
+        assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
          priority: formData.priority,
          equipmentRequired: formData.equipmentRequired,
          materialSpecs: formData.materialSpecs,
          crew: formData.crew,
+         crewName: selectedTeam?.name || "",
          gondola: formData.gondola,
          technology: formData.technology,
          sales: formData.sales,
+         campaignName: formData.campaignName,
          remarks: formData.remarks,
          requestedBy: {
            name:
