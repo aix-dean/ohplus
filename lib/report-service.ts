@@ -47,6 +47,11 @@ export interface ReportData {
   status: string
   createdBy: string
   createdByName: string
+  requestedBy?: {
+    name: string
+    department?: string
+  }
+  campaignName?: string
   created?: Timestamp
   updated?: Timestamp
   location?: string
@@ -165,6 +170,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
       tags: reportData.tags || [],
       created: Timestamp.now(),
       updated: Timestamp.now(),
+    }
+
+    // Add requestedBy if provided
+    if (reportData.requestedBy) {
+      finalReportData.requestedBy = reportData.requestedBy
     }
 
     // Add product information if provided

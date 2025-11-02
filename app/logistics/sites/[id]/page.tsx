@@ -46,6 +46,8 @@ import { collection, query, where, orderBy, getDocs, serverTimestamp } from "fir
 import { db } from "@/lib/firebase"
 import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import { SiteReportsTable } from "@/components/logistics/reports/SiteReportsTable"
+import { SiteServiceAssignmentsTable } from "@/components/logistics/assignments/SiteServiceAssignmentsTable"
 import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
@@ -282,6 +284,11 @@ export default function SiteDetailsPage({ params }: Props) {
     .custom-checkbox:checked {
       background-color: #22c55e;
       border-color: #22c55e;
+    }
+    .custom-checkbox:checked:disabled {
+      background-color: #22c55e;
+      border-color: #22c55e;
+      opacity: 1;
     }
     .custom-checkbox:checked::after {
       content: '✓';
@@ -940,17 +947,17 @@ export default function SiteDetailsPage({ params }: Props) {
                               </div>
                               <div style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }} className="inline-block w-[134px]">
                                 
-                                <p className="m-0">{product.specs_rental?.illumination_upper_lighting_specs || "4 Metal Halides"}</p>
-                                <p className="m-0">{product.specs_rental?.illumination_bottom_lighting_specs || "4 Metal Halides"}</p>
-                                <p className="m-0">{product.specs_rental?.illumination_left_lighting_specs || "5 Metal Halides"}</p>
-                                <p className="m-0">{product.specs_rental?.illumination_right_lighting_specs || "5 Metal Halides"}</p>
+                                <p className="m-0">{product.specs_rental?.illumination_upper_lighting_specs || "-"}</p>
+                                <p className="m-0">{product.specs_rental?.illumination_bottom_lighting_specs || "-"}</p>
+                                <p className="m-0">{product.specs_rental?.illumination_left_lighting_specs || "-"}</p>
+                                <p className="m-0">{product.specs_rental?.illumination_right_lighting_specs || "-"}</p>
                               </div>
                             </div>
 
                             <div className="flex justify-between items-center">
                               <div style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
                                 <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Average Monthly Electrical Consumption: </span>
-                                <span>{product.specs_rental?.power_consumption_monthly || "557"} kWh/month</span>
+                                <span>{product.specs_rental?.power_consumption_monthly || "-"} kWh/month</span>
                               </div>
                               <button
                                 onClick={() => setComingSoonDialogOpen(true)}
@@ -1073,7 +1080,7 @@ export default function SiteDetailsPage({ params }: Props) {
                                 type="checkbox"
                                 id="lease_agreement"
                                 checked={compliance.lease_agreement}
-                                onChange={() => handleComplianceChange('lease_agreement')}
+                                disabled
                                 className="custom-checkbox"
                               />
                               <label
@@ -1088,7 +1095,7 @@ export default function SiteDetailsPage({ params }: Props) {
                                 type="checkbox"
                                 id="mayors_permit"
                                 checked={compliance.mayors_permit}
-                                onChange={() => handleComplianceChange('mayors_permit')}
+                                disabled
                                 className="custom-checkbox"
                               />
                               <label
@@ -1103,7 +1110,7 @@ export default function SiteDetailsPage({ params }: Props) {
                                 type="checkbox"
                                 id="bir_registration"
                                 checked={compliance.bir_registration}
-                                onChange={() => handleComplianceChange('bir_registration')}
+                                disabled
                                 className="custom-checkbox"
                               />
                               <label
@@ -1118,7 +1125,7 @@ export default function SiteDetailsPage({ params }: Props) {
                                 type="checkbox"
                                 id="structural_approval"
                                 checked={compliance.structural_approval}
-                                onChange={() => handleComplianceChange('structural_approval')}
+                                disabled
                                 className="custom-checkbox"
                               />
                               <label
@@ -1227,9 +1234,7 @@ export default function SiteDetailsPage({ params }: Props) {
                     <CardTitle>Service Assignments</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-8 text-gray-500">
-                      Service assignments will be displayed here
-                    </div>
+                    <SiteServiceAssignmentsTable projectSiteId={params.id} companyId={product.company_id} />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1240,9 +1245,7 @@ export default function SiteDetailsPage({ params }: Props) {
                     <CardTitle>Reports</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-8 text-gray-500">
-                      Reports will be displayed here
-                    </div>
+                    <SiteReportsTable projectSiteId={params.id} companyId={product.company_id} />
                   </CardContent>
                 </Card>
               </TabsContent>
