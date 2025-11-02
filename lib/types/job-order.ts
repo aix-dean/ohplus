@@ -46,4 +46,16 @@ export interface JobOrder {
   client_email?: string // Client email for the job order
   campaignName?: string // Campaign name for the job order
   reservation_number?: string // Reservation number from booking
+  siteCode?: string
+  siteType?: string
+  siteSize?: string
+  totalAmount?: number
+  vatAmount?: number
+  poMo?: boolean
+  projectFa?: boolean
+  signedQuotation?: boolean
+  // Note fields for report attachments
+  beforeNote?: string
+  afterNote?: string
+  monitoringNote?: string
 }

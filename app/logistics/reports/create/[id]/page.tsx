@@ -38,7 +38,7 @@ export default function CreateReportPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, userData } = useAuth();
   const assignmentId = params.id as string;
 
   const [assignmentData, setAssignmentData] = useState<any>(null);
@@ -79,12 +79,14 @@ export default function CreateReportPage() {
       label: string;
     }>
   >([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
   const [beforePhotoNote, setBeforePhotoNote] = useState<string>("");
   const [afterPhotoNote, setAfterPhotoNote] = useState<string>("");
   const [photosNote, setPhotosNote] = useState<string>("");
   const [reportType, setReportType] = useState<string>("");
   const [teamsMap, setTeamsMap] = useState<Record<string, string>>({});
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
+  const [companyDataLoading, setCompanyDataLoading] = useState(true);
 
   const onCreateAReportClick = useCallback(() => {
     router.back();
@@ -93,37 +95,46 @@ export default function CreateReportPage() {
   const handleBeforePhotosChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files || []);
+      console.log("Uploading before photos:", files.length);
       setBeforePhotos((prev) => [...prev, ...files]);
+      setUploadingPhotos(true);
 
       // Upload photos immediately
       const isMonitoring = assignmentData?.serviceType === "Monitoring";
-      const note = isMonitoring
-        ? photosNote || "Monitoring Photo"
-        : beforePhotoNote || "Before SA Photo";
+      const note = isMonitoring ? photosNote : beforePhotoNote;
       const label = isMonitoring ? "Monitoring" : "Before";
 
-      for (const photo of files) {
-        try {
-          const downloadURL = await uploadFileToFirebaseStorage(
-            photo,
-            `reports/photos/`
-          );
-          const attachment = {
-            note: note,
-            fileName: photo.name,
-            fileType: photo.type,
-            fileUrl: downloadURL,
-            label: label,
-          };
-          if (isMonitoring) {
-            setPhotosAttachments((prev) => [...prev, attachment]);
-          } else {
-            setBeforePhotoAttachments((prev) => [...prev, attachment]);
-          }
-        } catch (uploadError) {
-          console.error("Error uploading before photo:", uploadError);
-          // Could show error to user here
-        }
+      try {
+        await Promise.all(
+          files.map(async (photo) => {
+            try {
+              console.log("Uploading photo:", photo.name);
+              const downloadURL = await uploadFileToFirebaseStorage(
+                photo,
+                `reports/photos/`
+              );
+              console.log("Upload successful for:", photo.name, downloadURL);
+              const attachment = {
+                note: note,
+                fileName: photo.name,
+                fileType: photo.type,
+                fileUrl: downloadURL,
+                label: label,
+              };
+              if (isMonitoring) {
+                setPhotosAttachments((prev) => [...prev, attachment]);
+              } else {
+                setBeforePhotoAttachments((prev) => [...prev, attachment]);
+              }
+              console.log("Attachment added to state:", attachment);
+            } catch (uploadError) {
+              console.error("Error uploading before photo:", photo.name, uploadError);
+              // Could show error to user here
+            }
+          })
+        );
+      } finally {
+        setUploadingPhotos(false);
       }
     },
     [assignmentData?.serviceType, beforePhotoNote, photosNote]
@@ -132,30 +143,41 @@ export default function CreateReportPage() {
   const handleAfterPhotosChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(event.target.files || []);
+      console.log("Uploading after photos:", files.length);
       setAfterPhotos((prev) => [...prev, ...files]);
+      setUploadingPhotos(true);
 
       // Upload photos immediately
-      const note = afterPhotoNote || "After SA Photo";
+      const note = afterPhotoNote;
       const label = "After";
 
-      for (const photo of files) {
-        try {
-          const downloadURL = await uploadFileToFirebaseStorage(
-            photo,
-            `reports/photos/`
-          );
-          const attachment = {
-            note: note,
-            fileName: photo.name,
-            fileType: photo.type,
-            fileUrl: downloadURL,
-            label: label,
-          };
-          setAfterPhotoAttachments((prev) => [...prev, attachment]);
-        } catch (uploadError) {
-          console.error("Error uploading after photo:", uploadError);
-          // Could show error to user here
-        }
+      try {
+        await Promise.all(
+          files.map(async (photo) => {
+            try {
+              console.log("Uploading photo:", photo.name);
+              const downloadURL = await uploadFileToFirebaseStorage(
+                photo,
+                `reports/photos/`
+              );
+              console.log("Upload successful for:", photo.name, downloadURL);
+              const attachment = {
+                note: note,
+                fileName: photo.name,
+                fileType: photo.type,
+                fileUrl: downloadURL,
+                label: label,
+              };
+              setAfterPhotoAttachments((prev) => [...prev, attachment]);
+              console.log("Attachment added to state:", attachment);
+            } catch (uploadError) {
+              console.error("Error uploading after photo:", photo.name, uploadError);
+              // Could show error to user here
+            }
+          })
+        );
+      } finally {
+        setUploadingPhotos(false);
       }
     },
     [afterPhotoNote]
@@ -169,23 +191,42 @@ export default function CreateReportPage() {
 
     try {
       // Collect all attachments
-      const uploadedAttachments = [
-        ...(assignmentData.attachments?.map((att: any) => ({
-          note: att.name || "",
-          fileName: att.name || "attachment",
-          fileType: att.type || "unknown",
-          fileUrl: "",
-          label: att.name || "",
-        })) || []),
-      ];
+      const assignmentAttachments = assignmentData.attachments?.map((att: any) => ({
+        note: att.name || "",
+        fileName: att.name || "attachment",
+        fileType: att.type || "unknown",
+        fileUrl: "",
+        label: att.name || "",
+      })) || [];
 
-      // Add pre-uploaded attachments
+      console.log("Assignment attachments:", assignmentAttachments.length);
+
+      const uploadedAttachments = [...assignmentAttachments];
+
+      // Add pre-uploaded attachments with current note values
       if (assignmentData?.serviceType === "Monitoring") {
-        uploadedAttachments.push(...photosAttachments);
+        const updatedPhotosAttachments = photosAttachments.map(att => ({
+          ...att,
+          note: photosNote
+        }));
+        console.log("Photos attachments:", updatedPhotosAttachments.length);
+        uploadedAttachments.push(...updatedPhotosAttachments);
       } else {
-        uploadedAttachments.push(...beforePhotoAttachments);
-        uploadedAttachments.push(...afterPhotoAttachments);
+        const updatedBeforePhotoAttachments = beforePhotoAttachments.map(att => ({
+          ...att,
+          note: beforePhotoNote
+        }));
+        const updatedAfterPhotoAttachments = afterPhotoAttachments.map(att => ({
+          ...att,
+          note: afterPhotoNote
+        }));
+        console.log("Before photo attachments:", updatedBeforePhotoAttachments.length);
+        console.log("After photo attachments:", updatedAfterPhotoAttachments.length);
+        uploadedAttachments.push(...updatedBeforePhotoAttachments);
+        uploadedAttachments.push(...updatedAfterPhotoAttachments);
       }
+
+      console.log("Total uploaded attachments before processing:", uploadedAttachments.length);
 
       // Map service assignment data to report data
       const reportData: ReportData = {
@@ -207,6 +248,7 @@ export default function CreateReportPage() {
         campaignName: assignmentData.campaignName || "",
         joNumber: assignmentData.joNumber || "",
         joType: assignmentData.joType || "",
+        joRequestBy: assignmentData.joRequestBy || "",
         bookingDates: {
           start: bookingData.start_date || Timestamp.now(),
           end: bookingData.end_date || Timestamp.now(),
@@ -224,7 +266,13 @@ export default function CreateReportPage() {
         createdBy: user.uid,
         completionPercentage: completePercentage,
         tags: [assignmentData.serviceType || "service"],
-        assignedTo: assignmentData.assignedTo || "",
+        crew: assignmentData.crew || "",
+        assignedTo: assignmentData.assignedToName || "",
+        costEstimateId: assignmentData.costEstimateId || "",
+        quotationId: assignmentData.quotationId || "",
+        beforeNote: beforePhotoNote || "",
+        afterNote: afterPhotoNote || "",
+        monitoringNote: assignmentData?.serviceType === "Monitoring" ? photosNote || "" : "",
       };
 
       if (assignmentData.remarks) {
@@ -257,7 +305,8 @@ export default function CreateReportPage() {
           throw new Error(`Failed to generate PDF: ${response.status} ${errorText}`);
         }
 
-        console.log("PDF generated successfully via API");
+        const result = await response.json();
+        console.log("PDF generated and uploaded successfully. Download URL:", result.downloadURL);
       } catch (pdfError) {
         console.error("Error generating PDF:", pdfError);
         // Don't fail the report creation if PDF generation fails
@@ -284,6 +333,9 @@ export default function CreateReportPage() {
     completePercentage,
     reportType,
     reportNumber,
+    beforePhotoNote,
+    afterPhotoNote,
+    photosNote,
   ]);
 
   useEffect(() => {
@@ -300,11 +352,11 @@ export default function CreateReportPage() {
     const urlReportType = searchParams.get("reportType");
     if (urlReportType) {
       if (urlReportType === "progress") {
-        setReportType("Progress");
+        setReportType("Progress Report");
       } else if (urlReportType === "completion") {
-        setReportType("Completion");
+        setReportType("Completion Report");
       } else if (urlReportType === "monitoring") {
-        setReportType("Monitoring");
+        setReportType("Monitoring Report");
       }
     } else if (assignmentData?.serviceType) {
       if (assignmentData.serviceType === "Monitoring") {
@@ -341,38 +393,36 @@ export default function CreateReportPage() {
   }, [user])
 
   const fetchCompanyData = useCallback(async () => {
-    if (!user) {
+    if (!userData) {
       console.log("[v0] fetchCompanyData: Missing user")
+      setCompanyDataLoading(false)
       return
     }
 
     try {
-      console.log("[v0] fetchCompanyData: user:", user)
 
-      // Get user data from auth context - check if user has userData property
-      const userData = (user as any).userData || user
-      console.log("[v0] fetchCompanyData: userData:", userData)
-      console.log("[v0] fetchCompanyData: userData.company_id:", userData.company_id)
-
-      if (!userData.company_id) {
+      if (!userData?.company_id) {
         console.warn("[v0] No company_id found in userData:", userData)
+        setCompanyDataLoading(false)
         return
       }
 
-      console.log("[v0] Fetching company data for company_id:", userData.company_id)
-      const companyDoc = await getDoc(doc(db, "companies", userData.company_id))
+      console.log("[v0] Fetching company data for company_id:", userData?.company_id)
+      const companyDoc = await getDoc(doc(db, "companies", userData?.company_id))
 
       if (companyDoc.exists()) {
         const companyData = { id: companyDoc.id, ...companyDoc.data() } as CompanyData
         console.log("[v0] Company data fetched successfully:", companyData)
         setCompanyData(companyData)
       } else {
-        console.warn("[v0] No company data found for company_id:", userData.company_id)
+        console.warn("[v0] No company data found for company_id:", userData?.company_id)
       }
     } catch (error) {
       console.error("[v0] Error fetching company data:", error)
+    } finally {
+      setCompanyDataLoading(false)
     }
-  }, [user])
+  }, [userData])
 
   const fetchAssignmentData = useCallback(async () => {
     if (!assignmentId) return;
@@ -853,7 +903,7 @@ export default function CreateReportPage() {
                     </div>
 
                     <textarea
-                      className="w-24 p-2 border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                      className="w-24 p-2 border border-[#c4c4c4] text-[#c4c4c4] pl-2 pt-1 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
                       rows={1}
                       placeholder="Add note..."
                       aria-label="Photos Note"
@@ -944,7 +994,7 @@ export default function CreateReportPage() {
                       </div>
 
                       <textarea
-                        className="w-[85px] h-[25px] border border-[#c4c4c4] text-[#c4c4c4] text-xs rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                        className="w-[85px] h-[25px] border border-[#c4c4c4] text-[#c4c4c4] pl-2 pt-1 text-xs rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
                         rows={1}
                         placeholder="Add note..."
                         aria-label="Before SA Photos Note"
@@ -1034,7 +1084,7 @@ export default function CreateReportPage() {
                       </div>
 
                       <textarea
-                        className="w-[85px] h-[25px] text-xs border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
+                        className="w-[85px] h-[25px] text-[#c4c4c4] pl-2 pt-1 text-xs border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
                         rows={1}
                         placeholder="Add note..."
                         aria-label="After SA Photos Note"
@@ -1058,11 +1108,11 @@ export default function CreateReportPage() {
               </button>
               <button
                 onClick={createReportFromAssignment}
-                disabled={creatingReport}
+                disabled={creatingReport || companyDataLoading || uploadingPhotos}
                 className="bg-[#1d0beb] h-[27px] w-[159px] text-xs text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 aria-label="Generate Report"
               >
-                {creatingReport ? <>Generating...</> : "Generate Report"}
+                {creatingReport ? <>Generating...</> : companyDataLoading ? "Loading..." : uploadingPhotos ? "Uploading..." : "Generate Report"}
               </button>
             </div>
           </div>
@@ -1071,3 +1121,4 @@ export default function CreateReportPage() {
     </div>
   );
 }
+

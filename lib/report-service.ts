@@ -24,6 +24,7 @@ export interface ReportData {
     location: string
     media_url: string
   }
+  joRequestBy: string
   siteName?: string
   companyId: string
   sellerId: string
@@ -84,7 +85,12 @@ export interface ReportData {
   siteImageUrl?: string
   logistics_report?: string
   reservation_number?: string
-  booking_id?: string
+  costEstimateId?: string
+  quotationId?: string
+  // Note fields for report attachments
+  beforeNote?: string
+  afterNote?: string
+  monitoringNote?: string
 }
 
 // Helper function to clean data by removing undefined values recursively
@@ -116,13 +122,17 @@ function cleanReportData(data: any): any {
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
     console.log("Creating report with data:", reportData)
-    console.log("Report attachments before processing:", reportData.attachments)
+    console.log("Report attachments before processing:", reportData.attachments?.length || 0)
 
     // Process attachments - ensure they have all required fields
     const processedAttachments = (reportData.attachments || [])
       .filter((attachment: any) => {
         // Only include attachments that have a fileUrl (successfully uploaded)
-        return attachment && attachment.fileUrl && attachment.fileName
+        const hasRequiredFields = attachment && attachment.fileUrl && attachment.fileName
+        if (!hasRequiredFields) {
+          console.log("Filtering out attachment due to missing fields:", attachment)
+        }
+        return hasRequiredFields
       })
       .map((attachment: any) => {
         const processedAttachment = {
@@ -137,7 +147,7 @@ export async function createReport(reportData: ReportData): Promise<string> {
         return processedAttachment
       })
 
-    console.log("Processed attachments:", processedAttachments)
+    console.log("Total processed attachments:", processedAttachments.length)
 
     // Generate report_id in format "RP-[currentmillis]"
     const reportId = `RP-${Date.now()}`

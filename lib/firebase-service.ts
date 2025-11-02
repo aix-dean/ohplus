@@ -1820,6 +1820,23 @@ export async function uploadFileToFirebaseStorage(file: File, path: string): Pro
   }
 }
 
+// Uploads a PDF buffer to Firebase Storage.
+export async function uploadPdfBufferToFirebaseStorage(buffer: Buffer, fileName: string, path: string): Promise<string> {
+  try {
+    const storageRef = ref(storage, `${path}${fileName}`);
+    const metadata = {
+      contentType: 'application/pdf',
+    };
+    const snapshot = await uploadBytes(storageRef, buffer, metadata);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    console.log("PDF uploaded successfully:", downloadURL);
+    return downloadURL;
+  } catch (error) {
+    console.error("Error uploading PDF buffer to Firebase Storage:", error);
+    throw error;
+  }
+}
+
 // Get all products
 export const getProducts = async (): Promise<Product[]> => {
   try {

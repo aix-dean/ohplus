@@ -34,12 +34,16 @@ export default function ReportPreviewPage() {
 
   const fetchLogisticsReport = async () => {
     try {
-      const report = await getReportById(reportId)
-      setReportData(report)
+      console.log("[ReportPreviewPage] Fetching report for ID:", reportId);
+      const report = await getReportById(reportId);
+      console.log("[ReportPreviewPage] Fetched report:", report);
+      setReportData(report);
       if (report?.logistics_report) {
-        setLogisticsReportUrl(report.logistics_report)
+        console.log("[ReportPreviewPage] Found logistics_report URL:", report.logistics_report);
+        setLogisticsReportUrl(report.logistics_report);
       } else {
-        setLogisticsReportUrl(null)
+        console.log("[ReportPreviewPage] No logistics_report URL found in report.");
+        setLogisticsReportUrl(null);
       }
 
       // Fetch crew name from logistics_teams collection
@@ -61,10 +65,12 @@ export default function ReportPreviewPage() {
         setCrewName(null)
       }
     } catch (error) {
-      console.error("Error fetching logistics report:", error)
-      setError("Failed to load logistics report")
+      console.error("[ReportPreviewPage] Error fetching logistics report:", error);
+      setError("Failed to load logistics report");
     } finally {
-      setLoading(false)
+      setLoading(false);
+      console.log("[ReportPreviewPage] Loading finished. logisticsReportUrl:", logisticsReportUrl);
+      console.log("[ReportPreviewPage] Error state:", error);
     }
   }
 
@@ -80,27 +86,6 @@ export default function ReportPreviewPage() {
     })
   }
 
-  const handleDownload = async () => {
-    if (!logisticsReportUrl) return;
-
-    try {
-      const response = await fetch(logisticsReportUrl);
-      if (!response.ok) throw new Error("Failed to fetch file");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `logistics_report_${reportId || "report"}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Download failed:", err);
-    }
-  };
-
   const handleShare = () => {
     if (navigator.share && logisticsReportUrl) {
       navigator.share({
@@ -114,7 +99,7 @@ export default function ReportPreviewPage() {
       alert('Link copied to clipboard!')
     }
   }
-  const handlePrint = async (e) => {
+  const handlePrint = async (e: React.MouseEvent) => {
     e?.stopPropagation();
     if (!logisticsReportUrl) return;
 
@@ -123,9 +108,11 @@ export default function ReportPreviewPage() {
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       const printWindow = window.open(blobUrl);
-      printWindow.onload = () => {
-        printWindow.print();
-      };
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
     } catch (error) {
       console.error("Failed to print:", error);
     }
@@ -192,9 +179,6 @@ export default function ReportPreviewPage() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-48">
-                <DropdownMenuItem onClick={handleDownload} className="border-b">
-                  Download
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleShare} className="border-b">
                   Share
                 </DropdownMenuItem>
