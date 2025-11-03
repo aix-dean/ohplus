@@ -2524,7 +2524,7 @@ export function ProductCard({
     }
   }
 
-  const isDynamicSite = product.content_type?.toLowerCase() === "digital";
+  const isDynamicSite = product.content_type?.toLowerCase() === "dynamic" || product.content_type?.toLowerCase() === "digital";
 
   return isDynamicSite ? (
     <div className="p-[4px] rounded-[16px] gradient-border h-[344px]">

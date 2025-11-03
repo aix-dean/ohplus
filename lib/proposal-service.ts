@@ -147,11 +147,22 @@ export async function createProposal(
         ? {
             location: product.specs_rental.location || "",
             traffic_count: product.specs_rental.traffic_count || 0,
+            traffic_unit: product.specs_rental.traffic_unit || "",
             elevation: product.specs_rental.elevation || 0,
+            elevation_unit: product.specs_rental.elevation_unit || "",
             height: product.specs_rental.height || 0,
             width: product.specs_rental.width || 0,
+            dimension_unit: product.specs_rental.dimension_unit || "",
             audience_type: product.specs_rental.audience_type || "",
             audience_types: product.specs_rental.audience_types || [],
+            location_visibility: product.specs_rental.location_visibility || 0,
+            location_visibility_unit: product.specs_rental.location_visibility_unit || "",
+            orientation: product.specs_rental.orientation || "",
+            partner: product.specs_rental.partner || "",
+            land_owner: product.specs_rental.land_owner || "",
+            geopoint: product.specs_rental.geopoint || [],
+            illumination: product.specs_rental.illumination || {},
+            structure: product.specs_rental.structure || {},
           }
         : null,
       light: product.light
@@ -184,7 +195,9 @@ export async function createProposal(
         dimension: true,
         type: true,
         traffic: true,
+        location_visibility: true,
         srp: true,
+        additionalMessage: true,
       }
     })
 

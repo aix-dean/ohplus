@@ -50,6 +50,7 @@ import { SendQuotationOptionsDialog } from "@/components/send-quotation-options-
 import { db, getDoc, doc } from "@/lib/firebase" // Import Firebase functions
 import { generateSeparateQuotationPDFs } from "@/lib/quotation-pdf-service"
 import { Timestamp } from "firebase/firestore"
+import { getUserById, type User } from "@/lib/access-management-service"
 
 interface CompanyData {
   id: string
@@ -237,6 +238,7 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
   const [preparingSend, setPreparingSend] = useState(false)
   const [preparingDownload, setPreparingDownload] = useState(false)
   const [userSignatureUrl, setUserSignatureUrl] = useState<string | null>(null)
+  const [creatorUser, setCreatorUser] = useState<User | null>(null)
 
   const [editingField, setEditingField] = useState<string | null>(null)
   const [tempValues, setTempValues] = useState<Record<string, any>>({})
@@ -495,30 +497,23 @@ export default function QuotationPage({ params }: { params: Promise<{ id: string
     }
   }, [fetchQuotationHistory])
 
-  // Fetch user signature
+
+  // Fetch creator user data
   useEffect(() => {
-    const fetchUserSignature = async () => {
-      if (!quotation?.created_by || !user?.uid) return
+    const fetchCreatorUser = async () => {
+      if (!quotation?.created_by) return
 
       try {
-        const userDocRef = doc(db, "iboard_users", user.uid)
-        const userDoc = await getDoc(userDocRef)
-
-        if (userDoc.exists()) {
-          const userData = userDoc.data()
-          // Check for user signature field (map with url, type, updated)
-          if (userData.signature && typeof userData.signature === 'object' && userData.signature.url) {
-            setUserSignatureUrl(userData.signature.url)
-            console.log("Found user signature URL:", userData.signature.url)
-          }
-        }
+        const creator = await getUserById(quotation.created_by)
+        setCreatorUser(creator)
+        setUserSignatureUrl(creator?.signature.url || null)
       } catch (error) {
-        console.error("Error fetching user signature:", error)
+        console.error("Error fetching creator user:", error)
       }
     }
 
-    fetchUserSignature()
-  }, [quotation?.created_by, user?.uid])
+    fetchCreatorUser()
+  }, [quotation?.created_by])
 
   // Handle automatic share when page loads with action parameter
   useEffect(() => {
@@ -646,7 +641,25 @@ The OH Plus Team`,
         }
       }
 
-      const { pdfUrl, password } = await generateAndUploadQuotationPDF(editableQuotation, companyData, logoDataUrl, userData, userSignatureDataUrl)
+      // Fetch signature date directly if not available from creatorUser
+      let signatureDate: Date | null = null
+      if (editableQuotation.created_by) {
+        try {
+          const userDocRef = doc(db, "iboard_users", editableQuotation.created_by)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching signature date:', error)
+        }
+      }
+
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(editableQuotation, companyData, logoDataUrl, creatorUser, userSignatureDataUrl)
 
       // Only save the quotation data if PDF generation succeeded
       await updateQuotation(
@@ -659,9 +672,9 @@ The OH Plus Team`,
       // Update quotation with new PDF URL and password
       await updateQuotation(
         editableQuotation.id!,
-        { pdf: pdfUrl, password: password },
-        userData?.uid || "system",
-        userData?.displayName || "System"
+        { pdf: pdfUrl, password: password, signature_date: signatureDate },
+        creatorUser?.id || "system",
+        creatorUser?.displayName || "System"
       )
 
       // Update local state
@@ -719,8 +732,19 @@ The OH Plus Team`,
 
     setDownloadingPDF(true)
     try {
+      // Check if signature dates match - if not, force regeneration
+      let forceRegenerate = false
+      if (quotation.created_by && creatorUser?.signature?.updated) {
+        const quotationSignatureDate = quotation.signature_date ? new Date(quotation.signature_date) : null
+        const userSignatureDate = creatorUser.signature.updated.toDate ? creatorUser.signature.updated.toDate() : new Date(creatorUser.signature.updated)
+
+        if (!quotationSignatureDate || quotationSignatureDate.getTime() !== userSignatureDate.getTime()) {
+          forceRegenerate = true
+        }
+      }
+
       // Ensure PDF is generated and saved if not already done
-      await generatePDFIfNeeded(quotation)
+      await generatePDFIfNeeded(quotation, forceRegenerate)
       // Prepare logo data URL if company logo exists
       let logoDataUrl: string | null = null
       if (companyData?.logo) {
@@ -746,7 +770,18 @@ The OH Plus Team`,
         // Generate PDFs for all related quotations if needed and collect pdfUrls
         const quotationData = []
         for (const relatedQuotation of relatedQuotations) {
-          const { pdfUrl } = await generatePDFIfNeeded(relatedQuotation)
+          // Check if signature dates match for each related quotation
+          let forceRegenerate = false
+          if (relatedQuotation.created_by && creatorUser?.signature?.updated) {
+            const quotationSignatureDate = relatedQuotation.signature_date ? new Date(relatedQuotation.signature_date) : null
+            const userSignatureDate = creatorUser.signature.updated.toDate ? creatorUser.signature.updated.toDate() : new Date(creatorUser.signature.updated)
+
+            if (!quotationSignatureDate || quotationSignatureDate.getTime() !== userSignatureDate.getTime()) {
+              forceRegenerate = true
+            }
+          }
+
+          const { pdfUrl } = await generatePDFIfNeeded(relatedQuotation, forceRegenerate)
           if (pdfUrl) {
             quotationData.push({ quotation: relatedQuotation, pdfUrl })
           }
@@ -830,7 +865,7 @@ The OH Plus Team`,
     }
   }
 
-  const handleDownloadImage = async (userData: any) => {
+  const handleDownloadImage = async () => {
     if (!quotation) return
 
     // Check if any PDFs need to be generated
@@ -851,7 +886,18 @@ The OH Plus Team`,
         // Generate PDFs for all related quotations if needed and collect pdfUrls
         const quotationData = []
         for (const relatedQuotation of relatedQuotations) {
-          const { pdfUrl } = await generatePDFIfNeeded(relatedQuotation)
+          // Check if signature dates match for each related quotation
+          let forceRegenerate = false
+          if (relatedQuotation.created_by && creatorUser?.signature?.updated) {
+            const quotationSignatureDate = relatedQuotation.signature_date ? new Date(relatedQuotation.signature_date) : null
+            const userSignatureDate = creatorUser.signature.updated.toDate ? creatorUser.signature.updated.toDate() : new Date(creatorUser.signature.updated)
+
+            if (!quotationSignatureDate || quotationSignatureDate.getTime() !== userSignatureDate.getTime()) {
+              forceRegenerate = true
+            }
+          }
+
+          const { pdfUrl } = await generatePDFIfNeeded(relatedQuotation, forceRegenerate)
           if (pdfUrl) {
             quotationData.push({ quotation: relatedQuotation, pdfUrl })
           }
@@ -1008,6 +1054,24 @@ The OH Plus Team`,
         setPdfPreviewUrl(historyItem.pdf)
       } else {
         // If no PDF exists, generate one
+        // Fetch signature date directly if not available from creatorUser
+        let signatureDate: Date | null = null
+        if (historyItem.created_by) {
+          try {
+            const userDocRef = doc(db, "iboard_users", historyItem.created_by)
+            const userDoc = await getDoc(userDocRef)
+
+            if (userDoc.exists()) {
+              const userDataFetched = userDoc.data()
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+              }
+            }
+          } catch (error) {
+            console.error('Error fetching signature date:', error)
+          }
+        }
+
         // Prepare logo data URL if company logo exists
         let logoDataUrl: string | null = null
         if (companyData?.logo) {
@@ -1046,7 +1110,7 @@ The OH Plus Team`,
             quotation: serializableQuotation,
             companyData,
             logoDataUrl,
-            userData,
+            creatorUser,
           }),
         })
 
@@ -1064,9 +1128,9 @@ The OH Plus Team`,
           const { pdfUrl } = await generateAndUploadQuotationPDF(historyItem)
           await updateQuotation(
             historyItem.id!,
-            { pdf: pdfUrl },
-            userData?.uid || "system",
-            userData?.displayName || "System"
+            { pdf: pdfUrl, signature_date: signatureDate },
+            creatorUser?.id || "system",
+            creatorUser?.displayName || "System"
           )
           console.log("PDF saved to quotation:", pdfUrl)
         } catch (saveError) {
@@ -1591,23 +1655,24 @@ The OH Plus Team`,
 
         <div className="space-y-8 mb-8">
           <div className="text-left">
-            <p className="mb-16">Very truly yours,</p>
+            <p className="mb-4">Very truly yours,</p>
             <div>
               {userSignatureUrl ? (
                 <div className="mb-2">
                   <img
                     src={userSignatureUrl}
                     alt="Signature"
-                    className="max-w-48 max-h-16 object-contain border-b border-gray-400"
+                    className="max-w-48 max-h-16 object-contain"
                     style={{ width: 'auto', height: 'auto' }}
                   />
+                  <div className="border-b border-gray-400 w-48 mb-2"></div>
                 </div>
               ) : (
                 <div className="border-b border-gray-400 w-48 mb-2"></div>
               )}
               <p className="font-medium">
-                {currentQuotation?.created_by_first_name && currentQuotation?.created_by_last_name
-                  ? `${currentQuotation.created_by_first_name} ${currentQuotation.created_by_last_name}`
+                {creatorUser?.first_name && creatorUser?.last_name
+                  ? `${creatorUser?.first_name} ${creatorUser?.last_name}`
                   : "AIX Xymbiosis"}
               </p>
               {isEditing && editingField === "signature_position" ? (
@@ -1628,7 +1693,7 @@ The OH Plus Team`,
                   onClick={() => isEditing && handleFieldEdit("signature_position", currentQuotation?.signature_position || "")}
                   title={isEditing ? "Click to edit position" : ""}
                 >
-                  {currentQuotation?.signature_position || "Account Manager"}
+                  {currentQuotation?.signature_position || "Sales"}
                   {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                 </p>
               )}
@@ -1701,12 +1766,31 @@ The OH Plus Team`,
   const currentQuotation = isEditing ? editableQuotation : getCurrentQuotation()
   const hasMultipleSites = false
 
-  const generatePDFIfNeeded = async (quotation: Quotation) => {
-    if (quotation.pdf && quotation.pdf.trim() !== "") {
+  const generatePDFIfNeeded = async (quotation: Quotation, forceRegenerate: boolean = false) => {
+    // Check if PDF exists and forceRegenerate is false
+    if (!forceRegenerate && quotation.pdf && quotation.pdf.trim() !== "") {
       return { pdfUrl: quotation.pdf, password: quotation.password }
     }
 
     try {
+      // Fetch signature date directly if not available from creatorUser
+      let signatureDate: Date | null = null
+      if (quotation.created_by) {
+        try {
+          const userDocRef = doc(db, "iboard_users", quotation.created_by)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching signature date:', error)
+        }
+      }
+
       // Prepare logo data URL if company logo exists
       let logoDataUrl: string | null = null
       if (companyData?.logo) {
@@ -1715,10 +1799,10 @@ The OH Plus Team`,
           if (logoResponse.ok) {
             const logoBlob = await logoResponse.blob()
             logoDataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result as string)
-              reader.readAsDataURL(logoBlob)
-            })
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
           }
         } catch (error) {
           console.error('Error fetching company logo:', error)
@@ -1745,24 +1829,24 @@ The OH Plus Team`,
         }
       }
 
-      const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, companyData, logoDataUrl, userData, userSignatureDataUrl)
+      const { pdfUrl, password } = await generateAndUploadQuotationPDF(quotation, companyData, logoDataUrl, creatorUser, userSignatureDataUrl)
 
-      // Update quotation with PDF URL and password
+      // Update quotation with PDF URL, password, and signature date
       await updateQuotation(
         quotation.id!,
-        { pdf: pdfUrl, password: password },
-        userData?.uid || "system",
-        userData?.displayName || "System"
+        { pdf: pdfUrl, password: password, signature_date: signatureDate },
+        creatorUser?.id || "system",
+        creatorUser?.displayName || "System"
       )
 
       // Update local state - check if it's the current quotation or a related one
       const current = getCurrentQuotation()
       if (current && quotation.id === current.id) {
-        setQuotation(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
+        setQuotation(prev => prev ? { ...prev, pdf: pdfUrl, password: password, signature_date: signatureDate } : null)
       } else {
         // Update in relatedQuotations
         setRelatedQuotations(prev =>
-          prev.map(q => q.id === quotation.id ? { ...q, pdf: pdfUrl, password: password } : q)
+          prev.map(q => q.id === quotation.id ? { ...q, pdf: pdfUrl, password: password, signature_date: signatureDate } : q)
         )
       }
 
@@ -1782,34 +1866,81 @@ The OH Plus Team`,
   const handleSendClick = async () => {
     if (!quotation) return
 
-    // Check if any PDFs need to be generated
-    const needsPDFGeneration = relatedQuotations.length > 1
-      ? relatedQuotations.some(q => !q.pdf || q.pdf.trim() === "")
-      : !quotation.pdf || quotation.pdf.trim() === ""
-
-    if (needsPDFGeneration) {
-      setPreparingSend(true)
-    }
+    // Always set preparing state since we need to check signatures and potentially regenerate PDFs
+    setPreparingSend(true)
 
     try {
+      // Fetch signature date directly if not available from creatorUser
+      let signatureDate: Date | null = null
+      if (quotation.created_by) {
+        try {
+          const userDocRef = doc(db, "iboard_users", quotation.created_by)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching signature date:', error)
+        }
+      }
+
       // If there are multiple related quotations, generate PDFs for all of them
       if (relatedQuotations.length > 1) {
         for (const relatedQuotation of relatedQuotations) {
-          await generatePDFIfNeeded(relatedQuotation)
+          // Check if signature dates match for each related quotation
+          let forceRegenerate = false
+          if (relatedQuotation.created_by && creatorUser?.signature?.updated) {
+            const quotationSignatureDate = relatedQuotation.signature_date ? new Date(relatedQuotation.signature_date) : null
+            const userSignatureDate = creatorUser.signature.updated.toDate ? creatorUser.signature.updated.toDate() : new Date(creatorUser.signature.updated)
+
+            if (!quotationSignatureDate || quotationSignatureDate.getTime() !== userSignatureDate.getTime()) {
+              forceRegenerate = true
+            }
+          }
+
+          const { pdfUrl } = await generatePDFIfNeeded(relatedQuotation, forceRegenerate)
+          if (pdfUrl) {
+            await updateQuotation(
+              relatedQuotation.id!,
+              { signature_date: signatureDate },
+              creatorUser?.id || "system",
+              creatorUser?.displayName || "System"
+            )
+          }
         }
         // Refresh related quotations data after updates
         await fetchRelatedQuotations(quotation)
       } else {
-        // Single quotation
-        await generatePDFIfNeeded(quotation)
+        // Single quotation - check if signature dates match
+        let forceRegenerate = false
+        if (quotation.created_by && creatorUser?.signature?.updated) {
+          const quotationSignatureDate = quotation.signature_date ? new Date(quotation.signature_date) : null
+          const userSignatureDate = creatorUser.signature.updated.toDate ? creatorUser.signature.updated.toDate() : new Date(creatorUser.signature.updated)
+
+          if (!quotationSignatureDate || quotationSignatureDate.getTime() !== userSignatureDate.getTime()) {
+            forceRegenerate = true
+          }
+        }
+
+        const { pdfUrl } = await generatePDFIfNeeded(quotation, forceRegenerate)
+        if (pdfUrl) {
+          await updateQuotation(
+            quotation.id!,
+            { signature_date: signatureDate },
+            creatorUser?.id || "system",
+            creatorUser?.displayName || "System"
+          )
+        }
       }
       setIsSendOptionsDialogOpen(true)
     } catch (error) {
       // Error is already handled in generatePDFIfNeeded
     } finally {
-      if (needsPDFGeneration) {
-        setPreparingSend(false)
-      }
+      setPreparingSend(false)
     }
   }
 
@@ -1874,7 +2005,7 @@ The OH Plus Team`,
             </Button>
             <Button
               variant="ghost"
-              onClick={ () => handleDownloadImage(userData)}
+              onClick={ () => handleDownloadImage()}
               disabled={downloadingImage || preparingDownload}
               className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
             >
@@ -2079,7 +2210,7 @@ The OH Plus Team`,
                 disabled={preparingSend}
                 className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
               >
-                {preparingSend ? "Preparing..." : "Send"}
+                {preparingSend ? "Generating PDF..." : "Send"}
               </Button>
             ) : (
               <Button
@@ -2101,7 +2232,7 @@ The OH Plus Team`,
             disabled={preparingSend}
             className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-full font-medium disabled:opacity-50"
           >
-            {preparingSend ? "Preparing..." : "Send"}
+            {preparingSend ? "Generating PDF..." : "Send"}
           </Button>
         </div>
       )}

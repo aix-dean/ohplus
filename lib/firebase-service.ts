@@ -2218,26 +2218,53 @@ export interface ContentMedia {
 
 // Get service assignments filtered by company_id and department
 export async function getServiceAssignmentsByDepartment(company_id: string, department: string): Promise<ServiceAssignment[]> {
-  try {
-    const assignmentsRef = collection(db, "service_assignments")
-    const q = query(
-      assignmentsRef,
-      where("company_id", "==", company_id),
-      where("requestedBy.department", "==", department),
-      orderBy("created", "desc")
-    )
+   try {
+     const assignmentsRef = collection(db, "service_assignments")
+     const q = query(
+       assignmentsRef,
+       where("company_id", "==", company_id),
+       where("requestedBy.department", "==", department),
+       orderBy("created", "desc")
+     )
 
+     const querySnapshot = await getDocs(q)
+
+     const assignments: ServiceAssignment[] = []
+     querySnapshot.forEach((doc) => {
+       assignments.push({ id: doc.id, ...doc.data() } as ServiceAssignment)
+     })
+
+     return assignments
+   } catch (error) {
+     console.error("Error fetching service assignments by department:", error)
+     return []
+   }
+}
+
+export async function getLatestServiceAssignmentsPerBooking(companyId: string): Promise<{ [bookingId: string]: ServiceAssignment }> {
+  try {
+    const q = query(collection(db, "service_assignments"), where("company_id", "==", companyId), orderBy("created", "desc"))
     const querySnapshot = await getDocs(q)
 
-    const assignments: ServiceAssignment[] = []
-    querySnapshot.forEach((doc) => {
-      assignments.push({ id: doc.id, ...doc.data() } as ServiceAssignment)
+    const assignmentsByBooking: { [bookingId: string]: ServiceAssignment } = {}
+
+    querySnapshot.docs.forEach((doc) => {
+      const data = doc.data()
+      const assignment: ServiceAssignment = {
+        id: doc.id,
+        ...data,
+      } as ServiceAssignment
+
+      // Only keep the latest assignment for each booking_id
+      if (assignment.booking_id && !assignmentsByBooking[assignment.booking_id]) {
+        assignmentsByBooking[assignment.booking_id] = assignment
+      }
     })
 
-    return assignments
+    return assignmentsByBooking
   } catch (error) {
-    console.error("Error fetching service assignments by department:", error)
-    return []
+    console.error("Error fetching latest service assignments per booking:", error)
+    throw error
   }
 }
 

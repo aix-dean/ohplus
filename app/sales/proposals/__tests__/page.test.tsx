@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { useParams, useRouter } from 'next/navigation'
 import ProposalDetailsPage from '../[id]/page'
-import { getProposalById } from '@/lib/proposal-service'
+import { getProposalById, updateProposal } from '@/lib/proposal-service'
 import { getPaginatedClients } from '@/lib/client-service'
 
 // Mock dependencies
@@ -410,5 +410,299 @@ describe('ProposalDetailsPage', () => {
 
     // Zoom controls should be available (though not directly testable without more setup)
     // This test ensures the component renders without crashing with zoom functionality
+  })
+
+  it('displays location visibility in view mode', async () => {
+    const mockProposal = {
+      id: 'test-proposal',
+      title: 'Test Proposal',
+      client: {
+        id: 'client-1',
+        contactPerson: 'John Doe',
+        company: 'Test Company',
+        email: 'john@test.com'
+      },
+      products: [
+        {
+          id: 'product-1',
+          name: 'Test Billboard',
+          location: 'Test Location',
+          specs_rental: {
+            location_visibility: 1000000,
+            location_visibility_unit: 'm'
+          },
+          categories: ['Billboard'],
+          price: 1000
+        }
+      ],
+      fieldVisibility: {
+        'product-1': {
+          location_visibility: true
+        }
+      },
+      createdAt: new Date().toISOString(),
+      companyName: 'Test Company',
+      proposalTitle: 'Test Proposal',
+      proposalMessage: 'Thank you',
+      contactInfo: {
+        heading: 'Contact Us',
+        name: 'Sales Rep',
+        role: 'Sales',
+        phone: '123-456-7890',
+        email: 'sales@test.com'
+      },
+      preparedByName: 'Sales Rep',
+      preparedByCompany: 'Test Company',
+      templateSize: 'A4',
+      templateOrientation: 'Landscape',
+      templateLayout: '1'
+    }
+
+    ;(getProposalById as any).mockResolvedValue(mockProposal)
+
+    act(() => {
+      render(<ProposalDetailsPage />)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Location Visibility:')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('1,000,000 m')).toBeInTheDocument()
+  })
+
+  it('allows editing location visibility in edit mode', async () => {
+    const mockProposal = {
+      id: 'test-proposal',
+      title: 'Test Proposal',
+      client: {
+        id: 'client-1',
+        contactPerson: 'John Doe',
+        company: 'Test Company',
+        email: 'john@test.com'
+      },
+      products: [
+        {
+          id: 'product-1',
+          name: 'Test Billboard',
+          location: 'Test Location',
+          specs_rental: {
+            location_visibility: 1000000,
+            location_visibility_unit: 'm'
+          },
+          categories: ['Billboard'],
+          price: 1000
+        }
+      ],
+      fieldVisibility: {
+        'product-1': {
+          location_visibility: true
+        }
+      },
+      createdAt: new Date().toISOString(),
+      companyName: 'Test Company',
+      proposalTitle: 'Test Proposal',
+      proposalMessage: 'Thank you',
+      contactInfo: {
+        heading: 'Contact Us',
+        name: 'Sales Rep',
+        role: 'Sales',
+        phone: '123-456-7890',
+        email: 'sales@test.com'
+      },
+      preparedByName: 'Sales Rep',
+      preparedByCompany: 'Test Company',
+      templateSize: 'A4',
+      templateOrientation: 'Landscape',
+      templateLayout: '1'
+    }
+
+    ;(getProposalById as any).mockResolvedValue(mockProposal)
+
+    act(() => {
+      render(<ProposalDetailsPage />)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Location Visibility:')).toBeInTheDocument()
+    })
+
+    // Enter edit mode
+    const editButton = screen.getAllByRole('button').find(btn =>
+      btn.querySelector('svg') // Edit icon
+    )
+
+    if (editButton) {
+      fireEvent.click(editButton)
+
+      // Wait for edit mode to activate
+      await waitFor(() => {
+        const locationVisibilityInput = screen.getByDisplayValue('1,000,000')
+        expect(locationVisibilityInput).toBeInTheDocument()
+      })
+
+      // Test number formatting - type '2000000' and expect '2,000,000'
+      const locationVisibilityInput = screen.getByDisplayValue('1,000,000')
+      fireEvent.change(locationVisibilityInput, { target: { value: '2000000' } })
+
+      expect(locationVisibilityInput).toHaveValue('2,000,000')
+    }
+  })
+
+  it('saves location visibility changes correctly', async () => {
+    ;(updateProposal as any).mockResolvedValue({})
+
+    const mockProposal = {
+      id: 'test-proposal',
+      title: 'Test Proposal',
+      client: {
+        id: 'client-1',
+        contactPerson: 'John Doe',
+        company: 'Test Company',
+        email: 'john@test.com'
+      },
+      products: [
+        {
+          id: 'product-1',
+          name: 'Test Billboard',
+          location: 'Test Location',
+          specs_rental: {
+            location_visibility: 1000000,
+            location_visibility_unit: 'm'
+          },
+          categories: ['Billboard'],
+          price: 1000
+        }
+      ],
+      fieldVisibility: {
+        'product-1': {
+          location_visibility: true
+        }
+      },
+      createdAt: new Date().toISOString(),
+      companyName: 'Test Company',
+      proposalTitle: 'Test Proposal',
+      proposalMessage: 'Thank you',
+      contactInfo: {
+        heading: 'Contact Us',
+        name: 'Sales Rep',
+        role: 'Sales',
+        phone: '123-456-7890',
+        email: 'sales@test.com'
+      },
+      preparedByName: 'Sales Rep',
+      preparedByCompany: 'Test Company',
+      templateSize: 'A4',
+      templateOrientation: 'Landscape',
+      templateLayout: '1'
+    }
+
+    ;(getProposalById as any).mockResolvedValue(mockProposal)
+
+    act(() => {
+      render(<ProposalDetailsPage />)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('Location Visibility:')).toBeInTheDocument()
+    })
+
+    // Enter edit mode
+    const editButton = screen.getAllByRole('button').find(btn =>
+      btn.querySelector('svg') // Edit icon
+    )
+
+    if (editButton) {
+      fireEvent.click(editButton)
+
+      // Wait for edit mode and change location visibility
+      await waitFor(() => {
+        const locationVisibilityInput = screen.getByDisplayValue('1,000,000')
+        fireEvent.change(locationVisibilityInput, { target: { value: '2000000' } })
+      })
+
+      // Find and click save button
+      const saveButton = screen.getByText('Save')
+      fireEvent.click(saveButton)
+
+      // Verify updateProposal was called with correct data
+      await waitFor(() => {
+        expect(updateProposal).toHaveBeenCalledWith(
+          'test-proposal',
+          expect.objectContaining({
+            products: expect.arrayContaining([
+              expect.objectContaining({
+                specs_rental: expect.objectContaining({
+                  location_visibility: 2000000
+                })
+              })
+            ])
+          }),
+          'test-user',
+          'Test User'
+        )
+      })
+    }
+  })
+
+  it('hides location visibility when field visibility is false', async () => {
+    const mockProposal = {
+      id: 'test-proposal',
+      title: 'Test Proposal',
+      client: {
+        id: 'client-1',
+        contactPerson: 'John Doe',
+        company: 'Test Company',
+        email: 'john@test.com'
+      },
+      products: [
+        {
+          id: 'product-1',
+          name: 'Test Billboard',
+          location: 'Test Location',
+          specs_rental: {
+            location_visibility: 1000000,
+            location_visibility_unit: 'm'
+          },
+          categories: ['Billboard'],
+          price: 1000
+        }
+      ],
+      fieldVisibility: {
+        'product-1': {
+          location_visibility: false // Hidden
+        }
+      },
+      createdAt: new Date().toISOString(),
+      companyName: 'Test Company',
+      proposalTitle: 'Test Proposal',
+      proposalMessage: 'Thank you',
+      contactInfo: {
+        heading: 'Contact Us',
+        name: 'Sales Rep',
+        role: 'Sales',
+        phone: '123-456-7890',
+        email: 'sales@test.com'
+      },
+      preparedByName: 'Sales Rep',
+      preparedByCompany: 'Test Company',
+      templateSize: 'A4',
+      templateOrientation: 'Landscape',
+      templateLayout: '1'
+    }
+
+    ;(getProposalById as any).mockResolvedValue(mockProposal)
+
+    act(() => {
+      render(<ProposalDetailsPage />)
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText('← Finalize proposal')).toBeInTheDocument()
+    })
+
+    // Location visibility should not be displayed
+    expect(screen.queryByText('Location Visibility:')).not.toBeInTheDocument()
+    expect(screen.queryByText('1,000,000 m')).not.toBeInTheDocument()
   })
 })

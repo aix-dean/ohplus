@@ -395,9 +395,7 @@ function generateQuotationHTML(
       .signature-line {
         font-weight: bold;
         border-bottom: 1px solid #000;
-        margin-top: 10px;
-        padding-top: 20px;
-        max-width: 200px; /* 👈 shorten the line */
+        max-width: 100px; /* 👈 shorten the line */
         margin-right: 0; 
       }
     </style>
@@ -539,13 +537,13 @@ function generateQuotationHTML(
       <div class="signature-section">
         <div>Very truly yours,</div>
        ${userSignatureDataUrl ? `<img src="${userSignatureDataUrl}" alt="Signature" style="max-width: 200px; max-height: 60px; margin: 10px 0;" /><div class="signature-line"></div>` : '<div class="signature-line"></div>'}
-
         <div>${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : companyData?.company_name || "Golden Touch Imaging Specialist"}</div>
-        <div>${quotation.signature_position || "Sale Manager"}</div>
+        <div>${quotation.signature_position || "Sales"}</div>
       </div>
       <div class="signature-section">
         <div>Conforme:</div>
-        <div class="signature-line"></div>
+        <div style="width: 200px; height: 60px; margin: 10px 0;"></div>
+        <div class="signature-line" ></div>
         <div>${quotation.client_name || "Client Name"}</div>
         <div>${quotation.client_designation || "Client Designation"}</div>
         <div style="font-size: 10px; margin-top: 10px; color: gray; font-style: italic;">
