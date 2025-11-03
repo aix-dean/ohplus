@@ -1415,6 +1415,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             className="bg-white border-[#C4C4C4] text-[#333333] hover:bg-gray-50"
             onClick={() => {
               if (product?.content_type?.toLowerCase() === "digital") {
+                if (!product.cms?.loops_per_day) {
+                  toast({
+                    title: "Configuration Required",
+                    description: "Spots for this site is not yet configured",
+                    variant: "destructive",
+                  })
+                  return
+                }
                 setSpotSelectionType("cost-estimate")
                 setSpotSelectionProducts([product])
                 const spotsData: Record<string, any> = {}
@@ -1442,6 +1450,14 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
             className="bg-white border-[#C4C4C4] text-[#333333] hover:bg-gray-50"
             onClick={() => {
               if (product?.content_type?.toLowerCase() === "digital") {
+                if (!product.cms?.loops_per_day) {
+                  toast({
+                    title: "Configuration Required",
+                    description: "Spots for this site is not yet configured",
+                    variant: "destructive",
+                  })
+                  return
+                }
                 setSpotSelectionType("quotation")
                 setSpotSelectionProducts([product])
                 const spotsData: Record<string, any> = {}
