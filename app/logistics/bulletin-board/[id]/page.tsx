@@ -7,9 +7,25 @@ import { ArrowLeft, Calendar, User, Building, Loader2, AlertCircle, FileText } f
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useAuth } from "@/contexts/auth-context"
-import { getProductById, type Product } from "@/lib/firebase-service"
+import { getProductById, getLatestServiceAssignmentsPerBooking, type Product, type ServiceAssignment } from "@/lib/firebase-service"
+import { bookingService, type Booking } from "@/lib/booking-service"
 import Image from "next/image"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import { collection, query, where, orderBy, getDocs, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import type { ReportData } from "@/lib/report-service"
+
+interface BulletinEntry {
+  id: string
+  date: string
+  by: string
+  department: string
+  campaignName: string
+  item: string
+  attachment?: string
+  attachmentUrl?: string
+  type: 'report' | 'service_assignment' | 'job_order'
+}
 
 interface ProjectMonitoringEntry {
   date: string
@@ -21,35 +37,124 @@ interface ProjectMonitoringEntry {
 }
 
 export default function SiteDetailsPage({ params }: { params: { id: string } }) {
-  const [product, setProduct] = useState<Product | null>(null)
+  const [booking, setBooking] = useState<Booking | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [product, setProduct] = useState<Product | null>(null)
+  const [reports, setReports] = useState<ReportData[]>([])
+  const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([])
+  const [campaignName, setCampaignName] = useState<string>("")
+  const [bulletinEntries, setBulletinEntries] = useState<BulletinEntry[]>([])
+  const [bulletinLoading, setBulletinLoading] = useState(false)
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
 
   const { user } = useAuth()
 
   useEffect(() => {
-    const fetchProduct = async () => {
+    const fetchBooking = async () => {
       if (!user?.uid || !params.id) return
 
       setLoading(true)
       try {
-        const productData = await getProductById(params.id)
-        if (productData) {
-          setProduct(productData)
+        const bookingData = await bookingService.getBookingById(params.id)
+        if (bookingData) {
+          setBooking(bookingData)
+          // Also fetch the product if needed for display
+          if (bookingData.product_id) {
+            const productData = await getProductById(bookingData.product_id)
+            setProduct(productData)
+          }
         } else {
-          setError("Site not found")
+          setError("Booking not found")
         }
       } catch (error) {
-        console.error("Error fetching product:", error)
-        setError("Failed to load site details")
+        console.error("Error fetching booking:", error)
+        setError("Failed to load booking details")
       } finally {
         setLoading(false)
       }
     }
 
-    fetchProduct()
+    fetchBooking()
   }, [user?.uid, params.id])
+
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (!booking?.id) return
+
+      try {
+        const reportsQuery = query(
+          collection(db, "reports"),
+          where("booking_id", "==", booking.id),
+          orderBy("created", "desc")
+        )
+
+        const querySnapshot = await getDocs(reportsQuery)
+        const reportsData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
+        })) as ReportData[]
+
+        setReports(reportsData)
+      } catch (error) {
+        console.error("Error fetching reports:", error)
+      }
+    }
+
+    if (booking) {
+      fetchReports()
+
+      // Set up real-time listener for reports
+      const reportsQuery = query(
+        collection(db, "reports"),
+        where("booking_id", "==", booking.id),
+        orderBy("created", "desc")
+      )
+
+      const unsubscribe = onSnapshot(reportsQuery, (snapshot) => {
+        const reportsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          attachments: Array.isArray(doc.data().attachments) ? doc.data().attachments : [],
+        })) as ReportData[]
+
+        setReports(reportsData)
+      })
+
+      return () => unsubscribe()
+    }
+  }, [booking])
+
+  useEffect(() => {
+    const fetchServiceAssignments = async () => {
+      if (!booking?.id) return
+
+      try {
+        const assignmentsRef = collection(db, "service_assignments")
+        const q = query(assignmentsRef, where("booking_id", "==", booking.id))
+        const querySnapshot = await getDocs(q)
+
+        const assignments: ServiceAssignment[] = []
+        querySnapshot.forEach((doc) => {
+          assignments.push({ id: doc.id, ...doc.data() } as ServiceAssignment)
+        })
+
+        setServiceAssignments(assignments)
+
+        // Get campaign name from the first assignment (if any)
+        if (assignments.length > 0) {
+          setCampaignName(assignments[0].campaignName || "")
+        } else {
+          setCampaignName("")
+        }
+      } catch (error) {
+        console.error("Error fetching service assignments:", error)
+      }
+    }
+
+    fetchServiceAssignments()
+  }, [booking])
 
   // Mock project monitoring data - in a real app, this would come from your database
   const projectMonitoringEntries: ProjectMonitoringEntry[] = [
@@ -129,12 +234,12 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
     )
   }
 
-  if (error || !product) {
+  if (error || !booking) {
     return (
       <div className="container mx-auto py-6 px-4">
         <div className="bg-red-50 border border-red-200 rounded-md p-4 text-center">
           <AlertCircle className="h-6 w-6 text-red-500 mx-auto mb-2" />
-          <p className="text-red-700">{error || "Site not found"}</p>
+          <p className="text-red-700">{error || "Booking not found"}</p>
           <Link href="/logistics/bulletin-board">
             <Button variant="outline" className="mt-4 bg-transparent">
               Back to Bulletin Board
@@ -147,142 +252,92 @@ export default function SiteDetailsPage({ params }: { params: { id: string } }) 
 
   return (
     <div className="container mx-auto py-6 px-4">
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Link href="/logistics/bulletin-board">
-          <Button variant="ghost" size="sm" className="flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+      {/* Back Navigation */}
+      <div className="mb-6">
+        <Link href="/logistics/bulletin-board" className="text-lg font-semibold text-gray-700 hover:text-gray-900">
+          ← View Project Bulletin
         </Link>
-        <div className={`${getCardHeaderColor(product.name)} text-white px-4 py-2 rounded-md font-bold text-lg`}>
-          {product.name}
-        </div>
-        <span className="text-gray-600 font-medium">{product.id}</span>
       </div>
 
-      {/* Site Information Card */}
-      <Card className="mb-6">
+      {/* Booking Details Card */}
+      <Card className="mb-6 shadow-md">
         <CardContent className="p-6">
-          <div className="flex gap-6">
-            {/* Site Image */}
-            <div className="relative w-32 h-24 bg-gray-200 rounded-md overflow-hidden flex-shrink-0">
-              <Image
-                src={product.media?.[0]?.url || "/roadside-billboard.png"}
-                alt={product.name}
-                fill
-                className="object-cover"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = "/roadside-billboard.png"
-                  target.className = "opacity-50 object-contain"
-                }}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-1">
+            <div>
+              <p className="text-sm font-semibold text-gray-600 mb-1">Reservation ID</p>
+              <p className="text-sm text-gray-900">{booking.reservation_id}</p>
             </div>
-
-            {/* Site Details */}
-            <div className="flex-1 space-y-3">
-              <div className="flex items-center gap-2">
-                <Building className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">Site:</span>
-                <span>{product.specs_rental?.location || product.light?.location || "Petplans EDSA Northbound"}</span>
+            <div>
+              <p className="text-sm font-semibold text-gray-600 mb-1">Site</p>
+              <p className="text-sm text-blue-600 font-medium">{booking.product_name || product?.name || "Unknown Site"}</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-600 mb-1">Client</p>
+              <p className="text-sm text-gray-900">{booking.client?.name || "Unknown Client"}</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-600 mb-1">Booking Dates</p>
+                <p className="text-sm text-gray-900">
+                  {booking.start_date ? (booking.start_date.toDate ? booking.start_date.toDate() : new Date(booking.start_date as any)).toLocaleDateString() : "N/A"} - {booking.end_date ? (booking.end_date.toDate ? booking.end_date.toDate() : new Date(booking.end_date as any)).toLocaleDateString() : "N/A"}
+                </p>
               </div>
-
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">Client:</span>
-                <span>Summit Media</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">Booking Dates:</span>
-                <span>May 20, 2025 to June 20, 2025</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">Breakdate:</span>
-                <span>May 20, 2025</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">Sales:</span>
-                <span>Noemi Abellaneda</span>
-              </div>
+              <Button variant="outline" className="border-gray-300">
+                Actions
+              </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Project Monitoring Section */}
+      {/* Bulletin Table */}
       <Card>
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white">
-          <CardTitle className="text-xl font-bold">Project Monitoring</CardTitle>
+        <CardHeader className="bg-[#2A31B4] text-white">
+          <div className="grid grid-cols-6 gap-3 text-sm font-semibold">
+            <div>Date</div>
+            <div>By</div>
+            <div>Department</div>
+            <div>Campaign Name</div>
+            <div>Item</div>
+            <div>Attachment</div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Team
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Update
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Attachments
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {projectMonitoringEntries.map((entry, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.date}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.time}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge className={`${entry.teamColor} text-white`}>{entry.team}</Badge>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">{entry.update}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {entry.hasAttachment ? (
-                        <Link href={`/logistics/bulletin-board/${params.id}/report`}>
-                          <Button variant="link" className="text-blue-600 p-0 h-auto">
-                            See Attachment
-                          </Button>
-                        </Link>
-                      ) : (
-                        <span className="text-gray-400">N/A</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="divide-y divide-gray-200">
+            {reports.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                No reports found for this booking
+              </div>
+            ) : (
+              reports.map((report) => (
+                <div key={report.id} className="p-4 grid grid-cols-6 gap-3 text-sm hover:bg-gray-50">
+                  <div className="font-medium">
+                    {report.created ? new Date(report.created.toDate ? report.created.toDate() : (report.created as any)).toLocaleDateString() : "N/A"}
+                  </div>
+                  <div>{report.createdByName || report.createdBy || "Unknown"}</div>
+                  <div>{report.category || "N/A"}</div>
+                  <div>{campaignName || "N/A"}</div>
+                  <div>{report.reportType || "Report"} submitted</div>
+                  <div>
+                    {report.attachments && report.attachments.length > 0 ? (
+                      <a
+                        href={report.attachments[0].fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 underline"
+                      >
+                        {report.report_id || `RPT#${report.id?.slice(-6)}`}.{report.attachments[0].fileType === 'pdf' ? 'pdf' : 'file'}
+                      </a>
+                    ) : (
+                      "No attachment"
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
-
-      {/* Floating Report Button */}
-      <div className="fixed bottom-8 right-8 z-10">
-        <Button
-          onClick={() => setReportDialogOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 rounded-full shadow-lg h-14 px-6"
-          size="lg"
-        >
-          <FileText className="mr-2 h-5 w-5" /> Create Report
-        </Button>
-      </div>
-
-      {/* Create Report Dialog */}
-      {product && <CreateReportDialog open={reportDialogOpen} onOpenChange={setReportDialogOpen} siteId={product.id} />}
     </div>
   )
 }

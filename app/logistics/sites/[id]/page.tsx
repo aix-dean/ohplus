@@ -31,7 +31,7 @@ import {
   Loader2,
 } from "lucide-react"
 import { loadGoogleMaps } from "@/lib/google-maps-loader"
-import { useRef, useState, useEffect } from "react"
+import { useRef, useState, useEffect, use } from "react"
 import { Document, Page, pdfjs } from "react-pdf"
 
 // Configure PDF.js worker
@@ -54,6 +54,7 @@ import { IlluminationIndexCardDialog } from "@/components/illumination-index-car
 import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
 import type { JobOrder } from "@/lib/types/job-order" // Import the JobOrder type
 import { useAuth } from "@/contexts/auth-context"
+import SiteInformation from "@/components/SiteInformation"
 
 // Google Map Component
 const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
@@ -196,7 +197,7 @@ export const formatFirebaseDate = (timestamp: any): string => {
 }
 
 type Props = {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 interface ServiceAssignment {
@@ -226,6 +227,7 @@ interface ServiceAssignment {
 }
 
 export default function SiteDetailsPage({ params }: Props) {
+  const resolvedParams = use(params)
   const [product, setProduct] = useState<any>(null)
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([]) // Changed from serviceAssignments
   const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([]) // Keep service assignments for other parts if needed
@@ -256,23 +258,33 @@ export default function SiteDetailsPage({ params }: Props) {
   const [maintenanceHistoryDialogOpen, setMaintenanceHistoryDialogOpen] = useState(false)
   const [maintenanceHistory, setMaintenanceHistory] = useState<ServiceAssignment[]>([])
   const [maintenanceHistoryLoading, setMaintenanceHistoryLoading] = useState(false)
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const view = searchParams.get("view")
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { userData } = useAuth()
+   // SiteInformation component states
+   const [activeImageIndex, setActiveImageIndex] = useState(0)
+   const [imageViewerOpen, setImageViewerOpen] = useState(false)
+   const [companyName, setCompanyName] = useState("")
+   const [companyLoading, setCompanyLoading] = useState(false)
+   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
+   const router = useRouter()
+   const searchParams = useSearchParams()
+   const view = searchParams.get("view")
+   const fileInputRef = useRef<HTMLInputElement>(null)
+   const { userData } = useAuth()
 
-  const [illuminationOn, setIlluminationOn] = useState(false)
-  const [illuminationMode, setIlluminationMode] = useState("Manual")
-
-  // Fetch product data and job orders
+   const [illuminationOn, setIlluminationOn] = useState(false)
+   const [illuminationMode, setIlluminationMode] = useState("Manual")
+ 
+   const handleCalendarOpen = () => {
+     setIsCalendarOpen(true)
+   }
+ 
+   // Fetch product data and job orders
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true)
 
         // Fetch product data
-        const productData = await getProductById(params.id)
+        const productData = await getProductById(resolvedParams.id)
         if (!productData) {
           notFound()
         }
@@ -281,7 +293,7 @@ export default function SiteDetailsPage({ params }: Props) {
         // Fetch job orders for this product
         const jobOrdersQuery = query(
           collection(db, "job_orders"), // Changed collection to "job_orders"
-          where("product_id", "==", params.id), // Assuming "product_id" links to the site
+          where("product_id", "==", resolvedParams.id), // Assuming "product_id" links to the site
           orderBy("createdAt", "desc"), // Changed from 'created' to 'createdAt'
         )
 
@@ -311,10 +323,10 @@ export default function SiteDetailsPage({ params }: Props) {
     }
 
     fetchData()
-  }, [params.id])
+  }, [resolvedParams.id])
 
   const handleCreateServiceAssignment = () => {
-    router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+    router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
   }
 
   const handleBlueprintFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -585,259 +597,7 @@ export default function SiteDetailsPage({ params }: Props) {
                 Site Information
               </h2>
             </div>
-            {/* Site Image and Map */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-              {/* Site Image - Left Side */}
-              <div className="relative aspect-square w-full">
-                <Image
-                  src={thumbnailUrl || "/placeholder.svg"}
-                  alt={product.name}
-                  fill
-                  className="object-cover rounded-md"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
-                  }}
-                />
-              </div>
-
-              {/* Google Map - Right Side */}
-              <div className="relative aspect-square w-full bg-gray-100 rounded-md overflow-hidden">
-                <GoogleMap location={location} className="w-full h-full" />
-              </div>
-            </div>
-
-            {/* Site Details */}
-            <div className="space-y-2">
-              <h2 className="text-gray-500 text-sm">{product.site_code || product.id}</h2>
-              <h3
-                style={{
-                  fontFamily: 'Inter',
-                  fontWeight: 700,
-                  fontSize: '28px',
-                  lineHeight: '120%',
-                  letterSpacing: '0%',
-                  color: '#000000'
-                }}
-              >
-                {product.name}
-              </h3>
-              <Button variant="outline" className="mt-2 w-[440px] h-[47px]">
-                <Calendar className="mr-2 h-4 w-4" />
-                Site Calendar
-              </Button>
-
-              <div className="space-y-2 text-sm mt-4">
-                <div>
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#000000'
-                    }}
-                  >
-                    Type:
-                  </span>{" "}
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 400,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#333333'
-                    }}
-                  >
-                    {isStatic ? "Static" : "Dynamic"} - Billboard
-                  </span>
-                </div>
-                <div>
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#000000'
-                    }}
-                  >
-                    Dimension:
-                  </span>{" "}
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 400,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#333333'
-                    }}
-                  >
-                    {dimension}
-                  </span>
-                </div>
-                <div>
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#000000'
-                    }}
-                  >
-                    Location:
-                  </span>{" "}
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 400,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#333333'
-                    }}
-                  >
-                    {location}
-                  </span>
-                </div>
-                <div>
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#000000'
-                    }}
-                  >
-                    Geopoint:
-                  </span>{" "}
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 400,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#333333'
-                    }}
-                  >
-                    {geopoint}
-                  </span>
-                </div>
-                <div>
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#000000'
-                    }}
-                  >
-                    Site Orientation:
-                  </span>{" "}
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 400,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#333333'
-                    }}
-                  >
-                    {product.specs_rental?.site_orientation || ""}
-                  </span>
-                </div>
-                <div>
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#000000'
-                    }}
-                  >
-                    Site Owner:
-                  </span>{" "}
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 400,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#333333'
-                    }}
-                  >
-                    {product.site_owner || ""}
-                  </span>
-                </div>
-                <div>
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#000000'
-                    }}
-                  >
-                    Land Owner:
-                  </span>{" "}
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 400,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#333333'
-                    }}
-                  >
-                    {product.specs_rental?.land_owner || ""}
-                  </span>
-                </div>
-                <div>
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 600,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#000000'
-                    }}
-                  >
-                    Partner:
-                  </span>{" "}
-                  <span
-                    style={{
-                      fontFamily: 'Inter',
-                      fontWeight: 400,
-                      fontSize: '16px',
-                      lineHeight: '120%',
-                      letterSpacing: '0%',
-                      color: '#333333'
-                    }}
-                  >
-                    {product.partner || ""}
-                  </span>
-                </div>
-              </div>
-            </div>
+            <SiteInformation product={product} activeImageIndex={activeImageIndex} setActiveImageIndex={setActiveImageIndex} setImageViewerOpen={setImageViewerOpen} handleCalendarOpen={handleCalendarOpen} companyName={companyName} companyLoading={companyLoading} />
 
             {/* Site Calendar */}
 
@@ -1554,7 +1314,7 @@ export default function SiteDetailsPage({ params }: Props) {
         product={product}
         onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
-          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+          router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
         }}
       />
       <DisplayIndexCardDialog
@@ -1562,13 +1322,13 @@ export default function SiteDetailsPage({ params }: Props) {
         onOpenChange={setDisplayIndexCardDialogOpen}
         onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
-          router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+          router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
         }}
       />
       <CreateReportDialog
         open={createReportDialogOpen}
         onOpenChange={setCreateReportDialogOpen}
-        siteId={params.id}
+        siteId={resolvedParams.id}
         module="logistics"
       />
 

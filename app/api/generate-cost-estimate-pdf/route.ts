@@ -603,9 +603,8 @@ function generateCostEstimateHTML(
       <div class="signature-section">
         <div>Very truly yours,</div>
        ${userSignatureDataUrl ? `<img src="${userSignatureDataUrl}" alt="Signature" style="max-width: 200px; max-height: 60px; margin: 10px 0;" /><div class="signature-line"></div>` : '<div class="signature-line"></div>'}
-
         <div>${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : companyData?.company_name || "Golden Touch Imaging Specialist"}</div>
-        <div>${costEstimate.signature_position || "Sale Manager"}</div>
+        <div>${costEstimate.signature_position || "Sales"}</div>
       </div>
     </div>
         <div class="page-footer" style="font-size:8px; width:100%; text-align:center; padding:2px 0; color: #444;">

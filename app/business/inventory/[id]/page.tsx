@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, MapPin, Calendar, Trash2, Upload, X, Loader2 } from "lucide-react"
 import Image from "next/image"
@@ -20,6 +20,7 @@ import { softDeleteProduct } from "@/lib/firebase-service"
 import { useToast } from "@/hooks/use-toast"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { GooglePlacesAutocomplete } from "@/components/google-places-autocomplete"
+import SiteInformation from "@/components/SiteInformation"
 // Price validation functions
 const validatePriceInput = (value: string): boolean => {
   // Allow empty string, numbers, and decimal point
@@ -29,9 +30,9 @@ const validatePriceInput = (value: string): boolean => {
 
 const formatPriceOnBlur = (value: string): string => {
   if (!value || value === '') return '0';
-  const num = parseFloat(value);
+  const num = parseFloat(value.replace(/,/g, ''));
   if (isNaN(num)) return '0';
-  return num.toFixed(2);
+  return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>, setPrice: (value: string) => void) => {
@@ -46,6 +47,156 @@ const handlePriceBlur = (e: React.FocusEvent<HTMLInputElement>, setPrice: (value
   const formatted = formatPriceOnBlur(value);
   setPrice(formatted);
 };
+
+const handleFormattedNumberInput = (e: React.ChangeEvent<HTMLInputElement>, setValue: (value: string) => void) => {
+  let value = e.target.value.replace(/,/g, '');
+  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+    setValue(value === '' ? '' : Number(value).toLocaleString());
+  }
+};
+
+// Enhanced validation function for dynamic content with detailed calculations
+const validateDynamicContent = (cms: { start_time: string; end_time: string; spot_duration: string; loops_per_day: string }, siteType: string, setValidationError: (error: string | null) => void) => {
+  if (siteType !== "digital") {
+    setValidationError(null)
+    return true
+  }
+
+  const { start_time, end_time, spot_duration, loops_per_day } = cms
+
+  if (!start_time || !end_time || !spot_duration || !loops_per_day) {
+    setValidationError("All dynamic content fields are required.")
+    return false
+  }
+
+  try {
+    // Parse start and end times
+    const [startHour, startMinute] = start_time.split(":").map(Number)
+    const [endHour, endMinute] = end_time.split(":").map(Number)
+
+    // Validate time format
+    if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+      setValidationError("Invalid time format.")
+      return false
+    }
+
+    // Convert to total minutes
+    const startTotalMinutes = startHour * 60 + startMinute
+    let endTotalMinutes = endHour * 60 + endMinute
+
+    // Handle next day scenario (e.g., 22:00 to 06:00)
+    if (endTotalMinutes <= startTotalMinutes) {
+      endTotalMinutes += 24 * 60 // Add 24 hours
+    }
+
+    // Calculate duration in minutes, then convert to seconds
+    const durationMinutes = endTotalMinutes - startTotalMinutes
+    const durationSeconds = durationMinutes * 60
+
+    // Parse numeric values
+    const spotDurationNum = Number.parseInt(spot_duration)
+    const spotsPerLoopNum = Number.parseInt(loops_per_day)
+
+    if (isNaN(spotDurationNum) || isNaN(spotsPerLoopNum) || spotDurationNum <= 0 || spotsPerLoopNum <= 0) {
+      setValidationError("Spot duration and spots per loop must be positive numbers.")
+      return false
+    }
+
+    // Calculate total spot time needed per loop
+    const totalSpotTimePerLoop = spotDurationNum * spotsPerLoopNum
+
+    // Calculate how many complete loops can fit in the time duration
+    const loopsResult = durationSeconds / totalSpotTimePerLoop
+
+    // Check if the division results in a whole number (integer)
+    if (!Number.isInteger(loopsResult)) {
+      // Find suggested values that result in whole number of loops
+      const findWorkingValues = (currentValue: number, isSpotDuration: boolean) => {
+        const suggestions: number[] = []
+        const maxOffset = 5 // Look for values within ±5 of current value
+
+        for (let offset = 1; offset <= maxOffset; offset++) {
+          // Try values above current
+          const higher = currentValue + offset
+          const lower = Math.max(1, currentValue - offset)
+
+          // Check if higher value works
+          const higherTotal = isSpotDuration
+            ? higher * spotsPerLoopNum
+            : spotDurationNum * higher
+          if (durationSeconds % higherTotal === 0) {
+            suggestions.push(higher)
+            if (suggestions.length >= 2) break
+          }
+
+          // Check if lower value works
+          const lowerTotal = isSpotDuration
+            ? lower * spotsPerLoopNum
+            : spotDurationNum * lower
+          if (durationSeconds % lowerTotal === 0) {
+            suggestions.push(lower)
+            if (suggestions.length >= 2) break
+          }
+        }
+
+        return suggestions
+      }
+
+      const spotDurationSuggestions = findWorkingValues(spotDurationNum, true)
+      const spotsPerLoopSuggestions = findWorkingValues(spotsPerLoopNum, false)
+
+      // Format duration for display
+      const durationHours = Math.floor(durationMinutes / 60)
+      const remainingMinutes = durationMinutes % 60
+      const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
+
+      // Build suggestions message
+      let suggestionsText = "Suggested corrections:\n"
+      let optionCount = 1
+
+      if (spotDurationSuggestions.length > 0) {
+        spotDurationSuggestions.forEach(suggestion => {
+          const loops = Math.floor(durationSeconds / (suggestion * spotsPerLoopNum))
+          suggestionsText += `• Option ${optionCount}: Change spot duration to ${suggestion}s (${loops} complete loops)\n`
+          optionCount++
+        })
+      }
+
+      if (spotsPerLoopSuggestions.length > 0) {
+        spotsPerLoopSuggestions.forEach(suggestion => {
+          const loops = Math.floor(durationSeconds / (spotDurationNum * suggestion))
+          suggestionsText += `• Option ${optionCount}: Change spots per loop to ${suggestion} (${loops} complete loops)\n`
+          optionCount++
+        })
+      }
+
+      if (optionCount === 1) {
+        // Fallback if no good suggestions found
+        suggestionsText += "• Try adjusting spot duration or spots per loop to values that divide evenly into the total time"
+      }
+
+      setValidationError(
+        `Invalid Input: The current configuration results in ${loopsResult.toFixed(2)} loops, which is not a whole number. \n\nTime Duration: ${durationDisplay} (${durationSeconds} seconds)\nCurrent Configuration: ${spotDurationNum}s × ${spotsPerLoopNum} spots = ${totalSpotTimePerLoop}s per loop\nResult: ${durationSeconds}s ÷ ${totalSpotTimePerLoop}s = ${loopsResult.toFixed(2)} loops\n\n${suggestionsText}`,
+      )
+      return false
+    }
+
+    // Success case - show calculation details
+    const durationHours = Math.floor(durationMinutes / 60)
+    const remainingMinutes = durationMinutes % 60
+    const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
+
+    setValidationError(
+      `✓ Valid Configuration: ${Math.floor(loopsResult)} complete loops will fit in the ${durationDisplay} time period. Each loop uses ${totalSpotTimePerLoop}s (${spotDurationNum}s × ${spotsPerLoopNum} spots).`,
+    )
+    return true
+  } catch (error) {
+    console.error("Validation error:", error)
+    setValidationError("Invalid time format or values.")
+    return false
+  }
+}
+
 
 export default function BusinessProductDetailPage() {
   const params = useParams()
@@ -63,6 +214,7 @@ export default function BusinessProductDetailPage() {
   const [category, setCategory] = useState("")
   const [siteName, setSiteName] = useState("")
   const [location, setLocation] = useState("")
+   const [geopoint, setGeopoint] = useState<[number, number] | null>(null)
   const [locationLabel, setLocationLabel] = useState("")
   const [height, setHeight] = useState("")
   const [width, setWidth] = useState("")
@@ -78,6 +230,26 @@ export default function BusinessProductDetailPage() {
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imagesToRemove, setImagesToRemove] = useState<string[]>([])
+
+  // Dynamic settings state
+  const [cms, setCms] = useState({
+    start_time: "",
+    end_time: "",
+    spot_duration: "",
+    loops_per_day: "",
+  })
+  const [validationError, setValidationError] = useState<string | null>(null)
+   const [landOwner, setLandOwner] = useState("")
+   const [partner, setPartner] = useState("")
+   const [orientation, setOrientation] = useState("")
+   const [locationVisibility, setLocationVisibility] = useState("")
+   const [locationVisibilityUnit, setLocationVisibilityUnit] = useState<string>("ft")
+   // SiteInformation component states
+   const [activeImageIndex, setActiveImageIndex] = useState(0)
+   const [imageViewerOpen, setImageViewerOpen] = useState(false)
+   const [companyName, setCompanyName] = useState("")
+   const [companyLoading, setCompanyLoading] = useState(false)
+   const [isCalendarOpen, setIsCalendarOpen] = useState(false)
 
   useEffect(() => {
     async function fetchProduct() {
@@ -102,12 +274,25 @@ export default function BusinessProductDetailPage() {
     }
 
     fetchProduct()
-  }, [params.id])
+  }, [params])
 
   // Update price unit based on site type
   useEffect(() => {
     setPriceUnit(siteType === "static" ? "per month" : "per spot")
   }, [siteType])
+
+
+  // Validate dynamic content when fields change
+  useEffect(() => {
+    if (siteType === "digital") {
+      validateDynamicContent(cms, siteType, setValidationError)
+    } else {
+      setValidationError(null)
+    }
+  }, [cms.start_time, cms.end_time, cms.spot_duration, cms.loops_per_day, siteType])
+  const handleCalendarOpen = () => {
+    setIsCalendarOpen(true)
+  }
 
   const handleBack = () => {
     router.back()
@@ -197,10 +382,61 @@ export default function BusinessProductDetailPage() {
 
     if (!price.trim()) {
       errors.push("Price")
-    } else if (isNaN(Number(price))) {
+    } else if (isNaN(Number(price.replace(/,/g, '')))) {
       toast({
         title: "Validation Error",
         description: "Price must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    // Validate dynamic content if digital site type
+    if (siteType === "digital" && !validateDynamicContent(cms, siteType, setValidationError)) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the dynamic content configuration errors.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (locationVisibility.trim() && isNaN(Number(locationVisibility.replace(/,/g, '')))) {
+      toast({
+        title: "Validation Error",
+        description: "Location Visibility must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (height.trim() && isNaN(Number(height.replace(/,/g, '')))) {
+      toast({
+        title: "Validation Error",
+        description: "Height must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (width.trim() && isNaN(Number(width.replace(/,/g, '')))) {
+      toast({
+        title: "Validation Error",
+        description: "Width must be a valid number.",
+        variant: "destructive",
+      })
+      setIsSubmitting(false)
+      return
+    }
+
+    if (elevation.trim() && isNaN(Number(elevation.replace(/,/g, '')))) {
+      toast({
+        title: "Validation Error",
+        description: "Elevation must be a valid number.",
         variant: "destructive",
       })
       setIsSubmitting(false)
@@ -244,17 +480,32 @@ export default function BusinessProductDetailPage() {
       const updateData = {
         name: siteName,
         description,
-        price: parseFloat(price) || 0,
+        price: parseFloat(price.replace(/,/g, '')) || 0,
         content_type: siteType,
         categories: [category],
+        cms: siteType === "digital" ? {
+          start_time: cms.start_time,
+          end_time: cms.end_time,
+          spot_duration: parseInt(cms.spot_duration) || 0,
+          loops_per_day: parseInt(cms.loops_per_day) || 0,
+        } : null,
         specs_rental: {
           audience_types: selectedAudience,
           location,
           location_label: locationLabel,
+          land_owner: landOwner,
+           ...(geopoint && { geopoint }),
+          partner,
+          orientation,
+          location_visibility: parseFloat(locationVisibility.replace(/,/g, '')) || null,
+          location_visibility_unit: locationVisibilityUnit,
           traffic_count: parseInt(dailyTraffic) || null,
-          height: parseFloat(height) || null,
-          width: parseFloat(width) || null,
-          elevation: parseFloat(elevation) || null,
+          traffic_unit: trafficUnit,
+          height: parseFloat(height.replace(/,/g, '')) || null,
+          width: parseFloat(width.replace(/,/g, '')) || null,
+          elevation: parseFloat(elevation.replace(/,/g, '')) || null,
+          dimension_unit: dimensionUnit,
+          elevation_unit: elevationUnit,
           structure: product.specs_rental?.structure || {
             color: null,
             condition: null,
@@ -312,39 +563,64 @@ export default function BusinessProductDetailPage() {
       setSiteType(currentSiteType)
       setCategory(product.categories?.[0] || "")
       setSiteName(product.name || "")
+       setGeopoint(product.specs_rental?.geopoint || null)
       setLocation(product.specs_rental?.location || "")
       setLocationLabel(product.specs_rental?.location_label || "")
-      setHeight(product.specs_rental?.height?.toString() || "")
-      setWidth(product.specs_rental?.width?.toString() || "")
-      setDimensionUnit("ft") // Default
-      setElevation(product.specs_rental?.elevation?.toString() || "")
-      setElevationUnit("ft") // Default
+      setHeight(product.specs_rental?.height ? Number(product.specs_rental.height).toLocaleString() : "")
+      setWidth(product.specs_rental?.width ? Number(product.specs_rental.width).toLocaleString() : "")
+      setDimensionUnit(product.specs_rental?.dimension_unit || "ft")
+      setElevation(product.specs_rental?.elevation ? Number(product.specs_rental.elevation).toLocaleString() : "")
+      setElevationUnit(product.specs_rental?.elevation_unit || "ft")
       setDescription(product.description || "")
       setSelectedAudience(product.specs_rental?.audience_types || [])
-      setDailyTraffic(product.specs_rental?.traffic_count?.toString() || "")
-      setTrafficUnit("monthly") // Default
+      setDailyTraffic(product.specs_rental?.traffic_count ? Number(product.specs_rental.traffic_count).toLocaleString() : "")
+      setTrafficUnit(product.specs_rental?.traffic_unit || "monthly")
       setPrice(product.price ? formatPriceOnBlur(String(product.price)) : "0")
       setPriceUnit(currentSiteType === "static" ? "per month" : "per spot")
       setUploadedFiles([])
       setCurrentImageIndex(0)
       setImagesToRemove([])
 
+      // Set CMS data if it exists
+      if (product.cms) {
+        setCms({
+          start_time: product.cms.start_time || "06:00",
+          end_time: product.cms.end_time || "22:00",
+          spot_duration: product.cms.spot_duration ? String(product.cms.spot_duration) : "10",
+          loops_per_day: product.cms.loops_per_day ? String(product.cms.loops_per_day) : "18",
+        })
+      } else {
+        // Set defaults for new digital sites
+        setCms({
+          start_time: "06:00",
+          end_time: "22:00",
+          spot_duration: "10",
+          loops_per_day: "18",
+        })
+      }
+       setLandOwner(product.specs_rental?.land_owner || "")
+       setPartner(product.specs_rental?.partner || "")
+       setOrientation(product.specs_rental?.orientation || "")
+       setLocationVisibility(product.specs_rental?.location_visibility ? Number(product.specs_rental.location_visibility).toLocaleString() : "")
+       setLocationVisibilityUnit(product.specs_rental?.location_visibility_unit || "ft")
+
       setEditDialogOpen(true)
       setValidationErrors([])
+      setValidationError(null)
 
       // Show info about required fields
-      setTimeout(() => {
-        toast({
-          title: "Required Fields",
-          description: "Fields marked with * are required: Site Name, Location, and Price.",
-        })
-      }, 500)
+      // setTimeout(() => {
+      //   toast({
+      //     title: "Required Fields",
+      //     description: "Fields marked with * are required: Site Name, Location, and Price.",
+      //   })
+      // }, 500)
     }
   }
 
   if (loading) {
     return (
-      <div className="overflow-auto p-6">
+      <div className="p-6">
         <div className="max-w-xs">
           <Skeleton className="h-8 w-32 mb-6" />
           <Skeleton className="h-[300px] w-full mb-6 rounded-lg" />
@@ -356,7 +632,7 @@ export default function BusinessProductDetailPage() {
 
   if (!product) {
     return (
-      <div className="overflow-auto p-6">
+      <div className="p-6">
         <div className="max-w-xs text-center py-12">
           <h2 className="text-2xl font-bold mb-2">Product Not Found</h2>
           <p className="text-gray-500 mb-6">The product you're looking for doesn't exist or has been removed.</p>
@@ -370,7 +646,7 @@ export default function BusinessProductDetailPage() {
   }
 
   return (
-    <div className="overflow-auto p-6">
+    <div className="p-6">
       <div className="max-w-xs">
         <div className="space-y-4">
           <div className="flex flex-row items-center">
@@ -392,168 +668,15 @@ export default function BusinessProductDetailPage() {
             </h2>
           </div>
 
-          {/* Site Image and Map */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
-            {/* Site Image - Left Side */}
-            <div className="relative aspect-square w-full">
-              <Image
-                src={product.media && product.media.length > 0 ? product.media[0].url : "/placeholder.svg"}
-                alt={product.name}
-                fill
-                className="object-cover rounded-md"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = "/abstract-geometric-sculpture.png"
-                }}
-              />
-            </div>
-
-            {/* Map Placeholder - Right Side */}
-            <div className="relative aspect-square w-full bg-gray-100 rounded-md overflow-hidden flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <MapPin className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">Map view</p>
-                <p className="text-xs mt-1">
-                  {product.type?.toLowerCase() === "rental"
-                    ? product.specs_rental?.location || "Unknown location"
-                    : product.light?.location || "Unknown location"}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Site Details */}
-          <div className="space-y-2">
-            <h3
-              style={{
-                fontFamily: 'Inter',
-                fontWeight: 700,
-                fontSize: '28px',
-                lineHeight: '120%',
-                letterSpacing: '0%',
-                color: '#000000'
-              }}
-            >
-              {product.name}
-            </h3>
-            <Button variant="outline" className="mt-2 w-full">
-              <Calendar className="mr-2 h-4 w-4" />
-              Site Calendar
-            </Button>
-
-            <div className="space-y-2 text-sm mt-4">
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 600,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#000000'
-                  }}
-                >
-                  Type:
-                </span>{" "}
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 400,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#333333'
-                  }}
-                >
-                  {product.content_type === "static" ? "Static" : "Dynamic"} - Billboard
-                </span>
-              </div>
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 600,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#000000'
-                  }}
-                >
-                  Dimension:
-                </span>{" "}
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 400,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#333333'
-                  }}
-                >
-                  {product.specs_rental?.height && product.specs_rental?.width
-                    ? `${product.specs_rental.height}ft x ${product.specs_rental.width}ft`
-                    : "Not specified"}
-                </span>
-              </div>
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 600,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#000000'
-                  }}
-                >
-                  Location:
-                </span>{" "}
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 400,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#333333'
-                  }}
-                >
-                  {product.type?.toLowerCase() === "rental"
-                    ? product.specs_rental?.location || "Unknown location"
-                    : product.light?.location || "Unknown location"}
-                </span>
-              </div>
-              <div>
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 600,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#000000'
-                  }}
-                >
-                  Geopoint:
-                </span>{" "}
-                <span
-                  style={{
-                    fontFamily: 'Inter',
-                    fontWeight: 400,
-                    fontSize: '16px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#333333'
-                  }}
-                >
-                  {product.specs_rental?.geopoint
-                    ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
-                    : "12.5346567742,14.09346723"}
-                </span>
-              </div>
-            </div>
-          </div>
+          <SiteInformation
+            product={product}
+            activeImageIndex={activeImageIndex}
+            setActiveImageIndex={setActiveImageIndex}
+            setImageViewerOpen={setImageViewerOpen}
+            handleCalendarOpen={handleCalendarOpen}
+            companyName={companyName}
+            companyLoading={companyLoading}
+          />
 
           {/* Action Buttons */}
           <div className="border-t pt-4 space-y-2">
@@ -620,7 +743,15 @@ export default function BusinessProductDetailPage() {
                 <div className="flex gap-2">
                   <Button
                     variant={siteType === "static" ? "default" : "outline"}
-                    onClick={() => setSiteType("static")}
+                    onClick={() => {
+                      setSiteType("static")
+                      setCms({
+                        start_time: "",
+                        end_time: "",
+                        spot_duration: "",
+                        loops_per_day: "",
+                      })
+                    }}
                     className={`flex-1 ${
                       siteType === "static"
                         ? "bg-[#30c71d] hover:bg-[#28a819] text-white border-[#30c71d]"
@@ -631,7 +762,15 @@ export default function BusinessProductDetailPage() {
                   </Button>
                   <Button
                     variant={siteType === "digital" ? "default" : "outline"}
-                    onClick={() => setSiteType("digital")}
+                    onClick={() => {
+                      setSiteType("digital")
+                      setCms({
+                        start_time: "06:00",
+                        end_time: "22:00",
+                        spot_duration: "10",
+                        loops_per_day: "18",
+                      })
+                    }}
                     className={`flex-1 ${
                       siteType === "digital"
                         ? "bg-[#30c71d] hover:bg-[#28a819] text-white border-[#30c71d]"
@@ -681,6 +820,7 @@ export default function BusinessProductDetailPage() {
                 <GooglePlacesAutocomplete
                   value={location}
                   onChange={setLocation}
+                  onGeopointChange={setGeopoint}
                   placeholder="Enter street address or search location..."
                   enableMap={true}
                   mapHeight="250px"
@@ -697,6 +837,62 @@ export default function BusinessProductDetailPage() {
                 />
               </div>
 
+              {/* Location Visibility */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Location Visibility:</Label>
+                <div className="flex gap-3">
+                  <Input
+                    type="text"
+                    placeholder="e.g., 100"
+                    className="flex-1 border-[#c4c4c4]"
+                    value={locationVisibility}
+                    onChange={(e) => handleFormattedNumberInput(e, setLocationVisibility)}
+                  />
+                  <Select value={locationVisibilityUnit} onValueChange={(value: string) => setLocationVisibilityUnit(value)}>
+                    <SelectTrigger className="w-20 border-[#c4c4c4]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ft">ft</SelectItem>
+                      <SelectItem value="m">m</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Land Owner */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Land Owner:</Label>
+                <Input
+                  placeholder="Enter land owner name"
+                  className="border-[#c4c4c4]"
+                  value={landOwner}
+                  onChange={(e) => setLandOwner(e.target.value)}
+                />
+              </div>
+
+              {/* Partner */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Partner:</Label>
+                <Input
+                  placeholder="Enter partner name"
+                  className="border-[#c4c4c4]"
+                  value={partner}
+                  onChange={(e) => setPartner(e.target.value)}
+                />
+              </div>
+
+              {/* Orientation */}
+              <div>
+                <Label className="text-[#4e4e4e] font-medium mb-3 block">Orientation:</Label>
+                <Input
+                  placeholder="e.g., North, South, East, West"
+                  className="border-[#c4c4c4]"
+                  value={orientation}
+                  onChange={(e) => setOrientation(e.target.value)}
+                />
+              </div>
+
               {/* Dimension */}
               <div>
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Dimension:</Label>
@@ -704,20 +900,20 @@ export default function BusinessProductDetailPage() {
                   <div className="flex-1">
                     <Label className="text-[#4e4e4e] text-sm mb-1 block">Height:</Label>
                     <Input
-                      type="number"
+                      type="text"
                       className="border-[#c4c4c4]"
                       value={height}
-                      onChange={(e) => setHeight(e.target.value)}
+                      onChange={(e) => handleFormattedNumberInput(e, setHeight)}
                     />
                   </div>
                   <span className="text-[#4e4e4e]">x</span>
                   <div className="flex-1">
                     <Label className="text-[#4e4e4e] text-sm mb-1 block">Width:</Label>
                     <Input
-                      type="number"
+                      type="text"
                       className="border-[#c4c4c4]"
                       value={width}
-                      onChange={(e) => setWidth(e.target.value)}
+                      onChange={(e) => handleFormattedNumberInput(e, setWidth)}
                     />
                   </div>
                   <Select value={dimensionUnit} onValueChange={(value: "ft" | "m") => setDimensionUnit(value)}>
@@ -739,10 +935,10 @@ export default function BusinessProductDetailPage() {
                 </Label>
                 <div className="flex gap-3">
                   <Input
-                    type="number"
+                    type="text"
                     className="flex-1 border-[#c4c4c4]"
                     value={elevation}
-                    onChange={(e) => setElevation(e.target.value)}
+                    onChange={(e) => handleFormattedNumberInput(e, setElevation)}
                   />
                   <Select value={elevationUnit} onValueChange={(value: "ft" | "m") => setElevationUnit(value)}>
                     <SelectTrigger className="w-20 border-[#c4c4c4]">
@@ -798,10 +994,10 @@ export default function BusinessProductDetailPage() {
                 <Label className="text-[#4e4e4e] font-medium mb-3 block">Traffic:</Label>
                 <div className="flex gap-3">
                   <Input
-                    type="number"
+                    type="text"
                     className="flex-1 border-[#c4c4c4]"
                     value={dailyTraffic}
-                    onChange={(e) => setDailyTraffic(e.target.value)}
+                    onChange={(e) => handleFormattedNumberInput(e, setDailyTraffic)}
                   />
                   <Select value={trafficUnit} onValueChange={(value: "daily" | "weekly" | "monthly") => setTrafficUnit(value)}>
                     <SelectTrigger className="w-24 border-[#c4c4c4]">
@@ -980,10 +1176,10 @@ export default function BusinessProductDetailPage() {
                 </Label>
                 <div className="flex gap-3">
                   <Input
-                    type="number"
+                    type="text"
                     className="flex-1 border-[#c4c4c4]"
                     value={price}
-                    onChange={(e) => handlePriceChange(e, setPrice)}
+                    onChange={(e) => handleFormattedNumberInput(e, setPrice)}
                     onBlur={(e) => handlePriceBlur(e, setPrice)}
                   />
                   <Select value={priceUnit} disabled>
@@ -998,6 +1194,80 @@ export default function BusinessProductDetailPage() {
                   </Select>
                 </div>
               </div>
+
+              {/* Dynamic Settings - Only show for digital site type */}
+              {siteType === "digital" && (
+                <div>
+                  <Label className="text-[#4e4e4e] font-medium mb-3 block">Digital Content Settings:</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-detail-start_time" className="text-[#4e4e4e] font-medium mb-3 block">Start Time</Label>
+                      <Input
+                        id="edit-detail-start_time"
+                        type="time"
+                        className="border-[#c4c4c4]"
+                        value={cms.start_time}
+                        onChange={(e) => setCms(prev => ({ ...prev, start_time: e.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-detail-end_time" className="text-[#4e4e4e] font-medium mb-3 block">End Time</Label>
+                      <Input
+                        id="edit-detail-end_time"
+                        type="time"
+                        className="border-[#c4c4c4]"
+                        value={cms.end_time}
+                        onChange={(e) => setCms(prev => ({ ...prev, end_time: e.target.value }))}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-detail-spot_duration" className="text-[#4e4e4e] font-medium mb-3 block">Spot Duration (seconds)</Label>
+                      <Input
+                        id="edit-detail-spot_duration"
+                        type="number"
+                        className="border-[#c4c4c4]"
+                        value={cms.spot_duration}
+                        onChange={(e) => setCms(prev => ({ ...prev, spot_duration: e.target.value }))}
+                        placeholder="Enter duration in seconds"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-detail-loops_per_day" className="text-[#4e4e4e] font-medium mb-3 block">Spots Per Loop</Label>
+                      <Input
+                        id="edit-detail-loops_per_day"
+                        type="number"
+                        className="border-[#c4c4c4]"
+                        value={cms.loops_per_day}
+                        onChange={(e) => setCms(prev => ({ ...prev, loops_per_day: e.target.value }))}
+                        placeholder="Enter spots per loop"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Validation feedback display */}
+                  {validationError && (
+                    <div
+                      className={`mt-4 p-4 rounded-lg border ${
+                        validationError.startsWith("✓")
+                          ? "bg-green-50 border-green-200 text-green-800"
+                          : "bg-red-50 border-red-200 text-red-800"
+                      }`}
+                    >
+                      <div className="text-sm font-medium mb-2">
+                        {validationError.startsWith("✓") ? "Configuration Valid" : "Configuration Error"}
+                      </div>
+                      <pre className="text-xs whitespace-pre-wrap font-mono">{validationError}</pre>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

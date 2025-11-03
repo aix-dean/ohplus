@@ -33,10 +33,17 @@ export default function SelectDatesPage() {
   const [siteBookings, setSiteBookings] = useState<Record<string, Booking[]>>({})
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   const [siteIds, setSiteIds] = useState<string[]>([])
+  const [cmsData, setCmsData] = useState<Record<string, any>>({})
+  const [spotNumbersData, setSpotNumbersData] = useState<Record<string, string>>({})
 
   useEffect(() => {
     const sitesParam = searchParams.get("sites")
     const clientIdParam = searchParams.get("clientId")
+    const productIdParam = searchParams.get("productId")
+    const spotNumbersParam = searchParams.get("spotNumbers")
+    const spotSelectionsParam = searchParams.get("spotSelections")
+    const cmsDataParam = searchParams.get("cmsData")
+    const spotNumbersDataParam = searchParams.get("spotNumbersData")
 
     if (clientIdParam) {
       const fetchClient = async () => {
@@ -46,7 +53,183 @@ export default function SelectDatesPage() {
       fetchClient()
     }
 
-    if (sitesParam) {
+    // Parse CMS and spot number data from cost estimates
+    if (cmsDataParam) {
+      try {
+        const parsedCmsData = JSON.parse(decodeURIComponent(cmsDataParam))
+        setCmsData(parsedCmsData)
+      } catch (error) {
+        console.error("Error parsing cmsData:", error)
+      }
+    }
+
+    if (spotNumbersDataParam) {
+      try {
+        const parsedSpotNumbersData = JSON.parse(decodeURIComponent(spotNumbersDataParam))
+        setSpotNumbersData(parsedSpotNumbersData)
+      } catch (error) {
+        console.error("Error parsing spotNumbersData:", error)
+      }
+    }
+
+    // Handle new spotSelections mode (from updated spot selection dialog)
+    if (spotSelectionsParam) {
+      try {
+        const spotSelections = JSON.parse(decodeURIComponent(spotSelectionsParam))
+        console.log(`Parsed spot selections:`, spotSelections)
+
+        const fetchProductsAndSpots = async () => {
+          setIsLoadingProducts(true)
+          const allSpotSites: Product[] = []
+          const bookingsMap: Record<string, Booking[]> = {}
+
+          for (const selection of spotSelections) {
+            const { productId, spotNumbers } = selection
+            const product = await getProductById(productId)
+
+            if (product) {
+              // Generate spots data like in product detail page
+              const totalSpots = product.cms?.loops_per_day || 18
+              const allSpots = []
+
+              // Sample client names for demonstration
+              const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
+
+              for (let i = 1; i <= totalSpots; i++) {
+                // Check if this spot has scheduled content
+                const hasScheduledContent = false // We'll assume spots are available for now
+
+                const isOccupied = hasScheduledContent
+
+                allSpots.push({
+                  id: `spot-${i}`,
+                  number: i,
+                  status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
+                  clientName: isOccupied ? clientNames[(i - 1) % clientNames.length] : undefined,
+                  imageUrl: isOccupied ? "/placeholder.svg" : undefined,
+                })
+              }
+
+              // Filter to selected spots
+              const selectedSpots = allSpots.filter(spot => spotNumbers.includes(spot.number))
+
+              // Convert spots to site-like objects for display
+              const spotSites = selectedSpots.map(spot => ({
+                ...product,
+                id: `${product.id}`,
+                name: `${product.name}`,
+                spotNumber: spot.number,
+                spotData: spot,
+              }))
+
+              allSpotSites.push(...spotSites)
+
+              // Fetch bookings for the product
+              const productBookings = await getProductBookings(productId)
+              spotSites.forEach(site => {
+                bookingsMap[site.id!] = productBookings
+              })
+            }
+          }
+
+          // If sitesParam is also present, combine with non-dynamic sites
+          if (sitesParam) {
+            try {
+              const parsedSiteIds = JSON.parse(decodeURIComponent(sitesParam))
+              console.log(`Also processing non-dynamic sites:`, parsedSiteIds)
+
+              for (const siteId of parsedSiteIds) {
+                const product = await getProductById(siteId)
+                if (product) {
+                  allSpotSites.push(product)
+
+                  // Fetch bookings for this product
+                  const productBookings = await getProductBookings(siteId)
+                  bookingsMap[siteId] = productBookings
+                }
+              }
+            } catch (error) {
+              console.error("Error parsing sites parameter:", error)
+            }
+          }
+
+          setSelectedSites(allSpotSites)
+          setSiteIds(allSpotSites.map(site => site.id!))
+          setSiteBookings(bookingsMap)
+          setIsLoadingProducts(false)
+        }
+        fetchProductsAndSpots()
+      } catch (error) {
+        console.error("Error parsing spot selections:", error)
+        setIsLoadingProducts(false)
+      }
+    }
+    // Handle spots mode (from spot selection dialog)
+    else if (productIdParam && spotNumbersParam) {
+      try {
+        const productId = productIdParam
+        const selectedSpotNumbers = JSON.parse(decodeURIComponent(spotNumbersParam))
+        console.log(`Parsed product ID:`, productId, `Selected spot numbers:`, selectedSpotNumbers)
+
+        const fetchProductAndSpots = async () => {
+          setIsLoadingProducts(true)
+          const product = await getProductById(productId)
+          if (product) {
+            // Generate spots data like in product detail page
+            const totalSpots = product.cms?.loops_per_day || 18
+            const allSpots = []
+
+            // Sample client names for demonstration
+            const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
+
+            for (let i = 1; i <= totalSpots; i++) {
+              // Check if this spot has scheduled content
+              const hasScheduledContent = false // We'll assume spots are available for now
+
+              const isOccupied = hasScheduledContent
+
+              allSpots.push({
+                id: `spot-${i}`,
+                number: i,
+                status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
+                clientName: isOccupied ? clientNames[(i - 1) % clientNames.length] : undefined,
+                imageUrl: isOccupied ? "/placeholder.svg" : undefined,
+              })
+            }
+
+            // Filter to selected spots
+            const selectedSpots = allSpots.filter(spot => selectedSpotNumbers.includes(spot.number))
+
+            // Convert spots to site-like objects for display
+            const spotSites = selectedSpots.map(spot => ({
+              ...product,
+              id: `${product.id}`,
+              name: `${product.name}`,
+              spotNumber: spot.number,
+              spotData: spot,
+            }))
+
+            setSelectedSites(spotSites)
+            setSiteIds(spotSites.map(site => site.id!))
+
+            // Fetch bookings for the product
+            const productBookings = await getProductBookings(productId)
+            const bookingsMap: Record<string, Booking[]> = {}
+            spotSites.forEach(site => {
+              bookingsMap[site.id!] = productBookings
+            })
+            setSiteBookings(bookingsMap)
+          }
+          setIsLoadingProducts(false)
+        }
+        fetchProductAndSpots()
+      } catch (error) {
+        console.error("Error parsing spot parameters:", error)
+        setIsLoadingProducts(false)
+      }
+    }
+    // Handle traditional sites mode
+    else if (sitesParam) {
       try {
         const parsedSiteIds = JSON.parse(decodeURIComponent(sitesParam))
         console.log(`Parsed site IDs:`, parsedSiteIds)
@@ -106,16 +289,27 @@ export default function SelectDatesPage() {
       const startDateObj = new Date(startDate)
       const endDateObj = new Date(endDate)
 
-      const sitesData = selectedSites.map((site) => ({
-        id: site.id!,
-        name: site.name,
-        location: site.specs_rental?.location || (site as any).light?.location || "N/A",
-        price: site.price || 0,
-        type: site.type || "Unknown",
-        image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
-        content_type: site.content_type || "",
-        specs_rental: site.specs_rental,
-      }))
+      const sitesData = selectedSites.map((site) => {
+        const isDynamicOrDigital = (site.content_type || "").toLowerCase() === "dynamic" || (site.content_type || "").toLowerCase() === "digital"
+        const siteId = site.id!
+
+        return {
+          id: siteId,
+          name: site.name,
+          location: site.specs_rental?.location || (site as any).light?.location || "N/A",
+          price: site.price || 0,
+          type: site.type || "Unknown",
+          image: site.media && site.media.length > 0 ? site.media[0].url : undefined,
+          content_type: site.content_type || "",
+          specs_rental: site.specs_rental,
+          // Include CMS map and spot number for dynamic/digital content types
+          // Use data from cost estimates if available, otherwise from site
+          ...(isDynamicOrDigital && {
+            cms: cmsData[siteId] || site.cms,
+            spot_number: spotNumbersData[siteId] || (site as any).spotNumber,
+          }),
+        }
+      })
 
       const clientData = {
         id: selectedClient.id,
@@ -186,17 +380,47 @@ export default function SelectDatesPage() {
   // Helper function to get filtered booked ranges for a site
   const getBookedRanges = (siteId: string) => {
     const bookings = siteBookings[siteId] || []
+    const site = selectedSites.find(s => s.id === siteId)
 
-    return bookings
-      .filter(booking => booking.status !== "COMPLETED" && booking.status !== "CANCELLED")
-      .map(booking => {
-        const start = convertToDate(booking.start_date)
-        const end = convertToDate(booking.end_date)
-        return {
-          start: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
-          end: new Date(end.getFullYear(), end.getMonth(), end.getDate()),
+    console.log(`🔍 DEBUG: getBookedRanges called for siteId:`, siteId)
+    console.log(`🔍 DEBUG: Site object:`, site)
+    console.log(`🔍 DEBUG: Site has spotNumber:`, (site as any)?.spotNumber)
+    console.log(`🔍 DEBUG: spotNumbersData for siteId:`, spotNumbersData[siteId])
+    console.log(`🔍 DEBUG: All bookings for this site:`, bookings)
+
+    const filteredBookings = bookings
+      .filter(booking => {
+        // Filter out completed/cancelled bookings
+        const statusFilter = booking.status !== "COMPLETED" && booking.status !== "CANCELLED"
+        console.log(`🔍 DEBUG: Booking ${booking.id} status filter:`, statusFilter, `status:`, booking.status)
+
+        // If this is a spot-specific site, filter by spot numbers
+        // Check both site.spotNumber and spotNumbersData[siteId]
+        const spotNumber = (site as any)?.spotNumber || (spotNumbersData[siteId] ? parseInt(spotNumbersData[siteId]) : undefined)
+        if (spotNumber !== undefined) {
+          const spotFilter = booking.spot_numbers && Array.isArray(booking.spot_numbers) && booking.spot_numbers.includes(spotNumber)
+          console.log(`🔍 DEBUG: Booking ${booking.id} spot filter for spot ${spotNumber}:`, spotFilter, `booking.spot_numbers:`, booking.spot_numbers)
+          return statusFilter && spotFilter
         }
+
+        return statusFilter
       })
+
+    console.log(`🔍 DEBUG: Filtered bookings:`, filteredBookings)
+
+    const ranges = filteredBookings.map(booking => {
+      const start = convertToDate(booking.start_date)
+      const end = convertToDate(booking.end_date)
+      const range = {
+        start: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
+        end: new Date(end.getFullYear(), end.getMonth(), end.getDate()),
+      }
+      console.log(`🔍 DEBUG: Booking ${booking.id} range:`, range)
+      return range
+    })
+
+    console.log(`🔍 DEBUG: Final ranges for site ${siteId}:`, ranges)
+    return ranges
   }
 
   const checkOverlap = (siteId: string, s: Date, e: Date) =>

@@ -8,14 +8,30 @@ interface SignatureEditDialogProps {
 }
 
 const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClose, onSave }) => {
-   const [selectedColor, setSelectedColor] = useState<string>('#000000');
-   const [isDrawing, setIsDrawing] = useState<boolean>(false);
-   const [activeTab, setActiveTab] = useState<'draw' | 'type' | 'upload'>('draw');
-   const [typedSignature, setTypedSignature] = useState<string>('');
-   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-   const [isSaving, setIsSaving] = useState<boolean>(false);
-   const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [selectedColor, setSelectedColor] = useState<string>('#000000');
+    const [isDrawing, setIsDrawing] = useState<boolean>(false);
+    const [activeTab, setActiveTab] = useState<'draw' | 'type' | 'upload'>('draw');
+    const [typedSignature, setTypedSignature] = useState<string>('');
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState<boolean>(false);
+    const [canvasHistory, setCanvasHistory] = useState<ImageData[]>([]);
+       const canvasRef = useRef<HTMLCanvasElement>(null);
+       const MAX_HISTORY = 10;
+  
+       const activeTabStyle = {
+         color: 'var(--LIGHTER-BLACK, #333)',
+         fontFamily: 'Inter',
+         fontSize: '12px',
+         fontStyle: 'normal',
+         fontWeight: 700,
+         lineHeight: '100%'
+       };
+  
+       const inactiveTabStyle = {
+         ...activeTabStyle,
+         fontWeight: 300
+       };
 
   const resetState = () => {
     setSelectedColor('#000000');
@@ -25,6 +41,7 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
     setUploadedFile(null);
     setPreviewUrl(null);
     setIsSaving(false);
+    setCanvasHistory([]);
     if (canvasRef.current) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
@@ -37,6 +54,29 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
       resetState();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (activeTab === 'draw') {
+      console.log('=== SWITCHING TO DRAW TAB - INITIALIZING HISTORY ===');
+      setCanvasHistory([]);
+      if (canvasRef.current) {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const blankData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          console.log('Initial blank canvas state:', {
+            dataLength: blankData.data.length,
+            width: blankData.width,
+            height: blankData.height,
+            hasContent: blankData.data.some(pixel => pixel !== 0),
+            nonZeroPixels: blankData.data.filter(pixel => pixel !== 0).length
+          });
+          setCanvasHistory([blankData]);
+          console.log('Canvas history initialized with blank state');
+        }
+      }
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'type' && canvasRef.current) {
@@ -98,6 +138,40 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
 
   const handleMouseUp = () => {
     setIsDrawing(false);
+    // Save canvas state to history after drawing
+    console.log('=== MOUSE UP - SAVING CANVAS STATE ===');
+    console.log('History length before save:', canvasHistory.length);
+
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        console.log('Captured canvas state:', {
+          dataLength: imageData.data.length,
+          width: imageData.width,
+          height: imageData.height,
+          hasContent: imageData.data.some(pixel => pixel !== 0),
+          nonZeroPixels: imageData.data.filter(pixel => pixel !== 0).length
+        });
+
+        setCanvasHistory(prev => {
+          // Check if the new imageData is different from the last saved state
+          if (prev.length > 0 && JSON.stringify(prev[prev.length - 1].data) === JSON.stringify(imageData.data)) {
+            console.log('Duplicate canvas state detected, skipping save');
+            return prev;
+          }
+          const newHistory = [...prev, imageData];
+          console.log('History length after save:', newHistory.length);
+          console.log('History items:', newHistory.map((item, index) => ({
+            index,
+            dataLength: item.data.length,
+            hasContent: item.data.some(pixel => pixel !== 0)
+          })));
+          return newHistory.length > MAX_HISTORY ? newHistory.slice(-MAX_HISTORY) : newHistory;
+        });
+      }
+    }
   };
 
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -137,6 +211,40 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
 
   const handleTouchEnd = () => {
     setIsDrawing(false);
+    // Save canvas state to history after drawing
+    console.log('=== TOUCH END - SAVING CANVAS STATE ===');
+    console.log('History length before save:', canvasHistory.length);
+
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        console.log('Captured canvas state:', {
+          dataLength: imageData.data.length,
+          width: imageData.width,
+          height: imageData.height,
+          hasContent: imageData.data.some(pixel => pixel !== 0),
+          nonZeroPixels: imageData.data.filter(pixel => pixel !== 0).length
+        });
+
+        setCanvasHistory(prev => {
+          // Check if the new imageData is different from the last saved state
+          if (prev.length > 0 && JSON.stringify(prev[prev.length - 1].data) === JSON.stringify(imageData.data)) {
+            console.log('Duplicate canvas state detected, skipping save');
+            return prev;
+          }
+          const newHistory = [...prev, imageData];
+          console.log('History length after save:', newHistory.length);
+          console.log('History items:', newHistory.map((item, index) => ({
+            index,
+            dataLength: item.data.length,
+            hasContent: item.data.some(pixel => pixel !== 0)
+          })));
+          return newHistory.length > MAX_HISTORY ? newHistory.slice(-MAX_HISTORY) : newHistory;
+        });
+      }
+    }
   };
 
   const validateFile = (file: File): boolean => {
@@ -191,56 +299,179 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
     }
   };
 
+  const handleUndo = () => {
+    console.log('=== UNDO OPERATION START ===');
+    console.log('Canvas history state before undo:', {
+      length: canvasHistory.length,
+      historyItems: canvasHistory.map((item, index) => ({
+        index,
+        dataLength: item.data.length,
+        width: item.width,
+        height: item.height
+      }))
+    });
+
+    if (canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const canvasContentBefore = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        console.log('Canvas content before undo:', {
+          hasContent: canvasContentBefore.data.some(pixel => pixel !== 0),
+          nonZeroPixels: canvasContentBefore.data.filter(pixel => pixel !== 0).length,
+          dataLength: canvasContentBefore.data.length
+        });
+      }
+    }
+
+    if (canvasHistory.length > 1) {
+      console.log('Restoring to previous state (length > 1)');
+      const previousState = canvasHistory[canvasHistory.length - 2];
+      console.log('Previous state details:', {
+        dataLength: previousState.data.length,
+        width: previousState.width,
+        height: previousState.height,
+        hasContent: previousState.data.some(pixel => pixel !== 0),
+        nonZeroPixels: previousState.data.filter(pixel => pixel !== 0).length
+      });
+
+      setCanvasHistory(prev => {
+        const newHistory = prev.slice(0, -1);
+        console.log('Canvas history state after undo:', {
+          length: newHistory.length,
+          historyItems: newHistory.map((item, index) => ({
+            index,
+            dataLength: item.data.length
+          }))
+        });
+        return newHistory;
+      });
+
+      if (canvasRef.current) {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.putImageData(previousState, 0, 0);
+          console.log('Canvas restoration completed');
+
+          // Verify restoration
+          const canvasContentAfter = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          console.log('Canvas content after undo:', {
+            hasContent: canvasContentAfter.data.some(pixel => pixel !== 0),
+            nonZeroPixels: canvasContentAfter.data.filter(pixel => pixel !== 0).length,
+            dataLength: canvasContentAfter.data.length,
+            matchesPreviousState: JSON.stringify(canvasContentAfter.data) === JSON.stringify(previousState.data)
+          });
+        }
+      }
+    } else if (canvasHistory.length === 1) {
+      console.log('Restoring to blank state (length === 1)');
+      const blankState = canvasHistory[0];
+      console.log('Blank state details:', {
+        dataLength: blankState.data.length,
+        width: blankState.width,
+        height: blankState.height,
+        hasContent: blankState.data.some(pixel => pixel !== 0),
+        nonZeroPixels: blankState.data.filter(pixel => pixel !== 0).length
+      });
+
+      if (canvasRef.current) {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.putImageData(blankState, 0, 0);
+          console.log('Canvas restoration to blank completed');
+
+          // Verify restoration
+          const canvasContentAfter = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          console.log('Canvas content after undo to blank:', {
+            hasContent: canvasContentAfter.data.some(pixel => pixel !== 0),
+            nonZeroPixels: canvasContentAfter.data.filter(pixel => pixel !== 0).length,
+            dataLength: canvasContentAfter.data.length,
+            matchesBlankState: JSON.stringify(canvasContentAfter.data) === JSON.stringify(blankState.data)
+          });
+        }
+      }
+    } else {
+      console.log('No history available for undo');
+    }
+
+    console.log('=== UNDO OPERATION END ===');
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 flex justify-center items-center">
-      <div className="mt-8 bg-white rounded-lg w-80 h-96 p-4 relative shadow-xl">
+      <div className="mt-8 bg-white rounded-lg w-80 h-80 p-4 relative shadow-xl">
         {/* Close button */}
         <button onClick={onClose} disabled={isSaving} className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
           <X className="w-4 h-4" />
         </button>
 
         {/* Title */}
-        <h2 className="text-lg font-semibold mb-4">Signature</h2>
+        <div style={{width: '315px', height: '24px', flexShrink: 0, color: 'var(--LIGHTER-BLACK, #333)', fontFamily: 'Inter', fontSize: '16px', fontStyle: 'normal', fontWeight: 700, lineHeight: '100%', marginBottom: '10px'}}>Signature</div>
 
         {/* Tabs */}
-        <div className="flex space-x-4 mb-4">
-          <button
-            onClick={() => setActiveTab('draw')}
-            className={`font-bold ${activeTab === 'draw' ? 'text-blue-500' : 'text-gray-500'}`}
-          >
-            Draw
-          </button>
-          <button
-            onClick={() => setActiveTab('type')}
-            className={`font-bold ${activeTab === 'type' ? 'text-blue-500' : 'text-gray-500'}`}
-          >
-            Type
-          </button>
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={`font-bold ${activeTab === 'upload' ? 'text-blue-500' : 'text-gray-500'}`}
-          >
-            Upload
-          </button>
+        <div className="relative mb-4">
+          <div className="flex space-x-4  pb-1">
+            <button
+            className='pl-1'
+              onClick={() => setActiveTab('draw')}
+              style={activeTab === 'draw' ? activeTabStyle : inactiveTabStyle}
+            >
+              Draw
+            </button>
+            <button
+              onClick={() => setActiveTab('type')}
+              style={activeTab === 'type' ? activeTabStyle : inactiveTabStyle}
+            >
+              Type
+            </button>
+            <button
+              onClick={() => setActiveTab('upload')}
+              style={activeTab === 'upload' ? activeTabStyle : inactiveTabStyle}
+            >
+              Upload
+            </button>
+          </div>
+          <div
+            className="absolute -bottom-1 transition-all duration-300"
+            style={{
+              width: activeTab === 'upload' ? '50px' : '38px',
+              height: '4.502px',
+              background: 'var(--LINK-BLUE, #2D3FFF)',
+              left: activeTab === 'draw' ? '0px' : activeTab === 'type' ? '47px' : '90px'
+            }}
+          ></div>
         </div>
 
         {/* Drawing area */}
         {activeTab === 'draw' && (
-          <canvas
-            ref={canvasRef}
-            width={288}
-            height={176}
-            className="w-72 h-44 border border-gray-300 mb-4"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          ></canvas>
+          <div className="relative">
+            <button
+              onClick={handleUndo}
+              disabled={canvasHistory.length <= 1}
+              className="absolute top-1 left-2 z-10 bg-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center px-2 py-1"
+              title="Undo"
+            >
+              <img src="/icons/undo.svg" alt="Undo" style={{ width: '21px', height: '22px' }} />
+              <span style={{ color: 'var(--LIGHTER-BLACK, #333)', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 300, lineHeight: '100%', marginLeft: '2px', marginTop: '2px' }}>Undo</span>
+            </button>
+            <canvas
+              ref={canvasRef}
+              width={288}
+              height={176}
+              className="w-72 h-44 border border-gray-300"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            ></canvas>
+          </div>
         )}
         {activeTab === 'type' && (
           <div className="w-72 h-44 border border-gray-300 mb-4 flex items-center justify-center relative">
@@ -298,100 +529,99 @@ const SignatureEditDialog: React.FC<SignatureEditDialogProps> = ({ isOpen, onClo
           </div>
         )}
 
-        {/* Color selection dots - show for Draw and Type tabs */}
-        {(activeTab === 'draw' || activeTab === 'type') && (
-          <div className="flex space-x-2 mb-4 justify-start">
-            <button
-              onClick={() => setSelectedColor('#000000')}
-              className={`w-4 h-4 bg-black rounded-full ${selectedColor === '#000000' ? 'ring-2 ring-gray-400' : ''}`}
-            ></button>
-            <button
-              onClick={() => setSelectedColor('#3b82f6')}
-              className={`w-4 h-4 bg-blue-500 rounded-full ${selectedColor === '#3b82f6' ? 'ring-2 ring-gray-400' : ''}`}
-            ></button>
-            <button
-              onClick={() => setSelectedColor('#ef4444')}
-              className={`w-4 h-4 bg-red-500 rounded-full ${selectedColor === '#ef4444' ? 'ring-2 ring-gray-400' : ''}`}
-            ></button>
-          </div>
-        )}
 
         {/* Buttons */}
-        <button
-          onClick={() => {
-            resetState();
-            onClose();
-          }}
-          className="absolute left-4 bottom-4 px-4 py-2 bg-gray-200 rounded"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={async () => {
-            setIsSaving(true);
-            try {
-              let signatureData: { data: string } | null = null;
-              if (activeTab === 'draw' && canvasRef.current) {
-                signatureData = { data: canvasRef.current.toDataURL('image/png') };
-              } else if (activeTab === 'type' && typedSignature.trim()) {
-                // Generate PNG from typed text
-                const canvas = document.createElement('canvas');
-                canvas.width = 288;
-                canvas.height = 176;
-                const ctx = canvas.getContext('2d');
-                if (ctx) {
-                  ctx.font = '24px cursive';
-                  ctx.fillStyle = selectedColor;
-                  ctx.textAlign = 'center';
-                  ctx.textBaseline = 'middle';
-                  ctx.fillText(typedSignature, canvas.width / 2, canvas.height / 2);
-                  signatureData = { data: canvas.toDataURL('image/png') };
+        <div className="absolute bottom-4 right-4 flex space-x-2">
+          <button
+            onClick={() => {
+              resetState();
+              onClose();
+            }}
+            style={{
+              width: '103px',
+              height: '27px',
+              flexShrink: 0,
+              borderRadius: '10px',
+              border: '2px solid var(--GREY, #C4C4C4)',
+              background: '#FFF'
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              setIsSaving(true);
+              try {
+                let signatureData: { data: string } | null = null;
+                if (activeTab === 'draw' && canvasRef.current) {
+                  signatureData = { data: canvasRef.current.toDataURL('image/png') };
+                } else if (activeTab === 'type' && typedSignature.trim()) {
+                  // Generate PNG from typed text
+                  const canvas = document.createElement('canvas');
+                  canvas.width = 288;
+                  canvas.height = 176;
+                  const ctx = canvas.getContext('2d');
+                  if (ctx) {
+                    ctx.font = '24px cursive';
+                    ctx.fillStyle = selectedColor;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(typedSignature, canvas.width / 2, canvas.height / 2);
+                    signatureData = { data: canvas.toDataURL('image/png') };
+                  }
+                } else if (activeTab === 'upload' && previewUrl) {
+                  // Convert uploaded image to PNG
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous';
+                  await new Promise<void>((resolve, reject) => {
+                    img.onload = () => {
+                      const canvas = document.createElement('canvas');
+                      canvas.width = img.naturalWidth;
+                      canvas.height = img.naturalHeight;
+                      const ctx = canvas.getContext('2d');
+                      if (ctx) {
+                        ctx.drawImage(img, 0, 0);
+                        signatureData = { data: canvas.toDataURL('image/png') };
+                        resolve();
+                      } else {
+                        reject(new Error('Could not get canvas context'));
+                      }
+                    };
+                    img.onerror = () => reject(new Error('Failed to load image'));
+                    img.src = previewUrl;
+                  });
                 }
-              } else if (activeTab === 'upload' && previewUrl) {
-                // Convert uploaded image to PNG
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                await new Promise<void>((resolve, reject) => {
-                  img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = img.naturalWidth;
-                    canvas.height = img.naturalHeight;
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                      ctx.drawImage(img, 0, 0);
-                      signatureData = { data: canvas.toDataURL('image/png') };
-                      resolve();
-                    } else {
-                      reject(new Error('Could not get canvas context'));
-                    }
-                  };
-                  img.onerror = () => reject(new Error('Failed to load image'));
-                  img.src = previewUrl;
-                });
+                if (signatureData) {
+                  await onSave(signatureData);
+                  resetState();
+                  onClose();
+                }
+              } catch (error) {
+                console.error('Error saving signature:', error);
+              } finally {
+                setIsSaving(false);
               }
-              if (signatureData) {
-                await onSave(signatureData);
-                resetState();
-                onClose();
-              }
-            } catch (error) {
-              console.error('Error saving signature:', error);
-            } finally {
-              setIsSaving(false);
-            }
-          }}
-          disabled={isSaving}
-          className="absolute right-4 bottom-4 px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            'Save'
-          )}
-        </button>
+            }}
+            disabled={isSaving}
+            style={{
+              width: '103px',
+              height: '27px',
+              flexShrink: 0,
+              borderRadius: '10px',
+              background: '#1D0BEB'
+            }}
+            className="text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
