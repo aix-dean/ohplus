@@ -8,7 +8,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/auth-context";
 import { createReport, ReportData } from "@/lib/report-service";
-import { getTeams } from "@/lib/teams-service";
+import { getTeams, getTeamById } from "@/lib/teams-service";
 import {
   getProductById,
   uploadFileToFirebaseStorage,
@@ -16,6 +16,8 @@ import {
 } from "@/lib/firebase-service";
 import { Timestamp } from "firebase/firestore";
 import { ArrowLeft, Loader2, SquarePen, Upload } from "lucide-react";
+import { Team } from "@/lib/types/team";
+import { te } from "date-fns/locale";
 
 interface CompanyData {
   id: string
@@ -52,6 +54,7 @@ export default function CreateReportPage() {
   const [afterPhotos, setAfterPhotos] = useState<File[]>([]);
   const [completePercentage, setCompletePercentage] = useState(0);
   const [reportNumber, setReportNumber] = useState(`RPT#${Date.now()}`);
+  const [remarks, setRemarks] = useState<string>("");
   const [beforePhotoAttachments, setBeforePhotoAttachments] = useState<
     Array<{
       note: string;
@@ -80,13 +83,22 @@ export default function CreateReportPage() {
     }>
   >([]);
   const [uploadingPhotos, setUploadingPhotos] = useState(false);
-  const [beforePhotoNote, setBeforePhotoNote] = useState<string>("");
-  const [afterPhotoNote, setAfterPhotoNote] = useState<string>("");
-  const [photosNote, setPhotosNote] = useState<string>("");
   const [reportType, setReportType] = useState<string>("");
-  const [teamsMap, setTeamsMap] = useState<Record<string, string>>({});
+  const [teamsMap, setTeamsMap] = useState<Team>();
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
   const [companyDataLoading, setCompanyDataLoading] = useState(true);
+
+  const updateBeforePhotoNote = useCallback((index: number, note: string) => {
+    setBeforePhotoAttachments(prev => prev.map((att, i) => i === index ? {...att, note} : att));
+  }, []);
+
+  const updateAfterPhotoNote = useCallback((index: number, note: string) => {
+    setAfterPhotoAttachments(prev => prev.map((att, i) => i === index ? {...att, note} : att));
+  }, []);
+
+  const updatePhotosNote = useCallback((index: number, note: string) => {
+    setPhotosAttachments(prev => prev.map((att, i) => i === index ? {...att, note} : att));
+  }, []);
 
   const onCreateAReportClick = useCallback(() => {
     router.back();
@@ -101,7 +113,7 @@ export default function CreateReportPage() {
 
       // Upload photos immediately
       const isMonitoring = assignmentData?.serviceType === "Monitoring";
-      const note = isMonitoring ? photosNote : beforePhotoNote;
+      const note = "";
       const label = isMonitoring ? "Monitoring" : "Before";
 
       try {
@@ -137,7 +149,7 @@ export default function CreateReportPage() {
         setUploadingPhotos(false);
       }
     },
-    [assignmentData?.serviceType, beforePhotoNote, photosNote]
+    [assignmentData?.serviceType]
   );
 
   const handleAfterPhotosChange = useCallback(
@@ -148,7 +160,7 @@ export default function CreateReportPage() {
       setUploadingPhotos(true);
 
       // Upload photos immediately
-      const note = afterPhotoNote;
+      const note = "";
       const label = "After";
 
       try {
@@ -180,7 +192,7 @@ export default function CreateReportPage() {
         setUploadingPhotos(false);
       }
     },
-    [afterPhotoNote]
+    []
   );
 
   const createReportFromAssignment = useCallback(async () => {
@@ -203,27 +215,15 @@ export default function CreateReportPage() {
 
       const uploadedAttachments = [...assignmentAttachments];
 
-      // Add pre-uploaded attachments with current note values
+      // Add pre-uploaded attachments
       if (assignmentData?.serviceType === "Monitoring") {
-        const updatedPhotosAttachments = photosAttachments.map(att => ({
-          ...att,
-          note: photosNote
-        }));
-        console.log("Photos attachments:", updatedPhotosAttachments.length);
-        uploadedAttachments.push(...updatedPhotosAttachments);
+        console.log("Photos attachments:", photosAttachments.length);
+        uploadedAttachments.push(...photosAttachments);
       } else {
-        const updatedBeforePhotoAttachments = beforePhotoAttachments.map(att => ({
-          ...att,
-          note: beforePhotoNote
-        }));
-        const updatedAfterPhotoAttachments = afterPhotoAttachments.map(att => ({
-          ...att,
-          note: afterPhotoNote
-        }));
-        console.log("Before photo attachments:", updatedBeforePhotoAttachments.length);
-        console.log("After photo attachments:", updatedAfterPhotoAttachments.length);
-        uploadedAttachments.push(...updatedBeforePhotoAttachments);
-        uploadedAttachments.push(...updatedAfterPhotoAttachments);
+        console.log("Before photo attachments:", beforePhotoAttachments.length);
+        console.log("After photo attachments:", afterPhotoAttachments.length);
+        uploadedAttachments.push(...beforePhotoAttachments);
+        uploadedAttachments.push(...afterPhotoAttachments);
       }
 
       console.log("Total uploaded attachments before processing:", uploadedAttachments.length);
@@ -236,6 +236,7 @@ export default function CreateReportPage() {
           location: assignmentData.projectSiteLocation || "",
           media_url: bookingData?.items?.media_url || "",
         },
+        materialSpecs: assignmentData.materialSpecs || "",
         report_id: reportNumber || "",
         companyId: assignmentData.company_id || "",
         client: bookingData?.client || null,
@@ -245,6 +246,7 @@ export default function CreateReportPage() {
           name: assignmentData.requestedBy?.name || "",
           id: assignmentData.requestedBy?.id || "",
         },
+        remarks: remarks || "",
         campaignName: assignmentData.campaignName || "",
         joNumber: assignmentData.joNumber || "",
         joType: assignmentData.joType || "",
@@ -270,9 +272,6 @@ export default function CreateReportPage() {
         assignedTo: assignmentData.assignedToName || "",
         costEstimateId: assignmentData.costEstimateId || "",
         quotationId: assignmentData.quotationId || "",
-        beforeNote: beforePhotoNote || "",
-        afterNote: afterPhotoNote || "",
-        monitoringNote: assignmentData?.serviceType === "Monitoring" ? photosNote || "" : "",
       };
 
       if (assignmentData.remarks) {
@@ -333,9 +332,6 @@ export default function CreateReportPage() {
     completePercentage,
     reportType,
     reportNumber,
-    beforePhotoNote,
-    afterPhotoNote,
-    photosNote,
   ]);
 
   useEffect(() => {
@@ -367,22 +363,6 @@ export default function CreateReportPage() {
     }
   }, [assignmentData, searchParams]);
 
-  useEffect(() => {
-    const fetchTeams = async () => {
-      try {
-        const teams = await getTeams();
-        const teamsMapping: Record<string, string> = {};
-        teams.forEach((team) => {
-          teamsMapping[team.id] = team.name;
-        });
-        setTeamsMap(teamsMapping);
-      } catch (error) {
-        console.error("Error fetching teams:", error);
-      }
-    };
-
-    fetchTeams();
-  }, []);
 
   useEffect(() => {
     console.log("[v0] useEffect triggered - user:", !!user)
@@ -495,6 +475,16 @@ export default function CreateReportPage() {
     );
   }
 
+  const getTeamName = async (teamId: string) => {
+    
+    if(teamId){
+      const team = await getTeamById(teamId);
+      return team?.name || "";
+    }else{  
+      return "N/A"
+    }
+  };
+
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -572,11 +562,7 @@ export default function CreateReportPage() {
             <div>
               <p className="font-semibold">Crew</p>
               <p>
-                {(assignmentData?.crew && teamsMap[assignmentData.crew]) ||
-                  (assignmentData?.assignedTo &&
-                    teamsMap[assignmentData.assignedTo]) ||
-                  assignmentData?.crew ||
-                  assignmentData?.assignedTo ||
+                { assignmentData.assignedToName ||
                   "Production- Jonathan Dela Cruz"}
               </p>
             </div>
@@ -639,6 +625,7 @@ export default function CreateReportPage() {
                   rows={3}
                   placeholder="Remarks"
                   aria-label="Remarks"
+                  onChange={(e) => setRemarks(e.target.value)}
                 />
               </div>
             </div>
@@ -793,11 +780,7 @@ export default function CreateReportPage() {
                     type="text"
                     className="flex-1  text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent "
                     value={
-                      (assignmentData?.crew && teamsMap[assignmentData.crew]) ||
-                      (assignmentData?.assignedTo &&
-                        teamsMap[assignmentData.assignedTo]) ||
-                      assignmentData?.crew ||
-                      assignmentData?.assignedTo ||
+                      assignmentData?.assignedToName ||
                       ""
                     }
                     readOnly
@@ -840,18 +823,24 @@ export default function CreateReportPage() {
                   </h4>
                   <div className="bg-gray-100 rounded-lg p-3">
                     <div className="mb-1">
-                      {beforePhotos.length > 0 ? (
+                      {photosAttachments.length > 0 ? (
                         <div className="flex items-start gap-2 overflow-x-auto flex-1 min-w-0">
-                          {/* Image Previews */}
-
-                          {beforePhotos.map((file, index) => (
+                          {/* Image Previews with Notes */}
+                          {photosAttachments.map((att, index) => (
                             <div key={index} className="relative flex-shrink-0">
                               <Image
-                                src={URL.createObjectURL(file)}
+                                src={att.fileUrl}
                                 alt={`Photo ${index + 1}`}
                                 width={85}
                                 height={85}
                                 className="h-[85px] w-[85px] object-cover rounded border"
+                              />
+                              <textarea
+                                className="w-[85px] border border-[#c4c4c4] mt-1 text-[#c4c4c4] pl-2 py-1 rounded-lg text-xs resize-none focus:outline-none"
+                                rows={1}
+                                placeholder="Add note..."
+                                value={att.note}
+                                onChange={(e) => updatePhotosNote(index, e.target.value)}
                               />
                             </div>
                           ))}
@@ -901,15 +890,6 @@ export default function CreateReportPage() {
                         </div>
                       )}
                     </div>
-
-                    <textarea
-                      className="w-24 p-2 border border-[#c4c4c4] text-[#c4c4c4] pl-2 pt-1 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
-                      rows={1}
-                      placeholder="Add note..."
-                      aria-label="Photos Note"
-                      value={photosNote}
-                      onChange={(e) => setPhotosNote(e.target.value)}
-                    />
                   </div>
                 </div>
               ) : (
@@ -922,28 +902,28 @@ export default function CreateReportPage() {
                     </h4>
                     <div className="bg-gray-100 rounded-lg p-3 h-[140px]">
                       <div className="mb-1">
-                        {beforePhotos.length > 0 ? (
+                        {beforePhotoAttachments.length > 0 ? (
                           <div className="flex items-start gap-2 overflow-x-auto flex-1 min-w-0">
-                            {/* Image Previews */}
-                            {beforePhotos.map((file, index) => (
+                            {/* Image Previews with Notes */}
+                            {beforePhotoAttachments.map((att, index) => (
                               <div
                                 key={index}
                                 className="relative flex-shrink-0"
                               >
                                 <Image
-                                  src={URL.createObjectURL(file)}
+                                  src={att.fileUrl}
                                   alt={`Before photo ${index + 1}`}
                                   width={85}
                                   height={85}
                                   className="h-[85px] w-[85px] object-cover rounded border"
                                 />
-                                {/* <button
-                                    onClick={() => setBeforePhotos(prev => prev.filter((_, i) => i !== index))}
-                                    className="absolute top-1 right-0 w-3 h-3 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
-                                    aria-label="Remove photo"
-                                  >
-                                    ×
-                                  </button> */}
+                                <textarea
+                                  className="w-[85px] border border-[#c4c4c4] mt-1 text-[#c4c4c4] pl-2 py-1 rounded-lg text-xs resize-none focus:outline-none"
+                                  rows={1}
+                                  placeholder="Add note..."
+                                  value={att.note}
+                                  onChange={(e) => updateBeforePhotoNote(index, e.target.value)}
+                                />
                               </div>
                             ))}
 
@@ -992,15 +972,6 @@ export default function CreateReportPage() {
                           </div>
                         )}
                       </div>
-
-                      <textarea
-                        className="w-[85px] h-[25px] border border-[#c4c4c4] text-[#c4c4c4] pl-2 pt-1 text-xs rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
-                        rows={1}
-                        placeholder="Add note..."
-                        aria-label="Before SA Photos Note"
-                        value={beforePhotoNote}
-                        onChange={(e) => setBeforePhotoNote(e.target.value)}
-                      />
                     </div>
                   </div>
 
@@ -1012,28 +983,28 @@ export default function CreateReportPage() {
                     </h4>
                     <div className="bg-gray-100 rounded-lg p-3 h-[140px]">
                       <div className="mb-1">
-                        {afterPhotos.length > 0 ? (
+                        {afterPhotoAttachments.length > 0 ? (
                           <div className="flex items-start gap-2 overflow-x-auto flex-1 min-w-0">
-                            {/* Image Previews */}
-                            {afterPhotos.map((file, index) => (
+                            {/* Image Previews with Notes */}
+                            {afterPhotoAttachments.map((att, index) => (
                               <div
                                 key={index}
                                 className="relative flex-shrink-0"
                               >
                                 <Image
-                                  src={URL.createObjectURL(file)}
+                                  src={att.fileUrl}
                                   alt={`After photo ${index + 1}`}
                                   width={85}
                                   height={85}
                                   className="h-[85px] w-[85px] object-cover rounded border"
                                 />
-                                {/* <button
-                                    onClick={() => setAfterPhotos(prev => prev.filter((_, i) => i !== index))}
-                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs hover:bg-red-600"
-                                    aria-label="Remove photo"
-                                  >
-                                    ×
-                                  </button> */}
+                                <textarea
+                                  className="w-[85px] border border-[#c4c4c4] mt-1 text-[#c4c4c4] pl-2 py-1 rounded-lg text-xs resize-none focus:outline-none"
+                                  rows={1}
+                                  placeholder="Add note..."
+                                  value={att.note}
+                                  onChange={(e) => updateAfterPhotoNote(index, e.target.value)}
+                                />
                               </div>
                             ))}
 
@@ -1082,15 +1053,6 @@ export default function CreateReportPage() {
                           </div>
                         )}
                       </div>
-
-                      <textarea
-                        className="w-[85px] h-[25px] text-[#c4c4c4] pl-2 pt-1 text-xs border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
-                        rows={1}
-                        placeholder="Add note..."
-                        aria-label="After SA Photos Note"
-                        value={afterPhotoNote}
-                        onChange={(e) => setAfterPhotoNote(e.target.value)}
-                      />
                     </div>
                   </div>
                 </>

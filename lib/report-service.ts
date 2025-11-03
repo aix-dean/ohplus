@@ -24,6 +24,8 @@ export interface ReportData {
     location: string
     media_url: string
   }
+  remarks?: string
+  materialSpecs?: string
   joRequestBy: string
   siteName?: string
   companyId: string

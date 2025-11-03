@@ -22,7 +22,7 @@ function safeToDate(dateValue: any): Date {
   return new Date() // fallback to current date
 }
 
-export async function  generateReportPDF(
+export async function generateReportPDF(
   report: ReportData,
   companyData?: any,
   userData?: any,
@@ -31,20 +31,6 @@ export async function  generateReportPDF(
 ): Promise<string | Buffer | void> {
   try {
     console.log("[generateReportPDF] Function called with:", { report, userData, returnBase64, module, companyData });
-
-    // Fetch product data if available
-    let product = null
-    if (report.site?.id) {
-      try {
-        const productDoc = await getDoc(doc(db, 'products', report.site.id))
-        if (productDoc.exists()) {
-          product = { id: productDoc.id, ...productDoc.data() }
-          console.log('[PDF] Product data retrieved:', product.id)
-        }
-      } catch (error) {
-        console.warn('[PDF] Could not fetch product data:', error)
-      }
-    }
 
     // Fetch team data if available
     let teamName = report.assignedTo
@@ -59,7 +45,7 @@ export async function  generateReportPDF(
         day: "2-digit",
       });
     }
-    
+
     const formatTime = (dateValue: Date | any | string) => {
       const date = safeToDate(dateValue)
       return date.toLocaleTimeString("en-US", {
@@ -81,67 +67,16 @@ export async function  generateReportPDF(
     }
 
     const getSiteName = (report: any) => {
-      return report.siteName || "N/A"
+      return report.siteName || report.site?.name || "N/A"
     }
 
-    const getSiteSize = (product: any) => {
-      if (!product) return "N/A"
-      const specs = product.specs_rental
-      if (specs?.height && specs?.width) {
-        return `${specs.height} (H) x ${specs.width} x ${specs} Panels`
-      }
-      return product.specs_rental?.size || product.light?.size || "N/A"
-    }
 
     const getMaterialSpecs = (product: any) => {
       if (!product) return "N/A"
       return product.specs_rental?.material || "Stickers"
     }
 
-    const getIllumination = (product: any) => {
-      if (!product) return "N/A"
-      const illumination = product.specs_rental?.illumination;
-      if (typeof illumination === 'object' && illumination !== null) {
-        return JSON.stringify(illumination);
-      }
-      return illumination || "LR 2097 (200 Watts x 40)";
-    }
 
-    const getGondola = (product: any) => {
-      if (!product) return "N/A"
-      return product.specs_rental?.gondola ? "YES" : "NO"
-    }
-
-    const getTechnology = (product: any) => {
-      if (!product) return "N/A"
-      return product.specs_rental?.technology || "Clear Tapes"
-    }
-
-    const calculateInstallationDuration = (startDate: string, endDate: string) => {
-      const start = new Date(startDate)
-      const end = new Date(endDate)
-      const diffTime = Math.abs(end.getTime() - start.getTime())
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-      return diffDays
-    }
-
-    const getCompletionPercentage = (report: any) => {
-      if (!report) return 100
-      if (report.completionPercentage !== undefined) {
-        return report.completionPercentage
-      }
-      // Default percentages based on report type
-      switch (report.reportType) {
-        case "progress-report":
-          return 50 // Default for progress reports
-        case "completion-report":
-          return 100
-        case "monitoring-report":
-          return 100
-        default:
-          return 100
-      }
-    }
 
     // Resolve company logo and prepared by name
     let companyLogoUrl = "/ohplus-new-logo.png"
@@ -231,9 +166,9 @@ export async function  generateReportPDF(
           }
           // Update receivedByName with actual user name
           receivedByName = `${receivedByUserData.first_name || ''} ${receivedByUserData.last_name || ''}`.trim() ||
-                          receivedByUserData.display_name ||
-                          receivedByUserData.email?.split('@')[0] ||
-                          "Noemi Abellanada"
+            receivedByUserData.display_name ||
+            receivedByUserData.email?.split('@')[0] ||
+            "Noemi Abellanada"
         }
       } catch (error) {
         console.warn("[PDF] Could not fetch received by signature:", error)
@@ -250,40 +185,28 @@ export async function  generateReportPDF(
       reportNumber: report.id?.slice(-4).toUpperCase() || "00642",
       saNumber: report.id?.slice(-4).toUpperCase() || "00642",
       projectInfo: {
-        siteId: getSiteLocation(product),
         jobOrder: report.id?.slice(-4).toUpperCase() || "7733",
         jobOrderDate: formatDate(report.created || new Date()),
         site: getSiteName(report),
-        size: getSiteSize(product),
+
         startDate: formatDate(report.start_date),
         endDate: formatDate(report.end_date),
         startTime: formatTime(report.start_date),
         endTime: formatTime(report.end_date),
-        installationDuration: `${calculateInstallationDuration(
-          safeToDate(report.bookingDates.start).toISOString(),
-          safeToDate(report.bookingDates.end).toISOString()
-        )} days`,
-        content: (product as any)?.content_type || "Static",
-        materialSpecs: getMaterialSpecs(product),
+        materialSpecs: report.materialSpecs || "",
         crew: teamName,
-        illumination: getIllumination(product),
-        gondola: getGondola(product),
-        technology: getTechnology(product),
         sales: report.sales || "N/A",
       },
-      statusPercentage: getCompletionPercentage(report),
       clientName: report.client?.name || "Client Name",
       campaignName: report.campaignName || "N/A",
-      remarks: report.descriptionOfWork || report.delayReason || "N/A",
+      remarks: report.remarks,
       receivedByName,
       preparedBySignature,
       receivedBySignature,
       attachments: report.attachments?.map(attachment => ({
         fileUrl: attachment.fileUrl,
-        date: formatDate(report.created || new Date()),
-        time: new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-        location: getSiteLocation(product),
-        note: attachment.note
+        note: attachment.note,
+        label: attachment.label
       })) || [],
       afterNote: report.afterNote,
       beforeNote: report.beforeNote,
@@ -319,13 +242,28 @@ export async function  generateReportPDF(
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${templateData.reportTypeBadge}</title>
 <style>
-    @page {
-        size: A4 portrait;
-        margin: 20mm 15mm 40mm 15mm;
-        counter-increment: page;
-        counter-reset: page 1;
-    }
 
+        * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        }
+        @page {
+  @bottom-center {
+    content:  counter(page) "/" counter(pages);
+  }
+}
+    .page-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 10px;
+        box-sizing: border-box;
+        color: #555;
+        width: 100%;
+  }
     body {
         font-family: 'Inter', Arial, sans-serif;
         font-size: 12px;
@@ -333,6 +271,7 @@ export async function  generateReportPDF(
         background: white;
         margin: 0;
         padding: 0;
+        position: relative;
     }
 
     .page {
@@ -354,12 +293,12 @@ export async function  generateReportPDF(
     }
     .logo {
         width: 35mm;
-        height: auto;
+        height: 150px;
         margin-bottom: 3mm;
     }
     .logo img {
         width: 100%;
-        height: auto;
+        height: 150px;
         object-fit: contain;
     }
     .company-name {
@@ -384,7 +323,6 @@ export async function  generateReportPDF(
     .title-bar {
         display: flex;
         align-items: center;
-        margin-top: 10mm;
     }
     .title-blue {
         background: #32A7FA;
@@ -428,7 +366,7 @@ export async function  generateReportPDF(
     }
     td {
         border: 1px solid #d9d9d9;
-        padding: 3mm;
+        padding: 2mm;
         vertical-align: middle;
     }
     td.label {
@@ -442,7 +380,7 @@ export async function  generateReportPDF(
 
     /* SIGNATURES */
     .signatures {
-    margin-top: 20px;
+    margin-top: 10mm;
   display: flex;
   justify-content: space-between;
   width: 100%;
@@ -481,7 +419,7 @@ export async function  generateReportPDF(
 
     /* ATTACHMENTS */
     .attachments {
-        margin-top: 40mm;
+        margin-top: 30mm;
     }
     .attachment-columns {
         display: grid;
@@ -496,51 +434,40 @@ export async function  generateReportPDF(
         flex-direction: column;
         gap: 10px;
         margin-top: 5mm;
+        width: 100%;
+        heigt: 450px;
     }
     .attachment-item {
         text-align: center;
     }
     .attachment-item img {
-        width: 50%;
-        height: auto;
+        width: 100%;
+        height: 350px;
         object-fit: cover;
         border: 1px solid #d9d9d9;
     }
     .attachment-label {
         font-weight: 600;
-        margin-bottom: 3mm;
-        font-size: 11px;
+        font-size: 20px;
         text-align: left;
         color: #32A7FA;
     }
     .attachment-info {
-        font-size: 8px;
+        font-size: 12px;
         margin-top: 2mm;
         color: #555;
+        text-align: left;
     }
-
-    /* FOOTER */
-    .page-footer {
-        position: fixed;
-        bottom: 0mm;
-        left: 15mm;
-        right: 15mm;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 9px;
-        color: #555;
-        box-sizing: border-box;
-    }
-    .page-footer .company-info {
+    .ending {
+        margin-top: 5px;
+        display: block;
         text-align: center;
-    }
-    .page-footer .page-info {
-        text-align: right;
-    }
-    .page-footer .pageNumber:before {
-        content: counter(page);
-    }
+        font-size: 14px;
+        bottom-padding: 40mm;
+  }
+
+    
+    
 </style>
 </head>
 <body>
@@ -549,7 +476,7 @@ export async function  generateReportPDF(
     <!-- Title -->
     <div class="title-bar">
         <div class="title-blue">${templateData.reportTypeBadge}</div>
-        <div class="title-number">RPT#${templateData.reportNumber}</div>
+        <div class="title-number">${report.report_id}</div>
     </div>
     <div class="issued-date">Issued on ${safeToDate(report.created).toLocaleDateString('en-US', {
       month: 'short',
@@ -567,7 +494,7 @@ export async function  generateReportPDF(
             </tr>
             <tr>
                 <td class="label">Site Address</td>
-                <td class="value">${templateData.projectInfo.siteId}</td>
+                <td class="value">${report.site.location}</td>
             </tr>
         </table>
     </div>
@@ -593,12 +520,17 @@ export async function  generateReportPDF(
         <table>
             <tr>
                 <td class="label">Service Type</td>
-                <td class="value">${report.saType }</td>
+                <td class="value" style="font-weight: 900;">${report.saType}</td>
             </tr>
-            <tr>
+  ${report.reportType == "Progress Report" ? `<tr>
+                <td class="label">Status</td>
+                <td class="value">${report.completionPercentage}%</td>
+            </tr>` : ""}
+  ${report.reportType != "Monitoring Report" ? `
+                <tr>
                 <td class="label">Material Specs</td>
                 <td class="value">${templateData.projectInfo.materialSpecs}</td>
-            </tr>
+            </tr>`: ''}
                     <tr style="padding: 0; border: none;">
                 <td class="label">Service Start Date</td>
                 <td class="value" style="padding: 0; border: none;">
@@ -655,53 +587,71 @@ export async function  generateReportPDF(
     ${(templateData.reportTypeBadge === 'Progress Report' || templateData.reportTypeBadge === 'Completion Report') && templateData.attachments.length > 0 ? `
     <div class="attachments">
         ${(() => {
-            const beforeAttachments = templateData.attachments.filter((_, index) => index % 2 === 0);
-            const afterAttachments = templateData.attachments.filter((_, index) => index % 2 === 1);
-            return `
-                <div class="attachment-columns">
-                    <div class="attachment-column">
-                        <div class="attachment-label">Before Service</div>
-                        <div class="attachment-images">
-                            ${beforeAttachments.map(attachment => `
-                                <div class="attachment-item">
-                                    <img src="${attachment.fileUrl}" alt="Before Service">
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div class="attachment-info">
-                            ${report.beforeNote ? `<div>${report.beforeNote}</div>` : ''}
-                        </div>
-                    </div>
-                    <div class="attachment-column">
-                        <div class="attachment-label">After Service</div>
-                        <div class="attachment-images">
-                            ${afterAttachments.map(attachment => `
-                                <div class="attachment-item">
-                                    <img src="${attachment.fileUrl}" alt="After Service">
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div class="attachment-info">
-                            ${report.afterNote ? `<div>${report.afterNote}</div>` : ''}
-                        </div>
-                    </div>
+          const beforeAttachments = templateData.attachments.filter(att =>
+            att.label && att.label.toLowerCase().includes('before')
+          );
+          const afterAttachments = templateData.attachments.filter(att =>
+            att.label && att.label.toLowerCase().includes('after')
+          );
+          return `
+                 <div class="attachment-columns">
+        <div class="attachment-column">
+          <div class="attachment-label">Before Service</div>
+          <div class="attachment-images">
+            ${beforeAttachments.map(attachment => `
+              <div class="attachment-item">
+                <img src="${attachment.fileUrl}" alt="Before Service">
+                <div class="attachment-info">
+                  ${attachment.note ? `<div>${attachment.note}</div>` : ''}
                 </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="attachment-column">
+          <div class="attachment-label">After Service</div>
+          <div class="attachment-images">
+            ${afterAttachments.map(attachment => `
+              <div class="attachment-item">
+                <img src="${attachment.fileUrl}" alt="After Service">
+                <div class="attachment-info">
+                  ${attachment.note ? `<div>${attachment.note}</div>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
             `;
         })()}
     </div>
-    ` : ''}
-
-</div>
-
-<!-- Footer -->
-<div class="page-footer">
-    <div class="spacer"></div>
-    <div class="company-info">
-        <div>${templateData.companyName}</div>
-        <div>721 Gen Solano St., San Miguel, Manila, Philippines</div>
+    ` : ''} 
+    ${(templateData.reportTypeBadge === 'Monitoring Report') && templateData.attachments.length > 0 ? `
+    <div class="attachments">
+    <br/>
+    <br/>
+    <br/>
+    <br/>
+    <div class="attachment-label">Photos</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        ${templateData.attachments.map(attachment => `
+          <div class="attachment-item">
+            <img src="${attachment.fileUrl}" alt="Monitoring Service" style="width: 100%; height: 350px; object-fit: cover; border: 1px solid #d9d9d9;">
+            <div class="attachment-info">
+              ${attachment.note ? `<div>${attachment.note}</div>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
     </div>
-    <div class="page-info">
-        Page <span class="pageNumber"></span>
+    ` : ''}
+    <span class="ending">--------- End of report ---------</span>
+</div>
+<div class="page-footer">
+<div class="page-number" style="text-align: right"></div>
+    <div style="text-align:center;">
+        <div>${templateData.companyName}</div>
+        <div>${`${companyData.address.street}, ${companyData.address.city} ${companyData.address.province}`}</div>
     </div>
 </div>
 </body>
@@ -712,18 +662,18 @@ export async function  generateReportPDF(
     const browser = await puppeteer.launch(
       process.env.NODE_ENV === 'production' || process.env.VERCEL
         ? {
-            headless: true,
-            args: chromium.args,
-            executablePath: await chromium.executablePath()
-          }
+          headless: true,
+          args: chromium.args,
+          executablePath: await chromium.executablePath()
+        }
         : {
-            headless: true,
-            executablePath: process.platform === 'win32'
-              ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
-              : process.platform === 'darwin'
-                ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
-                : '/usr/bin/google-chrome' // Linux fallback
-          }
+          headless: true,
+          executablePath: process.platform === 'win32'
+            ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+            : process.platform === 'darwin'
+              ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+              : '/usr/bin/google-chrome' // Linux fallback
+        }
     )
 
     try {
@@ -734,7 +684,7 @@ export async function  generateReportPDF(
         format: 'A4',
         printBackground: true,
         displayHeaderFooter: true,
-       headerTemplate: `
+        headerTemplate: `
   <div style="width:100%; font-family: Inter, Arial, sans-serif; font-size:10px; color:#333; display:flex; justify-content:space-between; align-items:flex-start; padding:5px 15mm 0 15mm; box-sizing:border-box;">
     <div style="display:flex; flex-direction:column;">
       ${templateData.companyLogoUrl ? `<img src="${templateData.companyLogoUrl}" alt="Company Logo" style="width:50px; height:50px; margin-bottom:3px;">` : ''}
@@ -747,12 +697,16 @@ export async function  generateReportPDF(
     </div>
   </div>
 `,
-footerTemplate: `<div></div>`,
+        footerTemplate: `
+<div style="width:100%; font-family: Inter, Arial, sans-serif; font-size:9px; color:#555; display:flex; justify-content:space-between; align-items:center; padding:5px 15mm; box-sizing:border-box;">
+    
+</div>
+`,
         margin: {
-            top: '25mm',
-        right: '10mm',
-        bottom: '30mm',
-        left: '10mm'
+          top: '30mm',
+          right: '10mm',
+          bottom: '30mm',
+          left: '10mm'
         }
       })
 
