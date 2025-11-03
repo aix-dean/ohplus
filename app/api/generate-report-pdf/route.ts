@@ -248,21 +248,27 @@ export async function generateReportPDF(
         margin: 0;
         padding: 0;
         }
-        @page {
-  @bottom-center {
-    content:  counter(page) "/" counter(pages);
+    @page {
+    @bottom-right{
+        content: counter(page) " / " counter(pages);
+        margin-bottom: 50mm;
+        font-size: 10px;
+        color: #555;
   }
-}
+    }
     .page-footer {
         position: fixed;
         bottom: 0;
         left: 0;
         right: 0;
-        text-align: center;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         font-size: 10px;
         box-sizing: border-box;
         color: #555;
         width: 100%;
+        padding: 5px 15mm;
   }
     body {
         font-family: 'Inter', Arial, sans-serif;
@@ -534,7 +540,7 @@ export async function generateReportPDF(
                     <tr style="padding: 0; border: none;">
                 <td class="label">Service Start Date</td>
                 <td class="value" style="padding: 0; border: none;">
-                  <div style="display: flex; width: 100%; border-left: 1px solid #d9d9d9; border-bottom: 1px solid #d9d9d9;">
+                  <div style="display: flex; width: 100%; border-bottom: 1px solid #d9d9d9;">
                     <div style="flex: 1; text-align: left; padding: 10px; border-right: 1px solid #d9d9d9;">
                       ${templateData.projectInfo.startDate || ""}
                     </div>
@@ -547,7 +553,7 @@ export async function generateReportPDF(
             <tr style="padding: 0; border: none;">
                 <td class="label">Service Start Date</td>
                 <td class="value" style="padding: 0; border: none;">
-                  <div style="display: flex; width: 100%; border-left: 1px solid #d9d9d9; ">
+                  <div style="display: flex; width: 100%; ">
                     <div style="flex: 1; text-align: left; padding: 10px; border-right: 1px solid #d9d9d9;">
                       ${templateData.projectInfo.endDate || ""}
                     </div>
@@ -648,11 +654,12 @@ export async function generateReportPDF(
     <span class="ending">--------- End of report ---------</span>
 </div>
 <div class="page-footer">
-<div class="page-number" style="text-align: right"></div>
-    <div style="text-align:center;">
+    <div></div>
+    <div style="text-align: center;">
         <div>${templateData.companyName}</div>
-        <div>${`${companyData.address.street}, ${companyData.address.city} ${companyData.address.province}`}</div>
+        <div>${companyData?.address ? `${companyData.address.street}, ${companyData.address.city} ${companyData.address.province}` : ''}</div>
     </div>
+    <div style="text-align: right;"><span class="page-number"></span></div>
 </div>
 </body>
 </html>
@@ -698,8 +705,7 @@ export async function generateReportPDF(
   </div>
 `,
         footerTemplate: `
-<div style="width:100%; font-family: Inter, Arial, sans-serif; font-size:9px; color:#555; display:flex; justify-content:space-between; align-items:center; padding:5px 15mm; box-sizing:border-box;">
-    
+<div>
 </div>
 `,
         margin: {

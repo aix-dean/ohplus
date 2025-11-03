@@ -227,7 +227,7 @@ export default function CreateReportPage() {
       }
 
       console.log("Total uploaded attachments before processing:", uploadedAttachments.length);
-
+      console.log(`Remarks: ${remarks}`)
       // Map service assignment data to report data
       const reportData: ReportData = {
         site: {
@@ -274,20 +274,15 @@ export default function CreateReportPage() {
         quotationId: assignmentData.quotationId || "",
       };
 
-      if (assignmentData.remarks) {
-        reportData.descriptionOfWork = assignmentData.remarks;
-      }
 
-      console.log("Creating report with data:", reportData);
-
+   
       const reportId = await createReport(reportData);
-      console.log("Report created successfully with ID:", reportId);
+
 
       setCreatedReportId(reportId);
 
       // Generate PDF after report creation using API
       try {
-        console.log("Generating PDF for report:", reportId);
         const response = await fetch('/api/generate-report-pdf', {
           method: 'POST',
           headers: {
@@ -344,19 +339,20 @@ export default function CreateReportPage() {
   }, [assignmentId]);
 
   useEffect(() => {
-    // Check for reportType from URL params first
-    const urlReportType = searchParams.get("reportType");
-    if (urlReportType) {
-      if (urlReportType === "progress") {
-        setReportType("Progress Report");
-      } else if (urlReportType === "completion") {
-        setReportType("Completion Report");
-      } else if (urlReportType === "monitoring") {
-        setReportType("Monitoring Report");
-      }
-    } else if (assignmentData?.serviceType) {
-      if (assignmentData.serviceType === "Monitoring") {
-        setReportType("Monitoring Report");
+    // Prioritize serviceType over URL params for validation
+    if (assignmentData?.serviceType === "Monitoring") {
+      setReportType("Monitoring Report");
+    } else {
+      // Check for reportType from URL params
+      const urlReportType = searchParams.get("reportType");
+      if (urlReportType) {
+        if (urlReportType === "progress") {
+          setReportType("Progress Report");
+        } else if (urlReportType === "completion") {
+          setReportType("Completion Report");
+        } else if (urlReportType === "monitoring") {
+          setReportType("Monitoring Report");
+        }
       } else {
         setReportType("Progress Report");
       }
@@ -625,6 +621,7 @@ export default function CreateReportPage() {
                   rows={3}
                   placeholder="Remarks"
                   aria-label="Remarks"
+                  value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
                 />
               </div>
