@@ -193,8 +193,7 @@ export function SpotSelectionDialog({
 
           // Generate spots data
           const spots = []
-          const totalSpots = product.cms?.loops_per_day || 18
-          const clientNames = ["Coca-Cola", "Bear-Brand", "Toyota", "Lucky Me", "Bench", "Maggi", "Oishi"]
+          const totalSpots = product.cms?.loops_per_day ?? 0
 
           for (let i = 1; i <= totalSpots; i++) {
             // Check if this spot has bookings today
@@ -232,7 +231,7 @@ export function SpotSelectionDialog({
               id: `spot-${i}`,
               number: i,
               status: (isOccupied ? "occupied" : "vacant") as "occupied" | "vacant",
-              clientName: isOccupied ? (booking?.client?.name || clientNames[(i - 1) % clientNames.length]) : undefined,
+              clientName: isOccupied ? booking?.client?.name : undefined,
               imageUrl,
             })
           }
@@ -512,7 +511,7 @@ export function SpotSelectionDialog({
                           <Skeleton className="h-4 w-20" />
                           <Skeleton className="h-4 w-32" />
                         </div>
-                      ) : productSpotsData ? (
+                      ) : productSpotsData && productSpotsData.totalSpots > 0 ? (
                         <div className="flex items-center gap-6 text-sm">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-gray-900">Total Spots:</span>
@@ -533,17 +532,23 @@ export function SpotSelectionDialog({
                     {spotsDataLoading ? (
                       <SpotsGridSkeleton />
                     ) : productSpotsData ? (
-                      <SpotsGrid
-                        spots={productSpotsData.spots}
-                        totalSpots={productSpotsData.totalSpots}
-                        occupiedCount={productSpotsData.occupiedCount}
-                        vacantCount={productSpotsData.vacantCount}
-                        currentDate={productSpotsData.currentDate}
-                        selectedSpots={selectedSpots[product.id] || []}
-                        onSpotToggle={(spotNumber) => handleSpotToggle(product.id, spotNumber)}
-                        showSummary={false}
-                        bg={false}
-                      />
+                      productSpotsData.totalSpots > 0 ? (
+                        <SpotsGrid
+                          spots={productSpotsData.spots}
+                          totalSpots={productSpotsData.totalSpots}
+                          occupiedCount={productSpotsData.occupiedCount}
+                          vacantCount={productSpotsData.vacantCount}
+                          currentDate={productSpotsData.currentDate}
+                          selectedSpots={selectedSpots[product.id] || []}
+                          onSpotToggle={(spotNumber) => handleSpotToggle(product.id, spotNumber)}
+                          showSummary={false}
+                          bg={false}
+                        />
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          Spots for this site is not yet configured
+                        </div>
+                      )
                     ) : null}
                   </div>
                 )
