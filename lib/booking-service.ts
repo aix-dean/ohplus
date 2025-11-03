@@ -65,6 +65,7 @@ export interface Booking {
   }[]
   reservation_id: string // Generated reservation ID with format "RV-" + currentmillis
   seller_id: string
+  spot_numbers?: number[] // Added spot_numbers field for digital/dynamic bookings
   start_date: Timestamp | null
   status: string
   total_cost: number
@@ -234,6 +235,22 @@ export class BookingService {
       // Only add product_name if it exists
       if (quotation.items?.name) {
         bookingData.product_name = quotation.items.name
+      }
+      // Conditionally add CMS and spot number fields for digital/dynamic types
+      const productType = (quotation.items?.type || "").toLowerCase()
+      if (productType === "digital" || productType === "dynamic") {
+        // Add CMS if it exists
+        if (quotation.items?.cms) {
+          bookingData.cms = quotation.items.cms
+        }
+
+        // Add spot numbers if they exist (can be single number or array)
+        if (quotation.items?.spot_number) {
+          const spotNumber = quotation.items.spot_number
+          bookingData.spot_numbers = Array.isArray(spotNumber) ? spotNumber : [parseInt(String(spotNumber))]
+        } else if (quotation.spot_numbers && quotation.spot_numbers.length > 0) {
+          bookingData.spot_numbers = quotation.spot_numbers
+        }
       }
       console.log("[DEBUG] Booking data to be created:", bookingData)
 

@@ -1220,6 +1220,7 @@ export async function createDirectQuotation(
     page_id?: string
     created_by_first_name?: string
     created_by_last_name?: string
+    spotNumbers?: number[] // Added spot numbers array parameter
     client_company_id?: string // Added client_company_id field
   },
 ): Promise<string> {
@@ -1279,8 +1280,11 @@ export async function createDirectQuotation(
         height: site.height || 0,
         width: site.width || 0,
         content_type: site.content_type || "",
-        specs: site.specs_rental,
+        ...(site.cms && { cms: site.cms }),
+        ...(site.specs_rental && { specs: site.specs_rental }),
+        ...(site.spot_number && { spot_number: site.spot_number }),
       },
+      spot_numbers: options.spotNumbers || [],
       projectCompliance: {
         signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
         signedContract: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },
@@ -1372,7 +1376,9 @@ export async function createMultipleQuotations(
           height: site.height || 0,
           width: site.width || 0,
           content_type: site.content_type || "",
-          specs: site.specs_rental,
+          ...(site.specs_rental && { specs: site.specs_rental }),
+          ...(site.cms && { cms: site.cms }),
+          ...(site.spot_number && { spot_number: site.spot_number }),
         },
         projectCompliance: {
           signedQuotation: { completed: false, fileUrl: null, fileName: null, uploadedAt: null, notes: null },

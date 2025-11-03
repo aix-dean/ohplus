@@ -138,6 +138,8 @@ interface CostEstimateSiteData {
   image?: string // Added image field for product images
   specs_rental?: any // Added specs_rental field to match quotation structure
   content_type?: string // Added content_type field to match quotation structure
+  cms?: any // Added cms field to match quotation structure
+  spot_number?: string // Added spot_number field to match quotation structure
 }
 
 // Generate an 8-digit password for cost estimate PDF access
@@ -312,6 +314,8 @@ export async function createDirectCostEstimate(
           image: site.image || "", // Added image field to line items
           content_type: site.content_type ? site.content_type.charAt(0).toUpperCase() + site.content_type.slice(1) : "", // Added content_type field to match quotation structure
           specs: site.specs_rental, // Added specs field to match quotation structure
+          ...(site.cms && { cms: site.cms }), // Conditionally include cms if it exists
+          ...(site.spot_number && { spot_number: site.spot_number }), // Conditionally include spot_number if it exists
         })
       })
     }
@@ -862,6 +866,8 @@ export async function createMultipleCostEstimates(
         image: site.image || "", // Added image field to line items for multiple cost estimates
         specs: site.specs_rental, // Added specs field to match quotation structure
         content_type: site.content_type ? site.content_type.charAt(0).toUpperCase() + site.content_type.slice(1) : "", // Added content_type field to match quotation structure
+        ...(site.cms && { cms: site.cms }), // Conditionally include cms if it exists
+        ...(site.spot_number && { spot_number: site.spot_number }), // Conditionally include spot_number if it exists
       })
 
       // Calculate total amount for this site

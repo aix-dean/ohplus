@@ -478,7 +478,7 @@ export function CreateReportDialog({
   const handleAfterImageUpload = async (index: number, event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (file) {
-      await uploadImage(file, index, afterImages, setAfterImages, "after")
+      await uploadImage(file, index, afterImages, setAfterImages, "After")
     }
   }
 
@@ -852,7 +852,7 @@ export function CreateReportDialog({
                 fileName: img.fileName || "",
                 fileType: img.fileType || img.file?.type || "",
                 fileUrl: img.fileUrl!,
-                label: "after",
+                label: "After",
               })),
             ...attachments
               .filter((att) => att.fileUrl)
@@ -1266,7 +1266,7 @@ export function CreateReportDialog({
                             onChange={(e) => handleAfterImageUpload(index, e)}
                             disabled={image.uploading}
                           />
-                          {renderImagePreview(image, `after-file-${index}`, "after")}
+                          {renderImagePreview(image, `after-file-${index}`, "After")}
                           {afterImages.length > 1 && (
                             <button
                               type="button"
