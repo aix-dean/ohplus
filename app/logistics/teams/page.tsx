@@ -15,9 +15,9 @@ import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 
 const imgMagnifyingGlass2 = "http://localhost:3845/assets/87240337af8d03b498dfc56870ac33cc3a3bd565.png";
-const imgDots = "http://localhost:3845/assets/33379aff6c0a74a8b123f21d0a65f44e6551bc89.png";
-const imgView = "http://localhost:3845/assets/0749c4cdf6563984269df11dc651353020c70a52.png";
-const imgGrid = "http://localhost:3845/assets/33500d326bcb1d4701b9cf02f2f063b8e9ed2f2a.png";
+const imgDots = "/icons/dots.svg";
+const imgView = "/icons/listview.png";
+const imgGrid = "/icons/cardview.png";
 
 export default function TeamsPage() {
   const { user, userData } = useAuth()
@@ -113,8 +113,8 @@ export default function TeamsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-4 md:p-6 lg:p-8" style={{ marginTop: '-32px' }}>
-      <div className="max-w-7xl" style={{ marginLeft: '-25px', marginRight: 'auto' }}>
+    <div className="min-h-screen p-4 md:p-6 lg:p-8" style={{ marginTop: '-32px' }}>
+      <div className="max-w-screen-2xl" style={{ marginLeft: '-25px', marginRight: 'auto' }}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-700" style={{ transform: 'translate(0px, -30px)' }}>
@@ -129,11 +129,11 @@ export default function TeamsPage() {
                 setIsAddTeamDialogOpen(true)
               }}
               className="bg-white border border-gray-400 rounded-lg px-4 py-2 text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              style={{ transform: 'translate(255px, 0px)' }}
+              style={{ transform: 'translate(275px, 0px)' }}
             >
               Add New Team
             </button>
-            <div className="flex items-center gap-2" style={{ transform: 'translate(220px, 3px)' }}>
+            <div className="flex items-center gap-2" style={{ transform: 'translate(240px, 3px)' }}>
               <button
                 onClick={() => setViewMode('list')}
                 className={`w-6 h-6 ${viewMode === 'list' ? '' : 'opacity-30'}`}
@@ -168,7 +168,7 @@ export default function TeamsPage() {
 
         {/* Team Display */}
         {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" style={{ transform: 'translate(0px, -55px)', columnGap: '-25px', rowGap: '20px' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" style={{ transform: 'translate(0px, -55px)', columnGap: '315px', rowGap: '20px' }}>
             {paginatedTeams.map((team) => (
             <div
               key={team.id}
@@ -247,7 +247,7 @@ export default function TeamsPage() {
               </div>
 
               <div className="flex flex-col items-center mb-2">
-                <div className="w-48 h-48 md:w-52 md:h-52 bg-transparent border-none outline-none flex items-center justify-center" style={{ border: 'none', outline: 'none' }}>
+                <div className="w-48 h-48 md:w-52 md:h-52 bg-transparent border-0 outline-0 shadow-none flex items-center justify-center overflow-hidden" style={{ border: 'none', outline: 'none', boxShadow: 'none' }}>
                   {(() => {
                     const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
                     const avatar = avatarMatch ? avatarMatch[1] : null
@@ -255,8 +255,8 @@ export default function TeamsPage() {
                       <img
                         src={`/icons/${avatar}`}
                         alt={`${team.name} avatar`}
-                        className="w-full h-full"
-                        style={{ outline: 'none', border: 'none' }}
+                        className="w-full h-full object-contain border-0 outline-0 shadow-none"
+                        style={{ outline: 'none', border: 'none', boxShadow: 'none', display: 'block' }}
                       />
                     ) : (
                       <span className="text-2xl md:text-3xl text-gray-500 font-bold">
@@ -282,15 +282,15 @@ export default function TeamsPage() {
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-t-lg" style={{ transform: 'translate(0px, -55px)', width: '1499px', height: '566px' }}>
+          <div className="bg-white rounded-t-lg w-full" style={{ transform: 'translate(0px, -55px)' }}>
             {/* Table Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <div className="flex items-center space-x-8">
-                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1" style={{ transform: 'translate(100px, 0px)' }}>Crew Name</div>
-                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1" style={{ transform: 'translate(220px, 0px)' }}>Crew Head</div>
-                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1 whitespace-nowrap" style={{ transform: 'translate(350px, 0px)' }}>Contact Number</div>
+            <div className="flex items-center px-6 py-4 border-b">
+              <div className="flex items-center">
+                <div className="w-80 text-sm font-semibold text-gray-700 text-left truncate">Crew Name</div>
+                <div className="w-64 text-sm font-semibold text-gray-700 text-left truncate">Crew Head</div>
+                <div className="w-64 text-sm font-semibold text-gray-700 text-left">Contact Number</div>
               </div>
-              <div className="w-16 text-center text-sm font-semibold text-gray-700">Actions</div>
+              <div className="ml-auto w-20 text-left text-sm font-semibold text-gray-700">Actions</div>
             </div>
 
             {/* Table Rows */}
@@ -298,7 +298,8 @@ export default function TeamsPage() {
               {paginatedTeams.map((team) => (
                 <div
                   key={team.id}
-                  className="flex items-center justify-between bg-white border-2 border-blue-200 rounded-lg h-16 px-4 cursor-pointer"
+                  className="flex items-center h-16 px-6 cursor-pointer"
+                  style={{ borderRadius: '10px', border: '2px solid #B8D9FF', background: '#F6F9FF' }}
                   onClick={(e) => {
                     // Prevent navigation if clicking on dropdown menu
                     if (!(e.target as Element).closest('.dropdown-menu')) {
@@ -306,12 +307,12 @@ export default function TeamsPage() {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-8">
-                    <div className="text-sm text-gray-700 text-left min-w-0 flex-1" style={{ transform: 'translate(95px, 0px)' }}>{team.name}</div>
-                    <div className="text-sm text-gray-700 text-left min-w-0 flex-1 whitespace-nowrap" style={{ transform: 'translate(190px, 0px)' }}>{team.leaderName || 'No Leader'}</div>
-                    <div className="text-sm text-gray-700 text-left min-w-0 flex-1" style={{ transform: 'translate(312px, 0px)' }}>{team.contactNumber || 'N/A'}</div>
+                  <div className="flex items-center">
+                    <div className="w-80 text-sm text-gray-700 text-left truncate">{team.name}</div>
+                    <div className="w-64 text-sm text-gray-700 text-left truncate">{team.leaderName || 'No Leader'}</div>
+                    <div className="w-64 text-sm text-gray-700 text-left">{team.contactNumber || 'N/A'}</div>
                   </div>
-                  <div className="w-16 flex justify-center relative">
+                  <div className="ml-auto w-20 flex justify-end relative">
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
