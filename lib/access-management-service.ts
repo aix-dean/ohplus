@@ -217,26 +217,6 @@ export async function removePermissionFromRole(roleId: string, permissionId: str
   }
 }
 
-export async function getUserById(userId: string): Promise<User | null> {
-  try {
-    const userDoc = await getDoc(doc(db, "iboard_users", userId))
-    if (userDoc.exists()) {
-      return {
-        id: userDoc.id,
-        ...userDoc.data(),
-        // Ensure these fields are properly typed
-        email: userDoc.data().email || "",
-        displayName: userDoc.data().display_name || "",
-        photoURL: userDoc.data().photo_url || "",
-      } as User
-    }
-    return null
-  } catch (error) {
-    console.error("Error getting user by ID:", error)
-    throw new Error("Failed to get user")
-  }
-}
-
 // User Management
 // User Management
 export async function getUsers(licenseKey?: string): Promise<User[]> {
