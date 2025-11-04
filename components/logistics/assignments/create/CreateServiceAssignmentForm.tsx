@@ -88,6 +88,10 @@ function JobOrderDetailsCard({
           <Label className="w-1/2">Requested by:</Label>
           <p className="w-1/2 font-medium m-0 p-0">{jobOrder.requestedBy}</p>
         </div>
+        <div className="flex items-center">
+          <Label className="w-1/2">Booking ID:</Label>
+          <p className="w-1/2 font-medium m-0 p-0">{jobOrder.booking_id || "N/A"}</p>
+        </div>
         <div className="flex justify-end">
           <Button variant="link" size="sm" onClick={onChange}>Change</Button>
         </div>

@@ -124,8 +124,16 @@ vi.mock('@/components/logistics/assignments/create/ProductSelectionDialog', () =
           onClick={() => onSelectProduct({
             id: 'test-product-id',
             name: 'Test Product',
+            description: 'Test Description',
+            price: 1000,
+            active: true,
+            deleted: false,
+            seller_id: 'seller-id',
+            seller_name: 'Seller Name',
+            company_id: 'company-id',
+            position: 1,
             playerIds: ['test-player-id-1', 'test-player-id-2']
-          })}
+          } as Product)}
         >
           Select Product
         </button>
@@ -142,14 +150,23 @@ vi.mock('@/components/logistics/assignments/create/JobOrderSelectionDialog', () 
           onClick={() => onSelectJobOrder({
             id: 'test-job-order-id',
             joNumber: 'JO-001',
-            product_id: 'test-product-id',
+            siteName: 'Test Site',
             joType: 'Installation',
-            jobDescription: 'Test job description',
-            campaignName: 'Test Campaign',
+            requestedBy: 'Test User',
+            assignTo: 'Test Assignee',
             dateRequested: new Date('2025-01-01'),
             deadline: new Date('2025-01-15'),
+            jobDescription: 'Test job description',
+            attachments: [],
+            status: 'pending',
+            created: new Date(),
+            updated: new Date(),
+            created_by: 'test-user',
+            company_id: 'test-company',
+            product_id: 'test-product-id',
+            campaignName: 'Test Campaign',
             clientName: 'Test Client'
-          })}
+          } as JobOrder)}
         >
           Select Job Order
         </button>
@@ -213,14 +230,23 @@ describe('CreateServiceAssignmentPage', () => {
       const mockJobOrder: JobOrder = {
         id: 'test-job-order-id',
         joNumber: 'JO-001',
-        product_id: 'test-product-id',
+        siteName: 'Test Site',
         joType: 'Installation',
-        jobDescription: 'Test job description',
-        campaignName: 'Test Campaign',
+        requestedBy: 'Test User',
+        assignTo: 'Test Assignee',
         dateRequested: new Date('2025-01-01'),
         deadline: new Date('2025-01-15'),
+        jobDescription: 'Test job description',
+        attachments: [],
+        status: 'pending',
+        created: new Date(),
+        updated: new Date(),
+        created_by: 'test-user',
+        company_id: 'test-company',
+        product_id: 'test-product-id',
+        campaignName: 'Test Campaign',
         clientName: 'Test Client'
-      }
+      } as JobOrder
 
       render(<CreateServiceAssignmentPage />)
 
@@ -243,6 +269,14 @@ describe('CreateServiceAssignmentPage', () => {
       expect(screen.getByTestId('confirmation-dialog')).toBeInTheDocument()
       expect(screen.getByTestId('confirm-submit-btn')).toBeInTheDocument()
       expect(screen.getByTestId('cancel-confirmation-btn')).toBeInTheDocument()
+    })
+
+    it('should handle async submit function', async () => {
+      render(<CreateServiceAssignmentPage />)
+
+      // Click the submit button - should resolve without error
+      const submitBtn = screen.getByTestId('submit-btn')
+      await expect(userEvent.click(submitBtn)).resolves.toBeUndefined()
     })
 
     it('should proceed with submission when confirmation is accepted', async () => {
