@@ -69,7 +69,7 @@ export default function SiteControls({ product }: SiteControlsProps) {
         },
         body: JSON.stringify({
           "playerIds": ["141a16d405254b8fb5c5173ef3a58cc5"],
-          "value": 0,
+          "value": 50,
           "noticeUrl": "http://www.abc.com/notice"
         })
       });
