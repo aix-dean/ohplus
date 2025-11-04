@@ -32,6 +32,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
+import { ServiceAssignmentConfirmationDialog } from "@/components/service-assignment-confirmation-dialog"
 import { useToast } from "@/hooks/use-toast"
 
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
@@ -65,6 +66,7 @@ export default function CreateServiceAssignmentPage() {
   const [draftId, setDraftId] = useState<string | null>(null)
   const [isJobOrderSelectionDialogOpen, setIsJobOrderSelectionDialogOpen] = useState(false) // State for JobOrderSelectionDialog
   const [jobOrderData, setJobOrderData] = useState<JobOrder | null>(null) // State to store fetched job order
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false) // State for confirmation dialog
 
   const [teams, setTeams] = useState<Team[]>([])
   const [isProductSelectionDialogOpen, setIsProductSelectionDialogOpen] = useState(false) // State for ProductSelectionDialog
@@ -413,8 +415,13 @@ export default function CreateServiceAssignmentPage() {
     return convertedAttachments
   }
 
-  // Handle form submission
-  const handleSubmit = async () => {
+  // Handle form submission - shows confirmation dialog first
+  const handleSubmit = () => {
+    setShowConfirmationDialog(true)
+  }
+
+  // Handle confirmed form submission
+  const handleSubmitConfirmed = async () => {
     if (!user) return
 
     // Validate that a site is selected
@@ -1227,6 +1234,19 @@ export default function CreateServiceAssignmentPage() {
         companyId={userData?.company_id || ""}
         onSelectJobOrder={handleJobOrderSelect}
         selectedJobOrderId={jobOrderId}
+      />
+
+      <ServiceAssignmentConfirmationDialog
+        open={showConfirmationDialog}
+        onOpenChange={setShowConfirmationDialog}
+        onConfirm={() => {
+          setShowConfirmationDialog(false)
+          handleSubmitConfirmed()
+        }}
+        formData={formData}
+        selectedProductName={products.find(p => p.id === formData.projectSite)?.name}
+        selectedTeamName={teams.find(t => t.id === (formData.assignedTo || formData.crew))?.name}
+        isSubmitting={loading}
       />
     </section>
   )
