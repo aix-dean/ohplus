@@ -796,11 +796,8 @@ export default function CreateReportPage() {
                         className="w-20  text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                         value={completePercentage}
                         onChange={(e) => {
-                          const value = Number(e.target.value);
-                          if (value >= 0 && value <= 100) {
-                            console.log("value type")
-                            setCompletePercentage(value);
-                          }
+                          const value = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                          setCompletePercentage(value);
                         }}
                       />
                       <span className="text-sm text-gray-600">of 100%</span>
