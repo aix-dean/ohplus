@@ -9,6 +9,7 @@ declare global {
   }
 }
 import { notFound, useRouter, useSearchParams } from "next/navigation"
+import { use } from "react"
 import Image from "next/image"
 import {
   Calendar,
@@ -48,6 +49,7 @@ import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-
 import { CreateReportDialog } from "@/components/create-report-dialog"
 import { SiteReportsTable } from "@/components/logistics/reports/SiteReportsTable"
 import { SiteServiceAssignmentsTable } from "@/components/logistics/assignments/SiteServiceAssignmentsTable"
+import SiteControls from "@/components/logistics/SiteControls"
 import Link from "next/link"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
@@ -228,7 +230,7 @@ interface ServiceAssignment {
 }
 
 export default function SiteDetailsPage({ params }: Props) {
-  const resolvedParams = use(params)
+  const resolvedParams = use(params) as { id: string }
   const [product, setProduct] = useState<any>(null)
   const [jobOrders, setJobOrders] = useState<JobOrder[]>([]) // Changed from serviceAssignments
   const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([]) // Keep service assignments for other parts if needed
@@ -363,6 +365,7 @@ export default function SiteDetailsPage({ params }: Props) {
 
         // Fetch product data
         const productData = await getProductById(resolvedParams.id)
+        const productData = await getProductById(resolvedParams.id)
         if (!productData) {
           notFound()
         }
@@ -371,6 +374,7 @@ export default function SiteDetailsPage({ params }: Props) {
         // Fetch job orders for this product
         const jobOrdersQuery = query(
           collection(db, "job_orders"), // Changed collection to "job_orders"
+          where("product_id", "==", resolvedParams.id), // Assuming "product_id" links to the site
           where("product_id", "==", resolvedParams.id), // Assuming "product_id" links to the site
           orderBy("createdAt", "desc"), // Changed from 'created' to 'createdAt'
         )
@@ -401,7 +405,7 @@ export default function SiteDetailsPage({ params }: Props) {
     }
 
     fetchData()
-  }, [params.id])
+  }, [resolvedParams.id])
 
   // Initialize compliance and illumination state from product data
   useEffect(() => {
@@ -419,7 +423,7 @@ export default function SiteDetailsPage({ params }: Props) {
 
   const handleCreateServiceAssignment = () => {
     setIsCreatingSA(true)
-    router.push(`/logistics/assignments/create?projectSite=${params.id}`)
+    router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
     setTimeout(() => setIsCreatingSA(false), 1000)
   }
 
@@ -651,6 +655,7 @@ export default function SiteDetailsPage({ params }: Props) {
   const contentType = (product.content_type || "").toLowerCase()
   const isStatic = contentType === "static"
   const isDynamic = contentType === "dynamic"
+  const showControlTab = contentType === "digital" || contentType === "dynamic"
   const category = product.categories[0] || ""
   // Format dimensions
   const width = product.specs_rental?.width || 0
@@ -856,11 +861,12 @@ export default function SiteDetailsPage({ params }: Props) {
           </Card>
           <div className="">
             <Tabs defaultValue="gen-info" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className={`grid w-full ${showControlTab ? 'grid-cols-5' : 'grid-cols-4'}`}>
                 <TabsTrigger value="gen-info">Gen. Info</TabsTrigger>
                 <TabsTrigger value="content-history">Content History</TabsTrigger>
                 <TabsTrigger value="service-assignments">Service Assignments</TabsTrigger>
                 <TabsTrigger value="reports">Reports</TabsTrigger>
+                {showControlTab && <TabsTrigger value="control">Control</TabsTrigger>}
               </TabsList>
 
               <TabsContent value="gen-info" className="">
@@ -1234,7 +1240,7 @@ export default function SiteDetailsPage({ params }: Props) {
                     <CardTitle>Service Assignments</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <SiteServiceAssignmentsTable projectSiteId={params.id} companyId={product.company_id} />
+                    <SiteServiceAssignmentsTable projectSiteId={resolvedParams.id} companyId={product.company_id} />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1245,10 +1251,16 @@ export default function SiteDetailsPage({ params }: Props) {
                     <CardTitle>Reports</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <SiteReportsTable projectSiteId={params.id} companyId={product.company_id} />
+                    <SiteReportsTable projectSiteId={resolvedParams.id} companyId={product.company_id} />
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              {showControlTab && (
+                <TabsContent value="control" className="">
+                  <SiteControls product={product} />
+                </TabsContent>
+              )}
             </Tabs>
           </div>
 
@@ -1270,6 +1282,7 @@ export default function SiteDetailsPage({ params }: Props) {
         onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
+          router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
         }}
       />
       <DisplayIndexCardDialog
@@ -1278,11 +1291,13 @@ export default function SiteDetailsPage({ params }: Props) {
         onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
           router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
+          router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
         }}
       />
       <CreateReportDialog
         open={createReportDialogOpen}
         onOpenChange={setCreateReportDialogOpen}
+        siteId={resolvedParams.id}
         siteId={resolvedParams.id}
         module="logistics"
       />
