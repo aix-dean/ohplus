@@ -81,7 +81,7 @@ function JobOrderDetailsCard({
         </div>
         <div className="flex items-center">
           <Label className={`${fieldLabelClass} w-1/2`}>Campaign Name:</Label>
-          <p className={`w-1/2 ${fieldValueClass} m-0 p-0`}>{jobOrder.siteName}</p>
+          <p className={`w-1/2 ${fieldValueClass} m-0 p-0`}>{jobOrder.campaignName}</p>
         </div>
         <div className="flex items-center">
           <Label className={`${fieldLabelClass} w-1/2`}>Deadline:</Label>

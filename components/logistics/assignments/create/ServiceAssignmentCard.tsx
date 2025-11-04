@@ -201,6 +201,13 @@ export function ServiceAssignmentCard({
     }
   }, [localSelectedJobOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Set campaignName from the tagged job order (selectedJobOrder) when it changes
+  useEffect(() => {
+    if (localSelectedJobOrder?.campaignName) {
+      handleInputChange("campaignName", localSelectedJobOrder.campaignName);
+    }
+  }, [localSelectedJobOrder]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-calculate service duration when dates or service type change
   useEffect(() => {
     const duration = calculateServiceDuration(formData.startDate, formData.endDate, formData.serviceType);
@@ -292,7 +299,7 @@ export function ServiceAssignmentCard({
     // Auto-fill form fields with job order data
     handleInputChange("serviceType", jobOrder.joType || "");
     handleInputChange("remarks", jobOrder.remarks || "");
-    handleInputChange("campaignName", jobOrder.siteName || "");
+    handleInputChange("campaignName", jobOrder.campaignName || "");
 
     // Set dates if available and valid
     const requestedDate = parseDateSafely(jobOrder.dateRequested);

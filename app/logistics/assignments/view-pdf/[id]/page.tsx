@@ -386,7 +386,22 @@ export default function ViewPDFPage() {
             endDate: assignmentData.endDate ? new Date(assignmentData.endDate) : null,
             alarmDate: assignmentData.alarmDate ? new Date(assignmentData.alarmDate) : null,
             alarmTime: assignmentData.alarmTime || '',
-            attachments: assignmentData.attachments || [],
+            attachments: assignmentData.attachments && assignmentData.attachments.length > 0
+              ? assignmentData.attachments
+              : [
+                  ...(jobOrderData?.attachments ? [{
+                    name: 'Job Order Attachment',
+                    type: 'image',
+                    url: jobOrderData.attachments.url,
+                    fileUrl: jobOrderData.attachments.url
+                  }] : []),
+                  ...(jobOrderData?.siteImageUrl ? [{
+                    name: 'Site Image',
+                    type: 'image',
+                    url: jobOrderData.siteImageUrl,
+                    fileUrl: jobOrderData.siteImageUrl
+                  }] : [])
+                ],
             serviceExpenses: assignmentData.serviceExpenses || [],
             status: "Sent",
             created: new Date(),
@@ -466,7 +481,22 @@ export default function ViewPDFPage() {
               endDate: assignmentData.endDate ? new Date(assignmentData.endDate) : null,
               alarmDate: assignmentData.alarmDate ? new Date(assignmentData.alarmDate) : null,
               alarmTime: assignmentData.alarmTime || '',
-              attachments: assignmentData.attachments || [],
+              attachments: assignmentData.attachments && assignmentData.attachments.length > 0
+                ? assignmentData.attachments
+                : [
+                    ...(jobOrderData?.attachments ? [{
+                      name: 'Job Order Attachment',
+                      type: 'image',
+                      url: jobOrderData.attachments.url,
+                      fileUrl: jobOrderData.attachments.url
+                    }] : []),
+                    ...(jobOrderData?.siteImageUrl ? [{
+                      name: 'Site Image',
+                      type: 'image',
+                      url: jobOrderData.siteImageUrl,
+                      fileUrl: jobOrderData.siteImageUrl
+                    }] : [])
+                  ],
               serviceExpenses: assignmentData.serviceExpenses || [],
               status: "Sent",
               created: new Date(),
