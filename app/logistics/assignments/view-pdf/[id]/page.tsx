@@ -540,67 +540,71 @@ export default function ViewPDFPage() {
        // Keep assignedTo as team ID for Firestore storage
        let assignedToValue = assignmentData.assignedTo || assignmentData.crew || 'Unassigned';
 
-       // Upload PDF to Firebase Storage with validation
-       if (!pdfData || pdfData.length === 0) {
-         throw new Error('PDF data is empty or invalid');
-       }
+        // Extract booking_id from URL parameters
+        const bookingId = searchParams.get("booking_id");
 
-       let pdfUrl: string;
-       try {
-         const pdfBlob = new Blob([Uint8Array.from(atob(pdfData), c => c.charCodeAt(0))], { type: 'application/pdf' });
-         const pdfFileName = `service-assignments/${assignmentData.saNumber}-${Date.now()}.pdf`;
-         const pdfRef = ref(storage, pdfFileName);
-         await uploadBytes(pdfRef, pdfBlob);
-         pdfUrl = await getDownloadURL(pdfRef);
-       } catch (blobError) {
-         console.error('Error creating PDF blob:', blobError);
-         throw new Error('Failed to create PDF blob from data');
-       }
+        // Upload PDF to Firebase Storage with validation
+        if (!pdfData || pdfData.length === 0) {
+          throw new Error('PDF data is empty or invalid');
+        }
 
-       // Create service assignment data with defaults
-       const firestoreAssignmentData = {
-         saNumber: assignmentData.saNumber,
-         projectSiteId: assignmentData.projectSiteId || '',
-         projectSiteName: assignmentData.projectSiteName || 'Project Site Name',
-         projectSiteLocation: assignmentData.projectSiteLocation || '',
-         serviceType: assignmentData.serviceType,
-         assignedTo: assignedToValue,
-         assignedToName: assignmentData.assignedToName || '',
-         serviceDuration: assignmentData.serviceDuration || '',
-         priority: assignmentData.priority || 'Normal',
-         equipmentRequired: assignmentData.equipmentRequired || '',
-         materialSpecs: assignmentData.materialSpecs || '',
-         crew: assignmentData.crew || '',
-         gondola: assignmentData.gondola || '',
-         technology: assignmentData.technology || '',
-         sales: assignmentData.sales || '',
-         remarks: assignmentData.remarks || '',
-         message: assignmentData.message || '',
-         campaignName: assignmentData.campaignName || '',
-         coveredDateStart: Timestamp.fromDate(new Date(assignmentData.startDate)),
-         coveredDateEnd: Timestamp.fromDate(new Date(assignmentData.endDate)),
-         alarmDate: assignmentData.alarmDate ? Timestamp.fromDate(new Date(assignmentData.alarmDate)) : null,
-         alarmTime: assignmentData.alarmTime || '',
-         attachments: assignmentData.attachments || [],
-         serviceExpenses: assignmentData.serviceExpenses || [],
-         pdf: pdfUrl,
-         status: "Sent",
-         updated: serverTimestamp(),
-         project_key: userData?.license_key || '',
-         company_id: userData?.company_id || null,
-         jobOrderId: jobOrderId,
-         requestedBy: jobOrderData?.requestedBy ? {
-           id: user.uid,
-           name: jobOrderData.requestedBy,
-           department: "LOGISTICS",
-         } : {
-           id: user.uid,
-           name: userData?.first_name && userData?.last_name
-             ? `${userData.first_name} ${userData.last_name}`
-             : user?.displayName || "Unknown User",
-           department: "LOGISTICS",
-         },
-       };
+        let pdfUrl: string;
+        try {
+          const pdfBlob = new Blob([Uint8Array.from(atob(pdfData), c => c.charCodeAt(0))], { type: 'application/pdf' });
+          const pdfFileName = `service-assignments/${assignmentData.saNumber}-${Date.now()}.pdf`;
+          const pdfRef = ref(storage, pdfFileName);
+          await uploadBytes(pdfRef, pdfBlob);
+          pdfUrl = await getDownloadURL(pdfRef);
+        } catch (blobError) {
+          console.error('Error creating PDF blob:', blobError);
+          throw new Error('Failed to create PDF blob from data');
+        }
+
+        // Create service assignment data with defaults
+        const firestoreAssignmentData = {
+          saNumber: assignmentData.saNumber,
+          projectSiteId: assignmentData.projectSiteId || '',
+          projectSiteName: assignmentData.projectSiteName || 'Project Site Name',
+          projectSiteLocation: assignmentData.projectSiteLocation || '',
+          serviceType: assignmentData.serviceType,
+          assignedTo: assignedToValue,
+          assignedToName: assignmentData.assignedToName || '',
+          serviceDuration: assignmentData.serviceDuration || '',
+          priority: assignmentData.priority || 'Normal',
+          equipmentRequired: assignmentData.equipmentRequired || '',
+          materialSpecs: assignmentData.materialSpecs || '',
+          crew: assignmentData.crew || '',
+          gondola: assignmentData.gondola || '',
+          technology: assignmentData.technology || '',
+          sales: assignmentData.sales || '',
+          remarks: assignmentData.remarks || '',
+          message: assignmentData.message || '',
+          campaignName: assignmentData.campaignName || '',
+          coveredDateStart: Timestamp.fromDate(new Date(assignmentData.startDate)),
+          coveredDateEnd: Timestamp.fromDate(new Date(assignmentData.endDate)),
+          alarmDate: assignmentData.alarmDate ? Timestamp.fromDate(new Date(assignmentData.alarmDate)) : null,
+          alarmTime: assignmentData.alarmTime || '',
+          attachments: assignmentData.attachments || [],
+          serviceExpenses: assignmentData.serviceExpenses || [],
+          pdf: pdfUrl,
+          status: "Sent",
+          updated: serverTimestamp(),
+          project_key: userData?.license_key || '',
+          company_id: userData?.company_id || null,
+          jobOrderId: jobOrderId,
+          booking_id: bookingId,
+          requestedBy: jobOrderData?.requestedBy ? {
+            id: user.uid,
+            name: jobOrderData.requestedBy,
+            department: "LOGISTICS",
+          } : {
+            id: user.uid,
+            name: userData?.first_name && userData?.last_name
+              ? `${userData.first_name} ${userData.last_name}`
+              : user?.displayName || "Unknown User",
+            department: "LOGISTICS",
+          },
+        };
 
        // Create the service assignment in Firestore
        await addDoc(collection(db, "service_assignments"), {
@@ -641,6 +645,9 @@ export default function ViewPDFPage() {
 
        // Keep assignedTo as team ID for Firestore storage
        let assignedToValue = assignmentData.assignedTo || assignmentData.crew || 'Unassigned';
+
+       // Extract booking_id from URL parameters
+       const bookingId = searchParams.get("booking_id");
 
        // Upload PDF to Firebase Storage with validation
        if (!pdfData || pdfData.length === 0) {
@@ -691,6 +698,7 @@ export default function ViewPDFPage() {
          project_key: userData?.license_key || '',
          company_id: userData?.company_id || null,
          jobOrderId: jobOrderId,
+         booking_id: bookingId,
          requestedBy: jobOrderData?.requestedBy ? {
            id: user.uid,
            name: jobOrderData.requestedBy,

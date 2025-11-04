@@ -684,8 +684,8 @@ export default function CreateServiceAssignmentPage() {
       localStorage.setItem('serviceAssignmentData', JSON.stringify(assignmentData));
       localStorage.setItem('serviceAssignmentPDF', pdfBase64);
 
-      // Navigate to view-pdf page with the exact URL format
-      router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=${jobOrderId || 'Df4wxbfrO5EnAbml0r2I'}`);
+      // Navigate to view-pdf page with the exact URL format including booking_id
+      router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=${jobOrderId || 'Df4wxbfrO5EnAbml0r2I'}&booking_id=${jobOrderData?.booking_id || ''}`);
     } catch (error) {
       console.error("Error generating PDF:", error)
       toast({
