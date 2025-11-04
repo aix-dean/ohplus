@@ -254,6 +254,7 @@ export async function generateReportPDF(
         margin-bottom: 50mm;
         font-size: 10px;
         color: #555;
+        margin-right: 10mm;
   }
     }
     .page-footer {
@@ -268,7 +269,6 @@ export async function generateReportPDF(
         box-sizing: border-box;
         color: #555;
         width: 100%;
-        padding: 5px 15mm;
   }
     body {
         font-family: 'Inter', Arial, sans-serif;
@@ -425,7 +425,7 @@ export async function generateReportPDF(
 
     /* ATTACHMENTS */
     .attachments {
-        margin-top: 30mm;
+        margin-top: 40mm;
     }
     .attachment-columns {
         display: grid;
@@ -710,9 +710,9 @@ export async function generateReportPDF(
 `,
         margin: {
           top: '30mm',
-          right: '10mm',
-          bottom: '30mm',
-          left: '10mm'
+          right: '0mm',
+          bottom: '20mm',
+          left: '0mm'
         }
       })
 

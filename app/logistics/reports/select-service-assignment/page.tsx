@@ -7,7 +7,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { searchServiceAssignments } from "@/lib/algolia-service"
 import { getPaginatedServiceAssignmentsByCompanyId, getServiceAssignmentsByCompanyIdRealtime } from "@/lib/firebase-service"
 import { useDebounce } from "@/hooks/use-debounce"
-import { getTeams } from "@/lib/teams-service"
+import { getTeamById } from "@/lib/teams-service"
 import type { Team } from "@/lib/types/team"
 import type { ServiceAssignment } from "@/lib/firebase-service"
 import ReportTypeDialog from "@/components/report-type-dialog"
@@ -96,14 +96,25 @@ const SelectServiceAssignmentPage = () => {
   }, [debouncedSearchQuery])
 
   useEffect(() => {
-    if (!userData?.company_id) return
+    if (!userData?.company_id || assignments.length === 0) return
 
-    const fetchTeams = async () => {
+    const fetchRelevantTeams = async () => {
       try {
-        const teams = await getTeams()
+        const teamIds = new Set<string>()
+        assignments.forEach(assignment => {
+          if (assignment.crew) teamIds.add(assignment.crew)
+          if (assignment.assignedTo) teamIds.add(assignment.assignedTo)
+        })
+
+        const teams = await Promise.all(
+          Array.from(teamIds).map(id => getTeamById(id, userData.company_id || undefined))
+        )
+
         const teamsMapping: Record<string, string> = {}
         teams.forEach(team => {
-          teamsMapping[team.id] = team.name
+          if (team) {
+            teamsMapping[team.id] = team.name
+          }
         })
         setTeamsMap(teamsMapping)
       } catch (error) {
@@ -111,8 +122,8 @@ const SelectServiceAssignmentPage = () => {
       }
     }
 
-    fetchTeams()
-  }, [userData?.company_id])
+    fetchRelevantTeams()
+  }, [assignments, userData?.company_id])
 
   // Real-time listener for service assignments when not searching
   useEffect(() => {
@@ -265,7 +276,7 @@ const SelectServiceAssignmentPage = () => {
                     <div>{assignment.serviceType || "—"}</div>
                     <div>{assignment.projectSiteName || "—"}</div>
                     <div>{assignment.campaignName || "—"}</div>
-                    <div className="truncate">{(assignment.crew && teamsMap[assignment.crew]) || (assignment.assignedTo && teamsMap[assignment.assignedTo]) || assignment.crew || assignment.assignedTo || "—"}</div>
+                    <div className="truncate">{assignment.assignedToName || assignment.assignedTo || "—"}</div>
                     <div >{formatDate(assignment.coveredDateEnd) || "—"}</div>
                     <div className="capitalize">{assignment.status || "—"}</div>
                   </div>

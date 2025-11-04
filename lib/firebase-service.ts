@@ -231,6 +231,7 @@ export interface ServiceAssignment {
   projectSiteLocation: string
   serviceType: string
   assignedTo: string
+  assignedToName: string  
   jobDescription: string
   requestedBy: {
     id: string
@@ -1278,6 +1279,7 @@ export async function updateServiceAssignment(
           projectSiteLocation: updatedData.projectSiteLocation,
           serviceType: updatedData.serviceType,
           assignedTo: updatedData.assignedTo,
+          assignedToName: updatedData.assignedToName,
           jobDescription: updatedData.jobDescription,
           requestedBy: updatedData.requestedBy,
           message: updatedData.message,
