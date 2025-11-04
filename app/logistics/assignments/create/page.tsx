@@ -66,6 +66,7 @@ export default function CreateServiceAssignmentPage() {
   const [draftId, setDraftId] = useState<string | null>(null)
   const [isJobOrderSelectionDialogOpen, setIsJobOrderSelectionDialogOpen] = useState(false) // State for JobOrderSelectionDialog
   const [jobOrderData, setJobOrderData] = useState<JobOrder | null>(null) // State to store fetched job order
+  const [selectedJobOrderId, setSelectedJobOrderId] = useState<string | null>(null) // State to store selected job order ID
   const [showConfirmationDialog, setShowConfirmationDialog] = useState(false) // State for confirmation dialog
 
   const [teams, setTeams] = useState<Team[]>([])
@@ -271,6 +272,7 @@ export default function CreateServiceAssignmentPage() {
           if (jobOrderDoc.exists()) {
             const fetchedJobOrder = { id: jobOrderDoc.id, ...jobOrderDoc.data() } as JobOrder
             setJobOrderData(fetchedJobOrder)
+            setSelectedJobOrderId(fetchedJobOrder.id)
 
             // Debug logging to understand the job order structure
             console.log("Fetched job order data:", fetchedJobOrder)
@@ -418,6 +420,7 @@ export default function CreateServiceAssignmentPage() {
   // Handle form submission - shows confirmation dialog first
   const handleSubmit = () => {
     setShowConfirmationDialog(true)
+    return Promise.resolve()
   }
 
   // Handle confirmed form submission
@@ -511,7 +514,7 @@ export default function CreateServiceAssignmentPage() {
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
         company_id: userData?.company_id || null,
-        jobOrderId: jobOrderData?.id || null, // Add job order ID if present
+        jobOrderId: selectedJobOrderId || null, // Add job order ID if present
         reservation_number: jobOrderData?.reservation_number || null, // Add reservation number from job order
         booking_id: jobOrderData?.booking_id || null, // Add booking ID from job order
       }
@@ -787,6 +790,8 @@ export default function CreateServiceAssignmentPage() {
 
     try {
       setLoading(true)
+      console.log("jobOrderData:", jobOrderData)
+      console.log("jobOrderData.booking_id:", jobOrderData?.booking_id)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
       const selectedTeam = teams.find((t) => t.id === (formData.assignedTo || formData.crew))
 
@@ -827,7 +832,7 @@ export default function CreateServiceAssignmentPage() {
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
         company_id: userData?.company_id || null,
-        jobOrderId: jobOrderData?.id || null, // Add job order ID if present
+        jobOrderId: selectedJobOrderId || null, // Add job order ID if present
         reservation_number: jobOrderData?.reservation_number || null, // Add reservation number from job order
         booking_id: jobOrderData?.booking_id || null, // Add booking ID from job order
       }
@@ -1043,59 +1048,72 @@ export default function CreateServiceAssignmentPage() {
   };
 
   // Handle job order selection
-  const handleJobOrderSelect = (jobOrder: JobOrder) => {
-    setJobOrderData(jobOrder)
+  const handleJobOrderSelect = async (jobOrder: JobOrder) => {
+    try {
+      // Fetch the complete job order document to get all fields including booking_id and jobOrderId
+      const jobOrderDoc = await getDoc(doc(db, "job_orders", jobOrder.id))
+      if (jobOrderDoc.exists()) {
+        const completeJobOrder = { id: jobOrderDoc.id, ...jobOrderDoc.data() } as JobOrder
+        console.log("Fetched job order data:", completeJobOrder)
+        console.log("booking_id:", completeJobOrder.booking_id)
+        console.log("jobOrderId:", completeJobOrder.id)
+        setJobOrderData(completeJobOrder)
+        setSelectedJobOrderId(completeJobOrder.id)
 
-    // Get the product_id during the selection
-    const productId = jobOrder.product_id || ""
-    if (productId) {
-      // Helper function to safely parse dates
-      const parseDateSafely = (dateValue: any): Date | null => {
-        if (!dateValue) return null;
+        // Get the product_id during the selection
+        const productId = completeJobOrder.product_id || ""
+        if (productId) {
+          // Helper function to safely parse dates
+          const parseDateSafely = (dateValue: any): Date | null => {
+            if (!dateValue) return null;
 
-        try {
-          let date: Date;
+            try {
+              let date: Date;
 
-          if (dateValue instanceof Date) {
-            date = dateValue;
-          } else if (typeof dateValue === 'string') {
-            date = new Date(dateValue);
-            if (isNaN(date.getTime())) {
+              if (dateValue instanceof Date) {
+                date = dateValue;
+              } else if (typeof dateValue === 'string') {
+                date = new Date(dateValue);
+                if (isNaN(date.getTime())) {
+                  return null;
+                }
+              } else if (typeof dateValue === 'number') {
+                date = new Date(dateValue * 1000);
+              } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+                date = new Date(dateValue.seconds * 1000);
+              } else {
+                return null;
+              }
+
+              if (isNaN(date.getTime())) {
+                return null;
+              }
+
+              return date;
+            } catch (error) {
+              console.warn('Error parsing date:', dateValue, error);
               return null;
             }
-          } else if (typeof dateValue === 'number') {
-            date = new Date(dateValue * 1000);
-          } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
-            date = new Date(dateValue.seconds * 1000);
-          } else {
-            return null;
-          }
+          };
 
-          if (isNaN(date.getTime())) {
-            return null;
-          }
+          setFormData((prev) => ({
+            ...prev,
+            projectSite: productId,
+            serviceType: completeJobOrder.joType ? completeJobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
+            remarks: completeJobOrder.remarks || completeJobOrder.jobDescription || "",
+            campaignName: completeJobOrder.campaignName || "",
+            startDate: parseDateSafely(completeJobOrder.dateRequested),
+            endDate: parseDateSafely(completeJobOrder.deadline),
+          }))
 
-          return date;
-        } catch (error) {
-          console.warn('Error parsing date:', dateValue, error);
-          return null;
+          // Update the URL to include the jobOrderId for consistency
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.set('jobOrderId', completeJobOrder.id);
+          window.history.replaceState({}, '', newUrl.toString());
         }
-      };
-
-      setFormData((prev) => ({
-        ...prev,
-        projectSite: productId,
-        serviceType: jobOrder.joType ? jobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
-        remarks: jobOrder.remarks || jobOrder.jobDescription || "",
-        campaignName: jobOrder.campaignName || "",
-        startDate: parseDateSafely(jobOrder.dateRequested),
-        endDate: parseDateSafely(jobOrder.deadline),
-      }))
-
-      // Update the URL to include the jobOrderId for consistency
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.set('jobOrderId', jobOrder.id);
-      window.history.replaceState({}, '', newUrl.toString());
+      }
+    } catch (error) {
+      console.error("Error fetching complete job order:", error)
     }
 
     setIsJobOrderSelectionDialogOpen(false)
@@ -1104,6 +1122,7 @@ export default function CreateServiceAssignmentPage() {
   // Handle changing job order
   const handleChangeJobOrder = () => {
     setJobOrderData(null);
+    setSelectedJobOrderId(null);
     // Clear the jobOrderId from URL
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.delete('jobOrderId');
@@ -1233,7 +1252,7 @@ export default function CreateServiceAssignmentPage() {
         productId={formData.projectSite}
         companyId={userData?.company_id || ""}
         onSelectJobOrder={handleJobOrderSelect}
-        selectedJobOrderId={jobOrderId}
+        selectedJobOrderId={selectedJobOrderId}
       />
 
       <ServiceAssignmentConfirmationDialog
