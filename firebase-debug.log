@@ -875,3 +875,24 @@
 [debug] [2025-11-02T07:29:03.850Z] No OAuth tokens found
 [debug] [2025-11-02T07:29:03.850Z] No OAuth tokens found
 [debug] [2025-11-02T07:29:03.870Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-11-04T01:35:50.015Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.020Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.021Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.022Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.022Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.023Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.023Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.024Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.024Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.025Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.025Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.025Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.026Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.026Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.026Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.026Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.027Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.027Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.028Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.028Z] No OAuth tokens found
+[debug] [2025-11-04T01:35:50.053Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
