@@ -31,8 +31,8 @@ function initializeServiceAssignmentsAlgolia() {
     try {
       algoliasearch = require('algoliasearch')
       const client = algoliasearch(
-        process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_APP_ID,
-        process.env.ALGOLIA_ASSIGNMENTS_ADMIN_API_KEY
+        process.env.NEXT_PUBLIC_ALGOLIA_APP_ID,
+        process.env.ALGOLIA_ADMIN_API_KEY
       )
       serviceAssignmentsIndex = client.initIndex(process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_INDEX_NAME)
     } catch (error) {

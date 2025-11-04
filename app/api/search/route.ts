@@ -65,8 +65,8 @@ export async function POST(request: Request) {
       apiKey = '67f06e32aa15542a1f9f118cb647d33a'
       finalIndexName = 'products'
     } else if (indexName === 'service_assignments') {
-      appId = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_APP_ID
-      apiKey = process.env.ALGOLIA_ASSIGNMENTS_ADMIN_API_KEY
+      appId = process.env.NEXT_PUBLIC_ALGOLIA_APP_ID
+      apiKey = process.env.ALGOLIA_ADMIN_API_KEY
       finalIndexName = process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_INDEX_NAME
     } else if (indexName === 'cost_estimates') {
       appId = process.env.NEXT_PUBLIC_ALGOLIA_COST_ESTIMATES_APP_ID
