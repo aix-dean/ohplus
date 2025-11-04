@@ -4,6 +4,7 @@ import chromium from '@sparticuz/chromium'
 import { generateServiceAssignmentHTMLSimple } from '@/lib/pdf-service'
 import { PDFDocument, PDFName } from 'pdf-lib'
 import { getTeamById } from '@/lib/teams-service'
+import { getJobOrderById } from '@/lib/job-order-service'
 
 // Service Assignment interface for PDF generation
 interface ServiceAssignmentPDFData {
@@ -25,10 +26,11 @@ interface ServiceAssignmentPDFData {
   sales: string
   campaignName?: string
   remarks: string
-  requestedBy: {
+  requestedBy?: {
     name: string
     department: string
   }
+  requestBy?: string // User ID field
   startDate: Date | null
   endDate: Date | null
   alarmDate: Date | null
@@ -88,13 +90,14 @@ export async function POST(request: NextRequest) {
   console.log('[API_PDF_SA] Received service assignment PDF generation request')
 
   try {
-    const { assignment, companyData, logoDataUrl, signatureDataUrl, format = 'pdf', userData }: {
+    const { assignment, companyData, logoDataUrl, signatureDataUrl, format = 'pdf', userData, jobOrderId }: {
       assignment: ServiceAssignmentPDFData;
       companyData: any;
       logoDataUrl: string | null;
       signatureDataUrl: string | null;
       format?: 'pdf' | 'image';
       userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string }
+      jobOrderId?: string;
     } = await request.json()
 
     console.log('[API_PDF_SA] SA Number:', assignment?.saNumber)
@@ -105,6 +108,7 @@ export async function POST(request: NextRequest) {
     console.log('[API_PDF_SA] Signature data URL starts with:', signatureDataUrl?.substring(0, 50))
     console.log('[API_PDF_SA] User data:', userData?.first_name)
     console.log('[API_PDF_SA] Format:', format)
+    console.log('[API_PDF_SA] Job Order ID:', jobOrderId)
 
     // Validate required assignment data
     if (!assignment) {
@@ -143,6 +147,38 @@ export async function POST(request: NextRequest) {
       }
     }
 
+
+    // Handle requestBy field - if assignment has requestBy (user ID), get the name from user data
+    if (assignment.requestBy && !assignment.requestedBy) {
+      console.log('[API_PDF_SA] Assignment has requestBy field:', assignment.requestBy)
+
+      let requesterName = null
+
+      if (userData?.first_name && userData?.last_name) {
+        requesterName = `${userData.first_name} ${userData.last_name}`
+        console.log('[API_PDF_SA] Using user data name:', requesterName)
+      }
+
+      if (requesterName) {
+        assignment.requestedBy = {
+          name: requesterName,
+          department: "LOGISTICS",
+        }
+        console.log('[API_PDF_SA] Set requestedBy from requestBy field:', assignment.requestedBy)
+      }
+    }
+
+    // Ensure requestedBy is set before generating HTML
+    if (!assignment.requestedBy) {
+      console.log('[API_PDF_SA] Setting default requestedBy since none was provided')
+      assignment.requestedBy = {
+        name: userData?.first_name && userData?.last_name
+          ? `${userData.first_name} ${userData.last_name}`
+          : userData?.email?.split('@')[0] || 'Unknown User',
+        department: "LOGISTICS",
+      }
+    }
+
     // Generate HTML content
     console.log('[API_PDF_SA] Generating HTML content...')
     const htmlContent = await generateServiceAssignmentHTMLSimple(assignment, companyData, logoDataUrl || undefined, signatureDataUrl || undefined)
@@ -177,31 +213,68 @@ export async function POST(request: NextRequest) {
     // Generate PDF
     console.log('[API_PDF_SA] Generating PDF...')
     const buffer = await page.pdf({
-      format: 'A4',
+      format: 'letter',
       printBackground: true,
       displayHeaderFooter: false, // Disable header/footer for now to avoid issues
       margin: {
-        top: '10mm',
-        right: '5mm',
-        bottom: '10mm',
-        left: '5mm'
+        top: '12.7mm',
+        right: '12.7mm',
+        bottom: '12.7mm',
+        left: '12.7mm'
       }
     })
     console.log('[API_PDF_SA] PDF buffer generated, size:', buffer.length, 'bytes')
 
-    // Apply PDF viewer preferences for initial zoom
+    // Apply PDF viewer preferences for initial zoom and filter blank pages
     const pdfDoc = await PDFDocument.load(buffer)
     const pages = pdfDoc.getPages()
-    if (pages.length > 0) {
-      const firstPage = pages[0]
-      const action = pdfDoc.context.obj({
+
+    console.log(`[API_PDF_SA] Original PDF has ${pages.length} pages`)
+
+    // Filter out blank pages (pages with no content)
+    const filteredPages = []
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i]
+      const { width, height } = page.getSize()
+      console.log(`[API_PDF_SA] Page ${i + 1} dimensions: ${width}x${height}`)
+
+      // For single-page PDFs, always keep the page
+      // For multi-page PDFs, only keep pages with reasonable dimensions (likely containing content)
+      if (pages.length === 1 || (width >= 200 && height >= 200)) {
+        filteredPages.push(page)
+        console.log(`[API_PDF_SA] Keeping page ${i + 1}`)
+      } else {
+        console.log(`[API_PDF_SA] Filtering out blank page ${i + 1}`)
+      }
+    }
+
+    // If we filtered out pages, create a new PDF with only the non-blank pages
+    let finalPdfDoc = pdfDoc
+    if (filteredPages.length < pages.length) {
+      console.log(`[API_PDF_SA] Filtered out ${pages.length - filteredPages.length} blank pages, keeping ${filteredPages.length} pages`)
+      finalPdfDoc = await PDFDocument.create()
+
+      for (const page of filteredPages) {
+        const [copiedPage] = await finalPdfDoc.copyPages(pdfDoc, [pdfDoc.getPages().indexOf(page)])
+        finalPdfDoc.addPage(copiedPage)
+      }
+    } else {
+      console.log(`[API_PDF_SA] No blank pages filtered, keeping all ${pages.length} pages`)
+    }
+
+    // Apply zoom preference to the first page
+    if (filteredPages.length > 0) {
+      const firstPage = finalPdfDoc.getPages()[0]
+      const action = finalPdfDoc.context.obj({
         Type: PDFName.of('Action'),
         S: PDFName.of('GoTo'),
         D: [firstPage.ref, PDFName.of('XYZ'), null, null, 1.25]
       })
-      pdfDoc.catalog.set(PDFName.of('OpenAction'), action)
+      finalPdfDoc.catalog.set(PDFName.of('OpenAction'), action)
     }
-    const modifiedBuffer = await pdfDoc.save()
+
+    const modifiedBuffer = await finalPdfDoc.save()
+    console.log(`[API_PDF_SA] Final PDF has ${filteredPages.length} pages`)
     console.log('[API_PDF_SA] PDF viewer preferences applied, modified buffer size:', modifiedBuffer.length, 'bytes')
 
     await browser.close()

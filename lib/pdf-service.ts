@@ -350,10 +350,11 @@ interface ServiceAssignmentPDFData {
   sales: string
   campaignName?: string
   remarks: string
-  requestedBy: {
+  requestedBy?: {
     name: string
     department: string
   }
+  requestBy?: string // User ID field
   startDate: Date | null
   endDate: Date | null
   alarmDate: Date | null
@@ -1069,7 +1070,7 @@ export async function generateServiceAssignmentPDF(
 
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "normal")
-    pdf.text(`${serviceAssignment.requestedBy.department} - ${serviceAssignment.requestedBy.name}`, margin, yPosition)
+    pdf.text(`${serviceAssignment.requestedBy?.department || "LOGISTICS"} - ${serviceAssignment.requestedBy?.name || "Unknown User"}`, margin, yPosition)
     yPosition += 15
 
     // Footer
@@ -2975,7 +2976,7 @@ export async function generateServiceAssignmentHTMLPDF(
           <div style="width: 194px; height: 290px; left: 55px; top: 318px; position: absolute; border: 1px #D9D9D9 solid"></div>
           <div style="width: 255px; height: 255px; left: 55px; top: 649px; position: absolute; border: 1px #D9D9D9 solid"></div>
           <div style="width: 109px; height: 18px; left: 634px; top: 669px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Prepared By</div>
-          <div style="width: 220px; height: 27px; left: 519px; top: 749px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 26px; font-family: Inter; font-weight: 700; line-height: 26px; word-wrap: break-word">${serviceAssignment.requestedBy.name}</div>
+          <div style="width: 220px; height: 27px; left: 519px; top: 749px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 26px; font-family: Inter; font-weight: 700; line-height: 26px; word-wrap: break-word">${serviceAssignment.requestedBy?.name || "Unknown User"}</div>
           <div style="width: 190px; height: 18px; left: 549px; top: 779px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Logistics Team</div>
           <div style="width: 125px; height: 42px; left: 605px; top: 55px; position: absolute; text-align: right"><span style="color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Tagged JO<br/></span><span style="color: var(--LIGHTER-BLACK, #333333); font-size: 21px; font-family: Inter; font-weight: 700; line-height: 24.57px; word-wrap: break-word">JO#${serviceAssignment.saNumber.slice(-4)} </span></div>
         </div>
@@ -3697,7 +3698,7 @@ export async function generateServiceAssignmentFallbackPDF(
 
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "normal")
-    pdf.text(`${serviceAssignment.requestedBy.department} - ${serviceAssignment.requestedBy.name}`, margin, yPosition)
+    pdf.text(`${serviceAssignment.requestedBy?.department || "LOGISTICS"} - ${serviceAssignment.requestedBy?.name || "Unknown User"}`, margin, yPosition)
     yPosition += 15
 
     // Footer
@@ -3790,15 +3791,11 @@ export async function generateServiceAssignmentHTMLSimple(
            background-color: #ffffff;
            color: #000000;
            line-height: 1.4;
-           display: flex;
-           justify-content: center;
-           align-items: center;
-           min-height: 100vh;
          }
 
          .container {
-           width: 595px;
-           height: 842px;
+           width: 816px;
+           height: 1056px;
            margin: auto;
          }
 
@@ -3818,7 +3815,6 @@ export async function generateServiceAssignmentHTMLSimple(
         }
 
         .company-logo {
-          width: 60px;
           height: 32px;
         }
 
@@ -3900,7 +3896,7 @@ export async function generateServiceAssignmentHTMLSimple(
           align-items: center;
           justify-content: center;
           width: 130px;
-          height: 33px;
+          height: 30px;
           flex-shrink: 0;
           margin-bottom: 8px;
         }
@@ -4040,6 +4036,10 @@ export async function generateServiceAssignmentHTMLSimple(
           background-color: #ffffff;
           padding: 16px 24px;
           text-align: center;
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
         }
 
         .footer-company {
@@ -4076,9 +4076,9 @@ export async function generateServiceAssignmentHTMLSimple(
           <div class="recipient-left">
             <p class="recipient-label">Recipient</p>
             <h2 class="recipient-name">
-              ${assignment.assignedToName || assignment.assignedTo}
+              ${assignment.requestedBy?.name || assignment.assignedTo}
             </h2>
-            <p class="recipient-dept">${assignment.requestedBy?.department || "Production"}</p>
+            <p class="recipient-dept">Sales</p>
           </div>
           <div class="recipient-right">
             <div class="sa-badge">
@@ -4524,7 +4524,7 @@ export async function generateServiceAssignmentHTML(
       <div class="section">
         <h2>REQUESTED BY</h2>
         <div class="field">
-          <span>${assignmentData.requestedBy.department} - ${assignmentData.requestedBy.name}</span>
+          <span>${assignmentData.requestedBy?.department || "LOGISTICS"} - ${assignmentData.requestedBy?.name || "Unknown User"}</span>
         </div>
       </div>
 
@@ -4550,7 +4550,7 @@ export async function generateServiceAssignmentHTML(
           <div class="signature-box">
             <div class="signature-line"></div>
             <div class="signature-name">Client Representative</div>
-            <div style="font-size: 10px; color: #6b7280; margin-top: 5px;">${assignmentData.requestedBy.name}</div>
+            <div style="font-size: 10px; color: #6b7280; margin-top: 5px;">${assignmentData.requestedBy?.name || "Unknown User"}</div>
           </div>
         </div>
       </div>

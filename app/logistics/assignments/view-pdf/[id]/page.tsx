@@ -16,6 +16,7 @@ import { GenericSuccessDialog } from "@/components/generic-success-dialog";
 import { getTeamById } from "@/lib/teams-service";
 import { CompanyService } from "@/lib/company-service";
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service";
+import { getJobOrderById } from "@/lib/job-order-service";
 
 interface CompanyData {
   id: string
@@ -154,6 +155,7 @@ export default function ViewPDFPage() {
      confirmButtonText: "OK"
    });
    const [companyData, setCompanyData] = useState<CompanyData | null>(null);
+   const [jobOrderData, setJobOrderData] = useState<any>(null);
    const isPreview = id === 'preview';
    const jobOrderId = searchParams.get('jobOrderId') || 'Df4wxbfrO5EnAbml0r2I';
 
@@ -164,6 +166,22 @@ export default function ViewPDFPage() {
       console.log('[PDF Loading] Local storage keys:', Object.keys(localStorage));
       setLoading(true);
       setError(null);
+
+      // Fetch job order data if jobOrderId is provided
+      if (jobOrderId) {
+        try {
+          console.log('[PDF Loading] Fetching job order data for jobOrderId:', jobOrderId);
+          const jobOrder = await getJobOrderById(jobOrderId);
+          if (jobOrder) {
+            setJobOrderData(jobOrder);
+            console.log('[PDF Loading] Job order data fetched:', jobOrder);
+          } else {
+            console.warn('[PDF Loading] Job order not found for ID:', jobOrderId);
+          }
+        } catch (error) {
+          console.error('[PDF Loading] Error fetching job order data:', error);
+        }
+      }
 
       try {
         // Enhanced localStorage validation
@@ -372,12 +390,7 @@ export default function ViewPDFPage() {
             serviceExpenses: assignmentData.serviceExpenses || [],
             status: "Sent",
             created: new Date(),
-            requestedBy: {
-              name: userData?.first_name && userData?.last_name
-                ? `${userData.first_name} ${userData.last_name}`
-                : user?.displayName || "Unknown User",
-              department: "LOGISTICS",
-            },
+            requestBy: user?.uid || '',
           };
 
           console.log('[PDF Loading] Sending request to /api/generate-service-assignment-pdf');
@@ -394,6 +407,7 @@ export default function ViewPDFPage() {
               signatureDataUrl,
               format: 'pdf',
               userData: userData,
+              jobOrderId: jobOrderId,
             }),
           });
 
@@ -456,12 +470,7 @@ export default function ViewPDFPage() {
               serviceExpenses: assignmentData.serviceExpenses || [],
               status: "Sent",
               created: new Date(),
-              requestedBy: {
-                name: userData?.first_name && userData?.last_name
-                  ? `${userData.first_name} ${userData.last_name}`
-                  : user?.displayName || "Unknown User",
-                department: "LOGISTICS",
-              },
+              requestBy: user?.uid || '',
             };
 
             // Generate PDF using client-side jsPDF
@@ -580,7 +589,11 @@ export default function ViewPDFPage() {
          project_key: userData?.license_key || '',
          company_id: userData?.company_id || null,
          jobOrderId: jobOrderId,
-         requestedBy: {
+         requestedBy: jobOrderData?.requestedBy ? {
+           id: user.uid,
+           name: jobOrderData.requestedBy,
+           department: "LOGISTICS",
+         } : {
            id: user.uid,
            name: userData?.first_name && userData?.last_name
              ? `${userData.first_name} ${userData.last_name}`
@@ -678,7 +691,11 @@ export default function ViewPDFPage() {
          project_key: userData?.license_key || '',
          company_id: userData?.company_id || null,
          jobOrderId: jobOrderId,
-         requestedBy: {
+         requestedBy: jobOrderData?.requestedBy ? {
+           id: user.uid,
+           name: jobOrderData.requestedBy,
+           department: "LOGISTICS",
+         } : {
            id: user.uid,
            name: userData?.first_name && userData?.last_name
              ? `${userData.first_name} ${userData.last_name}`
@@ -866,7 +883,7 @@ export default function ViewPDFPage() {
                 </div>
               </div>
             ) : (
-              <div className="w-[210mm] min-h-[297mm] bg-white shadow-md rounded-sm overflow-hidden">
+              <div className="w-[400mm] min-h-[279mm] bg-white shadow-md rounded-sm overflow-hidden">
                 {(() => {
                   console.log('[PDF Loading] Rendering iframe with data length:', pdfData.length);
                   console.log('[PDF Loading] PDF data starts with:', pdfData.substring(0, 50));
@@ -875,7 +892,7 @@ export default function ViewPDFPage() {
                 })()}
                 <iframe
                   src={`data:application/pdf;base64,${pdfData}#zoom=96&navpanes=0&sidebar=0&scrollbar=0`}
-                  className="w-full h-full min-h-[297mm]"
+                  className="w-full h-full min-h-[279mm]"
                   title="PDF Viewer"
                   onLoad={() => {
                     console.log('[PDF Loading] Iframe loaded successfully');
