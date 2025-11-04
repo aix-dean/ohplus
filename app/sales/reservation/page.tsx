@@ -836,7 +836,7 @@ export default function ReservationsPage() {
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation();
-                                router.push(`/sales/job-orders/create?quotationId=${quotationId}`);
+                                router.push(`/sales/job-orders/select-booking?productId=${product?.id}`);
                               }}
                             >
                               Create JO

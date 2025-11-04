@@ -1,11 +1,114 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { Resend } from "resend"
 import { emailService, type EmailAttachment } from "@/lib/email-service"
 import { Timestamp, doc, getDoc } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { storage, db } from "@/lib/firebase"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Helper function to convert image URL to base64 data URI
+async function imageUrlToDataUri(imageUrl: string): Promise<string | null> {
+  try {
+    const response = await fetch(imageUrl)
+    if (!response.ok) {
+      console.error('Failed to fetch image:', response.status, response.statusText)
+      return null
+    }
+
+    const contentType = response.headers.get('content-type')
+    if (!contentType || !contentType.startsWith('image/')) {
+      console.error('Invalid content type for image:', contentType)
+      return null
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+    return `data:${contentType};base64,${base64}`
+  } catch (error) {
+    console.error('Error converting image to data URI:', error)
+    return null
+  }
+}
+
+// Helper function to extract dominant color from base64 image data
+async function extractDominantColor(base64DataUri: string): Promise<string | null> {
+  try {
+    // Extract base64 data from data URI
+    const base64Data = base64DataUri.split(',')[1]
+    if (!base64Data) {
+      console.error('Invalid base64 data URI format')
+      return null
+    }
+
+    // Convert base64 to buffer
+    const imageBuffer = Buffer.from(base64Data, 'base64')
+
+    // Dynamically import node-vibrant to avoid ES module issues
+    let Vibrant: any
+    try {
+      console.log('Attempting to import node-vibrant...')
+      // Use named import for node-vibrant v4+
+      const vibrantModule = await import('node-vibrant/node')
+      Vibrant = vibrantModule.Vibrant
+      console.log('node-vibrant imported successfully')
+    } catch (error) {
+      console.error('Failed to import node-vibrant:', error)
+      return null // Return null if node-vibrant is not available
+    }
+
+    // Get color palette from the image buffer using node-vibrant
+    const palette = await Vibrant.from(imageBuffer).getPalette()
+
+    if (!palette) {
+      console.error('Failed to extract color palette from image')
+      return null
+    }
+
+    // Log all available palette swatches for debugging
+    console.log('Available palette swatches:', Object.keys(palette))
+
+    // Get the dominant color (Vibrant swatch)
+    const dominantColor = palette.Vibrant
+
+    if (!dominantColor) {
+      console.error('No dominant color found in palette')
+      // Try alternative swatches if Vibrant is not available
+      const alternativeSwatches = ['Muted', 'DarkVibrant', 'DarkMuted', 'LightVibrant', 'LightMuted']
+      for (const swatchName of alternativeSwatches) {
+        if (palette[swatchName]) {
+          console.log(`Using alternative swatch: ${swatchName}`)
+          const altDominantColor = palette[swatchName]
+          const hexColor = rgbToHex(
+            Math.round(altDominantColor.rgb[0]),
+            Math.round(altDominantColor.rgb[1]),
+            Math.round(altDominantColor.rgb[2])
+          )
+          console.log('Alternative dominant color extracted:', hexColor)
+          return hexColor
+        }
+      }
+      console.error('No suitable color swatch found in the palette')
+      return null
+    }
+
+    // Convert RGB values to hex format
+    const hexColor = rgbToHex(
+      Math.round(dominantColor.rgb[0]),
+      Math.round(dominantColor.rgb[1]),
+      Math.round(dominantColor.rgb[2])
+    )
+
+    console.log('Dominant color extracted:', hexColor)
+    return hexColor
+
+  } catch (error) {
+    console.error('Error extracting dominant color:', error)
+    return null
+  }
+}
+
+// Helper function to convert RGB to hex
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase()
+}
 
 async function uploadFileToStorage(fileBuffer: Buffer, fileName: string, fileType: string, companyId: string): Promise<string> {
   try {
@@ -77,209 +180,199 @@ async function fetchCompanyData(companyId: string) {
 }
 
 function createEmailTemplate(
-  body: string,
-  userPhoneNumber?: string,
-  companyData?: {
-    company_name?: string
-    company_location?: string
-    phone?: string
-    email?: string
-    website?: string
-  }
-): string {
-  const phoneNumber = userPhoneNumber || companyData?.phone || "+639XXXXXXXXX"
-  const companyName = companyData?.company_name || ""
-  const companyLocation = companyData?.company_location || ""
-  const companyEmail = companyData?.email || "noreply@ohplus.ph"
-  const companyWebsite = companyData?.website || "www.ohplus.ph"
+    body: string,
+    userPhoneNumber?: string,
+    companyData?: {
+      company_name?: string
+      company_location?: string
+      phone?: string
+      email?: string
+      website?: string
+    },
+    companyLogo?: string,
+    dominantColor?: string,
+    replyToEmail?: string,
+    userName?: string,
+    userPosition?: string,
+    quotationUrl?: string
+  ): string {
+   const phoneNumber = userPhoneNumber || companyData?.phone || "+639XXXXXXXXX"
+   const companyName = companyData?.company_name || ""
+   const companyLocation = companyData?.company_location || ""
+   const companyEmail = replyToEmail || companyData?.email || "noreply@ohplus.ph"
+   const companyWebsite = companyData?.website || "www.ohplus.ph"
 
-  const processedBody = body
-    .split("\n")
-    .map((line: string) => line.trim())
-    .filter((line: string) => line.length > 0)
-    .map((line: string) => `<p>${line}</p>`)
-    .join("")
+   // Use primary color for branding (dynamic based on logo or fallback)
+   const primaryColor = dominantColor || '#667eea'
 
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${companyName} - Quotation</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333333;
-            background-color: #f8f9fa;
-        }
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 30px 40px;
-            text-align: center;
-        }
-        .logo {
-            color: #ffffff;
-            font-size: 28px;
-            font-weight: bold;
-            margin: 0;
-            letter-spacing: 1px;
-        }
-        .tagline {
-            color: #e8eaff;
-            font-size: 14px;
-            margin: 5px 0 0 0;
-            font-weight: 300;
-        }
-        .content {
-            padding: 40px;
-        }
-        .content p {
-            margin: 0 0 16px 0;
-            font-size: 16px;
-            line-height: 1.6;
-        }
-        .highlight-box {
-            background-color: #f8f9ff;
-            border-left: 4px solid #667eea;
-            padding: 20px;
-            margin: 25px 0;
-            border-radius: 0 8px 8px 0;
-        }
-        .cta-section {
-            text-align: center;
-            margin: 30px 0;
-        }
-        .cta-button {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #ffffff !important;
-            text-decoration: none;
-            padding: 14px 30px;
-            border-radius: 25px;
-            font-weight: 600;
-            font-size: 16px;
-            transition: transform 0.2s ease;
-        }
-        .cta-button:link,
-        .cta-button:visited,
-        .cta-button:hover,
-        .cta-button:active {
-            color: #ffffff !important;
-            text-decoration: none !important;
-        }
-        .footer {
-            background-color: #f8f9fa;
-            padding: 30px 40px;
-            border-top: 1px solid #e9ecef;
-        }
-        .signature {
-            margin-bottom: 20px;
-        }
-        .signature-name {
-            font-weight: 600;
-            color: #667eea;
-            font-size: 18px;
-            margin-bottom: 5px;
-        }
-        .signature-title {
-            color: #6c757d;
-            font-size: 14px;
-            margin-bottom: 15px;
-        }
-        .contact-info {
-            font-size: 14px;
-            color: #6c757d;
-            line-height: 1.4;
-        }
-        .contact-info strong {
-            color: #495057;
-        }
-        .divider {
-            height: 1px;
-            background-color: #e9ecef;
-            margin: 20px 0;
-        }
-        .disclaimer {
-            font-size: 12px;
-            color: #adb5bd;
-            text-align: center;
-            margin-top: 20px;
-            line-height: 1.4;
-        }
-        @media only screen and (max-width: 600px) {
-            .email-container {
-                width: 100% !important;
-            }
-            .header, .content, .footer {
-                padding: 20px !important;
-            }
-            .logo {
-                font-size: 24px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="email-container">
-        <div class="header">
-            <h1 class="logo">${companyName}</h1>
-            <p class="tagline">Premium Outdoor Advertising Solutions</p>
-        </div>
+   const processedBody = body
+     .split("\n")
+     .map((line: string) => line.trim())
+     .filter((line: string) => line.length > 0)
+     .map((line: string) => `<p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.6; color: #333333;">${line}</p>`)
+     .join("")
 
-        <div class="content">
-            ${processedBody}
+   return `
+ <!DOCTYPE html>
+ <html lang="en">
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <title>${companyName} - Quotation</title>
+     <!--[if mso]>
+     <noscript>
+         <xml>
+             <o:OfficeDocumentSettings>
+                 <o:PixelsPerInch>96</o:PixelsPerInch>
+             </o:OfficeDocumentSettings>
+         </xml>
+     </noscript>
+     <![endif]-->
+     <style>
 
-            <div class="highlight-box">
-                <p style="margin: 0; font-weight: 500; color: #495057;">
-                    📋 <strong>What's Included:</strong><br>
-                    • Detailed quotation with specifications<br>
-                    • Competitive pricing for your advertising needs<br>
-                    • High-quality billboard placement options<br>
-                    • Professional campaign management
-                </p>
-            </div>
-
-            <div class="cta-section">
-                <a href="mailto:${companyEmail}" class="cta-button">Get In Touch</a>
-            </div>
-        </div>
-
-        <div class="footer">
-            <div class="signature">
-                <div class="signature-name">Sales Executive</div>
-                <div class="signature-title">${companyName} - Outdoor Advertising</div>
-            </div>
-
-            <div class="contact-info">
-                <strong>${companyName}</strong><br>
-                📍 ${companyLocation}<br>
-                📞 ${phoneNumber}<br>
-                📧 ${companyEmail}<br>
-                🌐 ${companyWebsite}
-            </div>
-
-            <div class="divider"></div>
-
-            <div class="disclaimer">
-                This email contains confidential information intended only for the recipient.
-                If you have received this email in error, please notify the sender and delete this message.
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-  `
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; background-color: #f5f5f5; }
+        .email-container { max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.header {
+        background: #ffffff;
+    padding: 0 0 0 20px;
+    color: #000000;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;  /* align footer-content to the right */
+    align-items: center;
 }
+        .header-circles { position: absolute; top: 0; right: 0; width: 140px; height: 100%; pointer-events: none; display: flex; justify-content: flex-end; align-items: center; gap: 20px; }
+        .header-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+        .header-square-1 { width: 80px; height: 130px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .header-square-2 { width: 60px; height: 130px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .header-content { width: 100%; height: 100px; display: flex; align-items: center; gap: 20px; position: relative; z-index: 3; padding-top: 10px }
+        .header-logo { height: 80px; width: auto; max-width: 150px; flex-shrink: 0; }
+        .company-info {  flex: 1; padding-left: 15px; }
+.company-name {
+  color: #000000;
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-align: start;
+  margin: 0px;
+}
+        .company-address { color: #000000; font-size: 14px; margin: 0; }
+        .content { padding: 40px 30px; background-color: #f9f9f9; }
+        .content p { margin: 0 0 16px 0; }
+        .highlight-box { background-color: #f8f9ff; border-left: 4px solid ${primaryColor}; padding: 20px; margin: 25px 0; border-radius: 0 8px 8px 0; }
+        .cta-section { text-align: center; margin: 30px 0; }
+        .cta-button { display: inline-block; background: ${primaryColor}; color: #ffffff !important; text-decoration: none; padding: 14px 30px; border-radius: 25px; font-weight: 600; font-size: 16px; transition: transform 0.2s ease; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
+        .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4); }
+.footer {
+    background: #ffffff;
+    padding: 0 0 0 20px;
+    color: #000000;
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;  /* align footer-content to the right */
+    align-items: center;
+}
+
+.footer-circles {
+    position: relative;
+    top: 0;
+    right: 0;
+    bottom: 0;                  /* ensure full height coverage */
+    height: 100%;
+    width: 140px;
+    pointer-events: none;
+    display: flex;
+    justify-content: flex-end;  /* align the squares to the right edge */
+    align-items: center;
+    gap: 0;                     /* remove gap so they stay flush right */
+    z-index: 1;                 /* keep it behind the text content */
+}
+.footer-div { background: ${dominantColor ? `rgba(${parseInt(dominantColor.slice(1,3),16)}, ${parseInt(dominantColor.slice(3,5),16)}, ${parseInt(dominantColor.slice(5,7),16)}, 0.5)` : ''}; opacity: 0.8; z-index: 1; display: flex; justify-content: flex-end; align-items: center;  }
+        .footer-square-1 { width: 80px; height: 160px; background: ${primaryColor}; opacity: 1.0; z-index: 2; }
+        .footer-square-2 { width: 60px; height: 160px; background: transparent; opacity: 0.8; z-index: 1;  }
+        .footer-content { height: 160px; width: 100%; position: relative; z-index: 3; }
+        .footer-header {  display: flex; justify-content: flex-start;align-items: center; gap: 20px; padding-top:20px; }
+        .footer-logo { height: 40px; width: auto; max-width: 120px;  }
+        .footer-company-name { font-size: 18px; font-weight: 600; margin: 0px 15px; color: #000000; }
+        .footer-website { color: #000000; font-size: 14px; margin: 0; }
+        .signature { margin-top: 5px; }
+        .signature-name { font-weight: 600; color: #000000; font-size: 16px; margin: 0; }
+        .signature-title { color: #000000; font-size: 14px; margin: 0; }
+        .contact-info { font-size: 14px; color: #000000; }
+        .contact-info strong { color: #000000; }
+        @media only screen and (max-width: 600px) {
+            .email-container { width: 100% !important; box-shadow: none; }
+            .header, .content, .footer { padding: 20px !important; }
+            .header-circles, .footer-circles { display: none !important; }
+            .header-content { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+            .company-name { font-size: 20px !important; }
+            .cta-button { padding: 12px 24px !important; font-size: 14px !important; }
+        }
+     </style>
+ </head>
+ <body>
+     <div class="email-container">
+         <div class="header">
+             <div class="header-content">
+                 ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="header-logo">` : ''}
+                 <div class="company-info">
+                     <h1 class="company-name">${companyName}</h1>
+                     ${companyLocation ? `<p class="company-address">${companyLocation}</p>` : ''}
+                 </div>
+             </div>
+             <div class="header-circles">
+                 <div class="header-div">
+                     <div class="header-square-2"></div>
+                     <div class="header-square-1"></div>
+                 </div>
+             </div>
+         </div>
+
+         <div class="content">
+             ${processedBody}
+
+
+             <div class="cta-section">
+                 <a href="${quotationUrl}" target="_blank" class="cta-button">View Quotation</a>
+             </div>
+         </div>
+
+         <div class="footer">
+             <div class="footer-content">
+                 <div class="footer-header">
+                     ${companyLogo ? `<img src="${companyLogo}" alt="${companyName || 'Company'} Logo" class="footer-logo">` : ''}
+                     <h3 class="footer-company-name">${companyName}</h3>
+                 </div>
+
+                 <div class="signature">
+                     <h4 class="signature-name">${userName || 'Sales Executive'}</h4>
+                     <p class="signature-title">${userPosition ? `${userPosition}` : ``}</p>
+                     <div class="contact-info">
+                        ${companyEmail}<br>
+                         ${phoneNumber ? `${phoneNumber}` : ''}
+                     </div>
+                 </div>
+             </div>
+             <div class="footer-circles">
+                 <div class="footer-div">
+                     <div class="footer-square-2"></div>
+                     <div class="footer-square-1"></div>
+                 </div>
+             </div>
+         </div>
+
+
+         </div>
+     </div>
+ </body>
+ </html>
+   `
+ }
 
 export async function POST(request: NextRequest) {
   try {
@@ -289,6 +382,39 @@ export async function POST(request: NextRequest) {
     if (!process.env.RESEND_API_KEY) {
       console.error("RESEND_API_KEY not found in environment variables")
       return NextResponse.json({ error: "Email service not configured" }, { status: 500 })
+    }
+
+    // Initialize Resend client inside the function to prevent module-level failures
+    let resend: any
+    try {
+      const { Resend } = await import("resend")
+      resend = new Resend(process.env.RESEND_API_KEY)
+      console.log("Resend client initialized successfully")
+    } catch (initError) {
+      console.error("Failed to initialize Resend client:", initError)
+
+      // Provide more specific error messages based on the type of error
+      let errorMessage = "Email service initialization failed"
+      let errorDetails = initError instanceof Error ? initError.message : "Unknown initialization error"
+
+      if (initError instanceof Error) {
+        if (initError.message.includes("API key")) {
+          errorMessage = "Email service configuration error"
+          errorDetails = "Invalid or missing Resend API key"
+        } else if (initError.message.includes("network") || initError.message.includes("fetch")) {
+          errorMessage = "Email service network error"
+          errorDetails = "Unable to connect to email service. Please check your internet connection."
+        } else if (initError.message.includes("module") || initError.message.includes("import")) {
+          errorMessage = "Email service module error"
+          errorDetails = "Email service module could not be loaded"
+        }
+      }
+
+      return NextResponse.json({
+        error: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString()
+      }, { status: 500 })
     }
 
     let body
@@ -353,7 +479,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const quotationUrl = `${process.env.NEXT_PUBLIC_APP_URL}/sales/quotations/${quotation.id}`
+    const quotationUrl = `https://mrk.ohplus.ph/q/${quotation.id}`
 
     console.log(`Using ${preGeneratedPDFs?.length || 0} pre-generated PDFs for email attachments`)
     console.log("Generated quotation URL:", quotationUrl)
@@ -366,10 +492,115 @@ export async function POST(request: NextRequest) {
     const companyId = userData?.company_id || quotation?.company_id || "unknown"
     const companyData = await fetchCompanyData(companyId)
 
-    // Create email template
-    const finalBody = createEmailTemplate(customBody || "We are excited to present you with a detailed quotation tailored to your specific advertising needs. Our team has carefully prepared this quotation to help you plan your marketing investment.", userData?.phone_number, companyData)
+    // Fetch company logo and extract dominant color
+    let companyLogo = undefined
+    let dominantColor = undefined
+
+    if (companyId && companyId !== "unknown") {
+      try {
+        const companyDoc = await getDoc(doc(db, "companies", companyId))
+        if (companyDoc.exists()) {
+          const companyDocData = companyDoc.data()
+          if (companyDocData?.logo || companyDocData?.photo_url) {
+            companyLogo = companyDocData.logo || companyDocData.photo_url
+            console.log("Company logo found:", companyLogo, {
+              logo: !!companyDocData.logo,
+              photo_url: !!companyDocData.photo_url,
+              usingField: companyDocData.logo ? 'logo' : 'photo_url'
+            })
+          } else {
+            console.log("No company logo found in document")
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching company logo:", error)
+      }
+    }
+
+    // Extract dominant color from logo if available
+    if (companyLogo) {
+      try {
+        console.log("Extracting dominant color from logo...")
+        const logoDataUri = await imageUrlToDataUri(companyLogo)
+        if (logoDataUri) {
+          dominantColor = await extractDominantColor(logoDataUri)
+          if (dominantColor) {
+            console.log("Successfully extracted dominant color:", dominantColor)
+          } else {
+            console.log("Failed to extract dominant color, using fallback")
+            dominantColor = undefined
+          }
+        }
+      } catch (error) {
+        console.error("Error extracting dominant color:", error)
+        dominantColor = undefined
+      }
+    }
+
+    // Create email template - construct user name from available fields
+    const userName = userData?.first_name && userData?.last_name
+      ? `${userData.first_name} ${userData.last_name}`.trim()
+      : userData?.displayName || userData?.displayName || "Sales Executive"
+
+    const finalBody = createEmailTemplate(customBody || "We are excited to present you with a detailed quotation tailored to your specific advertising needs. Our team has carefully prepared this quotation to help you plan your marketing investment.", userData?.phone_number, companyData, companyLogo, dominantColor, replyToEmail, userName, userData?.position || "Sales Executive", quotationUrl)
 
     console.log("Attempting to send email to:", clientEmail)
+
+    // Upload files to Firebase BEFORE sending email to ensure upload failures are fatal
+    let attachmentDetails: EmailAttachment[] = []
+
+    // Upload pre-generated PDFs to storage first
+    if (preGeneratedPDFs && Array.isArray(preGeneratedPDFs) && preGeneratedPDFs.length > 0) {
+      for (const pdf of preGeneratedPDFs) {
+        if (pdf.filename && pdf.content) {
+          try {
+            const fileUrl = await uploadFileToStorage(
+              Buffer.from(pdf.content, 'base64'),
+              pdf.filename,
+              'application/pdf',
+              companyId
+            )
+            attachmentDetails.push({
+              fileName: pdf.filename,
+              fileSize: Buffer.from(pdf.content, 'base64').length,
+              fileType: 'application/pdf',
+              fileUrl: fileUrl,
+            })
+            console.log(`Pre-generated PDF uploaded successfully:`, pdf.filename)
+          } catch (error) {
+            console.error(`Failed to upload PDF ${pdf.filename}:`, error)
+            throw error // Make upload failures fatal
+          }
+        }
+      }
+    }
+
+    // Upload uploaded files to storage first
+    if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
+      for (const file of uploadedFiles) {
+        if (file.filename && file.content && file.type) {
+          try {
+            const fileBuffer = Buffer.from(file.content, 'base64')
+            const fileUrl = await uploadFileToStorage(
+              fileBuffer,
+              file.filename,
+              file.type,
+              companyId
+            )
+            attachmentDetails.push({
+              fileName: file.filename,
+              fileSize: fileBuffer.length,
+              fileType: file.type,
+              fileUrl: fileUrl,
+            })
+            console.log(`Uploaded file uploaded successfully:`, file.filename)
+          } catch (error) {
+            console.error(`Failed to upload file ${file.filename}:`, error)
+            throw error // Make upload failures fatal
+          }
+        }
+      }
+    }
 
     const attachments: Array<{ filename: string; content: Buffer; type?: string }> = []
 
@@ -436,13 +667,41 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error("Resend API error:", error)
+
+      // Provide more specific error messages based on the error type
+      let errorMessage = "Failed to send email"
+      let errorDetails = error.message || "Unknown error from email service"
+      let statusCode = 500
+
+      if (error.message) {
+        if (error.message.includes("rate limit") || error.message.includes("429")) {
+          errorMessage = "Email service rate limited"
+          errorDetails = "Too many emails sent. Please try again later."
+          statusCode = 429
+        } else if (error.message.includes("authentication") || error.message.includes("unauthorized") || error.message.includes("403")) {
+          errorMessage = "Email service authentication failed"
+          errorDetails = "Email service credentials are invalid"
+          statusCode = 401
+        } else if (error.message.includes("validation") || error.message.includes("invalid") || error.message.includes("400")) {
+          errorMessage = "Email validation error"
+          errorDetails = "Email content or recipient address is invalid"
+          statusCode = 400
+        } else if (error.message.includes("network") || error.message.includes("timeout") || error.message.includes("ECONNRESET")) {
+          errorMessage = "Email service network error"
+          errorDetails = "Network error occurred while sending email"
+          statusCode = 503
+        }
+      }
+
       return NextResponse.json(
         {
           success: false,
-          error: "Failed to send email",
-          details: error.message || "Unknown error from email service",
+          error: errorMessage,
+          details: errorDetails,
+          timestamp: new Date().toISOString(),
+          requestId: `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         },
-        { status: 500 },
+        { status: statusCode },
       )
     }
 
@@ -451,52 +710,6 @@ export async function POST(request: NextRequest) {
     // Create email document in emails collection
     try {
       const companyId = userData?.company_id || quotation?.company_id || "unknown"
-      let attachmentDetails: EmailAttachment[] = []
-
-      // Upload pre-generated PDFs to storage and create attachment details
-      if (preGeneratedPDFs && Array.isArray(preGeneratedPDFs) && preGeneratedPDFs.length > 0) {
-        for (const pdf of preGeneratedPDFs) {
-          try {
-            const fileUrl = await uploadFileToStorage(
-              Buffer.from(pdf.content, 'base64'),
-              pdf.filename,
-              'application/pdf',
-              companyId
-            )
-            attachmentDetails.push({
-              fileName: pdf.filename,
-              fileSize: Buffer.from(pdf.content, 'base64').length,
-              fileType: 'application/pdf',
-              fileUrl: fileUrl,
-            })
-          } catch (error) {
-            console.error(`Failed to upload PDF ${pdf.filename}:`, error)
-          }
-        }
-      }
-
-      // Upload uploaded files to storage and create attachment details
-      if (uploadedFiles && Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
-        for (const file of uploadedFiles) {
-          try {
-            const fileBuffer = Buffer.from(file.content, 'base64')
-            const fileUrl = await uploadFileToStorage(
-              fileBuffer,
-              file.filename,
-              file.type,
-              companyId
-            )
-            attachmentDetails.push({
-              fileName: file.filename,
-              fileSize: fileBuffer.length,
-              fileType: file.type,
-              fileUrl: fileUrl,
-            })
-          } catch (error) {
-            console.error(`Failed to upload file ${file.filename}:`, error)
-          }
-        }
-      }
 
       const emailDocument = {
         from: from,
@@ -504,7 +717,7 @@ export async function POST(request: NextRequest) {
         cc: cc.length > 0 ? cc : null,
         replyTo: emailData.reply_to,
         subject: finalSubject.trim(),
-        body: customBody.trim(),
+        body: customBody?.trim() || '',
         attachments: attachmentDetails.length > 0 ? attachmentDetails : undefined,
         email_type: "quotation",
         quotationId: quotation.id,
@@ -535,13 +748,46 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("Email sending error:", error)
+
+    // Provide more specific error messages and better debugging info
+    let errorMessage = "Internal server error"
+    let errorDetails = error instanceof Error ? error.message : "Unknown error occurred"
+    let statusCode = 500
+
+    if (error instanceof Error) {
+      // Handle Firebase storage upload errors specifically for tests
+      if (error.message.includes("Failed to upload file")) {
+        errorMessage = "Internal server error"
+        errorDetails = error.message
+        statusCode = 500
+      } else if (error.message.includes("JSON") || error.message.includes("parse")) {
+        errorMessage = "Request parsing error"
+        errorDetails = "Invalid JSON in request body"
+        statusCode = 400
+      } else if (error.message.includes("network") || error.message.includes("fetch") || error.message.includes("ECONNRESET")) {
+        errorMessage = "Network error"
+        errorDetails = "Network error occurred while processing email"
+        statusCode = 503
+      } else if (error.message.includes("timeout")) {
+        errorMessage = "Request timeout"
+        errorDetails = "Email processing took too long"
+        statusCode = 408
+      } else if (error.message.includes("memory") || error.message.includes("heap")) {
+        errorMessage = "Server resource error"
+        errorDetails = "Server ran out of memory processing email"
+        statusCode = 507
+      }
+    }
+
     return NextResponse.json(
       {
         success: false,
-        error: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error occurred",
+        error: errorMessage,
+        details: errorDetails,
+        timestamp: new Date().toISOString(),
+        requestId: `email_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       },
-      { status: 500 },
+      { status: statusCode },
     )
   }
 }

@@ -23,6 +23,7 @@ export interface JobOrder {
   created_by: string
   company_id: string
   quotation_id?: string
+  booking_id?: string
 
   // Additional fields from the actual database structure
   clientCompany?: string
@@ -44,4 +45,5 @@ export interface JobOrder {
   illumination?: string // Illumination specification for the job order
   client_email?: string // Client email for the job order
   campaignName?: string // Campaign name for the job order
+  reservation_number?: string // Reservation number from booking
 }

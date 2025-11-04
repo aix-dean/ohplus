@@ -670,6 +670,8 @@ export default function CreateServiceAssignmentPage() {
         projectSiteId: formData.projectSite,
         message: formData.message,
         jobOrderId: jobOrderData?.id || null,
+        reservation_number: jobOrderData?.reservation_number || null, // Add reservation number from job order
+        booking_id: jobOrderData?.booking_id || null, // Add booking ID from job order
         userData: {
           uid: user.uid,
           first_name: userData?.first_name,
@@ -788,6 +790,8 @@ export default function CreateServiceAssignmentPage() {
         project_key: userData?.license_key || "",
         company_id: userData?.company_id || null,
         jobOrderId: jobOrderData?.id || null, // Add job order ID if present
+        reservation_number: jobOrderData?.reservation_number || null, // Add reservation number from job order
+        booking_id: jobOrderData?.booking_id || null, // Add booking ID from job order
       }
 
       if (isEditingDraft && draftId) {

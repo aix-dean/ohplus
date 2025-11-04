@@ -40,7 +40,7 @@ import {
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { collection, query, where, getDocs, getDoc, doc, Timestamp, orderBy, limit } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { SearchBox } from "@/components/search-box"
+import { ProductSearchBox } from "@/components/product-search-box"
 import type { SearchResult } from "@/lib/algolia-service"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useResponsive } from "@/hooks/use-responsive"
@@ -62,6 +62,13 @@ import { RouteProtection } from "@/components/route-protection"
 import { CheckCircle } from "lucide-react"
 import { createDirectQuotation, createMultipleQuotations } from "@/lib/quotation-service"
 import { CreateReportDialog } from "@/components/create-report-dialog"
+import { SpotSelectionDialog } from "@/components/spot-selection-dialog"
+// CSS for static gradient border
+const gradientBorderStyles = `
+.gradient-border {
+  background: linear-gradient(45deg, #ff0000, #ffff00, #00ff00, #0000ff, #8B00FF);
+}
+`
 
 // Number of items to display per page
 const ITEMS_PER_PAGE = 15
@@ -99,6 +106,8 @@ function SalesDashboardContent() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
+  const [searchPagination, setSearchPagination] = useState<{ page: number; nbPages: number; nbHits: number } | null>(null)
+  const [currentSearchPage, setCurrentSearchPage] = useState(0)
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -142,13 +151,20 @@ function SalesDashboardContent() {
   const [actionAfterDateSelection, setActionAfterDateSelection] = useState<"cost_estimate" | "quotation" | null>(null)
   const [isCreatingDocument, setIsCreatingDocument] = useState(false) // New loading state for document creation
 
-  // Display type selection for proposal creation
-  const [selectedDisplayType, setSelectedDisplayType] = useState<"static" | "digital" | null>("static")
+  
 
   // Search sites state
   const [siteSearchTerm, setSiteSearchTerm] = useState("")
 
   const [isCollabPartnerDialogOpen, setIsCollabPartnerDialogOpen] = useState(false)
+
+  // Spot Selection Dialog state
+  const [isSpotSelectionDialogOpen, setIsSpotSelectionDialogOpen] = useState(false)
+  const [spotSelectionProducts, setSpotSelectionProducts] = useState<Product[]>([])
+  const [spotSelectionSpotsData, setSpotSelectionSpotsData] = useState<Record<string, any>>({})
+  const [spotSelectionCurrentDate, setSpotSelectionCurrentDate] = useState("")
+  const [selectedSpots, setSelectedSpots] = useState<Record<string, number[]>>({})
+  const [currentSpotSelectionProduct, setCurrentSpotSelectionProduct] = useState<Product | null>(null)
 
   const handleCreateReport = async (product: Product, e: React.MouseEvent) => {
     e.preventDefault()
@@ -765,38 +781,39 @@ function SalesDashboardContent() {
   }
 
   // Handle search result click
-  const handleSearchResultClick = (result: SearchResult) => {
+  const handleSearchResultClick = useCallback((result: SearchResult) => {
     if (result.type === "product") {
       router.push(`/sales/products/${result.objectID}`)
     } else if (result.type === "client") {
       router.push(`/sales/clients/${result.objectID}`)
     }
-  }
+  }, [router])
 
   // Handle search results
-  const handleSearchResults = (results: SearchResult[], query: string) => {
+  const handleSearchResults = useCallback((results: SearchResult[], query: string, pagination?: { page: number; nbPages: number; nbHits: number }) => {
     setSearchResults(results)
     setSearchQuery(query)
     setIsSearching(!!query)
-  }
+    setSearchPagination(pagination || null)
+  }, [])
 
   // Handle search error
-  const handleSearchError = (error: string | null) => {
+  const handleSearchError = useCallback((error: string | null) => {
     setSearchError(error)
-  }
+  }, [])
 
   // Handle search loading
-  const handleSearchLoading = (isLoading: boolean) => {
+  const handleSearchLoading = useCallback((isLoading: boolean) => {
     // We don't need to do anything with this for now
-  }
+  }, [])
 
   // Handle search clear
-  const handleSearchClear = () => {
+  const handleSearchClear = useCallback(() => {
     setSearchResults([])
     setSearchQuery("")
     setIsSearching(false)
     setSearchError(null)
-  }
+  }, [])
 
   // Clear search and return to normal view
   const handleClearSearch = () => {
@@ -811,7 +828,7 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("") // Clear client search term
     setSelectedProducts([]) // Clear any previously selected products
     setSelectedSites([]) // Clear any previously selected sites
-    setSelectedDisplayType("static") // Reset display type to default
+    
   }
 
   const handleClientSelectOnDashboard = (client: Client) => {
@@ -843,7 +860,7 @@ function SalesDashboardContent() {
     setDashboardClientSearchTerm("")
     setDashboardClientSearchResults([])
     setSelectedProducts([])
-    setSelectedDisplayType(null)
+    
   }
 
   const handleProductSelect = (product: Product) => {
@@ -931,8 +948,8 @@ function SalesDashboardContent() {
         open: true, // Add the missing 'open' property
       })
 
-      // Redirect to the new proposal's detail page
-      router.push(`/sales/proposals/${proposalId}`)
+      // Redirect to the new proposal's detail page with edit mode enabled
+      router.push(`/sales/proposals/${proposalId}?action=edit`)
 
       // Reset the proposal creation mode and selected items
       setProposalCreationMode(false)
@@ -983,25 +1000,121 @@ function SalesDashboardContent() {
     setSelectedProducts([])
   }
 
-  const handleSiteSelect = (product: Product) => {
-    setSelectedSites((prev) => {
-      const isSelected = prev.some((p) => p.id === product.id)
-      if (isSelected) {
-        return prev.filter((p) => p.id !== product.id)
+  const handleSiteSelect = async (product: Product) => {
+    // Check if product is dynamic/digital
+    const isDynamicSite = product.content_type?.toLowerCase() === "dynamic" || product.content_type?.toLowerCase() === "digital"
+
+    if (isDynamicSite) {
+      // Check if product is already selected
+      const isAlreadySelected = selectedSites.some((p) => p.id === product.id)
+
+      if (isAlreadySelected) {
+        // Deselect the product and clear its spots
+        setSelectedSites((prev) => prev.filter((p) => p.id !== product.id))
+        setSelectedSpots((prev) => {
+          const newSpots = { ...prev }
+          delete newSpots[product.id || '']
+          return newSpots
+        })
       } else {
-        return [...prev, product]
+        // Open spot selection dialog for new selection
+        setCurrentSpotSelectionProduct(product)
+        setSpotSelectionProducts([product])
+
+        try {
+          const spotsData: Record<string, any> = {}
+          const currentDate = new Date().toISOString().split('T')[0]
+
+          const spotData = await generateSpotsDataForDialog(product)
+          spotsData[product.id || ''] = {
+            spots: spotData.spots,
+            totalSpots: spotData.totalSpots,
+            occupiedCount: spotData.occupiedCount,
+            vacantCount: spotData.vacantCount,
+            currentDate: spotData.currentDate,
+          }
+
+          setSpotSelectionSpotsData(spotsData)
+          setSpotSelectionCurrentDate(currentDate)
+          setIsSpotSelectionDialogOpen(true)
+        } catch (error) {
+          console.error("Error generating spots data:", error)
+          toast({
+            title: "Error",
+            description: "Failed to load spot information.",
+            variant: "destructive",
+          })
+        }
+      }
+    } else {
+      // Regular site selection
+      setSelectedSites((prev) => {
+        const isSelected = prev.some((p) => p.id === product.id)
+        if (isSelected) {
+          return prev.filter((p) => p.id !== product.id)
+        } else {
+          return [...prev, product]
+        }
+      })
+    }
+  }
+
+  // Helper function to generate spots data for dynamic/digital sites
+  const generateSpotsDataForDialog = async (product: Product) => {
+    const totalSpots = product.cms?.loops_per_day || 18
+    const spots = []
+
+    // Fetch current day bookings for the product
+    const currentDate = new Date().toISOString().split('T')[0]
+    const bookingsRef = collection(db, "booking")
+    const q = query(
+      bookingsRef,
+      where("product_id", "==", product.id),
+      where("status", "in", ["RESERVED", "reserved", "Reserved"])
+    )
+    const snapshot = await getDocs(q)
+
+    const occupiedSpots = new Set<number>()
+    snapshot.docs.forEach((doc) => {
+      const booking = doc.data()
+      const startDate = booking.start_date instanceof Timestamp ? booking.start_date.toDate() : new Date(booking.start_date)
+      const endDate = booking.end_date instanceof Timestamp ? booking.end_date.toDate() : new Date(booking.end_date)
+      const today = new Date()
+
+      if (today >= startDate && today <= endDate) {
+        // This booking is ongoing, mark spots as occupied
+        // For simplicity, we'll assume all spots in the loop are occupied if there's any booking
+        // In a real implementation, you'd need to track which specific spots are booked
+        for (let i = 1; i <= totalSpots; i++) {
+          occupiedSpots.add(i)
+        }
       }
     })
+
+    for (let i = 1; i <= totalSpots; i++) {
+      spots.push({
+        id: `spot-${i}`,
+        number: i,
+        status: occupiedSpots.has(i) ? "occupied" : "vacant",
+      })
+    }
+
+    return {
+      spots,
+      totalSpots,
+      occupiedCount: occupiedSpots.size,
+      vacantCount: totalSpots - occupiedSpots.size,
+      currentDate,
+    }
   }
 
   // New functions to navigate to cost estimate date selection
-  const navigateToCostEstimateDateSelection = () => {
+  const navigateToCostEstimateDateSelection = async () => {
     if (selectedSites.length === 0) {
       toast({
         title: "No sites selected",
         description: "Please select at least one site for the cost estimate.",
         variant: "destructive",
-        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -1010,24 +1123,73 @@ function SalesDashboardContent() {
         title: "No Client Selected",
         description: "Please select a client first.",
         variant: "destructive",
-        open: true, // Add the missing 'open' property
       })
       return
     }
 
-    // Navigate to the date selection page with product IDs and client ID
-    const siteIdsParam = encodeURIComponent(JSON.stringify(selectedSites.map(site => site.id)))
-    const clientIdParam = encodeURIComponent(selectedClientForProposal.id)
-    router.push(`/sales/cost-estimates/select-dates?sites=${siteIdsParam}&clientId=${clientIdParam}`)
+    // Check if any selected site has dynamic or digital content type that doesn't have spots selected yet
+    const dynamicSitesWithoutSpots = selectedSites.filter(site => {
+      const isDynamic = site.content_type?.toLowerCase() === "dynamic" || site.content_type?.toLowerCase() === "digital"
+      return isDynamic && (!selectedSpots[site.id || ''] || selectedSpots[site.id || ''].length === 0)
+    })
+
+    if (dynamicSitesWithoutSpots.length > 0) {
+      // Show spot selection dialog for dynamic sites without spots
+      setSpotSelectionProducts(dynamicSitesWithoutSpots)
+
+      try {
+        const spotsData: Record<string, any> = {}
+        const currentDate = new Date().toISOString().split('T')[0]
+
+        for (const site of dynamicSitesWithoutSpots) {
+          const spotData = await generateSpotsDataForDialog(site)
+          spotsData[site.id || ''] = {
+            spots: spotData.spots,
+            totalSpots: spotData.totalSpots,
+            occupiedCount: spotData.occupiedCount,
+            vacantCount: spotData.vacantCount,
+            currentDate: spotData.currentDate,
+          }
+        }
+
+        setSpotSelectionSpotsData(spotsData)
+        setSpotSelectionCurrentDate(currentDate)
+        setIsSpotSelectionDialogOpen(true)
+      } catch (error) {
+        console.error("Error generating spots data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load spot information.",
+          variant: "destructive",
+        })
+      }
+      return
+    }
+
+    // All dynamic sites have spots selected, proceed to date selection
+    // Combine selected sites with spot selections
+    const allSpotSelections = Object.entries(selectedSpots).map(([productId, spots]) => ({
+      productId,
+      spotNumbers: spots
+    }))
+
+    const params = new URLSearchParams({
+      spotSelections: JSON.stringify(allSpotSelections),
+      sites: JSON.stringify(selectedSites.filter(site =>
+        site.content_type?.toLowerCase() !== "dynamic" && site.content_type?.toLowerCase() !== "digital"
+      ).map(site => site.id)),
+      clientId: selectedClientForProposal.id,
+    })
+
+    router.push(`/sales/cost-estimates/select-dates?${params.toString()}`)
   }
 
-  const navigateToQuotationDateSelection = () => {
+  const navigateToQuotationDateSelection = async () => {
     if (selectedSites.length === 0) {
       toast({
         title: "No sites selected",
         description: "Please select at least one site for the quotation.",
         variant: "destructive",
-        open: true, // Add the missing 'open' property
       })
       return
     }
@@ -1036,15 +1198,65 @@ function SalesDashboardContent() {
         title: "No Client Selected",
         description: "Please select a client first.",
         variant: "destructive",
-        open: true, // Add the missing 'open' property
       })
       return
     }
 
-    // Navigate to the date selection page with product IDs and client ID
-    const siteIdsParam = encodeURIComponent(JSON.stringify(selectedSites.map(site => site.id)))
-    const clientIdParam = encodeURIComponent(selectedClientForProposal.id)
-    router.push(`/sales/quotations/select-dates?sites=${siteIdsParam}&clientId=${clientIdParam}`)
+    // Check if any selected site has dynamic or digital content type that doesn't have spots selected yet
+    const dynamicSitesWithoutSpots = selectedSites.filter(site => {
+      const isDynamic = site.content_type?.toLowerCase() === "dynamic" || site.content_type?.toLowerCase() === "digital"
+      return isDynamic && (!selectedSpots[site.id || ''] || selectedSpots[site.id || ''].length === 0)
+    })
+
+    if (dynamicSitesWithoutSpots.length > 0) {
+      // Show spot selection dialog for dynamic sites without spots
+      setSpotSelectionProducts(dynamicSitesWithoutSpots)
+
+      try {
+        const spotsData: Record<string, any> = {}
+        const currentDate = new Date().toISOString().split('T')[0]
+
+        for (const site of dynamicSitesWithoutSpots) {
+          const spotData = await generateSpotsDataForDialog(site)
+          spotsData[site.id || ''] = {
+            spots: spotData.spots,
+            totalSpots: spotData.totalSpots,
+            occupiedCount: spotData.occupiedCount,
+            vacantCount: spotData.vacantCount,
+            currentDate: spotData.currentDate,
+          }
+        }
+
+        setSpotSelectionSpotsData(spotsData)
+        setSpotSelectionCurrentDate(currentDate)
+        setIsSpotSelectionDialogOpen(true)
+      } catch (error) {
+        console.error("Error generating spots data:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load spot information.",
+          variant: "destructive",
+        })
+      }
+      return
+    }
+
+    // All dynamic sites have spots selected, proceed to date selection
+    // Combine selected sites with spot selections
+    const allSpotSelections = Object.entries(selectedSpots).map(([productId, spots]) => ({
+      productId,
+      spotNumbers: spots
+    }))
+
+    const params = new URLSearchParams({
+      spotSelections: JSON.stringify(allSpotSelections),
+      sites: JSON.stringify(selectedSites.filter(site =>
+        site.content_type?.toLowerCase() !== "dynamic" && site.content_type?.toLowerCase() !== "digital"
+      ).map(site => site.id)),
+      clientId: selectedClientForProposal.id,
+    })
+
+    router.push(`/sales/quotations/select-dates?${params.toString()}`)
   }
 
   // Callback from DateRangeCalendarDialog - NOW CREATES THE DOCUMENT
@@ -1342,34 +1554,13 @@ function SalesDashboardContent() {
     setSelectedSites([])
     setSelectedClientForProposal(null)
     setDashboardClientSearchTerm("")
-    setSelectedDisplayType(null)
+    
   }
 
-  // Display type selection handlers
-  const handleSelectStatic = () => {
-    setSelectedDisplayType("static")
-  }
+  
 
-  const handleSelectDigital = () => {
-    setSelectedDisplayType("digital")
-  }
-
-  // Filter products based on selected display type and search term
+  // Filter products based on search term
   const filteredProducts = products.filter(product => {
-    // Display type filter
-    if (selectedDisplayType) {
-      // Assume digital products have content_type containing "digital" or "led"
-      // Static products are everything else
-      const contentType = product.content_type?.toLowerCase() || ""
-      const isDigital = contentType.includes("digital") || contentType.includes("led") || contentType.includes("screen") || contentType.includes("dynamic")  
-
-      if (selectedDisplayType === "digital") {
-        if (!isDigital) return false
-      } else {
-        if (isDigital) return false
-      }
-    }
-
     // Search filter
     if (siteSearchTerm.trim()) {
       const searchLower = siteSearchTerm.toLowerCase()
@@ -1387,6 +1578,8 @@ function SalesDashboardContent() {
 
   return (
     <div className="h-screen flex flex-col">
+      {/* Inject CSS for gradient border */}
+      <style dangerouslySetInnerHTML={{ __html: gradientBorderStyles }} />
       {/* Main content area */}
       <div className="flex-1 overflow-hidden">
         {loading ? (
@@ -1504,7 +1697,7 @@ function SalesDashboardContent() {
                       <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={handleQuoteMode}>
                         Quotation
                       </Button>
-                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => router.push("/sales/job-orders/select-quotation")}>
+                      <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => router.push("/sales/job-orders/select-booking")}>
                         Job Order
                       </Button>
                       <Button variant="outline" className="bg-white border-[#d9d9d9] text-[#333333] hover:bg-gray-50" onClick={() => setIsCollabPartnerDialogOpen(true)}>
@@ -1517,12 +1710,15 @@ function SalesDashboardContent() {
                   <div className="flex justify-between items-center">
                     <div className="relative">
                       <div className="w-80 mt-2 mb-2">
-                        <SearchBox
+                        <ProductSearchBox
+                          companyId={userData?.company_id || ""}
                           onSearchResults={handleSearchResults}
                           onSearchError={handleSearchError}
                           onSearchLoading={handleSearchLoading}
                           onSearchClear={handleSearchClear}
-                          userId={user?.uid}
+                          placeholder="Search products..."
+                          page={currentSearchPage}
+                          hitsPerPage={20}
                         />
                       </div>
                     </div>
@@ -1550,7 +1746,7 @@ function SalesDashboardContent() {
                           placeholder="Search for sites..."
                           value={siteSearchTerm}
                           onChange={(e) => setSiteSearchTerm(e.target.value)}
-                          className="h-11 pl-4 pr-4 text-sm border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                          className="h-11 pl-4 pr-4 text-sm border-gray-300 rounded-lg focus:ring-0 focus:border-gray-300 transition-all"
                           aria-label="Search sites"
                         />
                         <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -1579,7 +1775,7 @@ function SalesDashboardContent() {
                             }
                           }}
                           className={cn(
-                            "h-11 pl-4 pr-10 text-sm border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all",
+                            "h-11 pl-4 pr-10 text-sm border-gray-300 rounded-lg focus:ring-0 focus:border-gray-300 transition-all",
                             (proposalCreationMode || ceQuoteMode) && selectedClientForProposal && "border-green-500 bg-green-50",
                           )}
                         />
@@ -1649,78 +1845,11 @@ function SalesDashboardContent() {
                 </div>
               )}
 
-              {/* Display Type Selection - Enhanced UX */}
-              {(proposalCreationMode || ceQuoteMode) && (
-                <div className="mb-2">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-700">Display Type</span>
-                      <div className="h-px bg-gray-200 flex-1"></div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Button
-                          variant={selectedDisplayType === "static" ? "default" : "outline"}
-                          className={selectedDisplayType === "static"
-                            ? "bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-105"
-                            : "border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-6 py-3 rounded-lg font-medium transition-all duration-200"
-                          }
-                          onClick={handleSelectStatic}
-                          aria-label="Select static display type"
-                          aria-pressed={selectedDisplayType === "static"}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${selectedDisplayType === "static" ? "bg-white" : "bg-gray-400 opacity-50"}`}></div>
-                            Static
-                          </div>
-                        </Button>
-                        <Button
-                          variant={selectedDisplayType === "digital" ? "default" : "outline"}
-                          className={selectedDisplayType === "digital"
-                            ? "bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-sm hover:shadow-md transition-all duration-200 transform hover:scale-105"
-                            : "border-2 border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400 px-6 py-3 rounded-lg font-medium transition-all duration-200"
-                          }
-                          onClick={handleSelectDigital}
-                          aria-label="Select digital display type"
-                          aria-pressed={selectedDisplayType === "digital"}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className={`w-2 h-2 rounded-full ${selectedDisplayType === "digital" ? "bg-white" : "bg-gray-400 opacity-50"}`}></div>
-                            Digital
-                          </div>
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className={`bg-white border-[#d9d9d9] hover:bg-gray-50 ${viewMode === "grid" ? "bg-gray-100" : ""}`}
-                          onClick={() => setViewMode("grid")}
-                          aria-label="Switch to grid view"
-                        >
-                          <Grid3X3 className="w-4 h-4 text-[#b7b7b7]" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className={`bg-white border-[#d9d9d9] hover:bg-gray-50 ${viewMode === "list" ? "bg-gray-100" : ""}`}
-                          onClick={() => setViewMode("list")}
-                          aria-label="Switch to list view"
-                        >
-                          <List className="w-4 h-4 text-[#b7b7b7]" />
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Choose the type of display for your campaign sites
-                    </p>
-                  </div>
-                </div>
-              )}
+              
 
               {/* Search Results View */}
               {isSearching && (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 overflow-y-auto">
                   {/* Search Header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1731,10 +1860,6 @@ function SalesDashboardContent() {
                         Results for "{searchQuery}" ({searchResults.length})
                       </h2>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-1 hidden sm:flex bg-transparent">
-                      <Filter size={14} />
-                      <span>Filter</span>
-                    </Button>
                   </div>
 
                   {/* Search Error */}
@@ -1753,53 +1878,46 @@ function SalesDashboardContent() {
                         <ResponsiveCardGrid
                           mobileColumns={1}
                           tabletColumns={2}
-                          desktopColumns={5}
+                          desktopColumns={4}
                           gap="xl"
                         >
-                          {searchResults.map((result) => (
-                            <Card
-                              key={result.objectID}
-                              className="overflow-hidden cursor-pointer border border-gray-200 shadow-md rounded-xl transition-all hover:shadow-lg"
-                              onClick={() => handleSearchResultClick(result)}
-                            >
-                              <div className="h-52 bg-gray-200 relative">
-                                <Image
-                                  src={result.image_url || "/abstract-geometric-sculpture.png"}
-                                  alt={result.name || "Search result"}
-                                  fill
-                                  className="object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement
-                                    target.src = "/abstract-geometric-sculpture.png"
-                                    target.className = "opacity-50 object-contain"
-                                  }}
-                                />
-                              </div>
+                          {searchResults.map((result) => {
+                            // Convert SearchResult to Product-like object for ProductCard
+                            const productLike: Product = {
+                              id: result.objectID,
+                              name: result.name,
+                              type: result.type,
+                              price: result.price || 0,
+                              media: result.media || [],
+                              specs_rental: result.specs_rental,
+                              description: result.description || "",
+                              site_code: result.site_code,
+                              categories: [],
+                              category_names: [],
+                              active: true,
+                              created: new Date(),
+                              updated: new Date(),
+                              deleted: false,
+                              seller_id: result.seller_id || "",
+                              seller_name: "",
+                              position: 0,
+                            }
 
-                              <CardContent className="p-4">
-                                <div className="flex flex-col">
-                                  {result.site_code && (
-                                    <span className="text-xs text-gray-700 mb-1">Site Code: {result.site_code}</span>
-                                  )}
-
-                                  <h3 className="font-semibold line-clamp-1">{result.name}</h3>
-
-                                  {result.price && (
-                                    <div className="mt-2 text-sm font-medium text-green-700">
-                                      ₱{Number(result.price).toLocaleString()}
-                                    </div>
-                                  )}
-
-                                  {result.location && (
-                                    <div className="mt-1 text-xs text-gray-500 flex items-center">
-                                      <MapPin size={12} className="mr-1 flex-shrink-0" />
-                                      <span className="truncate">{result.location}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
+                            return (
+                              <ProductCard
+                                key={result.objectID}
+                                product={productLike}
+                                hasOngoingBooking={false} // Search results don't show booking status
+                                onView={() => handleSearchResultClick(result)}
+                                onEdit={() => {}} // No edit for search results
+                                onDelete={() => {}} // No delete for search results
+                                onCreateReport={() => {}} // No report for search results
+                                isSelected={false}
+                                onSelect={() => {}}
+                                selectionMode={false}
+                              />
+                            )
+                          })}
                         </ResponsiveCardGrid>
                       ) : (
                         // List View for Search Results - Only show on tablet and desktop
@@ -1825,7 +1943,7 @@ function SalesDashboardContent() {
                                       onClick={() => handleSearchResultClick(result)}
                                     >
                                       <TableCell>
-                                        <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                        <div className="h-12 w-12 bg-gray-100 rounded overflow-hidden relative">
                                           {result.image_url ? (
                                             <Image
                                               src={result.image_url || "/placeholder.svg"}
@@ -1840,8 +1958,8 @@ function SalesDashboardContent() {
                                               }}
                                             />
                                           ) : (
-                                            <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                                              <MapPin size={16} className="text-gray-400" />
+                                            <div className="h-full w-full flex items-center justify-center text-gray-500 font-medium text-xs">
+                                              NO IMAGE
                                             </div>
                                           )}
                                         </div>
@@ -1876,6 +1994,69 @@ function SalesDashboardContent() {
                             </div>
                           </div>
                         )
+                      )}
+                      {/* Search Pagination Controls */}
+                      {searchPagination && searchPagination.nbPages > 1 && (
+                        <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+                          <div className="text-sm text-gray-500">
+                            Page {currentSearchPage + 1} of {searchPagination.nbPages} ({searchPagination.nbHits} results)
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentSearchPage(prev => Math.max(0, prev - 1))}
+                              disabled={currentSearchPage === 0}
+                              className="h-8 w-8 p-0 bg-transparent"
+                            >
+                              <ChevronLeft size={16} />
+                            </Button>
+
+                            {/* Page numbers - Hide on mobile */}
+                            <div className="hidden sm:flex items-center gap-1">
+                              {(() => {
+                                const totalPages = searchPagination.nbPages
+                                const currentPage = currentSearchPage
+                                const maxVisible = 5
+
+                                // Calculate the range of pages to show
+                                let startPage = Math.max(0, currentPage - Math.floor(maxVisible / 2))
+                                let endPage = Math.min(totalPages - 1, startPage + maxVisible - 1)
+
+                                // Adjust startPage if we're near the end
+                                if (endPage - startPage + 1 < maxVisible) {
+                                  startPage = Math.max(0, endPage - maxVisible + 1)
+                                }
+
+                                return Array.from({ length: endPage - startPage + 1 }, (_, i) => {
+                                  const pageNum = startPage + i
+                                  return (
+                                    <Button
+                                      key={`search-page-${pageNum}`}
+                                      variant={currentPage === pageNum ? "default" : "outline"}
+                                      size="sm"
+                                      onClick={() => setCurrentSearchPage(pageNum)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      {pageNum + 1}
+                                    </Button>
+                                  )
+                                })
+                              })()}
+                            </div>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setCurrentSearchPage(prev => Math.min(searchPagination.nbPages - 1, prev + 1))}
+                              disabled={currentSearchPage >= searchPagination.nbPages - 1}
+                              className="h-8 w-8 p-0 bg-transparent"
+                            >
+                              <ChevronRight size={16} />
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ) : (
@@ -1972,7 +2153,7 @@ function SalesDashboardContent() {
                                   }}
                                 >
                                   <TableCell>
-                                    <div className="h-12 w-12 bg-gray-200 rounded overflow-hidden relative">
+                                    <div className="h-12 w-12 bg-gray-100 rounded overflow-hidden relative">
                                       {product.media && product.media.length > 0 ? (
                                         <>
                                           <Image
@@ -1989,8 +2170,8 @@ function SalesDashboardContent() {
                                           />
                                         </>
                                       ) : (
-                                        <div className="h-full w-full flex items-center justify-center bg-gray-100">
-                                          <MapPin size={16} className="text-gray-400" />
+                                        <div className="h-full w-full flex items-center justify-center text-gray-500 font-medium text-xs">
+                                          NO IMAGE
                                         </div>
                                       )}
                                     </div>
@@ -2246,6 +2427,42 @@ function SalesDashboardContent() {
           siteId={selectedProductForReport}
           module="sales"
         />
+
+        {/* Spot Selection Dialog */}
+        <SpotSelectionDialog
+          open={isSpotSelectionDialogOpen}
+          onOpenChange={setIsSpotSelectionDialogOpen}
+          products={spotSelectionProducts}
+          currentDate={spotSelectionCurrentDate}
+          selectedDate={spotSelectionCurrentDate}
+          type={ceMode ? "cost-estimate" : "quotation"}
+          preSelectedClient={selectedClientForProposal}
+          nonDynamicSites={selectedSites.filter(site =>
+            site.content_type?.toLowerCase() !== "dynamic" && site.content_type?.toLowerCase() !== "digital"
+          )}
+          showDoneButton={!!currentSpotSelectionProduct}
+          hideClientSelection={!!currentSpotSelectionProduct}
+          onDone={(spots) => {
+            // Store the selected spots
+            setSelectedSpots(prev => ({
+              ...prev,
+              ...spots
+            }))
+
+            // Add the product to selected sites if it has spots selected
+            if (currentSpotSelectionProduct && spots[currentSpotSelectionProduct.id || '']?.length > 0) {
+              setSelectedSites(prev => {
+                const isAlreadySelected = prev.some(p => p.id === currentSpotSelectionProduct.id)
+                if (!isAlreadySelected) {
+                  return [...prev, currentSpotSelectionProduct]
+                }
+                return prev
+              })
+            }
+
+            setCurrentSpotSelectionProduct(null)
+          }}
+        />
       </div>
     </div>
   )
@@ -2269,7 +2486,7 @@ export default function SalesDashboardPage() {
 }
 
 // Product Card Component for Grid View
-function ProductCard({
+export function ProductCard({
   product,
   hasOngoingBooking,
   onView,
@@ -2290,10 +2507,6 @@ function ProductCard({
   onSelect?: () => void
   selectionMode?: boolean
 }) {
-  // Get the first media item for the thumbnail
-  const thumbnailUrl =
-    product.media && product.media.length > 0 ? product.media[0].url : "/abstract-geometric-sculpture.png"
-
   // Determine location based on product type
   const location = product.specs_rental?.location || product.light?.location || "Unknown location"
 
@@ -2311,18 +2524,21 @@ function ProductCard({
     }
   }
 
-  return (
-    <div
-      className={cn(
-        "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border",
-        isSelected ? "border-green-500" : "border-gray-200",
-        selectionMode ? "hover:border-green-300" : "",
-      )}
-      onClick={handleClick}
-    >
+  const isDynamicSite = product.content_type?.toLowerCase() === "dynamic" || product.content_type?.toLowerCase() === "digital";
+
+  return isDynamicSite ? (
+    <div className="p-[4px] rounded-[16px] gradient-border h-[344px]">
+      <div
+        className={cn(
+          "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border h-[335px] flex flex-col",
+          isSelected ? "border-green-500" : "border-gray-200",
+          selectionMode ? "hover:border-green-300" : "",
+        )}
+        onClick={handleClick}
+      >
       <div className="h-[218px] bg-gray-300 relative rounded-t-2xl">
         <Image
-          src={thumbnailUrl || "/placeholder.svg"}
+          src={product.media && product.media.length > 0 ? product.media[0].url : "/placeholder.svg"}
           alt={product.name || "Product image"}
           fill
           className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
@@ -2349,16 +2565,62 @@ function ProductCard({
 
       </div>
 
-      <div className="p-4">
+      <div className="p-4 flex-1 flex flex-col justify-end">
         <div className="space-y-2">
-          <div className="text-sm text-gray-500 font-medium">{siteCode || "N/A"}</div>
           <div className="text-sm text-black font-medium">{product.name}</div>
           <div className="text-sm text-black font-medium truncate">{location}</div>
           <div className="text-sm text-black font-medium">{formattedPrice}</div>
         </div>
       </div>
     </div>
-  )
+  </div>
+   ) : (
+    <div
+      className={cn(
+        "bg-white rounded-2xl shadow-lg overflow-hidden cursor-pointer transition-all hover:shadow-xl border h-[340px] flex flex-col",
+        isSelected ? "border-green-500" : "border-gray-200",
+        selectionMode ? "hover:border-green-300" : "",
+      )}
+      onClick={handleClick}
+    >
+      <div className="h-[218px] bg-gray-300 relative rounded-t-2xl">
+        <Image
+          src={product.media && product.media.length > 0 ? product.media[0].url : "/placeholder.svg"}
+          alt={product.name || "Product image"}
+          fill
+          className={`object-cover ${hasOngoingBooking ? "grayscale" : ""}`}
+          onError={(e) => {
+            const target = e.target as HTMLImageElement
+            target.src = "/abstract-geometric-sculpture.png"
+            target.className = `opacity-50 object-contain ${hasOngoingBooking ? "grayscale" : ""}`
+          }}
+        />
+
+        {/* Selection indicator */}
+        {selectionMode && (
+          <div className="absolute top-3 left-3 z-10">
+            <div
+              className={cn(
+                "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                isSelected ? "bg-green-500 border-green-500" : "bg-white border-gray-300",
+              )}
+            >
+              {isSelected && <CheckCircle2 size={16} className="text-white" />}
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      <div className="p-4 flex-1 flex flex-col justify-end">
+        <div className="space-y-2">
+          <div className="text-sm text-black font-medium">{product.name}</div>
+          <div className="text-sm text-black font-medium truncate">{location}</div>
+          <div className="text-sm text-black font-medium">{formattedPrice}</div>
+        </div>
+      </div>
+    </div>
+)
 }
 
 

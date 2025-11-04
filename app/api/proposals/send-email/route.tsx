@@ -174,6 +174,8 @@ export async function POST(request: NextRequest) {
       currentUserEmail: formData.get("currentUserEmail"),
       currentUserPhoneNumber: formData.get("currentUserPhoneNumber"),
       ccEmail: formData.get("ccEmail"), // Now a string that might contain multiple emails
+      replyToEmail: formData.get("replyToEmail"),
+      hasUserData: !!formData.get("userData"),
     })
 
     console.log("Proposal company logo:", proposal?.companyLogo)
@@ -225,6 +227,8 @@ export async function POST(request: NextRequest) {
     const currentUserEmail = formData.get("currentUserEmail") as string
     const currentUserPhoneNumber = formData.get("currentUserPhoneNumber") as string
     const ccEmail = formData.get("ccEmail") as string
+    const replyToEmail = formData.get("replyToEmail") as string
+    const userData = formData.get("userData") ? JSON.parse(formData.get("userData") as string) : null
 
     if (!proposal || !clientEmail) {
       console.error("Missing required fields:", { proposal: !!proposal, clientEmail: !!clientEmail })
@@ -278,8 +282,8 @@ export async function POST(request: NextRequest) {
     // Use custom subject and body if provided, otherwise fall back to default
     const finalSubject = subject || `Proposal: ${proposal.title || "Custom Advertising Solution"} - ${proposal.companyName || "OH Plus"}`
 
-    // Create email template function that uses the extracted dominant color
-    const createProposalEmailTemplate = (dominantColor: string) => `
+    // Create email template function that uses the extracted dominant color and user data
+    const createProposalEmailTemplate = (dominantColor: string, userName?: string, userPosition?: string, replyToEmail?: string) => `
       <!DOCTYPE html>
       <html>
       <head>
@@ -572,10 +576,10 @@ export async function POST(request: NextRequest) {
             <p>We believe this proposal offers excellent value and aligns perfectly with your advertising goals. Our team is ready to discuss any questions you may have and work with you to bring this campaign to life.</p>
 
             <div class="contact-info">
-              <strong>Ready to get started?</strong><br>
-              📧 Email: sales@ohplus.com<br>
-              📞 Phone: ${currentUserPhoneNumber || "+639XXXXXXXXX"}
-            </div>
+               <strong>Ready to get started?</strong><br>
+               📧 Email: ${replyToEmail || currentUserEmail || "noreply@ohplus.ph"}<br>
+               📞 Phone: ${currentUserPhoneNumber || "+639XXXXXXXXX"}
+             </div>
 
             <p>Thank you for considering OH Plus as your advertising partner. We look forward to creating something amazing together!</p>
 
@@ -599,10 +603,10 @@ export async function POST(request: NextRequest) {
                     <span style="color: white; font-size: 18px; font-weight: 600;">${proposal.companyName || 'OH Plus'}</span>
                   </div>
                   <div class="sales-info">
-                    <h4 class="sales-name" style="color: ${dominantColor}; margin: 0 0 2px 0; font-size: 16px; font-weight: 600;">Sales Executive</h4>
-                    <p class="sales-position" style="margin: 0 0 3px 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">AAi - Outdoor Advertising</p>
-                    <p class="sales-contact" style="margin: 0 0 2px 0; color: rgba(255, 255, 255, 0.9); font-size: 13px;">📞 +639923657387</p>
-                    <p class="sales-contact" style="margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 13px;">📧 aixymbiosis@aix.com</p>
+                    <h4 class="sales-name" style="color: ${dominantColor}; margin: 0 0 2px 0; font-size: 16px; font-weight: 600;">${userName || 'Sales Executive'}</h4>
+                    <p class="sales-position" style="margin: 0 0 3px 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">${userPosition || 'Sales Executive'}</p>
+                    <p class="sales-contact" style="margin: 0 0 2px 0; color: rgba(255, 255, 255, 0.9); font-size: 13px;">📞 ${currentUserPhoneNumber || "+639XXXXXXXXX"}</p>
+                    <p class="sales-contact" style="margin: 0; color: rgba(255, 255, 255, 0.9); font-size: 13px;">📧 ${replyToEmail || currentUserEmail || "noreply@ohplus.ph"}</p>
                   </div>
                 </div>
                 <div class="footer-company-section" style="text-align: right;">
@@ -613,17 +617,17 @@ export async function POST(request: NextRequest) {
 
               <!-- Updated contact information with header-like styling -->
               <div class="footer-contact-section">
-                <div class="footer-name" style="font-size: 18px; font-weight: 600; margin: 0 0 5px 0; color: white; letter-spacing: 0.5px;">Sales Executive</div>
-                <div class="footer-company" style="font-size: 16px; font-weight: 500; margin: 0 0 2px 0; color: rgba(255, 255, 255, 0.95);">AAi - Outdoor Advertising</div>
-                <div class="footer-position" style="font-size: 16px; font-weight: 600; margin: 0 0 15px 0; color: white; letter-spacing: 0.5px;">AAi</div>
+                <div class="footer-name" style="font-size: 18px; font-weight: 600; margin: 0 0 5px 0; color: white; letter-spacing: 0.5px;">${userName || 'Sales Executive'}</div>
+                <div class="footer-company" style="font-size: 16px; font-weight: 500; margin: 0 0 2px 0; color: rgba(255, 255, 255, 0.95);">${userPosition || 'Sales Executive'}</div>
+                <div class="footer-position" style="font-size: 16px; font-weight: 600; margin: 0 0 15px 0; color: white; letter-spacing: 0.5px;">${userName || 'Sales Executive'}</div>
 
                 <div class="footer-contact" style="font-size: 14px; margin: 5px 0; color: rgba(255, 255, 255, 0.95); display: flex; align-items: center; justify-content: flex-start;">
                   <span style="margin-right: 8px;">📞</span>
-                  <span>+639923657387</span>
+                  <span>${currentUserPhoneNumber || "+639XXXXXXXXX"}</span>
                 </div>
                 <div class="footer-contact" style="font-size: 14px; margin: 5px 0; color: rgba(255, 255, 255, 0.95); display: flex; align-items: center; justify-content: flex-start;">
                   <span style="margin-right: 8px;">📧</span>
-                  <span>aixymbiosis@aix.com</span>
+                  <span>${replyToEmail || currentUserEmail || "noreply@ohplus.ph"}</span>
                 </div>
 
                 <div class="footer-legal-text" style="font-size: 12px; margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.2); color: rgba(255, 255, 255, 0.85); line-height: 1.4;">
@@ -638,21 +642,34 @@ export async function POST(request: NextRequest) {
       </html>
     `
 
+    // Create user name and position from userData like in quotations template
+    const userName = userData?.first_name && userData?.last_name
+      ? `${userData.first_name} ${userData.last_name}`.trim()
+      : userData?.displayName || userData?.name || "Sales Executive"
+
+    const userPosition = userData?.position || "Sales Executive"
+
     const finalBody =
-      customBody ||
-      createProposalEmailTemplate(dominantColor)
+       customBody ||
+       createProposalEmailTemplate(dominantColor, userName, userPosition, replyToEmail)
 
     console.log("Attempting to send email to:", clientEmail)
 
     // Prepare email data with optional PDF attachment
     const emailData: any = {
-      from: "OH Plus <noreply@ohplus.ph>",
-      to: [clientEmail],
-      subject: finalSubject, // Use the final subject
-      html: finalBody, // Use the final body
-      reply_to: currentUserEmail ? [currentUserEmail] : undefined, // Set reply-to to current user's email
-      cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided
-    }
+       from: "OH Plus <noreply@ohplus.ph>",
+       to: [clientEmail],
+       subject: finalSubject, // Use the final subject
+       html: finalBody, // Use the final body
+       cc: ccEmailsArray.length > 0 ? ccEmailsArray : undefined, // Add CC if provided
+     }
+
+     // Add reply-to if replyToEmail is provided, otherwise use current user email
+     if (replyToEmail && replyToEmail.trim().length > 0) {
+       emailData.reply_to = replyToEmail.trim()
+     } else if (currentUserEmail && currentUserEmail.trim().length > 0) {
+       emailData.reply_to = currentUserEmail.trim()
+     }
 
     // Add PDF attachment if generated successfully
     if (pdfBase64) {

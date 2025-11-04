@@ -125,16 +125,19 @@ const getDateObject = (date: any): Date | undefined => {
 }
 
 export async function POST(request: NextRequest) {
-  const { quotation, companyData, logoDataUrl, userData, format = 'pdf' }: { quotation: Quotation; companyData: any; logoDataUrl: string | null; userData?: any; format?: 'pdf' | 'image' } = await request.json()
-  console.log('Received quotation:', quotation)
-  console.log('Received companyData:', companyData)
+  const { quotation, companyData, logoDataUrl, userData, userSignatureDataUrl, format = 'pdf' }: { quotation: Quotation; companyData: any; logoDataUrl: string | null; userData?: any; userSignatureDataUrl?: string | null; format?: 'pdf' | 'image' } = await request.json()
+  console.log('Received quotation:', quotation?.id, quotation?.quotation_number)
+  console.log('Received companyData:', companyData?.name)
   console.log('Received logoDataUrl:', !!logoDataUrl)
-  console.log('Received userData:', userData)
+  console.log('Received userData:', userData?.first_name)
+  console.log('Received userSignatureDataUrl:', !!userSignatureDataUrl)
   console.log('Format:', format)
 
   try {
     // Generate HTML content
-    const htmlContent = generateQuotationHTML(quotation, companyData, userData)
+    console.log('Generating HTML content...')
+    const htmlContent = generateQuotationHTML(quotation, companyData, userData, userSignatureDataUrl)
+    console.log('HTML content generated, length:', htmlContent.length)
 
     // Launch puppeteer with @sparticuz/chromium for serverless or local chromium for development
     const browser = await puppeteer.launch(
@@ -146,7 +149,11 @@ export async function POST(request: NextRequest) {
           }
         : {
             headless: true,
-            executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+            executablePath: process.platform === 'win32'
+              ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'
+              : process.platform === 'darwin'
+                ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+                : '/usr/bin/google-chrome' // Linux fallback
           }
     )
 
@@ -200,9 +207,19 @@ export async function POST(request: NextRequest) {
 function generateQuotationHTML(
   quotation: Quotation,
   companyData: any,
-  userData?: any
+  userData?: any,
+  userSignatureDataUrl?: string | null
 ): string {
+  console.log('Generating HTML for quotation:', quotation?.id, 'items:', !!quotation?.items)
+
   const item = quotation.items
+
+  if (!item) {
+    console.error('Quotation items are missing or undefined')
+    throw new Error('Quotation items are missing')
+  }
+
+  console.log('Item data:', { name: item.name, price: item.price, type: item.type })
 
   const startDate = quotation.start_date || (quotation as any).contract_period?.start_date
   const endDate = quotation.end_date || (quotation as any).contract_period?.end_date
@@ -378,9 +395,7 @@ function generateQuotationHTML(
       .signature-line {
         font-weight: bold;
         border-bottom: 1px solid #000;
-        margin-top: 10px;
-        padding-top: 20px;
-        max-width: 200px; /* 👈 shorten the line */
+        max-width: 100px; /* 👈 shorten the line */
         margin-right: 0; 
       }
     </style>
@@ -450,7 +465,7 @@ function generateQuotationHTML(
      <li>
       <div class="details-row">
         <div class="details-label">Lease rate per month:</div>
-        <div class="details-value">PHP ${item?.price ? item.price.toLocaleString() : "0"} (Exclusive of VAT)</div>
+        <div class="details-value">PHP ${item?.price ? item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0"} (Exclusive of VAT)</div>
       </div>
     </li>
   </ul>
@@ -464,7 +479,7 @@ function generateQuotationHTML(
     <div class="price-breakdown">
       <div class="price-row">
         <span>Lease rate per month</span>
-        <span>PHP ${(item?.price || 0).toLocaleString()}</span>
+        <span>PHP ${(item?.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row">
         <span>Contract duration</span>
@@ -476,7 +491,7 @@ function generateQuotationHTML(
       item?.price || 0,
       getDateObject(startDate) || new Date(),
       getDateObject(endDate) || new Date()
-    ).toLocaleString()}</span>
+    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row">
         <span>Add: VAT</span>
@@ -484,7 +499,7 @@ function generateQuotationHTML(
       item?.price || 0,
       getDateObject(startDate) || new Date(),
       getDateObject(endDate) || new Date()
-    ) * 0.12).toLocaleString()}</span>
+    ) * 0.12).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
       <div class="price-row price-total">
         <span>Total</span>
@@ -494,7 +509,7 @@ function generateQuotationHTML(
         getDateObject(startDate) || new Date(),
         getDateObject(endDate) || new Date()
       ) * 1.12
-    ).toLocaleString()}</span>
+    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
     </div>
 
@@ -521,13 +536,14 @@ function generateQuotationHTML(
     <div class="signatures">
       <div class="signature-section">
         <div>Very truly yours,</div>
-        <div class="signature-line"></div>
-        <div>${userData?.first_name || quotation.signature_name || "AIX Xymbiosis"}</div>
-        <div>${quotation.signature_position || "Sales Manager"}</div>
+       ${userSignatureDataUrl ? `<img src="${userSignatureDataUrl}" alt="Signature" style="max-width: 200px; max-height: 60px; margin: 10px 0;" /><div class="signature-line"></div>` : '<div class="signature-line"></div>'}
+        <div>${userData?.first_name && userData?.last_name ? `${userData.first_name} ${userData.last_name}` : companyData?.company_name || "Golden Touch Imaging Specialist"}</div>
+        <div>${quotation.signature_position || "Sales"}</div>
       </div>
       <div class="signature-section">
         <div>Conforme:</div>
-        <div class="signature-line"></div>
+        <div style="width: 200px; height: 60px; margin: 10px 0;"></div>
+        <div class="signature-line" ></div>
         <div>${quotation.client_name || "Client Name"}</div>
         <div>${quotation.client_designation || "Client Designation"}</div>
         <div style="font-size: 10px; margin-top: 10px; color: gray; font-style: italic;">

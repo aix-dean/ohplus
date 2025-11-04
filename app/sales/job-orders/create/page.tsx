@@ -33,21 +33,22 @@ import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import {
   createMultipleJobOrders,
-  getQuotationDetailsForJobOrder,
+  getBookingDetailsForJobOrder,
   generatePersonalizedJONumber,
 } from "@/lib/job-order-service"
+import { getQuotationById } from "@/lib/quotation-service"
 import { generateJobOrderPDF } from "@/lib/job-order-pdf-generator"
 import { updateQuotation } from "@/lib/quotation-service" // Import updateQuotation
 import type { QuotationProduct } from "@/lib/types/quotation" // Corrected import for QuotationProduct
 import { uploadFileToFirebaseStorage } from "@/lib/firebase-service"
 import { bookingService } from "@/lib/booking-service"
 import type { JobOrderType, JobOrderStatus } from "@/lib/types/job-order"
-import type { Quotation, ProjectComplianceItem } from "@/lib/types/quotation" // Import ProjectComplianceItem
+import type { Booking } from "@/lib/booking-service"
 import type { Product } from "@/lib/firebase-service"
 import { type Client, updateClient, updateClientCompany, type ClientCompany, getClientCompanyById, createNotifications } from "@/lib/client-service" // Import updateClient, updateClientCompany, ClientCompany, and getClientCompanyById
 import { cn, getProjectCompliance } from "@/lib/utils"
 import { JobOrderCreatedSuccessDialog } from "@/components/job-order-created-success-dialog"
-import { ComingSoonDialog } from "@/components/coming-soon-dialog"
+import { ComingSoonModal } from "@/components/coming-soon-dialog"
 import { ComplianceConfirmationDialog } from "@/components/compliance-confirmation-dialog"
 import { ComplianceDialog } from "@/components/compliance-dialog"
 import { serverTimestamp, Timestamp } from "firebase/firestore"
@@ -87,17 +88,16 @@ const safeToDate = (dateValue: any): Date | undefined => {
 export default function CreateJobOrderPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const quotationId = searchParams.get("quotationId")
+  const bookingId = searchParams.get("bookingId")
   const { user, userData } = useAuth()
   const { toast } = useToast()
 
   // All state declarations first
   const [loading, setLoading] = useState(true)
-  const [quotationData, setQuotationData] = useState<{
-    quotation: Quotation
+  const [bookingData, setBookingData] = useState<{
+    booking: Booking
     products: Product[]
     client: ClientCompany | null // This should be ClientCompany
-    items?: QuotationProduct[] // Changed from QuotationItem
   } | null>(null)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -165,11 +165,11 @@ export default function CreateJobOrderPage() {
 
 
   const missingCompliance = useMemo(() => {
-    const projectCompliance = quotationData?.quotation?.projectCompliance
+    const projectCompliance = bookingData?.booking?.projectCompliance
     return {
-      dtiBir: !dtiBirUrl && !quotationData?.client?.compliance?.dti,
-      gis: !gisUrl && !quotationData?.client?.compliance?.gis,
-      idSignature: !idSignatureUrl && !quotationData?.client?.compliance?.id,
+      dtiBir: !dtiBirUrl && !bookingData?.client?.compliance?.dti,
+      gis: !gisUrl && !bookingData?.client?.compliance?.gis,
+      idSignature: !idSignatureUrl && !bookingData?.client?.compliance?.id,
       signedQuotation: !signedQuotationUrl && !projectCompliance?.signedQuotation?.fileUrl,
       signedContract: !signedContractUrl && !projectCompliance?.signedContract?.fileUrl,
       poMo: !poMoUrl && !projectCompliance?.irrevocablePo?.fileUrl,
@@ -185,34 +185,34 @@ export default function CreateJobOrderPage() {
     poMoUrl,
     finalArtworkUrl,
     paymentAdvanceConfirmed,
-    quotationData?.client?.compliance?.dti,
-    quotationData?.client?.compliance?.gis,
-    quotationData?.client?.compliance?.id,
-    quotationData?.quotation?.projectCompliance, // Depend on the whole object
+    bookingData?.client?.compliance?.dti,
+    bookingData?.client?.compliance?.gis,
+    bookingData?.client?.compliance?.id,
+    bookingData?.booking?.projectCompliance, // Depend on the whole object
   ])
 
   // Calculate duration in months
   const totalDays = useMemo(() => {
-    if (!quotationData?.quotation) return 0 // Default to 0 days if no quotation data
-    const quotation = quotationData.quotation
-    return quotation.duration_days || 0 // Use duration_days directly
-  }, [quotationData])
+    if (!bookingData?.booking) return 0 // Default to 0 days if no booking data
+    const booking = bookingData.booking
+    return booking.costDetails?.days || 0 // Use days from costDetails
+  }, [bookingData])
 
   // Calculate individual product totals for display
   const productTotals = useMemo(() => {
-    if (!quotationData) return []
+    if (!bookingData) return []
 
-    const quotation = quotationData.quotation
-    const products = quotationData.products // Access products here
+    const booking = bookingData.booking
+    const products = bookingData.products // Access products here
 
-    // Always treat as a single product from quotation object
-    const subtotal = quotation.total_amount || 0 // Use total_amount for single product
+    // Always treat as a single product from booking object
+    const subtotal = booking.total_cost || 0 // Use total_cost for single product
     const vat = subtotal * 0.12 // Recalculate VAT based on new subtotal
     const total = subtotal + vat // Recalculate total
 
     const monthlyRate =
-      quotation.duration_days && quotation.duration_days > 0
-        ? subtotal / (quotation.duration_days / 30) // Approximate monthly rate
+      booking.costDetails?.days && booking.costDetails.days > 0
+        ? subtotal / (booking.costDetails.days / 30) // Approximate monthly rate
         : 0
 
     return [
@@ -222,20 +222,20 @@ export default function CreateJobOrderPage() {
         total,
         monthlyRate: monthlyRate,
         siteCode: products[0]?.site_code || "N/A", // Get from product
-        productName: products[0]?.name || "N/A", // Get from product
+        productName: products[0]?.name || booking.product_name || "N/A", // Get from product or booking
       },
     ]
-  }, [quotationData])
+  }, [bookingData])
 
   // Calculate overall totals
   const overallTotal = useMemo(() => {
     return productTotals.reduce((sum, product) => sum + product.total, 0)
   }, [productTotals])
 
-  // Extract content_type from quotation data
+  // Extract content_type from booking data
   const contentType = useMemo(() => {
-    return quotationData?.quotation?.items?.content_type || "static"
-  }, [quotationData])
+    return bookingData?.products[0]?.content_type || "static"
+  }, [bookingData])
 
   // Dynamic JO type options based on content_type
   const joTypeOptions = useMemo(() => {
@@ -372,10 +372,10 @@ export default function CreateJobOrderPage() {
         setFileState(file)
 
         // Prioritize updating client company compliance if clientId and a recognized fieldToUpdate are present
-        // Handle project compliance updates for quotation documents
-        if (quotationId && fieldToUpdate && (fieldToUpdate === "signedQuotation" || fieldToUpdate === "signedContract" || fieldToUpdate === "poMo" || fieldToUpdate === "finalArtwork" || fieldToUpdate === "paymentAsDeposit")) {
-          console.log("handleFileUpload: Attempting to update project compliance for quotation.");
-          console.log("handleFileUpload: quotationId:", quotationId);
+        // Handle project compliance updates for booking documents
+        if (bookingId && fieldToUpdate && (fieldToUpdate === "signedQuotation" || fieldToUpdate === "signedContract" || fieldToUpdate === "poMo" || fieldToUpdate === "finalArtwork" || fieldToUpdate === "paymentAsDeposit")) {
+          console.log("handleFileUpload: Attempting to update project compliance for booking.");
+          console.log("handleFileUpload: bookingId:", bookingId);
           console.log("handleFileUpload: fieldToUpdate:", fieldToUpdate);
           // Handle project compliance updates for the quotation document
           let projectComplianceFieldKey:
@@ -399,8 +399,8 @@ export default function CreateJobOrderPage() {
           }
 
           if (projectComplianceFieldKey) {
-            // Get the current project compliance from quotation data or use empty object with proper typing
-            const currentProjectCompliance = quotationData?.quotation?.projectCompliance || {
+            // Get the current project compliance from booking data or use empty object with proper typing
+            const currentProjectCompliance = bookingData?.booking?.projectCompliance || {
               finalArtwork: {
                 fileName: null,
                 fileUrl: null,
@@ -467,24 +467,14 @@ export default function CreateJobOrderPage() {
               },
             }
 
-            await updateQuotation(
-              quotationId,
-              {
-                projectCompliance: updatedProjectCompliance,
-              },
-              user?.uid || "unknown",
-              userData?.first_name || "System",
-            )
+            await bookingService.updateBookingProjectCompliance(bookingId, updatedProjectCompliance)
 
-            // Update local quotationData to reflect the change
-            setQuotationData(prev => prev ? { ...prev, quotation: { ...prev.quotation, projectCompliance: updatedProjectCompliance } } : null)
-
-            // Also update the booking document
-            await bookingService.updateBookingProjectCompliance(quotationId, updatedProjectCompliance)
+            // Update local bookingData to reflect the change
+            setBookingData(prev => prev ? { ...prev, booking: { ...prev.booking, projectCompliance: updatedProjectCompliance } } : null)
 
             toast({
               title: "Project Compliance Document Updated",
-              description: `Quotation's ${fieldToUpdate} updated successfully.`,
+              description: `Booking's ${fieldToUpdate} updated successfully.`,
             })
           } else {
             console.warn(`Unknown project compliance field to update: ${fieldToUpdate}`)
@@ -564,7 +554,7 @@ export default function CreateJobOrderPage() {
         setUploadingState(false)
       }
     },
-    [quotationData, quotationId, toast, user?.uid, userData?.first_name],
+    [bookingData, bookingId, toast, user?.uid, userData?.first_name],
   )
 
   const handleFormUpdate = useCallback((productIndex: number, field: keyof JobOrderFormData, value: any) => {
@@ -668,7 +658,7 @@ export default function CreateJobOrderPage() {
 
   const createJobOrdersWithStatus = useCallback(
     async (status: JobOrderStatus) => {
-      if (!quotationData || !user?.uid) {
+      if (!bookingData || !user?.uid) {
         toast({
           title: "Missing Information",
           description: "Cannot create Job Orders due to missing data or user authentication.",
@@ -680,9 +670,9 @@ export default function CreateJobOrderPage() {
       setIsSubmitting(true)
 
       try {
-        const quotation = quotationData.quotation
-        const products = quotationData.products
-        const client = quotationData.client
+        const booking = bookingData.booking
+        const products = bookingData.products
+        const client = bookingData.client
 
         let jobOrdersData = []
 
@@ -690,13 +680,28 @@ export default function CreateJobOrderPage() {
         const form = jobOrderForms[0]
         const product = products[0] || {}
 
+        // Fetch the original quotation number from the quotation that created this booking
+        // Get the quotation number from the booking data (stored when booking was created)
+        let originalQuotationNumber = booking.quotation_number || ""
+        if (booking.quotation_id) {
+          try {
+            const originalQuotation = await getQuotationById(booking.quotation_id)
+            if (originalQuotation) {
+              originalQuotationNumber = originalQuotation.quotation_number
+            }
+          } catch (error) {
+            console.warn("Could not fetch original quotation for quotation number:", error)
+          }
+        }
+
         // DEBUG: Log all date/time values before processing
         console.log("[DEBUG] Date/Time values in job order creation:")
         console.log("- Current time:", new Date().toISOString())
         console.log("- Form dateRequested:", form.dateRequested, "Type:", typeof form.dateRequested)
         console.log("- Form deadline:", form.deadline, "Type:", typeof form.deadline)
-        console.log("- Quotation start_date:", quotation.start_date, "Type:", typeof quotation.start_date, "Raw value:", quotation.start_date)
-        console.log("- Quotation end_date:", quotation.end_date, "Type:", typeof quotation.end_date, "Raw value:", quotation.end_date)
+        console.log("- Booking start_date:", booking.start_date, "Type:", typeof booking.start_date, "Raw value:", booking.start_date)
+        console.log("- Booking end_date:", booking.end_date, "Type:", typeof booking.end_date, "Raw value:", booking.end_date)
+        console.log("- Original quotation number:", originalQuotationNumber)
 
         // Validate date objects
         const createdDate = new Date()
@@ -705,13 +710,13 @@ export default function CreateJobOrderPage() {
         let contractPeriodStart = null
         let contractPeriodEnd = null
 
-        if (quotation.start_date) {
+        if (booking.start_date) {
           try {
             // Handle Firestore Timestamp objects
-            if (quotation.start_date && typeof quotation.start_date === 'object' && 'toDate' in quotation.start_date) {
-              contractPeriodStart = quotation.start_date.toDate()
+            if (booking.start_date && typeof booking.start_date === 'object' && 'toDate' in booking.start_date) {
+              contractPeriodStart = booking.start_date.toDate()
             } else {
-              contractPeriodStart = new Date(quotation.start_date)
+              contractPeriodStart = new Date(booking.start_date)
             }
             console.log("- Contract period start parsed:", contractPeriodStart, "Is valid:", !isNaN(contractPeriodStart.getTime()))
           } catch (error) {
@@ -720,13 +725,13 @@ export default function CreateJobOrderPage() {
           }
         }
 
-        if (quotation.end_date) {
+        if (booking.end_date) {
           try {
             // Handle Firestore Timestamp objects
-            if (quotation.end_date && typeof quotation.end_date === 'object' && 'toDate' in quotation.end_date) {
-              contractPeriodEnd = quotation.end_date.toDate()
+            if (booking.end_date && typeof booking.end_date === 'object' && 'toDate' in booking.end_date) {
+              contractPeriodEnd = booking.end_date.toDate()
             } else {
-              contractPeriodEnd = new Date(quotation.end_date)
+              contractPeriodEnd = new Date(booking.end_date)
             }
             console.log("- Contract period end parsed:", contractPeriodEnd, "Is valid:", !isNaN(contractPeriodEnd.getTime()))
           } catch (error) {
@@ -750,13 +755,14 @@ export default function CreateJobOrderPage() {
 
         const contractDuration = totalDays > 0 ? `(${totalDays} days)` : "N/A" // Use totalDays
 
-        const subtotal = quotation.total_amount || 0 // Use total_amount for single product
+        const subtotal = booking.total_cost || 0 // Use total_cost for single product
         const productVat = subtotal * 0.12 // Recalculate VAT
         const productTotal = subtotal + productVat // Recalculate total
 
         jobOrdersData = [
           {
-            quotationId: quotation.id,
+            quotationId: booking.quotation_id || booking.id, // Use quotation_id if available, else booking id
+            booking_id: booking.id, // Add booking_id
             created: createdDate,
             joNumber: form.joNumber || await generatePersonalizedJONumber(userData), // Use input JO# if provided, else generate
             dateRequested: form.dateRequested!,
@@ -773,35 +779,36 @@ export default function CreateJobOrderPage() {
               gisUrl: gisUrl, // Added client compliance
               idSignatureUrl: idSignatureUrl,
             }, // Initialize empty clientCompliance
-            quotationNumber: quotation.quotation_number,
+            quotationNumber: originalQuotationNumber || booking.reservation_id, // Use original quotation number, fallback to reservation_id
+            reservation_number: booking.reservation_id, // Include reservation number from booking
             clientName: client?.name || "N/A",
-            clientCompany: quotation?.client_company_name || "N/A", // Changed from client?.company to client?.name
-            clientCompanyId: quotation.client_company_id || "",
+            clientCompany: booking.client?.company_name || "N/A", // Use company_name from booking client
+            clientCompanyId: booking.client?.company_id || "",
             clientId: client?.id || "",
             client_email: (client as any)?.email || "",
             contractDuration: totalDays.toString(), // Convert to string as expected by type
             contractPeriodStart: contractPeriodStart || undefined,
             contractPeriodEnd: contractPeriodEnd || undefined,
-            siteLocation: quotation.items?.specs?.location || "N/A", // Get from quotation items
-            siteName: quotation.items?.name || "", // Get from quotation items
-            siteCode: quotation.items?.site_code || "N/A", // Get from quotation items
+            siteLocation: products[0]?.location || "N/A", // Get from product
+            siteName: products[0]?.name || "", // Get from product
+            siteCode: products[0]?.site_code || "N/A", // Get from product
             siteType: contentType || "N/A",
-            siteSize: `${quotationData.quotation.items?.specs?.height || 0}ft (h)  x ${quotationData.quotation.items?.specs?.width || 0}ft (w)`,
-            siteIllumination: quotation.items?.light ? "Yes" : "No", // Use quotation items light as boolean
+            siteSize: `${products[0]?.specs_rental?.height || 0}ft (h)  x ${products[0]?.specs_rental?.width || 0}ft (w)`, // Get from product specs
+            siteIllumination: products[0]?.light ? "Yes" : "No", // Use product light as boolean
             illumination: typeof products[0]?.specs_rental?.illumination === 'object'
               ? "Custom Illumination Setup"
               : products[0]?.specs_rental?.illumination || "N/A", // Use product illumination specs
             leaseRatePerMonth:
-              quotation.duration_days && quotation.duration_days > 0
-                ? subtotal / (quotation.duration_days / 30)
+              booking.costDetails?.days && booking.costDetails.days > 0
+                ? subtotal / (booking.costDetails.days / 30)
                 : 0, // Corrected monthlyRate
             totalMonths: totalDays / 30, // This might still be relevant for other calculations, but not for totalLease directly
             totalLease: subtotal, // totalLease is now the subtotal
             vatAmount: productVat, // Use recalculated VAT
             totalAmount: productTotal, // Use recalculated total
-            siteImageUrl: quotation.items?.media_url || "/placeholder.svg?height=48&width=48",
+            siteImageUrl: products[0]?.media?.[0]?.url || "/placeholder.svg?height=48&width=48", // Get from product media array
             missingCompliance: missingCompliance,
-            product_id: quotation.items.product_id || "",
+            product_id: booking.product_id || "",
             company_id: userData?.company_id || "",
             created_by: user.uid, // Added created_by
             content_type: contentType, // Added content_type
@@ -893,7 +900,7 @@ export default function CreateJobOrderPage() {
       }
     },
     [
-      quotationData,
+      bookingData,
       user,
       jobOrderForms,
       totalDays,
@@ -909,7 +916,7 @@ export default function CreateJobOrderPage() {
   )
 
   const handlePrint = useCallback(async () => {
-    if (!quotationData || !user?.uid || !userData) {
+    if (!bookingData || !user?.uid || !userData) {
       toast({
         title: "Missing Information",
         description: "Cannot generate PDF due to missing data.",
@@ -919,10 +926,23 @@ export default function CreateJobOrderPage() {
     }
 
     try {
-      const quotation = quotationData.quotation
-      const products = quotationData.products
-      const client = quotationData.client
+      const booking = bookingData.booking
+      const products = bookingData.products
+      const client = bookingData.client
       const form = jobOrderForms[0]
+
+      // Fetch the original quotation number from the quotation that created this booking
+      let originalQuotationNumber = ""
+      if (booking.quotation_id) {
+        try {
+          const originalQuotation = await getQuotationById(booking.quotation_id)
+          if (originalQuotation) {
+            originalQuotationNumber = originalQuotation.quotation_number
+          }
+        } catch (error) {
+          console.warn("Could not fetch original quotation for quotation number:", error)
+        }
+      }
 
       // Generate JO number if not provided
       const joNumber = form.joNumber || await generatePersonalizedJONumber(userData)
@@ -930,7 +950,8 @@ export default function CreateJobOrderPage() {
       // Create temporary JobOrder object
       const tempJobOrder = {
         id: "", // Not created yet
-        quotationId: quotation.id,
+        quotationId: booking.quotation_id || booking.id, // Use quotation_id if available, else booking id
+        booking_id: booking.id, // Add booking_id
         created: new Date(),
         joNumber,
         dateRequested: form.dateRequested || new Date(),
@@ -947,34 +968,35 @@ export default function CreateJobOrderPage() {
           gisUrl: gisUrl,
           idSignatureUrl: idSignatureUrl,
         },
-        quotationNumber: quotation.quotation_number,
+        quotationNumber: originalQuotationNumber || booking.reservation_id, // Use original quotation number, fallback to reservation_id
+        reservation_number: booking.reservation_id, // Include reservation number from booking
         clientName: client?.name || "N/A",
-        clientCompany: quotation?.client_company_name || "N/A",
-        clientCompanyId: quotation.client_company_id || "",
+        clientCompany: booking.client?.company_name || "N/A", // Use company_name from booking client
+        clientCompanyId: booking.client?.company_id || "",
         clientId: client?.id || "",
         client_email: (client as any)?.email || "",
         contractDuration: totalDays.toString(),
-        contractPeriodStart: quotation.start_date ? safeToDate(quotation.start_date) : undefined,
-        contractPeriodEnd: quotation.end_date ? safeToDate(quotation.end_date) : undefined,
-        siteLocation: quotation.items?.specs?.location || "N/A",
-        siteName: quotation.items?.name || "",
-        siteCode: quotation.items?.site_code || "N/A",
+        contractPeriodStart: booking.start_date ? safeToDate(booking.start_date) : undefined,
+        contractPeriodEnd: booking.end_date ? safeToDate(booking.end_date) : undefined,
+        siteLocation: products[0]?.location || "N/A", // Get from product
+        siteName: products[0]?.name || "", // Get from product
+        siteCode: products[0]?.site_code || "N/A", // Get from product
         siteType: contentType || "N/A",
-        siteSize: `${quotationData.quotation.items?.specs?.height || 0}ft (h) x ${quotationData.quotation.items?.specs?.width || 0}ft (w)`,
-        siteIllumination: quotation.items?.light ? "Yes" : "No",
+        siteSize: `${products[0]?.specs_rental?.height || 0}ft (h) x ${products[0]?.specs_rental?.width || 0}ft (w)`, // Get from product specs
+        siteIllumination: products[0]?.light ? "Yes" : "No", // Get from product
         illumination: typeof products[0]?.specs_rental?.illumination === 'object'
           ? "Custom Illumination Setup"
           : products[0]?.specs_rental?.illumination || "N/A",
-        leaseRatePerMonth: quotation.duration_days && quotation.duration_days > 0
-          ? (quotation.total_amount || 0) / (quotation.duration_days / 30)
+        leaseRatePerMonth: booking.costDetails?.days && booking.costDetails.days > 0
+          ? (booking.total_cost || 0) / (booking.costDetails.days / 30)
           : 0,
         totalMonths: totalDays / 30,
-        totalLease: quotation.total_amount || 0,
-        vatAmount: (quotation.total_amount || 0) * 0.12,
-        totalAmount: (quotation.total_amount || 0) * 1.12,
-        siteImageUrl: quotation.items?.media_url || "/placeholder.svg?height=48&width=48",
+        totalLease: booking.total_cost || 0,
+        vatAmount: (booking.total_cost || 0) * 0.12,
+        totalAmount: (booking.total_cost || 0) * 1.12,
+        siteImageUrl: products[0]?.media?.[0]?.url || "/placeholder.svg?height=48&width=48", // Get from product media array
         missingCompliance: missingCompliance,
-        product_id: quotation.items.product_id || "",
+        product_id: booking.product_id || "",
         company_id: userData?.company_id || "",
         created_by: user.uid,
         content_type: contentType,
@@ -1034,7 +1056,7 @@ export default function CreateJobOrderPage() {
       })
     }
   }, [
-    quotationData,
+    bookingData,
     user,
     userData,
     jobOrderForms,
@@ -1059,7 +1081,7 @@ export default function CreateJobOrderPage() {
 
   const handleCreateJobOrders = useCallback(
     async (status: JobOrderStatus) => {
-      if (!quotationData || !user?.uid) {
+      if (!bookingData || !user?.uid) {
         toast({
           title: "Missing Information",
           description: "Cannot create Job Orders due to missing data or user authentication.",
@@ -1094,35 +1116,35 @@ export default function CreateJobOrderPage() {
       // If all compliances are complete, proceed with creation
       await createJobOrdersWithStatus(status)
     },
-    [quotationData, user?.uid, validateForms, missingCompliance, createJobOrdersWithStatus],
+    [bookingData, user?.uid, validateForms, missingCompliance, createJobOrdersWithStatus],
   )
 
 
   // useEffect hooks
   useEffect(() => {
-    if (!quotationId) {
+    if (!bookingId) {
       toast({
         title: "Error",
-        description: "No quotation ID provided.",
+        description: "No booking ID provided.",
         variant: "destructive",
       })
-      router.push("/sales/job-orders/select-quotation")
+      router.push("/sales/job-orders/select-booking")
       return
     }
 
     const fetchDetails = async () => {
       setLoading(true)
       try {
-        const data = await getQuotationDetailsForJobOrder(quotationId)
+        const data = await getBookingDetailsForJobOrder(bookingId)
         if (data) {
-          setQuotationData(data)
-          console.log("Fetched quotation data:", data);
-          console.log("quotationData.quotation.client_company_id:", data.quotation.client_company_id);
-          console.log("quotationData.client?.id (expected client id):", data.client?.id);
+          setBookingData(data)
+          console.log("Fetched booking data:", data);
+          console.log("bookingData.booking.client.company_id:", data.booking.client.company_id);
+          console.log("bookingData.client?.id (expected client id):", data.client?.id);
 
-          // Fetch the client_company document using the client id from the client object
-          if (data.quotation.client_company_id) { // Use data.client?.id here
-            const clientCompanyDoc = await getClientCompanyById(data.quotation.client_company_id) // Use data.client.id here
+          // Fetch the client_company document using the client company_id from the booking object
+          if (data.booking.client.company_id) {
+            const clientCompanyDoc = await getClientCompanyById(data.booking.client.company_id)
             if (clientCompanyDoc) {
               // Use clientCompanyDoc data to set compliance URLs
               if (clientCompanyDoc.compliance?.dti) {
@@ -1135,38 +1157,38 @@ export default function CreateJobOrderPage() {
                 setIdSignatureUrl(clientCompanyDoc.compliance.id)
               }
             } else {
-              console.warn(`Client company with ID ${data.quotation.client_company_id} not found.`) // Use data.client.id here
+              console.warn(`Client company with ID ${data.booking.client.company_id} not found.`)
               // If clientCompanyDoc is not found, and data.client exists, try to set from data.client's direct compliance fields
               if (data.client) {
-                if (data.client.dti_bir_2303_url) {
-                  setDtiBirUrl(data.client.dti_bir_2303_url)
+                if ((data.client as any).dti_bir_2303_url) {
+                  setDtiBirUrl((data.client as any).dti_bir_2303_url)
                 }
-                if (data.client.gis_url) {
-                  setGisUrl(data.client.gis_url)
+                if ((data.client as any).gis_url) {
+                  setGisUrl((data.client as any).gis_url)
                 }
-                if (data.client.id_signature_url) {
-                  setIdSignatureUrl(data.client.id_signature_url)
+                if ((data.client as any).id_signature_url) {
+                  setIdSignatureUrl((data.client as any).id_signature_url)
                 }
               }
             }
           } else {
-            // If no client id from data.client, and data.client exists, try to set from data.client's direct compliance fields
+            // If no client company_id, and data.client exists, try to set from data.client's direct compliance fields
             if (data.client) {
-              if (data.client.dti_bir_2303_url) {
-                setDtiBirUrl(data.client.dti_bir_2303_url)
+              if ((data.client as any).dti_bir_2303_url) {
+                setDtiBirUrl((data.client as any).dti_bir_2303_url)
               }
-              if (data.client.gis_url) {
-                setGisUrl(data.client.gis_url)
+              if ((data.client as any).gis_url) {
+                setGisUrl((data.client as any).gis_url)
               }
-              if (data.client.id_signature_url) {
-                setIdSignatureUrl(data.client.id_signature_url)
+              if ((data.client as any).id_signature_url) {
+                setIdSignatureUrl((data.client as any).id_signature_url)
               }
             }
           }
 
-          // Initialize project compliance states from quotationData
-          if (data.quotation.projectCompliance) {
-            const projectCompliance = data.quotation.projectCompliance
+          // Initialize project compliance states from bookingData
+          if (data.booking.projectCompliance) {
+            const projectCompliance = data.booking.projectCompliance
             if (projectCompliance.signedQuotation?.fileUrl) {
               setSignedQuotationUrl(projectCompliance.signedQuotation.fileUrl)
             }
@@ -1186,37 +1208,37 @@ export default function CreateJobOrderPage() {
         } else {
           toast({
             title: "Error",
-            description: "Quotation or Product details not found. Please ensure they exist.",
+            description: "Booking or Product details not found. Please ensure they exist.",
             variant: "destructive",
           })
-          router.push("/sales/job-orders/select-quotation")
+          router.push("/sales/job-orders/select-booking")
         }
       } catch (error) {
-        console.error("Failed to fetch quotation details:", error)
+        console.error("Failed to fetch booking details:", error)
         toast({
           title: "Error",
-          description: "Failed to load quotation details. Please try again.",
+          description: "Failed to load booking details. Please try again.",
           variant: "destructive",
         })
-        router.push("/sales/job-orders/select-quotation")
+        router.push("/sales/job-orders/select-booking")
       } finally {
         setLoading(false)
       }
     }
 
     fetchDetails()
-  }, [quotationId, router, toast])
+  }, [bookingId, router, toast])
 
-  // Initialize forms when quotation data changes
+  // Initialize forms when booking data changes
   useEffect(() => {
-    if (quotationData && userData?.uid) {
+    if (bookingData && userData?.uid) {
       const initialForms: JobOrderFormData[] = [
         {
           joNumber: "",
           joType: "",
           dateRequested: new Date(),
           deadline: undefined,
-          campaignName: quotationData.quotation?.campaignId || "", // Initialize with quotation campaignId
+          campaignName: bookingData.booking?.project_name || "", // Initialize with booking project_name
           remarks: "",
           attachmentFile: null,
           attachmentUrl: null,
@@ -1233,7 +1255,7 @@ export default function CreateJobOrderPage() {
       ]
       setJobOrderForms(initialForms)
     }
-  }, [quotationData, userData?.uid])
+  }, [bookingData, userData?.uid])
 
   // Reset joType and materialSpec if they are not in the new dynamic options
   useEffect(() => {
@@ -1261,21 +1283,21 @@ export default function CreateJobOrderPage() {
     )
   }
 
-  if (!quotationData) {
+  if (!bookingData) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-64px)] p-4 text-center">
         <XCircle className="h-12 w-12 text-red-500 mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Quotation Details Not Found</h2>
-        <p className="text-gray-600 mb-4">The selected quotation or its associated products could not be loaded.</p>
-        <Button onClick={() => router.push("/sales/job-orders/select-quotation")}>Go to Select Quotation</Button>
+        <h2 className="text-xl font-semibold mb-2">Booking Details Not Found</h2>
+        <p className="text-gray-600 mb-4">The selected booking or its associated products could not be loaded.</p>
+        <Button onClick={() => router.push("/sales/job-orders/select-booking")}>Go to Select Booking</Button>
       </div>
     )
   }
 
   // Safe access to data after null check
-  const quotation = quotationData.quotation
-  const products = quotationData.products
-  const client = quotationData.client
+  const booking = bookingData.booking
+  const products = bookingData.products
+  const client = bookingData.client
   console.log()
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 p-2">
@@ -1291,12 +1313,12 @@ export default function CreateJobOrderPage() {
         <div className="bg-white rounded-[10px] shadow-[-2px_4px_7.8px_0px_rgba(0,0,0,0.25)] p-4">
           <div className="grid grid-cols-6 gap-4 items-center">
             <div>
-              <p className="font-semibold text-[12px] text-[#333333]">Quotation ID</p>
-              <p className="font-normal text-[18px] text-[#333333]">{quotation.quotation_number}</p>
+              <p className="font-semibold text-[12px] text-[#333333]">Booking ID</p>
+              <p className="font-normal text-[18px] text-[#333333]">{booking.reservation_id}</p>
             </div>
             <div>
               <p className="font-semibold text-[12px] text-[#333333]">Site</p>
-              <p className="font-bold text-[18px] text-[#2d3fff]">{quotation.items?.name || quotation.items?.site_code || "N/A"}</p>
+              <p className="font-bold text-[18px] text-[#2d3fff]">{products[0]?.name || products[0]?.site_code || "N/A"}</p>
             </div>
             <div>
               <p className="font-semibold text-[12px] text-[#333333]">Client</p>
@@ -1304,22 +1326,22 @@ export default function CreateJobOrderPage() {
             </div>
             <div>
               <p className="font-semibold text-[12px] text-[#333333]">Booking Dates</p>
-              <p className="font-normal text-[18px] text-[#333333]">{formatPeriod(quotation.start_date, quotation.end_date)}</p>
+              <p className="font-normal text-[18px] text-[#333333]">{formatPeriod(booking.start_date, booking.end_date)}</p>
             </div>
             <div>
               <p className="font-semibold text-[12px] text-[#333333]">Compliance</p>
               <p
                 className="font-bold text-[18px] text-[#2d3fff] cursor-pointer"
                 onClick={() => {
-                  console.log("[DEBUG] quotationData:", quotationData);
-                  console.log("[DEBUG] quotationData?.quotation:", quotationData?.quotation);
-                  console.log("[DEBUG] quotationData?.quotation?.projectCompliance:", quotationData?.quotation?.projectCompliance);
-                  console.log("[DEBUG] selectedQuotationForCompliance will be set to:", quotationData);
-                  setSelectedQuotationForCompliance(quotationData)
+                  console.log("[DEBUG] bookingData:", bookingData);
+                  console.log("[DEBUG] bookingData?.booking:", bookingData?.booking);
+                  console.log("[DEBUG] bookingData?.booking?.projectCompliance:", bookingData?.booking?.projectCompliance);
+                  console.log("[DEBUG] selectedBookingForCompliance will be set to:", bookingData);
+                  setSelectedQuotationForCompliance(bookingData)
                   setShowComplianceDialogNew(true)
                 }}
               >
-                ({getProjectCompliance(quotationData?.quotation).completed}/{getProjectCompliance(quotationData?.quotation).total})
+                ({getProjectCompliance(bookingData?.booking).completed}/{getProjectCompliance(bookingData?.booking).total})
               </p>
             </div>
             <div className="flex justify-end">
@@ -1328,28 +1350,28 @@ export default function CreateJobOrderPage() {
                 className="bg-white border-2 border-[#c4c4c4] rounded-[10px] h-[35px] w-[140px]"
                 disabled={isViewQuoteLoading}
                 onClick={() => {
-                  // Handle loading state and navigation for specific quotation ID
-                  if (quotationId === "sycqON5DiDawhWLjd3QB") {
+                  // Handle loading state and navigation for specific booking ID
+                  if (bookingId === "sycqON5DiDawhWLjd3QB") {
                     setIsViewQuoteLoading(true);
-                    console.log("Loading state started for quotation ID:", quotationId);
+                    console.log("Loading state started for booking ID:", bookingId);
 
                     // Show loading state for 1.5 seconds, then proceed with same-tab navigation
                     setTimeout(() => {
                       setIsViewQuoteLoading(false);
-                      console.log("Loading state completed, proceeding with same-tab navigation for quotation ID:", quotationId);
+                      console.log("Loading state completed, proceeding with same-tab navigation for booking ID:", bookingId);
 
                       // Navigate in the same tab using router navigation
-                      router.push(`/sales/quotations/${quotation.id}`);
+                      router.push(`/sales/bookings/${booking.id}`);
                     }, 1500);
 
                     return;
                   }
 
-                  // Original navigation logic for other quotation IDs
-                  const handleViewQuotation = () => {
+                  // Original navigation logic for other booking IDs
+                  const handleViewBooking = () => {
                     try {
                       // First try to open in a new tab/window
-                      const newWindow = window.open(`/sales/quotations/${quotation.id}`, '_blank');
+                      const newWindow = window.open(`/sales/bookings/${booking.id}`, '_blank');
 
                       // Check if popup was blocked (newWindow will be null)
                       if (!newWindow) {
@@ -1360,18 +1382,18 @@ export default function CreateJobOrderPage() {
                       setTimeout(() => {
                         if (newWindow && newWindow.closed) {
                           // Window was closed immediately, fall back to router navigation
-                          router.push(`/sales/quotations/${quotation.id}`);
+                          router.push(`/sales/bookings/${booking.id}`);
                         }
                       }, 100);
 
                     } catch (error) {
                       // If popup fails or is blocked, fall back to router navigation
                       console.warn('Popup blocked or failed, falling back to navigation:', error);
-                      router.push(`/sales/quotations/${quotation.id}`);
+                      router.push(`/sales/bookings/${booking.id}`);
                     }
                   };
 
-                  handleViewQuotation();
+                  handleViewBooking();
                 }}
               >
                 {isViewQuoteLoading ? (
@@ -1380,7 +1402,7 @@ export default function CreateJobOrderPage() {
                     <p className="font-medium text-[16px] text-[#333333]">Loading...</p>
                   </>
                 ) : (
-                  <p className="font-medium text-[16px] text-[#333333]">View Quote</p>
+                  <p className="font-medium text-[16px] text-[#333333]">View Booking</p>
                 )}
               </Button>
             </div>
@@ -1411,10 +1433,10 @@ export default function CreateJobOrderPage() {
             <div className="w-[303px]">
               <div className="flex justify-center mb-2">
                 <div className="w-full aspect-square rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
-                  {quotation.items?.media_url ? (
+                  {products[0]?.media?.[0]?.url ? (
                     <Image
-                      src={quotation.items.media_url}
-                      alt={quotation.items?.name || "Site image"}
+                      src={products[0].media[0].url}
+                      alt={products[0]?.name || "Site image"}
                       width={200}
                       height={200}
                       className="w-full h-full object-cover"
@@ -1427,18 +1449,18 @@ export default function CreateJobOrderPage() {
                     />
                   ) : null}
                   <div
-                    className={`w-full h-full flex items-center justify-center ${quotation.items?.media_url ? 'hidden' : ''}`}
+                    className={`w-full h-full flex items-center justify-center ${products[0]?.media?.[0]?.url ? 'hidden' : ''}`}
                     style={{
                       backgroundColor: '#f3f4f6',
-                      display: quotation.items?.media_url ? 'none' : 'flex'
+                      display: products[0]?.media?.[0]?.url ? 'none' : 'flex'
                     }}
                   >
                     <ImageIcon className="w-8 h-8 text-gray-400" />
                   </div>
                 </div>
               </div>
-              <p className="font-bold text-[20px] text-[#333333]">{quotation.items?.name || "Site Name"}</p>
-              <p className="font-normal text-[14px] text-[#333333]">{quotation.items?.location || "Location"}</p>
+              <p className="font-bold text-[20px] text-[#333333]">{products[0]?.name || "Site Name"}</p>
+              <p className="font-normal text-[14px] text-[#333333]">{products[0]?.location || "Location"}</p>
               <div className="bg-white border-2 border-[#c4c4c4] rounded-[10px] h-[125px] mt-2 flex items-center justify-center">
                 <Input
                   placeholder="Remarks"
@@ -1658,7 +1680,15 @@ export default function CreateJobOrderPage() {
 
 
       {/* Coming Soon Dialog */}
-      <ComingSoonDialog isOpen={showComingSoonDialog} onClose={() => setShowComingSoonDialog(false)} feature="Timeline" />
+      {showComingSoonDialog && (
+        <ComingSoonModal
+          onClose={() => setShowComingSoonDialog(false)}
+          onNotify={() => {
+            // Handle notify functionality if needed
+            setShowComingSoonDialog(false)
+          }}
+        />
+      )}
 
       {/* Compliance Confirmation Dialog */}
       <ComplianceConfirmationDialog

@@ -120,7 +120,7 @@ export const PHILIPPINES_LOCATIONS = [
   { key: "264877", name: "Tacloban", region: "Eastern Visayas" },
 ]
 
-const ACCUWEATHER_API_KEY = "Q8kh0FSLbDrTBY9SHnr2m69v1mrFv4GR"
+const ACCUWEATHER_API_KEY = process.env.ACCUWEATHER_API_KEY || "zpka_c49dda9fcf514ce0b77eb4508c7ffa78_34b7f88c"
 const BASE_URL = "https://dataservice.accuweather.com"
 
 // Map AccuWeather icons to our icon system
@@ -212,7 +212,7 @@ async function handleAccuWeatherResponse(response: Response): Promise<any> {
 }
 
 // Get current weather conditions for a location
-export async function getCurrentWeather(locationKey: string): Promise<AccuWeatherCurrent[]> {
+export async function getCurrentWeather(locationKey: string): Promise<AccuWeatherCurrent[] | null> {
   const url = `${BASE_URL}/currentconditions/v1/${locationKey}?apikey=${ACCUWEATHER_API_KEY}&details=true`
 
   try {
@@ -223,7 +223,7 @@ export async function getCurrentWeather(locationKey: string): Promise<AccuWeathe
     return await handleAccuWeatherResponse(response)
   } catch (error) {
     console.error(`Error fetching current weather for ${locationKey}:`, error)
-    throw error
+    return null
   }
 }
 
@@ -240,6 +240,22 @@ export async function getFiveDayForecast(locationKey: string): Promise<{ DailyFo
   } catch (error) {
     console.error(`Error fetching forecast for ${locationKey}:`, error)
     throw error
+  }
+}
+
+// Get 10-day weather forecast for a location
+export async function getTenDayForecast(locationKey: string): Promise<{ DailyForecasts: AccuWeatherForecast[] } | null> {
+  const url = `${BASE_URL}/forecasts/v1/daily/10day/${locationKey}?apikey=${ACCUWEATHER_API_KEY}&details=true&metric=true`
+
+  try {
+    const response = await fetch(url, {
+      next: { revalidate: 3600 }, // Cache for 1 hour
+    })
+
+    return await handleAccuWeatherResponse(response)
+  } catch (error) {
+    console.error(`Error fetching 10-day forecast for ${locationKey}:`, error)
+    return null
   }
 }
 
@@ -267,49 +283,30 @@ export async function getWeatherAlerts(): Promise<AccuWeatherAlert[]> {
 
 // Get comprehensive weather data for a Philippines location
 export async function getPhilippinesWeatherData(locationKey = "264885"): Promise<PhilippinesWeatherData> {
+  // Get location info
+  const location = PHILIPPINES_LOCATIONS.find((loc) => loc.key === locationKey) || PHILIPPINES_LOCATIONS[0]
+
+
   try {
-    // Get location info
-    const location = PHILIPPINES_LOCATIONS.find((loc) => loc.key === locationKey) || PHILIPPINES_LOCATIONS[0]
+    console.log(`[AccuWeather] Starting API calls for location: ${locationKey} (${location.name}) using key: ${ACCUWEATHER_API_KEY.substring(0, 10)}...`)
 
-    const fallbackData: PhilippinesWeatherData = {
-      location: location.name,
-      locationKey,
-      current: {
-        temperature: 28,
-        feelsLike: 32,
-        condition: "Weather data temporarily unavailable",
-        icon: "cloud",
-        humidity: 75,
-        windSpeed: 10,
-        windDirection: "E",
-        uvIndex: 6,
-        visibility: 10,
-        cloudCover: 50,
-        isDayTime: true,
-        lastUpdated: new Date().toISOString(),
-      },
-      forecast: Array.from({ length: 5 }, (_, i) => {
-        const date = new Date()
-        date.setDate(date.getDate() + i)
-        return {
-          date: date.toISOString(),
-          dayOfWeek: date.toLocaleDateString("en-US", { weekday: "long" }),
-          temperature: { min: 24, max: 32 },
-          day: { condition: "Partly Cloudy", icon: "cloud-sun", precipitation: false },
-          night: { condition: "Clear", icon: "moon", precipitation: false },
-        }
+    // Try to fetch from AccuWeather API
+    const [currentWeather, forecast] = await Promise.all([
+      getCurrentWeather(locationKey).catch((error) => {
+        console.error(`[AccuWeather] Current weather API call failed for ${locationKey}:`, error)
+        return null
       }),
-      alerts: [],
-      lastUpdated: new Date().toISOString(),
-    }
+      getFiveDayForecast(locationKey).catch((error) => {
+        console.error(`[AccuWeather] Forecast API call failed for ${locationKey}:`, error)
+        return null
+      }),
+    ])
 
-    try {
-      // Fetch current weather and forecast in parallel
-      const [currentWeather, forecast] = await Promise.all([
-        getCurrentWeather(locationKey),
-        getFiveDayForecast(locationKey),
-      ])
+    console.log(`[AccuWeather] API call results - Current weather: ${currentWeather ? 'SUCCESS' : 'FAILED'}, Forecast: ${forecast && forecast.DailyForecasts ? 'SUCCESS' : 'FAILED'}`)
 
+    // If we got valid data from API, process it
+    if (currentWeather && forecast && forecast.DailyForecasts) {
+      console.log(`[AccuWeather] Using real API data for ${location.name}`)
       // Try to get alerts separately (non-blocking)
       let alerts: AccuWeatherAlert[] = []
       try {
@@ -320,11 +317,11 @@ export async function getPhilippinesWeatherData(locationKey = "264885"): Promise
 
       const current = currentWeather[0]
 
-      // Process forecast data
-      const processedForecast = forecast.DailyForecasts.map((day) => {
+      // Process forecast data (limit to 5 days)
+      const processedForecast = forecast.DailyForecasts.slice(0, 5).map((day) => {
         const date = new Date(day.Date)
         return {
-          date: day.Date,
+          date: day.Date.split('T')[0], // Normalize to date-only string
           dayOfWeek: date.toLocaleDateString("en-US", { weekday: "long" }),
           temperature: {
             min: Math.round(day.Temperature.Minimum.Value),
@@ -354,7 +351,7 @@ export async function getPhilippinesWeatherData(locationKey = "264885"): Promise
         area: alert.Area.Name,
       }))
 
-      return {
+      const result = {
         location: location.name,
         locationKey,
         current: {
@@ -375,19 +372,22 @@ export async function getPhilippinesWeatherData(locationKey = "264885"): Promise
         alerts: processedAlerts,
         lastUpdated: new Date().toISOString(),
       }
-    } catch (apiError) {
-      console.error("AccuWeather API failed, returning fallback data:", apiError)
 
-      return {
-        ...fallbackData,
-        current: {
-          ...fallbackData.current,
-          condition: `Weather service unavailable (${apiError instanceof Error ? apiError.message : "Unknown error"})`,
-        },
-      }
+      console.log(`[AccuWeather] Real API data for ${location.name}:`, {
+        condition: result.current.condition,
+        temperature: result.current.temperature,
+        forecastDays: result.forecast.length,
+        source: 'AccuWeather API'
+      })
+
+      return result
+    } else {
+      // API failed, throw error instead of using fallback data
+      console.error(`[AccuWeather] API calls failed for ${location.name}, throwing error`)
+      throw new Error('Failed to fetch weather data from AccuWeather API')
     }
   } catch (error) {
-    console.error("Error in getPhilippinesWeatherData:", error)
-    throw error
+    console.error(`[AccuWeather] Unexpected error in getPhilippinesWeatherData for ${location.name}:`, error)
+    throw new Error('Failed to fetch weather data from AccuWeather API')
   }
 }
