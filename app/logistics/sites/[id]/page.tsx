@@ -9,7 +9,6 @@ declare global {
   }
 }
 import { notFound, useRouter, useSearchParams } from "next/navigation"
-import { use } from "react"
 import Image from "next/image"
 import {
   Calendar,
@@ -364,7 +363,6 @@ export default function SiteDetailsPage({ params }: Props) {
         setLoading(true)
 
         // Fetch product data
-        const productData = await getProductById(resolvedParams.id)
         const productData = await getProductById(resolvedParams.id)
         if (!productData) {
           notFound()
