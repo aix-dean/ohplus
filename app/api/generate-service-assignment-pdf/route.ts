@@ -88,10 +88,11 @@ export async function POST(request: NextRequest) {
   console.log('[API_PDF_SA] Received service assignment PDF generation request')
 
   try {
-    const { assignment, companyData, logoDataUrl, format = 'pdf', userData }: {
+    const { assignment, companyData, logoDataUrl, signatureDataUrl, format = 'pdf', userData }: {
       assignment: ServiceAssignmentPDFData;
       companyData: any;
       logoDataUrl: string | null;
+      signatureDataUrl: string | null;
       format?: 'pdf' | 'image';
       userData?: { first_name?: string; last_name?: string; email?: string; company_id?: string }
     } = await request.json()
@@ -99,6 +100,9 @@ export async function POST(request: NextRequest) {
     console.log('[API_PDF_SA] SA Number:', assignment?.saNumber)
     console.log('[API_PDF_SA] Company data:', companyData?.name)
     console.log('[API_PDF_SA] Logo data URL provided:', !!logoDataUrl)
+    console.log('[API_PDF_SA] Signature data URL provided:', !!signatureDataUrl)
+    console.log('[API_PDF_SA] Signature data URL length:', signatureDataUrl?.length || 0)
+    console.log('[API_PDF_SA] Signature data URL starts with:', signatureDataUrl?.substring(0, 50))
     console.log('[API_PDF_SA] User data:', userData?.first_name)
     console.log('[API_PDF_SA] Format:', format)
 
@@ -141,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     // Generate HTML content
     console.log('[API_PDF_SA] Generating HTML content...')
-    const htmlContent = await generateServiceAssignmentHTMLSimple(assignment)
+    const htmlContent = await generateServiceAssignmentHTMLSimple(assignment, companyData, logoDataUrl || undefined, signatureDataUrl || undefined)
     console.log('[API_PDF_SA] HTML content generated, length:', htmlContent.length)
 
     // Launch puppeteer with @sparticuz/chromium for serverless or local chromium for development

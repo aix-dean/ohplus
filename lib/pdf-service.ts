@@ -3727,7 +3727,30 @@ export async function generateServiceAssignmentFallbackPDF(
 
 export async function generateServiceAssignmentHTMLSimple(
   assignment: ServiceAssignmentPDFData,
+  companyData?: any,
+  logoDataUrl?: string,
+  signatureDataUrl?: string,
 ): Promise<string> {
+  const companyName = companyData?.name || companyData?.company_name || "Golden Touch Imaging Specialist"
+  const companyAddress = companyData?.address ? (() => {
+    // Model 2: address as object with city, province, street
+    if (companyData.address && typeof companyData.address === "object") {
+      const { street, city, province } = companyData.address
+      const addressParts = [street, city, province].filter(
+        (part) => part && part.trim() !== "" && !part.toLowerCase().includes("default"),
+      )
+      return addressParts.join(", ")
+    }
+
+    // Model 3: address as string
+    if (companyData.address && typeof companyData.address === "string") {
+      return companyData.address
+    }
+
+    return "721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines"
+  })() : "721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines"
+  const logoSrc = logoDataUrl || "/placeholder.svg?height=32&width=60"
+
   return `
     <!DOCTYPE html>
     <html lang="en">
@@ -3951,6 +3974,16 @@ export async function generateServiceAssignmentHTMLSimple(
           height: 91px;
           border: 1px solid #d1d5db;
           margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #ffffff;
+        }
+
+        .signature-image {
+          max-width: 140px;
+          max-height: 80px;
+          object-fit: contain;
         }
 
         .prepared-by-name {
@@ -3994,9 +4027,9 @@ export async function generateServiceAssignmentHTMLSimple(
         <!-- Header -->
         <div class="header">
           <div class="header-left">
-            <img src="/placeholder.svg?height=32&width=60" alt="Company Logo" class="company-logo" />
-            <p class="company-name">Golden Touch Imaging Specialist</p>
-            <p class="company-contact">721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines</p>
+            <img src="${logoSrc}" alt="Company Logo" class="company-logo" />
+            <p class="company-name">${companyName}</p>
+            <p class="company-contact">${companyAddress}</p>
           </div>
           <div class="header-right">
             <p class="tagged-jo-label">Tagged JO</p>
@@ -4076,7 +4109,9 @@ export async function generateServiceAssignmentHTMLSimple(
             <div class="attachment-box"></div>
             <div class="prepared-by-section">
               <p class="prepared-by-label">Prepared By</p>
-              <div class="signature-box"></div>
+              <div class="signature-box">
+                ${signatureDataUrl ? `<img src="${signatureDataUrl}" alt="Signature" class="signature-image" />` : ''}
+              </div>
               <p class="prepared-by-name">${assignment.requestedBy?.name || "User"}</p>
               <p class="prepared-by-dept">${assignment.requestedBy?.department || "Logistics Team"}</p>
             </div>
@@ -4085,9 +4120,9 @@ export async function generateServiceAssignmentHTMLSimple(
 
         <!-- Footer -->
         <div class="footer">
-          <p class="footer-company">Golden Touch Imaging Specialist</p>
+          <p class="footer-company">${companyName}</p>
           <p class="footer-address">
-            721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines
+            ${companyAddress}
           </p>
         </div>
       </div>

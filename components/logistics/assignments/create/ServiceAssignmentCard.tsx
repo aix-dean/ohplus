@@ -194,6 +194,13 @@ export function ServiceAssignmentCard({
     setShowJobOrderDetails(!!jobOrderData);
   }, [jobOrderData]);
 
+  // Set materialSpecs from the tagged job order (jobOrderData) when it changes
+  useEffect(() => {
+    if (jobOrderData?.materialSpec) {
+      handleInputChange("materialSpecs", jobOrderData.materialSpec);
+    }
+  }, [jobOrderData]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-calculate service duration when dates or service type change
   useEffect(() => {
     const duration = calculateServiceDuration(formData.startDate, formData.endDate, formData.serviceType);
@@ -285,9 +292,6 @@ export function ServiceAssignmentCard({
     handleInputChange("remarks", jobOrder.remarks || "");
     handleInputChange("campaignName", jobOrder.siteName || "");
 
-    // Set materialSpecs from job order data
-    handleInputChange("materialSpecs", jobOrder.materialSpec || "");
-
     // Set dates if available and valid
     const requestedDate = parseDateSafely(jobOrder.dateRequested);
     if (requestedDate) {
@@ -305,7 +309,7 @@ export function ServiceAssignmentCard({
       handleInputChange("serviceDuration", duration);
     }
 
-    // Set assignedTo if available
+    // Set assignedTo if available (should be team ID from logistics_teams)
     if (jobOrder.assignTo) {
       handleInputChange("assignedTo", jobOrder.assignTo);
     }
@@ -533,8 +537,7 @@ export function ServiceAssignmentCard({
                 value={formData.campaignName || ""}
                 onChange={(e) => handleInputChange("campaignName", e.target.value)}
                 className="flex-1"
-                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#F5F5F5' }}
-                readOnly
+                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}
                 required
               />
             </div>

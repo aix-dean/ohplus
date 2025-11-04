@@ -34,6 +34,17 @@ interface CompanyData {
   updated?: Date
 }
 
+interface UserData {
+  id: string
+  first_name?: string
+  last_name?: string
+  email?: string
+  signature?: {
+    url?: string
+  }
+  company_id?: string
+}
+
 // Chunked base64 conversion to handle large PDFs efficiently
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer)
@@ -252,9 +263,84 @@ export default function ViewPDFPage() {
 
            // Fetch company data for PDF generation
            let fetchedCompanyData = null;
+           let logoDataUrl = null;
+           let signatureDataUrl = null;
            try {
              fetchedCompanyData = await fetchCompanyData(user, userData);
              console.log('[PDF Loading] Company data fetched:', fetchedCompanyData?.name);
+
+             // Get logo URL (simplified - using company logo if available)
+             if (fetchedCompanyData?.logo) {
+               try {
+                 const logoResponse = await fetch(fetchedCompanyData.logo)
+                 if (logoResponse.ok) {
+                   const logoBlob = await logoResponse.blob()
+                   logoDataUrl = await new Promise<string>((resolve) => {
+                     const reader = new FileReader()
+                     reader.onload = () => resolve(reader.result as string)
+                     reader.readAsDataURL(logoBlob)
+                   })
+                 }
+               } catch (error) {
+                 console.error('Error fetching company logo:', error)
+                 // Continue without logo if fetch fails
+               }
+             }
+
+             // Get signature URL from user data
+             console.log('[DEBUG] Fetching user signature data for user:', user?.uid)
+             try {
+               if (!user?.uid) {
+                 console.log('[DEBUG] User not available for signature fetch')
+                 return
+               }
+               const userDocRef = doc(db, "iboard_users", user.uid)
+               const userDocSnap = await getDoc(userDocRef)
+
+               if (userDocSnap.exists()) {
+                 const userData = userDocSnap.data()
+                 console.log('[DEBUG] User document exists, signature data:', userData.signature)
+                 console.log('[DEBUG] Full user data keys:', Object.keys(userData))
+                 console.log('[DEBUG] Signature object:', userData.signature)
+                 console.log('[DEBUG] Signature URL:', userData.signature?.url)
+
+                 if (userData.signature?.url) {
+                   console.log('[DEBUG] Signature URL found, attempting to fetch:', userData.signature.url)
+                   try {
+                     const signatureResponse = await fetch(userData.signature.url)
+                     console.log('[DEBUG] Signature fetch response status:', signatureResponse.status)
+                     if (signatureResponse.ok) {
+                       const signatureBlob = await signatureResponse.blob()
+                       console.log('[DEBUG] Signature blob size:', signatureBlob.size, 'type:', signatureBlob.type)
+                       signatureDataUrl = await new Promise<string>((resolve) => {
+                         const reader = new FileReader()
+                         reader.onload = () => {
+                           console.log('[DEBUG] Signature data URL generated, length:', reader.result?.toString().length)
+                           resolve(reader.result as string)
+                         }
+                         reader.onerror = () => {
+                           console.error('[DEBUG] FileReader error for signature')
+                           resolve('')
+                         }
+                         reader.readAsDataURL(signatureBlob)
+                       })
+                       console.log('[DEBUG] Final signatureDataUrl set:', !!signatureDataUrl)
+                     } else {
+                       console.error('[DEBUG] Signature fetch failed with status:', signatureResponse.status)
+                     }
+                   } catch (error) {
+                     console.error('[DEBUG] Error fetching user signature:', error)
+                     // Continue without signature if fetch fails
+                   }
+                 } else {
+                   console.log('[DEBUG] No signature URL available in user data')
+                 }
+               } else {
+                 console.log('[DEBUG] User document does not exist in iboard_users collection')
+               }
+             } catch (error) {
+               console.error("[DEBUG] Error fetching user signature data:", error)
+             }
            } catch (companyError) {
              console.warn('[PDF Loading] Failed to fetch company data:', companyError);
            }
@@ -303,7 +389,8 @@ export default function ViewPDFPage() {
             body: JSON.stringify({
               assignment: apiAssignmentData,
               companyData: fetchedCompanyData,
-              logoDataUrl: null, // Logo handling can be added later if needed
+              logoDataUrl,
+              signatureDataUrl,
               format: 'pdf',
               userData: userData,
             }),
@@ -426,11 +513,6 @@ export default function ViewPDFPage() {
     loadPDF();
   }, []);
 
-  useEffect(() => {
-    if (user && userData) {
-      fetchCompanyData(user, userData).then(setCompanyData)
-    }
-  }, [user, userData])
 
   const handleConfirmAndCreate = async () => {
       if (!user) return;
@@ -445,19 +527,8 @@ export default function ViewPDFPage() {
 
         const assignmentData = JSON.parse(assignmentDataString);
 
-       // Fetch team name if assignedTo is a team ID
+       // Keep assignedTo as team ID for Firestore storage
        let assignedToValue = assignmentData.assignedTo || assignmentData.crew || 'Unassigned';
-       if (assignmentData.assignedTo && assignmentData.assignedTo !== assignmentData.crew && userData?.company_id) {
-         try {
-           const team = await getTeamById(assignmentData.assignedTo, userData.company_id);
-           if (team) {
-             assignedToValue = team.name;
-           }
-         } catch (error) {
-           console.error("Error fetching team:", error);
-           // Keep the original assignedTo value as fallback
-         }
-       }
 
        // Upload PDF to Firebase Storage with validation
        if (!pdfData || pdfData.length === 0) {
@@ -502,7 +573,7 @@ export default function ViewPDFPage() {
          alarmTime: assignmentData.alarmTime || '',
          attachments: assignmentData.attachments || [],
          serviceExpenses: assignmentData.serviceExpenses || [],
-         pdfUrl: pdfUrl,
+         pdf: pdfUrl,
          status: "Sent",
          updated: serverTimestamp(),
          project_key: userData?.license_key || '',
@@ -519,7 +590,7 @@ export default function ViewPDFPage() {
 
        // Create the service assignment in Firestore
        await addDoc(collection(db, "service_assignments"), {
-         ...assignmentData,
+         ...firestoreAssignmentData,
          created: serverTimestamp(),
        });
 
@@ -554,19 +625,8 @@ export default function ViewPDFPage() {
 
        const assignmentData = JSON.parse(assignmentDataString);
 
-       // Fetch team name if assignedTo is a team ID
+       // Keep assignedTo as team ID for Firestore storage
        let assignedToValue = assignmentData.assignedTo || assignmentData.crew || 'Unassigned';
-       if (assignmentData.assignedTo && assignmentData.assignedTo !== assignmentData.crew && userData?.company_id) {
-         try {
-           const team = await getTeamById(assignmentData.assignedTo, userData.company_id);
-           if (team) {
-             assignedToValue = team.name;
-           }
-         } catch (error) {
-           console.error("Error fetching team:", error);
-           // Keep the original assignedTo value as fallback
-         }
-       }
 
        // Upload PDF to Firebase Storage with validation
        if (!pdfData || pdfData.length === 0) {
@@ -611,7 +671,7 @@ export default function ViewPDFPage() {
          alarmTime: assignmentData.alarmTime || '',
          attachments: assignmentData.attachments || [],
          serviceExpenses: assignmentData.serviceExpenses || [],
-         pdfUrl: pdfUrl,
+         pdf: pdfUrl,
          status: "Draft",
          updated: serverTimestamp(),
          project_key: userData?.license_key || '',

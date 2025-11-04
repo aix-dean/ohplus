@@ -523,7 +523,7 @@ export default function CreateServiceAssignmentPage() {
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: selectedTeam?.name || formData.crew,
+        assignedTo: selectedTeam?.id || formData.crew,
         assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
@@ -558,7 +558,20 @@ export default function CreateServiceAssignmentPage() {
       // Get logo URL (simplified - using company logo if available)
       let logoDataUrl = null
       if (companyData?.logo) {
-        logoDataUrl = companyData.logo
+        try {
+          const logoResponse = await fetch(companyData.logo)
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob()
+            logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(logoBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching company logo:', error)
+          // Continue without logo if fetch fails
+        }
       }
 
       // Generate PDF using server-side API
@@ -595,7 +608,7 @@ export default function CreateServiceAssignmentPage() {
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: selectedTeam?.name || formData.crew,
+        assignedTo: selectedTeam?.id || formData.crew,
         assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
@@ -712,7 +725,7 @@ export default function CreateServiceAssignmentPage() {
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: selectedTeam?.name || formData.assignedTo || formData.crew,
+        assignedTo: selectedTeam?.id || formData.assignedTo || formData.crew,
         assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
