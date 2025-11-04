@@ -892,3 +892,24 @@
 [debug] [2025-11-03T00:57:56.016Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/firebasecrashlytics.googleapis.com [omitted]
 [debug] [2025-11-03T00:57:56.182Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ 200
 [debug] [2025-11-03T00:57:56.182Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/oh-app-bcf24/services/ [omitted]
+[debug] [2025-11-03T15:38:30.212Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.217Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.219Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.219Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.219Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.220Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.220Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.221Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.222Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.222Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.223Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.223Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.224Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.224Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.225Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.225Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.226Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.226Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.226Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.226Z] No OAuth tokens found
+[debug] [2025-11-03T15:38:30.253Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
