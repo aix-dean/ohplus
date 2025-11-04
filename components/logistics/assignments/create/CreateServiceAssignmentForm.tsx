@@ -146,6 +146,8 @@ export function CreateServiceAssignmentForm({
   onOpenProductSelection,
   onIdentifyJO,
   onChangeJobOrder,
+  onFileUpload,
+  onRemoveAttachment,
 }: {
   onSaveAsDraft: () => Promise<void>;
   onSubmit: () => Promise<void>;
@@ -165,6 +167,8 @@ export function CreateServiceAssignmentForm({
   onOpenProductSelection: () => void;
   onIdentifyJO?: () => void;
   onChangeJobOrder?: () => void;
+  onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveAttachment?: (index: number) => void;
 }) {
   return (
     <div className="flex flex-col lg:flex-row  p-4">
@@ -179,6 +183,8 @@ export function CreateServiceAssignmentForm({
           saNumber={saNumber}
           jobOrderData={jobOrderData}
           onOpenProductSelection={onOpenProductSelection}
+          onFileUpload={onFileUpload}
+          onRemoveAttachment={onRemoveAttachment}
         />
       </div>
       <div className="flex flex-col gap-6 w-full lg:w-[40%]">

@@ -27,6 +27,7 @@ import {
   updateDoc,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -37,6 +38,7 @@ import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
 import { JobOrderSelectionDialog } from "@/components/logistics/assignments/create/JobOrderSelectionDialog"
 import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
+import { playerService } from "@/lib/player-service"
 
 
 // Service types as provided
@@ -261,7 +263,7 @@ export default function CreateServiceAssignmentPage() {
   // Fetch job order data if jobOrderId is present
   useEffect(() => {
     const fetchJobOrder = async () => {
-      if (jobOrderId) {
+      if (jobOrderId && !jobOrderData) {
         try {
           const jobOrderDoc = await getDoc(doc(db, "job_orders", jobOrderId))
           if (jobOrderDoc.exists()) {
@@ -367,8 +369,7 @@ export default function CreateServiceAssignmentPage() {
       }))
     }
 
-    // Reset the input
-    event.target.value = ""
+    // Note: Input reset is now handled in ServiceAssignmentCard component
   }
 
   // Remove attachment
@@ -380,14 +381,36 @@ export default function CreateServiceAssignmentPage() {
   }
 
   // Convert attachments to Firestore-compatible format
-  const convertAttachmentsForFirestore = (attachments: { name: string; type: string; file?: File }[]) => {
-    return attachments.map((attachment) => ({
-      name: attachment.name,
-      type: attachment.type,
-      // Remove the file object as it's not serializable
-      size: attachment.file?.size || 0,
-      lastModified: attachment.file?.lastModified || Date.now(),
-    }))
+  const convertAttachmentsForFirestore = async (attachments: { name: string; type: string; file?: File }[], saNumber: string) => {
+    const convertedAttachments = []
+
+    for (const attachment of attachments) {
+      let downloadUrl = null
+
+      // Upload file to Firebase Storage if it exists
+      if (attachment.file) {
+        try {
+          const storage = getStorage()
+          const fileName = `${attachment.name}`
+          const storageRef = ref(storage, fileName)
+
+          const snapshot = await uploadBytes(storageRef, attachment.file)
+          downloadUrl = await getDownloadURL(snapshot.ref)
+        } catch (error) {
+          console.error("Error uploading attachment to storage:", error)
+        }
+      }
+
+      convertedAttachments.push({
+        name: attachment.name,
+        type: attachment.type,
+        size: attachment.file?.size || 0,
+        lastModified: attachment.file?.lastModified || Date.now(),
+        url: downloadUrl, // Include the download URL
+      })
+    }
+
+    return convertedAttachments
   }
 
   // Handle form submission
@@ -475,7 +498,7 @@ export default function CreateServiceAssignmentPage() {
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: convertAttachmentsForFirestore(formData.attachments),
+        attachments: await convertAttachmentsForFirestore(formData.attachments, saNumber),
         serviceExpenses: formData.serviceExpenses,
         status: "Pending", // Always set to Pending when submitting
         updated: serverTimestamp(),
@@ -539,6 +562,161 @@ export default function CreateServiceAssignmentPage() {
         // Don't throw here - we don't want notification failure to break assignment creation
       }
 
+      // Integrate with Player Management API
+      // Temporarily disabled due to 404 API errors in development environment
+      /*
+      try {
+        const playerSns = ["24A12N000000101"] // Updated player SNS as requested
+        const playerIds = selectedProduct?.playerIds || ["bf1ae7a5dc7e4ac18c900b7b7943dc7c"] // Get player IDs from selected product
+
+        // Get player basic info
+        console.log("Fetching player basic info...")
+        const playerInfo = await playerService.getPlayerBasicInfo({
+          playerIds,
+          playerSns
+        })
+        console.log("Player basic info:", playerInfo)
+
+        // If it's a content-related service, create a player program
+        if (formData.serviceType === "Change Material" || formData.campaignName) {
+          console.log("Creating player program for service assignment...")
+
+          // Create a schedule based on the service assignment dates
+          const schedule = {
+            startDate: formData.startDate ? format(formData.startDate, "yyyy-MM-dd") : "2020-04-11",
+            endDate: formData.endDate ? format(formData.endDate, "yyyy-MM-dd") : "2060-05-12",
+            plans: [{
+              weekDays: [1, 2, 3, 4, 5], // Monday to Friday
+              startTime: "00:00",
+              endTime: "22:00"
+            }]
+          }
+
+          // Create program with a placeholder image (can be customized based on material specs)
+          const programRequest = {
+            playerIds,
+            schedule,
+            pages: [{
+              name: `sa-${saNumber}-page`,
+              widgets: [{
+                zIndex: 1,
+                type: "PICTURE" as const,
+                size: 12000, // Placeholder size
+                md5: "placeholder-md5", // Should be calculated from actual image
+                duration: 10000,
+                url: "https://firebasestorage.googleapis.com/v0/b/oh-app---dev.appspot.com/o/FIAMImages%2FKILIG-POPUP.png?alt=media&token=4b87cde2-b73a-4d8c-b2e2-54235d7aeae6", // Placeholder image
+                layout: {
+                  x: "0%",
+                  y: "0%",
+                  width: "100%",
+                  height: "100%"
+                }
+              }]
+            }]
+          }
+
+          const programResult = await playerService.createPlayerProgram(programRequest)
+          console.log("Player program created:", programResult)
+        }
+
+        // Get player configuration status
+        console.log("Fetching player configuration status...")
+        const configStatus = await playerService.getPlayerConfig({
+          playerIds,
+          commands: ["volumeValue", "brightnessValue", "videoSourceValue", "timeValue"],
+          noticeUrl: "http://www.abc.com/notice"
+        })
+        console.log("Player config status:", configStatus)
+
+      } catch (playerApiError) {
+        console.error("Error with Player API integration:", playerApiError)
+        // Don't throw here - we don't want API failure to break assignment creation
+        // Log the error for debugging but continue with the assignment creation
+      }
+      */
+
+      // Integrate with CMS API for content deployment
+      try {
+        // Get the download URL from the first uploaded attachment
+        const convertedAttachments = await convertAttachmentsForFirestore(formData.attachments, saNumber)
+        const attachmentDownloadUrl = convertedAttachments.length > 0 ? convertedAttachments[0].url : null
+
+        if (attachmentDownloadUrl) {
+          console.log("Creating CMS content deployment for service assignment...")
+          console.log("Attachment URL:", attachmentDownloadUrl)
+
+          const cmsRequestBody = {
+            playerIds: selectedProduct?.playerIds || ["141a16d405254b8fb5c5173ef3a58cc5"], // Get player IDs from selected product
+            schedule: {
+              startDate: formData.startDate ? format(formData.startDate, "yyyy-MM-dd") : "2020-01-11",
+              endDate: formData.endDate ? format(formData.endDate, "yyyy-MM-dd") : "2060-05-12",
+              plans: [
+                {
+                  weekDays: [1, 2, 3, 4, 5],
+                  startTime: "00:00",
+                  endTime: "22:00"
+                }
+              ]
+            },
+            pages: [
+              {
+                name: `sa-${saNumber}-page`,
+                widgets: [
+                  {
+                    zIndex: 1,
+                    type: "STREAM_MEDIA",
+                    size: 12000,
+                    md5: "placeholder-md5", // This should be calculated from the actual file
+                    duration: 9000,
+                    url: attachmentDownloadUrl,
+                    layout: {
+                      x: "0%",
+                      y: "0%",
+                      width: "100%",
+                      height: "100%"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+
+          console.log("CMS Request Body:", JSON.stringify(cmsRequestBody, null, 2))
+
+          const cmsResponse = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/solutions/common-solutions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(cmsRequestBody)
+          })
+
+          console.log("CMS Response Status:", cmsResponse.status, cmsResponse.statusText)
+
+          if (cmsResponse.ok) {
+            const cmsResult = await cmsResponse.json()
+            console.log("CMS API Response Details:")
+            console.log("StatusCode        :", cmsResponse.status)
+            console.log("StatusDescription :", cmsResponse.statusText)
+            console.log("Content           :", JSON.stringify(cmsResult))
+            console.log("RawContent        :", `HTTP/1.1 ${cmsResponse.status} ${cmsResponse.statusText}`)
+            console.log("CMS content deployment created successfully:", cmsResult)
+          } else {
+            const errorText = await cmsResponse.text()
+            console.error("CMS API Response Details:")
+            console.error("StatusCode        :", cmsResponse.status)
+            console.error("StatusDescription :", cmsResponse.statusText)
+            console.error("Content           :", errorText)
+            console.error("RawContent        :", `HTTP/1.1 ${cmsResponse.status} ${cmsResponse.statusText}`)
+            console.error("CMS API error:", cmsResponse.status, cmsResponse.statusText, errorText)
+          }
+        } else {
+          console.log("No attachment found for CMS deployment")
+        }
+      } catch (cmsApiError) {
+        console.error("Error with CMS API integration:", cmsApiError)
+        // Don't throw here - we don't want CMS API failure to break assignment creation
+      }
 
       // Set session storage and navigate to assignments
       sessionStorage.setItem('lastCreatedServiceAssignmentId', assignmentDocRef.id)
@@ -636,7 +814,7 @@ export default function CreateServiceAssignmentPage() {
         coveredDateEnd: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: convertAttachmentsForFirestore(formData.attachments),
+        attachments: await convertAttachmentsForFirestore(formData.attachments, saNumber),
         serviceExpenses: formData.serviceExpenses,
         status: "Draft",
         updated: serverTimestamp(),
@@ -859,8 +1037,61 @@ export default function CreateServiceAssignmentPage() {
 
   // Handle job order selection
   const handleJobOrderSelect = (jobOrder: JobOrder) => {
-    // Navigate to the same page with the selected job order ID
-    router.push(`/logistics/assignments/create?jobOrderId=${jobOrder.id}`);
+    setJobOrderData(jobOrder)
+
+    // Get the product_id during the selection
+    const productId = jobOrder.product_id || ""
+    if (productId) {
+      // Helper function to safely parse dates
+      const parseDateSafely = (dateValue: any): Date | null => {
+        if (!dateValue) return null;
+
+        try {
+          let date: Date;
+
+          if (dateValue instanceof Date) {
+            date = dateValue;
+          } else if (typeof dateValue === 'string') {
+            date = new Date(dateValue);
+            if (isNaN(date.getTime())) {
+              return null;
+            }
+          } else if (typeof dateValue === 'number') {
+            date = new Date(dateValue * 1000);
+          } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+            date = new Date(dateValue.seconds * 1000);
+          } else {
+            return null;
+          }
+
+          if (isNaN(date.getTime())) {
+            return null;
+          }
+
+          return date;
+        } catch (error) {
+          console.warn('Error parsing date:', dateValue, error);
+          return null;
+        }
+      };
+
+      setFormData((prev) => ({
+        ...prev,
+        projectSite: productId,
+        serviceType: jobOrder.joType ? jobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
+        remarks: jobOrder.remarks || jobOrder.jobDescription || "",
+        campaignName: jobOrder.campaignName || "",
+        startDate: parseDateSafely(jobOrder.dateRequested),
+        endDate: parseDateSafely(jobOrder.deadline),
+      }))
+
+      // Update the URL to include the jobOrderId for consistency
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('jobOrderId', jobOrder.id);
+      window.history.replaceState({}, '', newUrl.toString());
+    }
+
+    setIsJobOrderSelectionDialogOpen(false)
   };
 
   // Handle changing job order
@@ -937,6 +1168,8 @@ export default function CreateServiceAssignmentPage() {
         onOpenProductSelection={() => setIsProductSelectionDialogOpen(true)}
         onIdentifyJO={handleIdentifyJO}
         onChangeJobOrder={handleChangeJobOrder}
+        onFileUpload={handleFileUpload}
+        onRemoveAttachment={removeAttachment}
       />
 
 
