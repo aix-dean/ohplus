@@ -148,7 +148,7 @@ interface ServiceAssignmentCardProps {
   products: Product[];
   teams: Team[];
   saNumber: string;
-  jobOrderData: JobOrder | null;
+  selectedJobOrder: JobOrder | null;
   onOpenProductSelection: () => void;
   onClearJobOrder?: () => void;
 }
@@ -161,12 +161,12 @@ export function ServiceAssignmentCard({
   products,
   teams,
   saNumber,
-  jobOrderData,
+  selectedJobOrder,
   onOpenProductSelection,
   onClearJobOrder
 }: ServiceAssignmentCardProps) {
   const [showJobOrderDetails, setShowJobOrderDetails] = useState(false); // State to manage JobOrderDetailsCard visibility
-  const [selectedJobOrder, setSelectedJobOrder] = useState<JobOrder | null>(jobOrderData); // State to hold selected job order data
+  const [localSelectedJobOrder, setLocalSelectedJobOrder] = useState<JobOrder | null>(selectedJobOrder); // State to hold selected job order data
   const [currentTime, setCurrentTime] = useState(""); // State for current time display
   const [showJobOrderSelectionDialog, setShowJobOrderSelectionDialog] = useState(false); // State for JobOrderSelectionDialog
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null); // State for uploaded image URL
@@ -175,8 +175,8 @@ export function ServiceAssignmentCard({
   const { toast } = useToast(); // Use the toast hook
 
   // Determine the current product ID to display (from form data, job order, or prop)
-  const currentProductId = formData.projectSite || selectedJobOrder?.product_id || productId;
-  console.log("ServiceAssignmentCard render - currentProductId:", currentProductId, "productId prop:", productId, "selectedJobOrder:", selectedJobOrder, "formData.projectSite:", formData.projectSite);
+  const currentProductId = formData.projectSite || localSelectedJobOrder?.product_id || productId;
+  console.log("ServiceAssignmentCard render - currentProductId:", currentProductId, "productId prop:", productId, "selectedJobOrder:", localSelectedJobOrder, "formData.projectSite:", formData.projectSite);
 
   // Set current time on component mount
   useEffect(() => {
@@ -188,18 +188,18 @@ export function ServiceAssignmentCard({
     }));
   }, []);
 
-  // Sync selectedJobOrder with jobOrderData prop
+  // Sync selectedJobOrder with selectedJobOrder prop
   useEffect(() => {
-    setSelectedJobOrder(jobOrderData);
-    setShowJobOrderDetails(!!jobOrderData);
-  }, [jobOrderData]);
+    setLocalSelectedJobOrder(selectedJobOrder);
+    setShowJobOrderDetails(!!selectedJobOrder);
+  }, [selectedJobOrder]);
 
-  // Set materialSpecs from the tagged job order (jobOrderData) when it changes
+  // Set materialSpecs from the tagged job order (selectedJobOrder) when it changes
   useEffect(() => {
-    if (jobOrderData?.materialSpec) {
-      handleInputChange("materialSpecs", jobOrderData.materialSpec);
+    if (localSelectedJobOrder?.materialSpec) {
+      handleInputChange("materialSpecs", localSelectedJobOrder.materialSpec);
     }
-  }, [jobOrderData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [localSelectedJobOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-calculate service duration when dates or service type change
   useEffect(() => {
@@ -209,6 +209,8 @@ export function ServiceAssignmentCard({
     }
   }, [formData.startDate, formData.endDate, formData.serviceType]);
 
+  // Extract job order image
+  const jobOrderImage = localSelectedJobOrder?.siteImageUrl || localSelectedJobOrder?.attachments?.url;
 
   // Helper function to safely parse and validate dates
   const parseDateSafely = (dateValue: any): Date | null => {
@@ -284,7 +286,7 @@ export function ServiceAssignmentCard({
 
   const handleJobOrderSelect = (jobOrder: JobOrder) => {
     // Set the selected job order and show the details
-    setSelectedJobOrder(jobOrder);
+    setLocalSelectedJobOrder(jobOrder);
     setShowJobOrderDetails(true);
 
     // Auto-fill form fields with job order data
@@ -331,12 +333,12 @@ export function ServiceAssignmentCard({
 
   const handleHideJobOrderDetails = () => {
     setShowJobOrderDetails(false);
-    setSelectedJobOrder(null);
+    setLocalSelectedJobOrder(null);
   };
 
   const handleChangeJobOrder = () => {
     // Clear job order data and reset form fields
-    setSelectedJobOrder(null);
+    setLocalSelectedJobOrder(null);
     setShowJobOrderDetails(false);
     // Call the parent callback to clear job order data
     if (onClearJobOrder) {
@@ -710,6 +712,19 @@ export function ServiceAssignmentCard({
                       >
                         ×
                       </button>
+                    </div>
+                  ) : jobOrderImage ? (
+                    <div className="relative shadow-sm w-[70px] h-[70px]">
+                      <img
+                        src={jobOrderImage}
+                        alt="Job Order Image"
+                        className="w-[70px] h-[70px] rounded-md object-cover"
+                      />
+                      <button
+                        onClick={() => !isUploading && fileInputRef.current?.click()}
+                        className="absolute inset-0 w-full h-full cursor-pointer"
+                        style={{ background: 'transparent' }}
+                      />
                     </div>
                   ) : (
                     <div

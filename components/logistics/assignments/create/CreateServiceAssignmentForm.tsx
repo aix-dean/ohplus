@@ -216,7 +216,7 @@ export function CreateServiceAssignmentForm({
           products={products}
           teams={teams}
           saNumber={saNumber}
-          jobOrderData={jobOrderData}
+          selectedJobOrder={jobOrderData}
           onOpenProductSelection={onOpenProductSelection}
           onClearJobOrder={onClearJobOrder}
         />
