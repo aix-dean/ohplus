@@ -33,7 +33,7 @@ interface ServiceAssignmentPDFData {
   endDate: Date | null
   alarmDate: Date | null
   alarmTime: string
-  attachments: { name: string; type: string }[]
+  attachments: { name: string; type: string; url?: string; fileUrl?: string }[]
   serviceExpenses: { name: string; amount: string }[]
   status: string
   created: Date

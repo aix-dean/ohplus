@@ -5,17 +5,41 @@ import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { doc, getDoc } from "firebase/firestore"
+import { getStorage, ref, getDownloadURL } from "firebase/storage"
 import { db } from "@/lib/firebase"
 import { PDFDocument, PDFName } from 'pdf-lib'
 
 // Helper function to load image and convert to base64
 export async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
+    let fetchUrl = url
+
+    // Check if this is a Firebase Storage URL
+    if (url.includes('firebasestorage.googleapis.com')) {
+      try {
+        // Extract the path from Firebase Storage URL
+        const urlObj = new URL(url)
+        const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^\/]+\/o\/(.+)/)
+        if (pathMatch) {
+          const encodedPath = pathMatch[1]
+          const decodedPath = decodeURIComponent(encodedPath)
+
+          // Get Firebase Storage reference and download URL
+          const storage = getStorage()
+          const storageRef = ref(storage, decodedPath)
+          fetchUrl = await getDownloadURL(storageRef)
+        }
+      } catch (firebaseError) {
+        console.warn("Failed to get Firebase download URL, falling back to original URL:", firebaseError)
+        // Fall back to original URL if Firebase auth fails
+      }
+    }
+
     // Add timeout to prevent hanging
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-    const response = await fetch(url, {
+    const response = await fetch(fetchUrl, {
       signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; PDF-Generator/1.0)",
@@ -334,7 +358,7 @@ interface ServiceAssignmentPDFData {
   endDate: Date | null
   alarmDate: Date | null
   alarmTime: string
-  attachments: { name: string; type: string }[]
+  attachments: { name: string; type: string; url?: string; fileUrl?: string }[]
   serviceExpenses: { name: string; amount: string }[]
   status: string
   created: Date
@@ -2920,7 +2944,7 @@ export async function generateServiceAssignmentHTMLPDF(
           <div style="width: 115px; height: 18px; left: 67px; top: 358px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Site Address</div>
           <div style="width: 307px; height: 18px; left: 269px; top: 358px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.projectSiteLocation}</div>
           <div style="width: 132px; height: 18px; left: 67px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Campaign Name</div>
-          <div style="width: 241px; height: 18px; left: 269px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${assignment.campaignName || "N/A"}</div>
+          <div style="width: 241px; height: 18px; left: 269px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.campaignName || "N/A"}</div>
           <div style="width: 115px; height: 18px; left: 67px; top: 420px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Service Type</div>
           <div style="width: 210px; height: 18px; left: 269px; top: 420px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 700; line-height: 15px; word-wrap: break-word">${serviceAssignment.serviceType}</div>
           <div style="width: 115px; height: 18px; left: 67px; top: 451px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Material Specs</div>
@@ -3955,6 +3979,16 @@ export async function generateServiceAssignmentHTMLSimple(
           width: 200px;
           height: 200px;
           border: 1px solid #d1d5db;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #ffffff;
+        }
+
+        .attachment-image {
+          max-width: 190px;
+          max-height: 190px;
+          object-fit: contain;
         }
 
         .prepared-by-section {
@@ -4106,7 +4140,9 @@ export async function generateServiceAssignmentHTMLSimple(
             Attachments:
           </p>
           <div class="attachments-content">
-            <div class="attachment-box"></div>
+            <div class="attachment-box">
+              ${assignment.attachments && assignment.attachments.length > 0 && (assignment.attachments[0].url || assignment.attachments[0].fileUrl) ? `<img src="${assignment.attachments[0].url || assignment.attachments[0].fileUrl}" alt="Attachment" class="attachment-image" />` : ''}
+            </div>
             <div class="prepared-by-section">
               <p class="prepared-by-label">Prepared By</p>
               <div class="signature-box">

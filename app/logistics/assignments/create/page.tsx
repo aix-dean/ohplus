@@ -96,7 +96,7 @@ export default function CreateServiceAssignmentPage() {
     endDate: null as Date | null,
     alarmDate: null as Date | null,
     alarmTime: "",
-    attachments: [] as { name: string; type: string; file?: File }[],
+    attachments: [] as { name: string; type: string; file?: File; url?: string }[],
     serviceExpenses: [] as { name: string; amount: string }[],
     serviceCost: {
       crewFee: "",
@@ -398,25 +398,37 @@ export default function CreateServiceAssignmentPage() {
 
 
   // Handle file upload
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (!files) return
 
-    const newAttachments: { name: string; type: string; file: File }[] = []
+    const newAttachments: { name: string; type: string; file: File; url?: string }[] = []
 
-    Array.from(files).forEach((file) => {
+    for (const file of Array.from(files)) {
       // Check file size (10MB limit)
       if (file.size > 10 * 1024 * 1024) {
         alert(`File ${file.name} is too large. Maximum size is 10MB.`)
-        return
+        continue
       }
 
-      newAttachments.push({
-        name: file.name,
-        type: file.type,
-        file: file,
-      })
-    })
+      try {
+        // Upload file to Firebase Storage
+        const fileName = `attachments/${Date.now()}-${file.name}`
+        const fileRef = ref(storage, fileName)
+        await uploadBytes(fileRef, file)
+        const downloadURL = await getDownloadURL(fileRef)
+
+        newAttachments.push({
+          name: file.name,
+          type: file.type,
+          file: file,
+          url: downloadURL,
+        })
+      } catch (error) {
+        console.error(`Error uploading file ${file.name}:`, error)
+        alert(`Failed to upload ${file.name}. Please try again.`)
+      }
+    }
 
     if (newAttachments.length > 0) {
       setFormData((prev) => ({
@@ -438,10 +450,11 @@ export default function CreateServiceAssignmentPage() {
   }
 
   // Convert attachments to Firestore-compatible format
-  const convertAttachmentsForFirestore = (attachments: { name: string; type: string; file?: File }[]) => {
+  const convertAttachmentsForFirestore = (attachments: { name: string; type: string; file?: File; url?: string }[]) => {
     return attachments.map((attachment) => ({
       name: attachment.name,
       type: attachment.type,
+      url: attachment.url || '',
       // Remove the file object as it's not serializable
       size: attachment.file?.size || 0,
       lastModified: attachment.file?.lastModified || Date.now(),
@@ -460,6 +473,16 @@ export default function CreateServiceAssignmentPage() {
     }
 
     return btoa(result)
+  }
+
+  // Helper function to convert File objects to base64 data URLs
+  const fileToBase64DataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsDataURL(file)
+    })
   }
 
   // Handle form submission (now navigates to PDF preview without creating assignment)
@@ -546,7 +569,11 @@ export default function CreateServiceAssignmentPage() {
         endDate: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: formData.attachments,
+        attachments: formData.attachments.map((att) => ({
+          name: att.name,
+          type: att.type,
+          url: att.url
+        })),
         serviceExpenses: formData.serviceExpenses,
         status: "Draft",
         created: new Date(),
@@ -631,7 +658,11 @@ export default function CreateServiceAssignmentPage() {
         endDate: formData.endDate,
         alarmDate: formData.alarmDate,
         alarmTime: formData.alarmTime,
-        attachments: formData.attachments,
+        attachments: formData.attachments.map((att) => ({
+          name: att.name,
+          type: att.type,
+          url: att.url
+        })),
         serviceExpenses: formData.serviceExpenses,
         status: "Draft",
         created: new Date(),
@@ -914,7 +945,11 @@ export default function CreateServiceAssignmentPage() {
          endDate: formData.endDate,
          alarmDate: formData.alarmDate,
          alarmTime: formData.alarmTime,
-         attachments: formData.attachments,
+         attachments: formData.attachments.map(att => ({
+           name: att.name,
+           type: att.type,
+           url: att.url
+         })),
          serviceExpenses: formData.serviceExpenses,
          status: "Draft",
          created: new Date(),

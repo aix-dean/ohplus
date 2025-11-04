@@ -237,6 +237,7 @@ export default function ViewPDFPage() {
         assignmentData.serviceExpenses = assignmentData.serviceExpenses || [];
 
         console.log('[PDF Loading] Data validation and defaults completed');
+        console.log('[PDF Loading] Attachments data:', assignmentData.attachments);
 
         // Validate and set default date fields
         if (!assignmentData.startDate || isNaN(new Date(assignmentData.startDate).getTime())) {
