@@ -23,6 +23,7 @@ import type { Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
+import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -42,6 +43,8 @@ export default function ReportPreviewPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("/ohplus-new-logo.png")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [postedReportId, setPostedReportId] = useState<string | null>(null)
 
   useEffect(() => {
     loadPreviewData()
@@ -198,17 +201,11 @@ export default function ReportPreviewPage() {
 
       const reportId = await postReport(finalReportData)
 
-      sessionStorage.setItem("lastPostedReportId", reportId)
+      setPostedReportId(reportId)
+      setShowSuccessDialog(true)
 
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
-
-      toast({
-        title: "Success",
-        description: "Report posted successfully!",
-      })
-
-      router.push("/logistics/service-reports")
     } catch (error) {
       console.error("Error posting report:", error)
       toast({
@@ -218,6 +215,13 @@ export default function ReportPreviewPage() {
       })
     } finally {
       setPosting(false)
+    }
+  }
+
+  const handleSuccessDialogClose = (open: boolean) => {
+    setShowSuccessDialog(open)
+    if (!open) {
+      router.push("/logistics/service-reports")
     }
   }
 
@@ -801,6 +805,14 @@ export default function ReportPreviewPage() {
           onClose={() => setIsSendDialogOpen(false)}
           report={report}
           onSelectOption={handleSendOption}
+        />
+      )}
+
+      {postedReportId && (
+        <ReportPostSuccessDialog
+          open={showSuccessDialog}
+          onOpenChange={handleSuccessDialogClose}
+          reportId={postedReportId}
         />
       )}
 

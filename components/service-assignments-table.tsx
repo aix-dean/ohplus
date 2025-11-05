@@ -91,10 +91,29 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
   const [totalPages, setTotalPages] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [totalItems, setTotalItems] = useState(0)
+  const [totalOverall, setTotalOverall] = useState(0)
   const [lastDoc, setLastDoc] = useState<any>(null)
   const [allFetchedDocs, setAllFetchedDocs] = useState<any[]>([])
   const [isSearchMode, setIsSearchMode] = useState(false)
   const itemsPerPage = 10
+
+  // Function to get total count of assignments
+  const getTotalCount = async () => {
+    try {
+      const assignmentsRef = collection(db, "service_assignments")
+      let q = query(assignmentsRef)
+
+      if (companyId) {
+        q = query(q, where("company_id", "==", companyId))
+      }
+
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.size
+    } catch (error) {
+      console.error("Error getting total count:", error)
+      return 0
+    }
+  }
 
   const handlePrint = async (assignment: ServiceAssignment) => {
     try {
@@ -223,12 +242,19 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
         setAssignments(pageAssignments)
         setHasMore(allAssignments.length > endIndex)
         setTotalPages(Math.ceil(allAssignments.length / itemsPerPage))
-        setTotalItems(allAssignments.length)
+        setTotalItems(pageAssignments.length)
+        setTotalOverall(allAssignments.length)
         setAllFetchedDocs(allDocs)
 
         await fetchTeamsForAssignments(pageAssignments)
       } else {
         // For non-search: use server-side pagination
+        // Get total count on first page
+        if (page === 1) {
+          const total = await getTotalCount()
+          setTotalOverall(total)
+        }
+
         let q = query(collection(db, "service_assignments"), orderBy("created", "desc"), limit(itemsPerPage + 1))
 
         if (companyId) {
@@ -291,7 +317,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
         setAssignments(pageAssignments)
         setHasMore(hasMorePages)
         setTotalPages(hasMorePages ? page + 1 : page) // Estimate based on current page
-        setTotalItems(0) // Unknown with server-side pagination
+        setTotalItems(pageAssignments.length) // Number of items on current page
         setAllFetchedDocs(docs)
 
         await fetchTeamsForAssignments(pageAssignments)
@@ -302,6 +328,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
       setHasMore(false)
       setTotalPages(1)
       setTotalItems(0)
+      setTotalOverall(0)
     } finally {
       setLoading(false)
     }
@@ -389,6 +416,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
     setCurrentPage(1)
     setLastDoc(null)
     setAllFetchedDocs([])
+    setTotalOverall(0)
     setIsSearchMode(false)
   }, [searchQuery, companyId])
 
