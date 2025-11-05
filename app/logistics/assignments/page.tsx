@@ -32,7 +32,7 @@ export default function ServiceAssignmentsPage() {
    }, [])
 
   const handleSelectAssignment = async (id: string) => {
-    router.push(`/logistics/service-assignments/${id}`)
+    router.push(`/logistics/assignments/${id}`)
   }
 
   const handleCreateAssignment = () => {
@@ -46,45 +46,50 @@ export default function ServiceAssignmentsPage() {
   }
 
   return (
-    <div className="flex-1 overflow-auto">
-      <header className="flex justify-between items-center p-4 border-b border-gray-200">
-        <div>
-          <h1 className="text-2xl font-bold">Service Assignments</h1>
-          <p className="text-sm text-gray-500">Manage service assignments</p>
-        </div>
-        <Button
-          onClick={handleCreateAssignment}
-          disabled={isCreatingAssignment}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isCreatingAssignment ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="mr-2 h-4 w-4" />
-          )}
-          {isCreatingAssignment ? "Creating..." : "Create Assignment"}
-        </Button>
-      </header>
-
-      <main className="p-4">
-        <div className="mb-6">
-          <div className="relative w-64">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Search assignments..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+    <div className="bg-neutral-50 min-h-screen">
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Service Assignments</h1>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              onClick={handleCreateAssignment}
+            >
+              Create SA
+            </Button>
+            <Button
+              variant="outline"
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              History
+            </Button>
           </div>
         </div>
 
-        <ServiceAssignmentsTable
-          onSelectAssignment={handleSelectAssignment}
-          companyId={userData?.company_id || undefined}
-          searchQuery={searchQuery}
-        />
-      </main>
+        <div>
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search assignments..."
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-full w-80"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[20px] p-8">
+              <ServiceAssignmentsTable
+                onSelectAssignment={handleSelectAssignment}
+                searchQuery={searchQuery}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Service Assignment Success Dialog */}
       <ServiceAssignmentSuccessDialog

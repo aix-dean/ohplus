@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "@magicuidesign/mcp": {
+    "sequentialthinking": {
       "command": "npx",
       "args": [
         "-y",

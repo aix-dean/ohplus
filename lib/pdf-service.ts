@@ -1,19 +1,45 @@
 import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 import type { Proposal } from "@/lib/types/proposal"
 import type { CostEstimate } from "@/lib/types/cost-estimate"
 import type { ReportData } from "@/lib/report-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { doc, getDoc } from "firebase/firestore"
+import { getStorage, ref, getDownloadURL } from "firebase/storage"
 import { db } from "@/lib/firebase"
+import { PDFDocument, PDFName } from 'pdf-lib'
 
 // Helper function to load image and convert to base64
 export async function loadImageAsBase64(url: string): Promise<string | null> {
   try {
+    let fetchUrl = url
+
+    // Check if this is a Firebase Storage URL
+    if (url.includes('firebasestorage.googleapis.com')) {
+      try {
+        // Extract the path from Firebase Storage URL
+        const urlObj = new URL(url)
+        const pathMatch = urlObj.pathname.match(/\/v0\/b\/[^\/]+\/o\/(.+)/)
+        if (pathMatch) {
+          const encodedPath = pathMatch[1]
+          const decodedPath = decodeURIComponent(encodedPath)
+
+          // Get Firebase Storage reference and download URL
+          const storage = getStorage()
+          const storageRef = ref(storage, decodedPath)
+          fetchUrl = await getDownloadURL(storageRef)
+        }
+      } catch (firebaseError) {
+        console.warn("Failed to get Firebase download URL, falling back to original URL:", firebaseError)
+        // Fall back to original URL if Firebase auth fails
+      }
+    }
+
     // Add timeout to prevent hanging
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-    const response = await fetch(url, {
+    const response = await fetch(fetchUrl, {
       signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; PDF-Generator/1.0)",
@@ -39,6 +65,7 @@ export async function loadImageAsBase64(url: string): Promise<string | null> {
     })
   } catch (error) {
     console.error("Error loading image:", url, error)
+    // Return null for failed image loads instead of throwing
     return null
   }
 }
@@ -121,6 +148,29 @@ function safeToDate(dateValue: any): Date {
     return dateValue.toDate()
   }
   return new Date() // fallback to current date
+}
+
+// Helper function to set PDF viewer preferences including initial zoom
+async function setPDFViewerPreferences(pdfBytes: Uint8Array, zoom: number = 1.25): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.load(pdfBytes)
+
+  // Get the first page
+  const pages = pdfDoc.getPages()
+  if (pages.length > 0) {
+    const firstPage = pages[0]
+
+    // Create a GoTo action with zoom
+    const action = pdfDoc.context.obj({
+      Type: PDFName.of('Action'),
+      S: PDFName.of('GoTo'),
+      D: [firstPage.ref, PDFName.of('XYZ'), null, null, zoom]
+    })
+
+    // Set OpenAction on catalog
+    pdfDoc.catalog.set(PDFName.of('OpenAction'), action)
+  }
+
+  return await pdfDoc.save()
 }
 
 async function logProposalPDFGenerated(proposalId: string, userId: string, userName: string): Promise<void> {
@@ -293,20 +343,23 @@ interface ServiceAssignmentPDFData {
   equipmentRequired: string
   materialSpecs: string
   crew: string
+  crewName?: string
   illuminationNits?: string
   gondola: string
   technology: string
   sales: string
+  campaignName?: string
   remarks: string
-  requestedBy: {
+  requestedBy?: {
     name: string
     department: string
   }
+  requestBy?: string // User ID field
   startDate: Date | null
   endDate: Date | null
   alarmDate: Date | null
   alarmTime: string
-  attachments: { name: string; type: string }[]
+  attachments: { name: string; type: string; url?: string; fileUrl?: string }[]
   serviceExpenses: { name: string; amount: string }[]
   status: string
   created: Date
@@ -734,15 +787,27 @@ export async function generateServiceAssignmentDetailsPDF(
       pdf.text("No service expenses recorded", margin, yPosition)
     }
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `service-assignment-${assignmentData.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Service Assignment Details PDF:", error)
-    throw new Error("Failed to generate Service Assignment Details PDF")
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -781,12 +846,12 @@ export async function generateServiceAssignmentPDF(
 
     // Add white text for header
     pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(20)
+    pdf.setFontSize(16)
     pdf.setFont("helvetica", "bold")
     pdf.text("SERVICE ASSIGNMENT", margin, 15)
 
     // Add logistics badge
-    pdf.setFontSize(10)
+    pdf.setFontSize(8)
     pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
 
     yPosition = 35
@@ -1005,7 +1070,7 @@ export async function generateServiceAssignmentPDF(
 
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "normal")
-    pdf.text(`${serviceAssignment.requestedBy.department} - ${serviceAssignment.requestedBy.name}`, margin, yPosition)
+    pdf.text(`${serviceAssignment.requestedBy?.department || "LOGISTICS"} - ${serviceAssignment.requestedBy?.name || "Unknown User"}`, margin, yPosition)
     yPosition += 15
 
     // Footer
@@ -1031,17 +1096,30 @@ export async function generateServiceAssignmentPDF(
     pdf.setFont("helvetica", "bold")
     pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
       // Return base64 string for email attachment
-      return pdf.output("datauristring").split(",")[1]
+      const base64 = Buffer.from(modifiedPdfBytes).toString('base64')
+      return base64
     } else {
       // Save the PDF for download
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `service-assignment-${serviceAssignment.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Service Assignment PDF:", error)
-    throw new Error("Failed to generate Service Assignment PDF")
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1087,7 +1165,7 @@ export async function generateJobOrderPDF(jobOrder: JobOrder, returnBase64 = fal
     pdf.setFont("helvetica", "bold")
     pdf.text("JOB ORDER", margin, 15)
 
-    // Add logistics badge
+    // Add department badge from props
     pdf.setFontSize(10)
     pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
 
@@ -1362,17 +1440,29 @@ export async function generateJobOrderPDF(jobOrder: JobOrder, returnBase64 = fal
     pdf.setFont("helvetica", "bold")
     pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
       // Return base64 string for email attachment
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
       // Save the PDF for download
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `job-order-${jobOrder.joNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Job Order PDF:", error)
-    throw new Error("Failed to generate Job Order PDF")
+    throw new Error("Unable to create job order PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1630,15 +1720,27 @@ try {
       }
     }
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `proposal-${(proposal.title || "proposal").replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating PDF:", error)
-    throw new Error("Failed to generate PDF")
+    throw new Error("Unable to create proposal PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1737,7 +1839,7 @@ export async function generateSeparateCostEstimatePDFs(
     }
   } catch (error) {
     console.error("Error generating separate PDFs:", error)
-    throw error
+    throw new Error("Unable to create separate cost estimate PDFs. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1814,7 +1916,8 @@ export async function generateCostEstimatePDF(
       throw new Error("No sites selected for PDF generation")
     }
 
-    sitesToProcess.forEach(async (siteName, siteIndex) => {
+    for (const siteName of sitesToProcess) {
+      const siteIndex = sitesToProcess.indexOf(siteName)
       if (siteIndex > 0) {
         pdf.addPage()
         yPosition = margin
@@ -2072,23 +2175,23 @@ export async function generateCostEstimatePDF(
       pdf.text(representativeName, margin, yPosition)
       console.log(
         "[v0] Adding client name:",
-        costEstimate?.clientName || "Client Name",
+        costEstimate?.client?.name || "Client Name",
         "at:",
         margin + contentWidth / 2,
         yPosition,
       )
-      pdf.text(costEstimate?.clientName || "Client Name", margin + contentWidth / 2, yPosition)
+      pdf.text(costEstimate?.client?.name || "Client Name", margin + contentWidth / 2, yPosition)
       yPosition += 5
 
       pdf.setFont("helvetica", "normal")
       console.log(
         "[v0] Adding client company:",
-        costEstimate?.clientCompany || "Client Company",
+        costEstimate?.client?.company || "Client Company",
         "at:",
         margin + contentWidth / 2,
         yPosition,
       )
-      pdf.text(costEstimate?.clientCompany || "Client Company", margin + contentWidth / 2, yPosition)
+      pdf.text(costEstimate?.client?.company || "Client Company", margin + contentWidth / 2, yPosition)
       yPosition += 8
 
       pdf.setFontSize(7)
@@ -2101,10 +2204,14 @@ export async function generateCostEstimatePDF(
 
       console.log("[v0] Final yPosition after signature section:", yPosition)
       console.log("[v0] Page dimensions - width:", pageWidth, "height:", pageHeight)
-    })
+    }
+
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
 
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
       const baseFileName = (costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()
       const sitesSuffix =
@@ -2118,12 +2225,20 @@ export async function generateCostEstimatePDF(
       const fileName = `cost-estimate-${baseFileName}${sitesSuffix}-${Date.now()}.pdf`
 
       console.log("[v0] Attempting to download PDF:", fileName)
-      pdf.save(fileName)
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
       console.log("[v0] PDF download triggered successfully")
     }
   } catch (error) {
     console.error("Error generating Cost Estimate PDF:", error)
-    throw new Error("Failed to generate Cost Estimate PDF")
+    throw new Error("Unable to create cost estimate PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -2720,14 +2835,1732 @@ export async function generateReportPDF(
     })
     pdf.text(`This report was automatically generated on ${currentDate}.`, pageWidth - margin - 70, footerY)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `report-${report.id}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating report PDF:", error)
-    throw new Error("Failed to generate report PDF")
+    throw new Error("Unable to create report PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
+}
+
+export async function generateServiceAssignmentHTMLPDF(
+  serviceAssignment: ServiceAssignmentPDFData,
+  returnBase64 = false,
+): Promise<string | void> {
+  try {
+    console.log("[DEBUG] Starting generateServiceAssignmentHTMLPDF for SA:", serviceAssignment.saNumber)
+    console.log("[DEBUG] Service assignment data keys:", Object.keys(serviceAssignment))
+    console.log("[DEBUG] Service expenses count:", serviceAssignment.serviceExpenses?.length || 0)
+    console.log("[DEBUG] Attachments count:", serviceAssignment.attachments?.length || 0)
+
+    // Test with minimal HTML first to isolate issues
+    console.log("[DEBUG] Testing with minimal HTML template...")
+    const testHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head><title>Test</title></head>
+      <body><h1>Test PDF - ${serviceAssignment.saNumber}</h1></body>
+      </html>
+    `
+
+    const testIframe = document.createElement('iframe')
+    testIframe.style.position = 'absolute'
+    testIframe.style.left = '-9999px'
+    testIframe.style.top = '-9999px'
+    testIframe.style.width = '200px'
+    testIframe.style.height = '200px'
+    testIframe.style.border = 'none'
+    testIframe.style.opacity = '0'
+    testIframe.style.pointerEvents = 'none'
+    document.body.appendChild(testIframe)
+
+    try {
+      await new Promise((resolve, reject) => {
+        testIframe.onload = resolve
+        testIframe.src = 'about:blank'
+        setTimeout(() => reject(new Error('Test iframe timeout')), 5000)
+      })
+
+      const testDoc = testIframe.contentDocument || testIframe.contentWindow?.document
+      if (!testDoc) throw new Error('Test iframe document not accessible')
+
+      testDoc.open()
+      testDoc.write(testHtml)
+      testDoc.close()
+
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      const testCanvas = await html2canvas(testIframe, {
+        scale: 1,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        width: 200,
+        height: 200,
+      })
+
+      console.log("[DEBUG] Test canvas successful, dimensions:", testCanvas.width, "x", testCanvas.height)
+      document.body.removeChild(testIframe)
+
+    } catch (testError) {
+      console.error("[DEBUG] Test HTML generation failed:", testError)
+      document.body.removeChild(testIframe)
+      throw new Error(`Basic HTML rendering test failed: ${testError}`)
+    }
+
+    // Generate HTML template for service assignment
+    const htmlTemplate = `
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Service Assignment - ${serviceAssignment.saNumber}</title>
+      </head>
+      <body style="margin:0; padding:0;">
+        <div style="width: 794px; height: 1123px; position: relative">
+          <div style="width: 507px; height: 31px; left: 138px; top: 1023px; position: absolute; text-align: center; color: var(--LIGHTER-BLACK, #333333); font-size: 13px; font-family: Inter; font-weight: 400; line-height: 13px; word-wrap: break-word">Golden Touch Imaging Specialist<br/>721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines</div>
+          <div style="width: 78px; height: 18px; left: 55px; top: 170px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Recipient</div>
+          <div style="width: 254px; height: 27px; left: 55px; top: 197px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 26px; font-family: Inter; font-weight: 700; line-height: 26px; word-wrap: break-word">${serviceAssignment.assignedToName || serviceAssignment.assignedTo}</div>
+          <div style="width: 190px; height: 18px; left: 534px; top: 239px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Issued on ${serviceAssignment.created ? new Date(serviceAssignment.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
+          <div style="width: 190px; height: 18px; left: 55px; top: 228px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Production</div>
+          <div style="width: 115px; height: 18px; left: 67px; top: 327px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Site Name</div>
+          <div style="width: 153px; height: 18px; left: 269px; top: 327px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.projectSiteName}</div>
+          <div style="width: 115px; height: 18px; left: 67px; top: 358px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Site Address</div>
+          <div style="width: 307px; height: 18px; left: 269px; top: 358px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.projectSiteLocation}</div>
+          <div style="width: 132px; height: 18px; left: 67px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Campaign Name</div>
+          <div style="width: 241px; height: 18px; left: 269px; top: 389px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.campaignName || "N/A"}</div>
+          <div style="width: 115px; height: 18px; left: 67px; top: 420px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Service Type</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 420px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 700; line-height: 15px; word-wrap: break-word">${serviceAssignment.serviceType}</div>
+          <div style="width: 115px; height: 18px; left: 67px; top: 451px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Material Specs</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 451px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.materialSpecs}</div>
+          <div style="width: 148px; height: 18px; left: 67px; top: 482px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Service Start Date</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 482px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.startDate ? new Date(serviceAssignment.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
+          <div style="width: 138px; height: 18px; left: 67px; top: 513px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Service End Date</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 513px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.endDate ? new Date(serviceAssignment.endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
+          <div style="width: 138px; height: 18px; left: 67px; top: 544px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Crew</div>
+          <div style="width: 210px; height: 18px; left: 269px; top: 544px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.crew}</div>
+          <div style="width: 138px; height: 18px; left: 67px; top: 575px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Remarks</div>
+          <div style="width: 353px; height: 18px; left: 269px; top: 575px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">${serviceAssignment.remarks}</div>
+          <div style="width: 115px; height: 18px; left: 55px; top: 621px; position: absolute; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 700; line-height: 15px; word-wrap: break-word">Attachments:</div>
+          <img style="width: 105px; height: 41px; left: 48px; top: 49px; position: absolute" src="https://placehold.co/105x41" />
+          <div style="width: 166px; height: 42px; left: 556px; top: 190px; position: absolute; background: #32A7FA"></div>
+          <div style="width: 668px; height: 35px; left: 55px; top: 283px; position: absolute; background: #32A7FA"></div>
+          <div style="width: 151px; height: 31px; left: 561px; top: 200px; position: absolute; text-align: right; color: white; font-size: 26px; font-family: Inter; font-weight: 700; line-height: 26px; word-wrap: break-word">SA#${serviceAssignment.saNumber}</div>
+          <div style="width: 355px; height: 19px; left: 67px; top: 291px; position: absolute; color: white; font-size: 21px; font-family: Inter; font-weight: 700; line-height: 21px; word-wrap: break-word">Service Assignment Information</div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 318px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 351px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 384px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 417px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 450px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 483px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 549px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 582px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 668px; height: 33px; left: 55px; top: 516px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 194px; height: 290px; left: 55px; top: 318px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 255px; height: 255px; left: 55px; top: 649px; position: absolute; border: 1px #D9D9D9 solid"></div>
+          <div style="width: 109px; height: 18px; left: 634px; top: 669px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Prepared By</div>
+          <div style="width: 220px; height: 27px; left: 519px; top: 749px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 26px; font-family: Inter; font-weight: 700; line-height: 26px; word-wrap: break-word">${serviceAssignment.requestedBy?.name || "Unknown User"}</div>
+          <div style="width: 190px; height: 18px; left: 549px; top: 779px; position: absolute; text-align: right; color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Logistics Team</div>
+          <div style="width: 125px; height: 42px; left: 605px; top: 55px; position: absolute; text-align: right"><span style="color: var(--LIGHTER-BLACK, #333333); font-size: 15px; font-family: Inter; font-weight: 400; line-height: 15px; word-wrap: break-word">Tagged JO<br/></span><span style="color: var(--LIGHTER-BLACK, #333333); font-size: 21px; font-family: Inter; font-weight: 700; line-height: 24.57px; word-wrap: break-word">JO#${serviceAssignment.saNumber.slice(-4)} </span></div>
+        </div>
+      </body>
+      </html>
+    `
+
+    console.log("[DEBUG] HTML template generated, length:", htmlTemplate.length)
+
+    // Create an iframe for isolated DOM manipulation to prevent layout shifts
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'absolute'
+    iframe.style.left = '-9999px'
+    iframe.style.top = '-9999px'
+    iframe.style.width = '794px' // A4 width
+    iframe.style.height = '1123px' // A4 height
+    iframe.style.border = 'none'
+    iframe.style.opacity = '0'
+    iframe.style.pointerEvents = 'none'
+
+    // Append iframe to body
+    document.body.appendChild(iframe)
+    console.log("[DEBUG] Iframe created and appended to DOM")
+
+    // Check if html2canvas is available
+    if (typeof html2canvas === 'undefined') {
+      throw new Error('html2canvas library is not loaded')
+    }
+    console.log("[DEBUG] html2canvas is available")
+
+    try {
+      // Wait for iframe to load
+      await new Promise((resolve) => {
+        iframe.onload = resolve
+        iframe.src = 'about:blank'
+      })
+      console.log("[DEBUG] Iframe loaded with about:blank")
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+      if (!iframeDoc) {
+        throw new Error('Unable to access iframe document')
+      }
+      console.log("[DEBUG] Iframe document accessed successfully")
+
+      // Write HTML content to iframe
+      iframeDoc.open()
+      iframeDoc.write(htmlTemplate)
+      iframeDoc.close()
+      console.log("[DEBUG] HTML content written to iframe")
+
+      // Wait for iframe content to load
+      await new Promise((resolve) => {
+        if (iframeDoc.readyState === 'complete') {
+          console.log("[DEBUG] Iframe readyState is complete")
+          resolve(void 0)
+        } else {
+          console.log("[DEBUG] Waiting for DOMContentLoaded event")
+          iframeDoc.addEventListener('DOMContentLoaded', () => {
+            console.log("[DEBUG] DOMContentLoaded event fired")
+            resolve(void 0)
+          })
+        }
+      })
+
+      // Additional wait for CSS and images to load
+      console.log("[DEBUG] Waiting additional time for CSS/images to load")
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      console.log("[DEBUG] Starting html2canvas conversion")
+
+      // Check if iframe content is visible/rendered
+      const iframeBody = iframeDoc.body
+      console.log("[DEBUG] Iframe body dimensions:", iframeBody?.offsetWidth, "x", iframeBody?.offsetHeight)
+      console.log("[DEBUG] Iframe body content:", iframeBody?.innerHTML?.substring(0, 200) + "...")
+
+      // Check if iframe body has content
+      if (!iframeBody || !iframeBody.innerHTML || iframeBody.innerHTML.trim().length === 0) {
+        throw new Error('Iframe body is empty or not rendered')
+      }
+
+      // Use html2canvas to capture the iframe content
+      console.log("[DEBUG] Starting html2canvas with options...")
+      const canvas = await html2canvas(iframe, {
+        scale: 2, // Higher resolution capture for better PDF quality
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        width: 794, // A4 width in pixels at 96 DPI
+        height: 1123, // A4 height in pixels at 96 DPI
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: 794,
+        windowHeight: 1123,
+        // Optimize for absolute positioning capture
+        imageTimeout: 0,
+        removeContainer: true,
+        foreignObjectRendering: false,
+        // Additional optimizations for absolute positioning
+        logging: false,
+        // proxy: undefined,
+        ignoreElements: (element) => {
+          // Skip elements that might cause layout shifts
+          return element.tagName === 'SCRIPT' || element.tagName === 'STYLE'
+        },
+      })
+
+      console.log("[DEBUG] html2canvas completed, canvas dimensions:", canvas.width, "x", canvas.height)
+
+      // Check if canvas has content
+      if (!canvas || canvas.width === 0 || canvas.height === 0) {
+        throw new Error('Canvas is empty or has zero dimensions')
+      }
+
+      // Remove the iframe
+      document.body.removeChild(iframe)
+      console.log("[DEBUG] Iframe removed from DOM")
+
+      // Convert canvas to PDF using jsPDF
+      console.log("[DEBUG] Converting canvas to PDF...")
+      const pdf = new jsPDF("p", "mm", "a4")
+      const imgData = canvas.toDataURL('image/jpeg', 0.95) // Use JPEG format with high quality (0.95)
+      console.log("[DEBUG] Canvas converted to data URL, length:", imgData.length)
+
+      // Validate data URL
+      if (!imgData || !imgData.startsWith('data:image/png;base64,')) {
+        throw new Error('Invalid canvas data URL generated')
+      }
+
+      // Calculate dimensions to fit A4
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = canvas.width
+      const imgHeight = canvas.height
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+      const imgX = (pdfWidth - imgWidth * ratio) / 2
+      const imgY = 0
+
+      console.log("[DEBUG] PDF dimensions - pdf:", pdfWidth, "x", pdfHeight, "img:", imgWidth, "x", imgHeight, "ratio:", ratio)
+
+      pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth * ratio, imgHeight * ratio)
+      console.log("[DEBUG] Image added to PDF successfully")
+
+      // Apply PDF viewer preferences for initial zoom
+      const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+      const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
+      if (returnBase64) {
+        console.log("[DEBUG] Returning base64 string")
+        return Buffer.from(modifiedPdfBytes).toString('base64')
+      } else {
+        const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        const fileName = `service-assignment-${serviceAssignment.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      }
+    } catch (canvasError) {
+      console.error("[DEBUG] Error with html2canvas:", canvasError)
+      // Clean up iframe if it still exists
+      if (document.body.contains(iframe)) {
+        console.log("[DEBUG] Cleaning up iframe after error")
+        document.body.removeChild(iframe)
+      }
+      throw new Error("Failed to convert HTML to canvas")
+    }
+  } catch (error) {
+    console.error("Error generating Service Assignment HTML PDF:", error)
+    // Fallback to native jsPDF method when html2canvas fails
+    console.log("Falling back to native jsPDF method for PDF generation")
+    return generateServiceAssignmentFallbackPDF(serviceAssignment, returnBase64)
+  }
+}
+
+// Fallback PDF generation function using jsPDF native API
+// Form data interface for create page PDF generation
+interface ServiceAssignmentCreateFormData {
+  projectSite: string;
+  serviceType: string;
+  assignedTo: string;
+  serviceDuration: number;
+  priority: string;
+  equipmentRequired: string;
+  materialSpecs: string;
+  crew: string;
+  gondola: string;
+  technology: string;
+  sales: string;
+  remarks: string;
+  message: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  alarmDate: Date | null;
+  alarmTime: string;
+  attachments: { name: string; type: string; file?: File }[];
+  serviceExpenses: { name: string; amount: string }[];
+  serviceCost: {
+    crewFee: string;
+    overtimeFee: string;
+    transpo: string;
+    tollFee: string;
+    mealAllowance: string;
+    otherFees: { name: string; amount: string }[];
+    total: number;
+  };
+}
+
+export async function generateServiceAssignmentCreatePDF(
+  formData: ServiceAssignmentCreateFormData,
+  saNumber: string,
+  returnBase64 = false,
+): Promise<string | void> {
+  try {
+    const pdf = new jsPDF("p", "mm", "a4")
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
+    let yPosition = margin
+
+    // Helper function to add text with word wrapping
+    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+      pdf.setFontSize(fontSize)
+      const lines = pdf.splitTextToSize(text, maxWidth)
+      pdf.text(lines, x, y)
+      return y + lines.length * fontSize * 0.3
+    }
+
+    // Helper function to check if we need a new page
+    const checkNewPage = (requiredHeight: number) => {
+      if (yPosition + requiredHeight > pageHeight - margin - 20) {
+        pdf.addPage()
+        yPosition = margin
+      }
+    }
+
+    // Header
+    pdf.setFillColor(30, 58, 138) // blue-900
+    pdf.rect(0, 0, pageWidth, 25, "F")
+
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(20)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("SERVICE ASSIGNMENT CREATE", margin, 15)
+
+    pdf.setFontSize(10)
+    pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
+
+    yPosition = 35
+    pdf.setTextColor(0, 0, 0)
+
+    // SA Number
+    pdf.setFontSize(24)
+    pdf.setFont("helvetica", "bold")
+    pdf.text(`SA# ${saNumber}`, margin, yPosition)
+    yPosition += 15
+
+    // Service Assignment Information Section
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("SERVICE ASSIGNMENT INFORMATION", margin, yPosition)
+    yPosition += 8
+
+    pdf.setLineWidth(0.5)
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 10
+
+    // Display key fields in a simple format
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "normal")
+
+    const fields = [
+      { label: "Project Site:", value: formData.projectSite || "N/A" },
+      { label: "Service Type:", value: formData.serviceType || "N/A" },
+      { label: "Assigned To:", value: formData.assignedTo || "N/A" },
+      { label: "Service Duration:", value: formData.serviceDuration ? `${formData.serviceDuration} hours` : "N/A" },
+      { label: "Priority:", value: formData.priority || "N/A" },
+      { label: "Crew:", value: formData.crew || "N/A" },
+      { label: "Gondola:", value: formData.gondola || "N/A" },
+      { label: "Technology:", value: formData.technology || "N/A" },
+      { label: "Sales:", value: formData.sales || "N/A" },
+      { label: "Start Date:", value: formData.startDate ? formData.startDate.toLocaleDateString() : "N/A" },
+      { label: "End Date:", value: formData.endDate ? formData.endDate.toLocaleDateString() : "N/A" },
+      { label: "Alarm Date:", value: formData.alarmDate ? formData.alarmDate.toLocaleDateString() : "N/A" },
+      { label: "Alarm Time:", value: formData.alarmTime || "N/A" },
+    ]
+
+    fields.forEach((field) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(field.label, margin, yPosition)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(field.value, margin + 40, yPosition)
+      yPosition += 8
+    })
+
+    yPosition += 10
+
+    // Equipment and Materials Section
+    if (formData.equipmentRequired || formData.materialSpecs) {
+      checkNewPage(30)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("EQUIPMENT & MATERIALS", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+
+      if (formData.equipmentRequired) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Equipment Required:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 5
+        yPosition = addText(formData.equipmentRequired, margin, yPosition, contentWidth)
+        yPosition += 5
+      }
+
+      if (formData.materialSpecs) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Material Specifications:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 5
+        yPosition = addText(formData.materialSpecs, margin, yPosition, contentWidth)
+      }
+
+      yPosition += 10
+    }
+
+    // Service Expenses Section
+    if (formData.serviceExpenses && formData.serviceExpenses.length > 0) {
+      checkNewPage(40)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("SERVICE EXPENSES", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+
+      formData.serviceExpenses.forEach((expense) => {
+        if (expense.name && expense.amount) {
+          pdf.setFont("helvetica", "bold")
+          pdf.text("Expense:", margin, yPosition)
+          pdf.setFont("helvetica", "normal")
+          pdf.text(expense.name, margin + 25, yPosition)
+          pdf.setFont("helvetica", "bold")
+          pdf.text("Amount:", margin + contentWidth / 2, yPosition)
+          pdf.setFont("helvetica", "normal")
+          pdf.text(`PHP ${expense.amount}`, margin + contentWidth / 2 + 25, yPosition)
+          yPosition += 8
+        }
+      })
+
+      // Total
+      const total = formData.serviceExpenses.reduce((sum, expense) => sum + (Number.parseFloat(expense.amount) || 0), 0)
+      yPosition += 5
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 8
+
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("TOTAL EXPENSES:", margin, yPosition)
+      pdf.text(`PHP ${total.toLocaleString()}`, margin + 50, yPosition)
+      yPosition += 15
+    }
+
+    // Remarks Section
+    if (formData.remarks || formData.message) {
+      checkNewPage(30)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("REMARKS", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+      const remarks = formData.remarks || formData.message || "N/A"
+      yPosition = addText(remarks, margin, yPosition, contentWidth)
+      yPosition += 10
+    }
+
+    // Attachments Section
+    if (formData.attachments && formData.attachments.length > 0) {
+      checkNewPage(20)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("ATTACHMENTS", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+
+      formData.attachments.forEach((attachment) => {
+        pdf.text(`${attachment.name} (${attachment.type})`, margin, yPosition)
+        yPosition += 6
+      })
+
+      yPosition += 10
+    }
+
+    // Footer
+    checkNewPage(30)
+    yPosition = pageHeight - 40
+
+    pdf.setLineWidth(0.5)
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 10
+
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    pdf.setTextColor(100, 100, 100)
+
+    pdf.text("Generated by OH Plus Platform - Logistics Department", margin, yPosition)
+    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, margin, yPosition + 5)
+
+    pdf.text("Smart. Seamless. Scalable.", pageWidth - margin - 50, yPosition)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
+
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
+    if (returnBase64) {
+      return Buffer.from(modifiedPdfBytes).toString('base64')
+    } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const fileName = `service-assignment-create-${saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    }
+  } catch (error) {
+    console.error("Error generating Service Assignment Create PDF:", error)
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
+  }
+}
+
+export async function generateServiceAssignmentFallbackPDF(
+  serviceAssignment: ServiceAssignmentPDFData,
+  returnBase64 = false,
+): Promise<string | void> {
+  try {
+    console.log("Generating Service Assignment PDF using fallback method")
+
+    const pdf = new jsPDF("p", "mm", "a4")
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const margin = 20
+    const contentWidth = pageWidth - margin * 2
+    let yPosition = margin
+
+    // Helper function to add text with word wrapping
+    const addText = (text: string, x: number, y: number, maxWidth: number, fontSize = 10) => {
+      pdf.setFontSize(fontSize)
+      const lines = pdf.splitTextToSize(text, maxWidth)
+      pdf.text(lines, x, y)
+      return y + lines.length * fontSize * 0.3
+    }
+
+    // Helper function to check if we need a new page
+    const checkNewPage = (requiredHeight: number) => {
+      if (yPosition + requiredHeight > pageHeight - margin - 20) {
+        pdf.addPage()
+        yPosition = margin
+      }
+    }
+
+    // Header with gradient background (simulated with rectangles)
+    pdf.setFillColor(30, 58, 138) // blue-900
+    pdf.rect(0, 0, pageWidth, 25, "F")
+
+    // Angular cyan section
+    const cyanStartX = pageWidth * 0.6
+    pdf.setFillColor(52, 211, 235) // cyan-400
+    pdf.lines([
+      [cyanStartX, 0],
+      [pageWidth, 0],
+      [pageWidth, 25],
+      [cyanStartX - pageWidth * 0.15, 25],
+    ], cyanStartX, 0, [1, 1], "F", true)
+
+    // Add white text for header
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("SERVICE ASSIGNMENT", margin, 15)
+
+    // Add logistics badge
+    pdf.setFontSize(8)
+    pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
+
+    yPosition = 35
+    pdf.setTextColor(0, 0, 0)
+
+    // Service Assignment Title and Number
+    pdf.setFontSize(18)
+    pdf.setFont("helvetica", "bold")
+    pdf.text(`SA# ${serviceAssignment.saNumber}`, margin, yPosition)
+    yPosition += 10
+
+    // Status badge
+    const getStatusColor = (status: string) => {
+      switch (status?.toLowerCase()) {
+        case "completed":
+          return [34, 197, 94] // green
+        case "pending":
+          return [234, 179, 8] // yellow
+        case "in progress":
+          return [59, 130, 246] // blue
+        default:
+          return [107, 114, 128] // gray
+      }
+    }
+
+    const statusColor = getStatusColor(serviceAssignment.status)
+    pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2])
+    pdf.rect(margin, yPosition, 20, 6, "F")
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFontSize(8)
+    pdf.setFont("helvetica", "bold")
+    pdf.text(serviceAssignment.status.toUpperCase(), margin + 2, yPosition + 4)
+    pdf.setTextColor(0, 0, 0)
+    yPosition += 20
+
+    // Service Assignment Information Section
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("SERVICE ASSIGNMENT INFORMATION", margin, yPosition)
+    yPosition += 8
+
+    pdf.setLineWidth(0.5)
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 10
+
+    // Two column layout
+    const leftColumn = margin
+    const rightColumn = margin + contentWidth / 2
+
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "normal")
+
+    // Left column
+    let leftY = yPosition
+    const leftColumnData = [
+      { label: "SA Number:", value: serviceAssignment.saNumber },
+      { label: "Project Site:", value: serviceAssignment.projectSiteName },
+      { label: "Location:", value: serviceAssignment.projectSiteLocation || "N/A" },
+      { label: "Service Type:", value: serviceAssignment.serviceType },
+      { label: "Assigned To:", value: serviceAssignment.assignedToName || serviceAssignment.assignedTo },
+      { label: "Duration:", value: serviceAssignment.serviceDuration ? `${serviceAssignment.serviceDuration} hours` : "N/A" },
+      { label: "Priority:", value: serviceAssignment.priority },
+    ]
+
+    leftColumnData.forEach((item) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(item.label, leftColumn, leftY)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(item.value, leftColumn + 35, leftY)
+      leftY += 6
+    })
+
+    // Right column
+    let rightY = yPosition
+    const rightColumnData = [
+      { label: "Created:", value: serviceAssignment.created.toLocaleDateString() },
+      { label: "Start Date:", value: serviceAssignment.startDate ? serviceAssignment.startDate.toLocaleDateString() : "N/A" },
+      { label: "End Date:", value: serviceAssignment.endDate ? serviceAssignment.endDate.toLocaleDateString() : "N/A" },
+      { label: "Alarm Date:", value: serviceAssignment.alarmDate ? serviceAssignment.alarmDate.toLocaleDateString() : "N/A" },
+      { label: "Alarm Time:", value: serviceAssignment.alarmTime || "N/A" },
+      { label: "Illumination:", value: serviceAssignment.illuminationNits ? `${serviceAssignment.illuminationNits} nits` : "N/A" },
+      { label: "Gondola:", value: serviceAssignment.gondola || "N/A" },
+      { label: "Technology:", value: serviceAssignment.technology || "N/A" },
+    ]
+
+    rightColumnData.forEach((item) => {
+      pdf.setFont("helvetica", "bold")
+      pdf.text(item.label, rightColumn, rightY)
+      pdf.setFont("helvetica", "normal")
+      pdf.text(item.value, rightColumn + 35, rightY)
+      rightY += 6
+    })
+
+    yPosition += 10
+
+    // Equipment and Materials Section
+    if (serviceAssignment.equipmentRequired || serviceAssignment.materialSpecs) {
+      checkNewPage(30)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("EQUIPMENT & MATERIALS", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+
+      if (serviceAssignment.equipmentRequired) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Equipment Required:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 5
+        yPosition = addText(serviceAssignment.equipmentRequired, margin, yPosition, contentWidth)
+        yPosition += 5
+      }
+
+      if (serviceAssignment.materialSpecs) {
+        pdf.setFont("helvetica", "bold")
+        pdf.text("Material Specifications:", margin, yPosition)
+        pdf.setFont("helvetica", "normal")
+        yPosition += 5
+        yPosition = addText(serviceAssignment.materialSpecs, margin, yPosition, contentWidth)
+      }
+
+      yPosition += 10
+    }
+
+    // Service Cost Section
+    const totalCost = serviceAssignment.serviceExpenses.reduce((sum, expense) => sum + (Number.parseFloat(expense.amount) || 0), 0)
+    if (totalCost > 0) {
+      checkNewPage(40)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("SERVICE COST BREAKDOWN", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.setDrawColor(200, 200, 200)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+
+      // All expenses
+      serviceAssignment.serviceExpenses.forEach((expense) => {
+        if (expense.name && expense.amount && Number.parseFloat(expense.amount) > 0) {
+          pdf.setFont("helvetica", "bold")
+          pdf.text(`${expense.name}:`, margin, yPosition)
+          pdf.setFont("helvetica", "normal")
+          pdf.text(formatCurrency(Number.parseFloat(expense.amount)), rightColumn, yPosition)
+          yPosition += 6
+        }
+      })
+
+      // Total
+      yPosition += 5
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 8
+
+      pdf.setFontSize(14)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("TOTAL COST:", margin, yPosition)
+      pdf.text(formatCurrency(totalCost), margin + 40, yPosition)
+      yPosition += 15
+    }
+
+    // Remarks Section
+    if (serviceAssignment.remarks) {
+      checkNewPage(30)
+      pdf.setFontSize(16)
+      pdf.setFont("helvetica", "bold")
+      pdf.text("REMARKS", margin, yPosition)
+      yPosition += 8
+
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+      yPosition += 10
+
+      pdf.setFontSize(11)
+      pdf.setFont("helvetica", "normal")
+      yPosition = addText(serviceAssignment.remarks, margin, yPosition, contentWidth)
+      yPosition += 10
+    }
+
+    // Requested By Section
+    checkNewPage(20)
+    pdf.setFontSize(16)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("REQUESTED BY", margin, yPosition)
+    yPosition += 8
+
+    pdf.setLineWidth(0.5)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 10
+
+    pdf.setFontSize(11)
+    pdf.setFont("helvetica", "normal")
+    pdf.text(`${serviceAssignment.requestedBy?.department || "LOGISTICS"} - ${serviceAssignment.requestedBy?.name || "Unknown User"}`, margin, yPosition)
+    yPosition += 15
+
+    // Footer
+    checkNewPage(30)
+    yPosition = pageHeight - 40
+
+    // Footer separator
+    pdf.setLineWidth(0.5)
+    pdf.setDrawColor(200, 200, 200)
+    pdf.line(margin, yPosition, pageWidth - margin, yPosition)
+    yPosition += 10
+
+    // Footer content
+    pdf.setFontSize(10)
+    pdf.setFont("helvetica", "normal")
+    pdf.setTextColor(100, 100, 100)
+
+    pdf.text("Generated by OH Plus Platform - Logistics Department", margin, yPosition)
+    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, margin, yPosition + 5)
+
+    // Company info on the right
+    pdf.text("Smart. Seamless. Scalable.", pageWidth - margin - 50, yPosition)
+    pdf.setFont("helvetica", "bold")
+    pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
+
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
+    if (returnBase64) {
+      // Return base64 string for email attachment
+      return Buffer.from(modifiedPdfBytes).toString('base64')
+    } else {
+      // Save the PDF for download
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const fileName = `service-assignment-${serviceAssignment.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    }
+  } catch (error) {
+    console.error("Error generating Service Assignment Fallback PDF:", error)
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
+  }
+}
+
+export async function generateServiceAssignmentHTMLSimple(
+  assignment: ServiceAssignmentPDFData,
+  companyData?: any,
+  logoDataUrl?: string,
+  signatureDataUrl?: string,
+): Promise<string> {
+  const companyName = companyData?.name || companyData?.company_name || "Golden Touch Imaging Specialist"
+  const companyAddress = companyData?.address ? (() => {
+    // Model 2: address as object with city, province, street
+    if (companyData.address && typeof companyData.address === "object") {
+      const { street, city, province } = companyData.address
+      const addressParts = [street, city, province].filter(
+        (part) => part && part.trim() !== "" && !part.toLowerCase().includes("default"),
+      )
+      return addressParts.join(", ")
+    }
+
+    // Model 3: address as string
+    if (companyData.address && typeof companyData.address === "string") {
+      return companyData.address
+    }
+
+    return "721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines"
+  })() : "721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines"
+  const logoSrc = logoDataUrl || "/placeholder.svg?height=32&width=60"
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Service Assignment - ${assignment.saNumber}</title>
+      <style>
+        body {
+           font-family: 'Helvetica', 'Arial', sans-serif;
+           margin: 0;
+           padding: 0;
+           background-color: #ffffff;
+           color: #000000;
+           line-height: 1.4;
+         }
+
+         .container {
+           width: 816px;
+           height: 1056px;
+           margin: auto;
+         }
+
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding: 16px;
+          padding-bottom: 8px;
+        }
+
+        .header-left {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+
+        .company-logo {
+          height: 32px;
+        }
+
+        .company-name {
+          font-size: 16px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .company-contact {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .header-right {
+          text-align: right;
+        }
+
+        .tagged-jo-label {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .tagged-jo-number {
+          font-size: 14px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .recipient-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding-left: 16px;
+          padding-right: 16px;
+          padding-top: 8px;
+          padding-bottom: 8px;
+        }
+
+        .recipient-left {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .recipient-label {
+          font-size: 12px;
+          color: #6b7280;
+          margin-bottom: 4px;
+        }
+
+        .recipient-name {
+          font-size: 20px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .recipient-dept {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 4px 0 0 0;
+        }
+
+        .recipient-right {
+          text-align: right;
+        }
+
+        .sa-badge {
+          background-color: #2196f3;
+          color: white;
+          padding: 8px 16px;
+          font-size: 20px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 130px;
+          height: 30px;
+          flex-shrink: 0;
+          margin-bottom: 8px;
+        }
+
+        .issued-date {
+          font-size: 12px;
+          color: #6b7280;
+          margin-top: 8px;
+        }
+
+        .info-section {
+          padding-left: 16px;
+          padding-right: 16px;
+          padding-top: 8px;
+          padding-bottom: 16px;
+        }
+
+        .info-header {
+          background-color: #2196f3;
+          color: #ffffff;
+          padding: 12px 16px;
+          font-size: 16px;
+          font-weight: 700;
+          line-height: 1;
+          margin-bottom: 0;
+        }
+
+        .info-table {
+          width: 100%;
+          border-collapse: collapse;
+          height: 253px;
+        }
+
+        .info-table tr {
+          border: 1px solid #d1d5db;
+        }
+
+        .info-table td {
+          padding: 4px 16px;
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .info-table td:first-child {
+          background-color: #ffffff;
+          width: 33.33%;
+          border-right: 1px solid #d1d5db;
+        }
+
+        .info-table td:nth-child(2) {
+          font-weight: 700;
+        }
+
+        .attachments-section {
+          padding-left: 24px;
+          padding-right: 24px;
+          padding-bottom: 24px;
+        }
+
+        .attachments-label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #333333;
+          line-height: 1;
+          margin-bottom: 16px;
+        }
+
+        .attachments-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 24px;
+        }
+
+        .attachment-box {
+          width: 200px;
+          height: 200px;
+          border: 1px solid #d1d5db;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #ffffff;
+        }
+
+        .attachment-image {
+          max-width: 190px;
+          max-height: 190px;
+          object-fit: contain;
+        }
+
+        .prepared-by-section {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+        }
+
+        .prepared-by-label {
+          font-size: 12px;
+          color: #6b7280;
+          margin-bottom: 8px;
+        }
+
+        .signature-box {
+          width: 152px;
+          height: 91px;
+          border: 1px solid #d1d5db;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #ffffff;
+        }
+
+        .signature-image {
+          max-width: 140px;
+          max-height: 80px;
+          object-fit: contain;
+        }
+
+        .prepared-by-name {
+          font-size: 20px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+          text-align: right;
+          margin-top: 16px;
+        }
+
+        .prepared-by-dept {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 4px 0 0 0;
+          text-align: right;
+        }
+
+        .footer {
+          background-color: #ffffff;
+          padding: 16px 24px;
+          text-align: center;
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+        }
+
+        .footer-company {
+          font-size: 12px;
+          font-weight: 600;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .footer-address {
+          font-size: 12px;
+          color: #9ca3af;
+          margin: 4px 0 0 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <!-- Header -->
+        <div class="header">
+          <div class="header-left">
+            <img src="${logoSrc}" alt="Company Logo" class="company-logo" />
+            <p class="company-name">${companyName}</p>
+            <p class="company-contact">${companyAddress}</p>
+          </div>
+          <div class="header-right">
+            <p class="tagged-jo-label">Tagged JO</p>
+            <p class="tagged-jo-number">JO#${assignment.saNumber.slice(-4)}</p>
+          </div>
+        </div>
+
+        <!-- Recipient Section -->
+        <div class="recipient-section">
+          <div class="recipient-left">
+            <p class="recipient-label">Recipient</p>
+            <h2 class="recipient-name">
+              ${assignment.requestedBy?.name || assignment.assignedTo}
+            </h2>
+            <p class="recipient-dept">Sales</p>
+          </div>
+          <div class="recipient-right">
+            <div class="sa-badge">
+              SA#${assignment.saNumber}
+            </div>
+            <p class="issued-date">Issued on ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+          </div>
+        </div>
+
+        <!-- Service Assignment Information Table -->
+        <div class="info-section">
+          <div class="info-header">
+            Service Assignment Information
+          </div>
+          <table class="info-table">
+            <tbody>
+              <tr>
+                <td>Site Name</td>
+                <td>${assignment.projectSiteName}</td>
+              </tr>
+              <tr>
+                <td>Site Address</td>
+                <td>${assignment.projectSiteLocation}</td>
+              </tr>
+              <tr>
+                <td>Campaign Name</td>
+                <td>${assignment.campaignName || "N/A"}</td>
+              </tr>
+              <tr>
+                <td>Service Type</td>
+                <td>${assignment.serviceType}</td>
+              </tr>
+              <tr>
+                <td>Material Specs</td>
+                <td>${assignment.materialSpecs}</td>
+              </tr>
+              <tr>
+                <td>Service Start Date</td>
+                <td>${assignment.startDate ? new Date(assignment.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
+              </tr>
+              <tr>
+                <td>Service End Date</td>
+                <td>${assignment.endDate ? new Date(assignment.endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
+              </tr>
+              <tr>
+                <td>Crew</td>
+                <td>${assignment.crewName || assignment.crew}</td>
+              </tr>
+              <tr>
+                <td>Remarks</td>
+                <td>${assignment.remarks}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="attachments-section">
+          <p class="attachments-label">
+            Attachments:
+          </p>
+          <div class="attachments-content">
+            <div class="attachment-box">
+              ${assignment.attachments && assignment.attachments.length > 0 && (assignment.attachments[0].url || assignment.attachments[0].fileUrl) ? `<img src="${assignment.attachments[0].url || assignment.attachments[0].fileUrl}" alt="Attachment" class="attachment-image" />` : ''}
+            </div>
+            <div class="prepared-by-section">
+              <p class="prepared-by-label">Prepared By</p>
+              <div class="signature-box">
+                ${signatureDataUrl ? `<img src="${signatureDataUrl}" alt="Signature" class="signature-image" />` : ''}
+              </div>
+              <p class="prepared-by-name">${assignment.requestedBy?.name || "User"}</p>
+              <p class="prepared-by-dept">${assignment.requestedBy?.department || "Logistics Team"}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+          <p class="footer-company">${companyName}</p>
+          <p class="footer-address">
+            ${companyAddress}
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+export async function generateServiceAssignmentHTML(
+  assignmentData: ServiceAssignmentPDFData,
+  companyData: any,
+  logoDataUrl: string,
+): Promise<string> {
+  const companyName = companyData?.name || companyData?.company_name || "Company Name"
+  const companyTagline = companyData?.tagline || "Smart. Seamless. Scalable."
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Service Assignment - ${assignmentData.saNumber}</title>
+      <style>
+        body {
+          font-family: 'Helvetica', 'Arial', sans-serif;
+          margin: 0;
+          padding: 20px;
+          background-color: #ffffff;
+          color: #000000;
+          line-height: 1.4;
+        }
+
+        .header {
+          background: linear-gradient(135deg, #1e3a8a 60%, #34d3eb 100%);
+          color: white;
+          padding: 20px;
+          text-align: center;
+          margin: -20px -20px 20px -20px;
+          position: relative;
+        }
+
+        .header-logo {
+          position: absolute;
+          top: 10px;
+          right: 20px;
+          width: 60px;
+          height: 60px;
+          object-fit: contain;
+        }
+
+        .header h1 {
+          margin: 0;
+          font-size: 28px;
+          font-weight: bold;
+        }
+
+        .header p {
+          margin: 5px 0 0 0;
+          font-size: 14px;
+        }
+
+        .sa-number {
+          font-size: 32px;
+          font-weight: bold;
+          color: #1e3a8a;
+          margin: 20px 0;
+          text-align: center;
+        }
+
+        .status-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: bold;
+          color: white;
+          margin: 10px 0;
+        }
+
+        .status-completed { background-color: #22c55e; }
+        .status-pending { background-color: #eab308; }
+        .status-in-progress { background-color: #3b82f6; }
+        .status-draft { background-color: #6b7280; }
+
+        .section {
+          margin: 20px 0;
+          padding: 15px;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          background-color: #ffffff;
+        }
+
+        .section h2 {
+          margin: 0 0 15px 0;
+          font-size: 18px;
+          font-weight: bold;
+          color: #111827;
+          border-bottom: 2px solid #e5e7eb;
+          padding-bottom: 5px;
+        }
+
+        .field-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+        }
+
+        .field {
+          margin-bottom: 10px;
+        }
+
+        .field label {
+          display: block;
+          font-weight: bold;
+          color: #374151;
+          margin-bottom: 3px;
+          font-size: 12px;
+        }
+
+        .field span {
+          color: #111827;
+          font-size: 14px;
+        }
+
+        .expenses-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+        }
+
+        .expenses-table th,
+        .expenses-table td {
+          padding: 8px 12px;
+          text-align: left;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .expenses-table th {
+          background-color: #f9fafb;
+          font-weight: bold;
+          color: #374151;
+        }
+
+        .total-row {
+          border-top: 2px solid #374151;
+          font-weight: bold;
+        }
+
+        .terms-section {
+          margin: 20px 0;
+          padding: 15px;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          background-color: #ffffff;
+        }
+
+        .terms-section h2 {
+          margin: 0 0 15px 0;
+          font-size: 18px;
+          font-weight: bold;
+          color: #111827;
+          border-bottom: 2px solid #e5e7eb;
+          padding-bottom: 5px;
+        }
+
+        .terms-list {
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        .terms-list div {
+          margin-bottom: 8px;
+        }
+
+        .signatures-section {
+          margin: 20px 0;
+          padding: 15px;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          background-color: #ffffff;
+        }
+
+        .signatures-section h2 {
+          margin: 0 0 15px 0;
+          font-size: 18px;
+          font-weight: bold;
+          color: #111827;
+          border-bottom: 2px solid #e5e7eb;
+          padding-bottom: 5px;
+        }
+
+        .signature-row {
+          display: flex;
+          justify-content: space-between;
+          margin: 20px 0;
+        }
+
+        .signature-box {
+          flex: 1;
+          margin: 0 10px;
+          text-align: center;
+        }
+
+        .signature-line {
+          border-bottom: 1px solid #000;
+          margin: 20px 0;
+          height: 30px;
+        }
+
+        .signature-name {
+          font-weight: bold;
+          font-size: 12px;
+        }
+
+        .footer {
+          margin-top: 30px;
+          padding-top: 20px;
+          border-top: 1px solid #e5e7eb;
+          text-align: center;
+          color: #6b7280;
+          font-size: 12px;
+        }
+
+        @media print {
+          body { margin: 0; }
+          .header { margin: 0 -20px 20px -20px; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        ${logoDataUrl ? `<img src="${logoDataUrl}" alt="Company Logo" class="header-logo">` : ''}
+        <h1>SERVICE ASSIGNMENT</h1>
+        <p>LOGISTICS DEPARTMENT</p>
+      </div>
+
+      <div class="sa-number">SA# ${assignmentData.saNumber}</div>
+
+      <div class="status-badge status-${assignmentData.status.toLowerCase().replace(' ', '-')}">
+        ${assignmentData.status.toUpperCase()}
+      </div>
+
+      <div class="section">
+        <h2>SERVICE ASSIGNMENT INFORMATION</h2>
+        <div class="field-grid">
+          <div class="field">
+            <label>SA Number:</label>
+            <span>${assignmentData.saNumber}</span>
+          </div>
+          <div class="field">
+            <label>Project Site:</label>
+            <span>${assignmentData.projectSiteName}</span>
+          </div>
+          <div class="field">
+            <label>Location:</label>
+            <span>${assignmentData.projectSiteLocation || "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Service Type:</label>
+            <span>${assignmentData.serviceType}</span>
+          </div>
+          <div class="field">
+            <label>Assigned To:</label>
+            <span>${assignmentData.assignedToName || assignmentData.assignedTo}</span>
+          </div>
+          <div class="field">
+            <label>Duration:</label>
+            <span>${assignmentData.serviceDuration ? `${assignmentData.serviceDuration} hours` : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Priority:</label>
+            <span>${assignmentData.priority}</span>
+          </div>
+          <div class="field">
+            <label>Created:</label>
+            <span>${safeToDate(assignmentData.created).toLocaleDateString()}</span>
+          </div>
+          <div class="field">
+            <label>Start Date:</label>
+            <span>${assignmentData.startDate ? safeToDate(assignmentData.startDate).toLocaleDateString() : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>End Date:</label>
+            <span>${assignmentData.endDate ? safeToDate(assignmentData.endDate).toLocaleDateString() : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Alarm Date:</label>
+            <span>${assignmentData.alarmDate ? safeToDate(assignmentData.alarmDate).toLocaleDateString() : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Alarm Time:</label>
+            <span>${assignmentData.alarmTime || "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Illumination:</label>
+            <span>${assignmentData.illuminationNits ? `${assignmentData.illuminationNits} nits` : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Gondola:</label>
+            <span>${assignmentData.gondola || "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Technology:</label>
+            <span>${assignmentData.technology || "N/A"}</span>
+          </div>
+        </div>
+      </div>
+
+      ${assignmentData.equipmentRequired || assignmentData.materialSpecs ? `
+      <div class="section">
+        <h2>EQUIPMENT & MATERIALS</h2>
+        ${assignmentData.equipmentRequired ? `
+        <div class="field">
+          <label>Equipment Required:</label>
+          <span>${assignmentData.equipmentRequired}</span>
+        </div>
+        ` : ''}
+        ${assignmentData.materialSpecs ? `
+        <div class="field">
+          <label>Material Specifications:</label>
+          <span>${assignmentData.materialSpecs}</span>
+        </div>
+        ` : ''}
+      </div>
+      ` : ''}
+
+      ${assignmentData.serviceExpenses && assignmentData.serviceExpenses.length > 0 ? `
+      <div class="section">
+        <h2>SERVICE COST BREAKDOWN</h2>
+        <table class="expenses-table">
+          <thead>
+            <tr>
+              <th>Expense Name</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${assignmentData.serviceExpenses.map(expense => `
+            <tr>
+              <td>${expense.name}</td>
+              <td>PHP ${Number.parseFloat(expense.amount).toLocaleString()}</td>
+            </tr>
+            `).join('')}
+            <tr class="total-row">
+              <td><strong>TOTAL COST</strong></td>
+              <td><strong>PHP ${assignmentData.serviceExpenses.reduce((sum, expense) => sum + (Number.parseFloat(expense.amount) || 0), 0).toLocaleString()}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      ` : ''}
+
+      ${assignmentData.remarks ? `
+      <div class="section">
+        <h2>REMARKS</h2>
+        <div class="field">
+          <span>${assignmentData.remarks}</span>
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="section">
+        <h2>REQUESTED BY</h2>
+        <div class="field">
+          <span>${assignmentData.requestedBy?.department || "LOGISTICS"} - ${assignmentData.requestedBy?.name || "Unknown User"}</span>
+        </div>
+      </div>
+
+      <div class="terms-section">
+        <h2>TERMS AND CONDITIONS</h2>
+        <div class="terms-list">
+          <div>1. Service assignments are subject to the terms and conditions outlined in the original service agreement.</div>
+          <div>2. All work must be completed within the specified duration and meet quality standards.</div>
+          <div>3. Equipment and materials provided must be handled with care and returned in good condition.</div>
+          <div>4. Any additional costs incurred must be approved in advance.</div>
+          <div>5. Safety protocols must be followed at all times during service execution.</div>
+        </div>
+      </div>
+
+      <div class="signatures-section">
+        <h2>SIGNATURES</h2>
+        <div class="signature-row">
+          <div class="signature-box">
+            <div class="signature-line"></div>
+            <div class="signature-name">Service Provider</div>
+            <div style="font-size: 10px; color: #6b7280; margin-top: 5px;">${assignmentData.assignedToName || assignmentData.assignedTo}</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-line"></div>
+            <div class="signature-name">Client Representative</div>
+            <div style="font-size: 10px; color: #6b7280; margin-top: 5px;">${assignmentData.requestedBy?.name || "Unknown User"}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>Generated by OH Plus Platform - Logistics Department</p>
+        <p>Generated on ${new Date().toLocaleDateString()}</p>
+        <p>${companyTagline} - ${companyName}</p>
+      </div>
+    </body>
+    </html>
+  `
 }

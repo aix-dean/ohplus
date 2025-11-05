@@ -771,13 +771,7 @@ export default function CreateJobOrderPage() {
             campaignName: form.campaignName, // Added campaign name
             requestedBy: `${userData?.first_name} ${userData?.last_name}` || "Auto-Generated",
             remarks: form.remarks,
-            attachments: form.attachmentUrl
-              ? [{
-                url: form.attachmentUrl,
-                name: form.attachmentFile?.name || "Attachment",
-                type: form.attachmentFile?.type || "image",
-              }]
-              : [],
+            attachments: form.materialSpecAttachmentUrl ? { name: form.materialSpecAttachmentFile?.name || "Attachment", type: form.materialSpecAttachmentFile?.type || "image", url: form.materialSpecAttachmentUrl } : null,
             materialSpec: form.materialSpec,
             materialSpecAttachmentUrl: form.materialSpecAttachmentUrl,
             clientCompliance: {
@@ -966,13 +960,7 @@ export default function CreateJobOrderPage() {
         campaignName: form.campaignName,
         requestedBy: userData?.first_name || "Auto-Generated",
         remarks: form.remarks,
-        attachments: form.attachmentUrl
-          ? [{
-              url: form.attachmentUrl,
-              name: form.attachmentFile?.name || "Attachment",
-              type: form.attachmentFile?.type || "image",
-            }]
-          : [],
+        attachments: form.materialSpecAttachmentUrl ? { name: form.materialSpecAttachmentFile?.name || "Attachment", type: form.materialSpecAttachmentFile?.type || "image", url: form.materialSpecAttachmentUrl } : null,
         materialSpec: form.materialSpec,
         materialSpecAttachmentUrl: form.materialSpecAttachmentUrl,
         clientCompliance: {
