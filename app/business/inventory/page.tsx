@@ -1116,6 +1116,27 @@ export default function BusinessInventoryPage() {
           spot_duration: parseInt(cms.spot_duration) || 0,
           loops_per_day: parseInt(cms.loops_per_day) || 0,
         } : null,
+        pages: siteType === "digital" ? [
+          {
+            "name": "a-page",
+            "widgets": [
+              {
+                "zIndex": 1,
+                "type": "STREAM_MEDIA",
+                "size": 143046,
+                "md5": "726F13D3B7B68F2C25400EE5B014CDB2",
+                "duration": 10000,
+                "layout": {
+                  "x": "0%",
+                  "y": "0%",
+                  "width": "100%",
+                  "height": "100%"
+                }
+              }
+            ]
+          }
+        ] : null,
+        playerIds: siteType === "digital" ? ["141a16d405254b8fb5c5173ef3a58cc5"] : null,
         specs_rental: {
           audience_types: selectedAudience,
           location,
@@ -1311,6 +1332,27 @@ export default function BusinessInventoryPage() {
           spot_duration: parseInt(cms.spot_duration) || 0,
           loops_per_day: parseInt(cms.loops_per_day) || 0,
         } : null,
+        pages: siteType === "digital" ? [
+          {
+            "name": "a-page",
+            "widgets": [
+              {
+                "zIndex": 1,
+                "type": "PICTURE",
+                "size": 143046,
+                "md5": "726F13D3B7B68F2C25400EE5B014CDB2",
+                "duration": 10000,
+                "layout": {
+                  "x": "0%",
+                  "y": "0%",
+                  "width": "100%",
+                  "height": "100%"
+                }
+              }
+            ]
+          }
+        ] : null,
+        playerIds: siteType === "digital" ? ["141a16d405254b8fb5c5173ef3a58cc5"] : null,
         specs_rental: {
           audience_types: selectedAudience,
           location,

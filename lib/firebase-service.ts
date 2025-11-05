@@ -219,6 +219,7 @@ export interface Product {
     created: any
     created_by: string
   }>
+  playerIds?: string[]
 }
 
 // ServiceAssignment interface

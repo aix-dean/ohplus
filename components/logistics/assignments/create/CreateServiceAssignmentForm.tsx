@@ -88,6 +88,10 @@ function JobOrderDetailsCard({
           <Label className="w-1/2">Requested by:</Label>
           <p className="w-1/2 font-medium m-0 p-0">{jobOrder.requestedBy}</p>
         </div>
+        <div className="flex items-center">
+          <Label className="w-1/2">Booking ID:</Label>
+          <p className="w-1/2 font-medium m-0 p-0">{jobOrder.booking_id || "N/A"}</p>
+        </div>
         <div className="flex justify-end">
           <Button variant="link" size="sm" onClick={onChange}>Change</Button>
         </div>
@@ -146,6 +150,8 @@ export function CreateServiceAssignmentForm({
   onOpenProductSelection,
   onIdentifyJO,
   onChangeJobOrder,
+  onFileUpload,
+  onRemoveAttachment,
 }: {
   onSaveAsDraft: () => Promise<void>;
   onSubmit: () => Promise<void>;
@@ -165,6 +171,8 @@ export function CreateServiceAssignmentForm({
   onOpenProductSelection: () => void;
   onIdentifyJO?: () => void;
   onChangeJobOrder?: () => void;
+  onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveAttachment?: (index: number) => void;
 }) {
   return (
     <div className="flex flex-col lg:flex-row  p-4">
@@ -179,6 +187,8 @@ export function CreateServiceAssignmentForm({
           saNumber={saNumber}
           jobOrderData={jobOrderData}
           onOpenProductSelection={onOpenProductSelection}
+          onFileUpload={onFileUpload}
+          onRemoveAttachment={onRemoveAttachment}
         />
       </div>
       <div className="flex flex-col gap-6 w-full lg:w-[40%]">
