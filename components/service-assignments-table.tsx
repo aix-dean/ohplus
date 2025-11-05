@@ -9,7 +9,6 @@ import { searchServiceAssignments } from "@/lib/algolia-service"
 import type { Product } from "@/lib/firebase-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import type { Team } from "@/lib/types/team"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
@@ -92,10 +91,29 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
   const [totalPages, setTotalPages] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [totalItems, setTotalItems] = useState(0)
+  const [totalOverall, setTotalOverall] = useState(0)
   const [lastDoc, setLastDoc] = useState<any>(null)
   const [allFetchedDocs, setAllFetchedDocs] = useState<any[]>([])
   const [isSearchMode, setIsSearchMode] = useState(false)
   const itemsPerPage = 10
+
+  // Function to get total count of assignments
+  const getTotalCount = async () => {
+    try {
+      const assignmentsRef = collection(db, "service_assignments")
+      let q = query(assignmentsRef)
+
+      if (companyId) {
+        q = query(q, where("company_id", "==", companyId))
+      }
+
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.size
+    } catch (error) {
+      console.error("Error getting total count:", error)
+      return 0
+    }
+  }
 
   const handlePrint = async (assignment: ServiceAssignment) => {
     try {
@@ -224,12 +242,19 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
         setAssignments(pageAssignments)
         setHasMore(allAssignments.length > endIndex)
         setTotalPages(Math.ceil(allAssignments.length / itemsPerPage))
-        setTotalItems(allAssignments.length)
+        setTotalItems(pageAssignments.length)
+        setTotalOverall(allAssignments.length)
         setAllFetchedDocs(allDocs)
 
         await fetchTeamsForAssignments(pageAssignments)
       } else {
         // For non-search: use server-side pagination
+        // Get total count on first page
+        if (page === 1) {
+          const total = await getTotalCount()
+          setTotalOverall(total)
+        }
+
         let q = query(collection(db, "service_assignments"), orderBy("created", "desc"), limit(itemsPerPage + 1))
 
         if (companyId) {
@@ -292,7 +317,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
         setAssignments(pageAssignments)
         setHasMore(hasMorePages)
         setTotalPages(hasMorePages ? page + 1 : page) // Estimate based on current page
-        setTotalItems(0) // Unknown with server-side pagination
+        setTotalItems(pageAssignments.length) // Number of items on current page
         setAllFetchedDocs(docs)
 
         await fetchTeamsForAssignments(pageAssignments)
@@ -303,6 +328,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
       setHasMore(false)
       setTotalPages(1)
       setTotalItems(0)
+      setTotalOverall(0)
     } finally {
       setLoading(false)
     }
@@ -390,6 +416,7 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
     setCurrentPage(1)
     setLastDoc(null)
     setAllFetchedDocs([])
+    setTotalOverall(0)
     setIsSearchMode(false)
   }, [searchQuery, companyId])
 
@@ -435,17 +462,17 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case "completed":
-        return "bg-green-100 text-green-800"
+        return "bg-green-50 text-green-700 border border-green-200"
       case "in progress":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-50 text-blue-700 border border-blue-200"
       case "pending":
-        return "bg-yellow-100 text-yellow-800"
+        return "bg-yellow-50 text-yellow-700 border border-yellow-200"
       case "cancelled":
-        return "bg-red-100 text-red-800"
+        return "bg-red-50 text-red-700 border border-red-200"
       case "draft":
-        return "bg-orange-100 text-orange-800"
+        return "bg-orange-50 text-orange-700 border border-orange-200"
       default:
-        return "bg-gray-100 text-gray-800"
+        return "bg-gray-50 text-gray-700 border border-gray-200"
     }
   }
 
@@ -459,123 +486,223 @@ export function ServiceAssignmentsTable({ onSelectAssignment, companyId, searchQ
   }
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>SA#</TableHead>
-            <TableHead>JO#</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Site</TableHead>
-            <TableHead>End Date</TableHead>
-            <TableHead>Campaign Name</TableHead>
-            <TableHead>Crew</TableHead>
-            <TableHead>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-32 h-8">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="in progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                </SelectContent>
-              </Select>
-            </TableHead>
-            <TableHead>Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+    <div className="overflow-x-auto">
+      <div className="min-w-full">
+        {/* Header Row */}
+        <div className="hidden md:grid md:gap-4 bg-white p-4 font-semibold text-gray-900" style={{ gridTemplateColumns: '1fr 1fr 1fr 1.2fr 2fr 1fr 2fr 1fr 1fr 1fr' }}>
+          <div>Date</div>
+          <div>SA I.D.</div>
+          <div>Type</div>
+          <div>Campaign Name</div>
+          <div>Site</div>
+          <div>Created</div>
+          <div>Crew</div>
+          <div>Deadline</div>
+          <div>Status</div>
+          <div>Actions</div>
+        </div>
+        {/* Mobile Header - Hidden on desktop */}
+        <div className="md:hidden bg-white p-4 font-semibold text-gray-900 text-center">
+          Service Assignments
+        </div>
+        {/* Data Rows Container */}
+        <div className="space-y-5">
           {filteredAssignments.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                No service assignments found. Create your first assignment.
-              </TableCell>
-            </TableRow>
+            <div className="text-center py-12 text-gray-500">
+              <div className="flex flex-col items-center gap-2">
+                <div className="text-gray-400 text-sm">No service assignments found</div>
+                <div className="text-xs text-gray-400">Create your first assignment to get started</div>
+              </div>
+            </div>
           ) : (
             filteredAssignments.map((assignment) => (
-              <TableRow
-                key={assignment.id}
-                className="cursor-pointer hover:bg-gray-50"
-                onClick={() => router.push(`/logistics/assignments/${assignment.id}`)}
-              >
-                <TableCell className="font-medium">{assignment.saNumber}</TableCell>
-                <TableCell>{assignment.joNumber || "N/A"}</TableCell>
-                <TableCell>{assignment.serviceType}</TableCell>
-                <TableCell>{assignment.projectSiteName}</TableCell>
-                <TableCell>
-                  {assignment.coveredDateEnd ? (
-                    format(
-                      assignment.coveredDateEnd instanceof Date
-                        ? assignment.coveredDateEnd
-                        : assignment.coveredDateEnd.toDate
-                          ? assignment.coveredDateEnd.toDate()
-                          : new Date(assignment.coveredDateEnd),
-                      "MMM d, yyyy"
-                    )
-                  ) : (
-                    "Not specified"
-                  )}
-                </TableCell>
-                <TableCell>{assignment.campaignName || assignment.message || assignment.jobDescription || "N/A"}</TableCell>
-                <TableCell>{assignment.assignedTo ? (teams[assignment.assignedTo]?.name || assignment.assignedTo) : "N/A"}</TableCell>
-                <TableCell>
-                  <Badge className={getStatusColor(assignment.status)}>{assignment.status}</Badge>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePrint(assignment); }}>
-                        <Printer className="mr-2 h-4 w-4" />
-                        Print
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); console.log("Cancel assignment", assignment.id); }}>
-                        <X className="mr-2 h-4 w-4" />
-                        Cancel
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); console.log("Set alarm for", assignment.id); }}>
-                        <Bell className="mr-2 h-4 w-4" />
-                        Set an Alarm
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => {
-                        e.stopPropagation();
-                        // Show create report dialog directly
-                        setCreateReportDialog({
-                          open: true,
-                          assignmentId: assignment.id,
-                          projectSiteId: assignment.projectSiteId
-                        });
-                      }}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        Create a Report
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
+              <div key={assignment.id}>
+                {/* Desktop Grid Layout */}
+                <div
+                  className="hidden md:grid md:gap-4 p-4 cursor-pointer rounded-[10px] border-2 border-[#B8D9FF] bg-[#F6F9FF] transition-colors hover:bg-[#F0F4FF]"
+                  onClick={() => router.push(`/logistics/assignments/${assignment.id}`)}
+                  style={{ marginBottom: '5px', gridTemplateColumns: '1fr 1fr 1fr 1.2fr 2fr 1fr 2fr 1fr 1fr 1fr' }}
+                >
+                  <div className="text-gray-600 truncate">
+                    {assignment.coveredDateStart ? (
+                      format(
+                        assignment.coveredDateStart instanceof Date
+                          ? assignment.coveredDateStart
+                          : assignment.coveredDateStart.toDate
+                            ? assignment.coveredDateStart.toDate()
+                            : new Date(assignment.coveredDateStart),
+                        "MMM d, yyyy"
+                      )
+                    ) : (
+                      "Not set"
+                    )}
+                  </div>
+                  <div className="font-medium text-gray-900 truncate">{assignment.saNumber}</div>
+                  <div className="font-medium text-gray-900 truncate">{assignment.serviceType}</div>
+                  <div className="text-gray-700 truncate">{assignment.campaignName || "N/A"}</div>
+                  <div className="text-gray-700 truncate">{assignment.projectSiteName}</div>
+                  <div className="text-gray-600 truncate">
+                    {assignment.created ? (
+                      format(
+                        assignment.created instanceof Date
+                          ? assignment.created
+                          : assignment.created.toDate
+                            ? assignment.created.toDate()
+                            : new Date(assignment.created),
+                        "MMM d, yyyy"
+                      )
+                    ) : (
+                      "Not set"
+                    )}
+                  </div>
+                  <div className="text-gray-700 truncate">{assignment.assignedTo ? (teams[assignment.assignedTo]?.name || assignment.assignedTo) : "Unassigned"}</div>
+                  <div className="text-gray-600 truncate">
+                    {assignment.coveredDateEnd ? (
+                      format(
+                        assignment.coveredDateEnd instanceof Date
+                          ? assignment.coveredDateEnd
+                          : assignment.coveredDateEnd.toDate
+                            ? assignment.coveredDateEnd.toDate()
+                            : new Date(assignment.coveredDateEnd),
+                        "MMM d, yyyy"
+                      )
+                    ) : (
+                      "Not set"
+                    )}
+                  </div>
+                  <div className="text-gray-900 font-bold truncate">
+                    {assignment.status}
+                  </div>
+                  <div className="truncate" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => router.push(`/logistics/assignments/${assignment.id}`)}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handlePrint(assignment)}>
+                            <Printer className="mr-2 h-4 w-4" />
+                            Print
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => console.log("Edit assignment", assignment.id)}>
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => console.log("Duplicate assignment", assignment.id)}>
+                            Duplicate
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setCreateReportDialog({
+                                open: true,
+                                assignmentId: assignment.id,
+                                projectSiteId: assignment.projectSiteId
+                              });
+                            }}
+                          >
+                            <FileText className="mr-2 h-4 w-4" />
+                            Create Report
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600" onClick={() => console.log("Cancel assignment", assignment.id)}>
+                            <X className="mr-2 h-4 w-4" />
+                            Cancel
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mobile Card Layout */}
+                <div
+                  className="md:hidden p-4 cursor-pointer rounded-[10px] border-2 border-[#B8D9FF] bg-[#F6F9FF] transition-colors hover:bg-[#F0F4FF]"
+                  onClick={() => router.push(`/logistics/assignments/${assignment.id}`)}
+                  style={{ marginBottom: '5px' }}
+                >
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-gray-900">{assignment.saNumber}</span>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => router.push(`/logistics/assignments/${assignment.id}`)}>
+                              <FileText className="mr-2 h-4 w-4" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePrint(assignment)}>
+                              <Printer className="mr-2 h-4 w-4" />
+                              Print
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => console.log("Edit assignment", assignment.id)}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => console.log("Duplicate assignment", assignment.id)}>
+                              Duplicate
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setCreateReportDialog({
+                                  open: true,
+                                  assignmentId: assignment.id,
+                                  projectSiteId: assignment.projectSiteId
+                                });
+                              }}
+                            >
+                              <FileText className="mr-2 h-4 w-4" />
+                              Create Report
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600" onClick={() => console.log("Cancel assignment", assignment.id)}>
+                              <X className="mr-2 h-4 w-4" />
+                              Cancel
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div><span className="font-medium">Date:</span> {assignment.coveredDateStart ? format(assignment.coveredDateStart instanceof Date ? assignment.coveredDateStart : assignment.coveredDateStart.toDate ? assignment.coveredDateStart.toDate() : new Date(assignment.coveredDateStart), "MMM d, yyyy") : "Not set"}</div>
+                      <div><span className="font-medium">Type:</span> {assignment.serviceType}</div>
+                      <div className="col-span-2"><span className="font-medium">Site:</span> {assignment.projectSiteName}</div>
+                      <div className="col-span-2"><span className="font-medium">Campaign:</span> {assignment.campaignName || "N/A"}</div>
+                      <div><span className="font-medium">Crew:</span> {assignment.assignedTo ? (teams[assignment.assignedTo]?.name || assignment.assignedTo) : "Unassigned"}</div>
+                      <div><span className="font-medium">Deadline:</span> {assignment.coveredDateEnd ? format(assignment.coveredDateEnd instanceof Date ? assignment.coveredDateEnd : assignment.coveredDateEnd.toDate ? assignment.coveredDateEnd.toDate() : new Date(assignment.coveredDateEnd), "MMM d, yyyy") : "Not set"}</div>
+                      <div className="col-span-2"><span className="font-medium">Status:</span> {assignment.status}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ))
           )}
-        </TableBody>
-      </Table>
+        </div>
+      </div>
 
       {/* Pagination Controls */}
       {assignments.length > 0 && (
-        <Pagination
-          currentPage={currentPage}
-          itemsPerPage={itemsPerPage}
-          totalItems={totalItems}
-          onNextPage={handleNextPage}
-          onPreviousPage={handlePreviousPage}
-          hasMore={hasMore}
-        />
+        <div className="bg-white px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Showing {Math.min((currentPage - 1) * itemsPerPage + 1, totalItems)} to {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} assignments
+            </div>
+            <Pagination
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
+              totalItems={totalItems}
+              onNextPage={handleNextPage}
+              onPreviousPage={handlePreviousPage}
+              hasMore={hasMore}
+            />
+          </div>
+        </div>
       )}
 
       {/* Create Report Dialog */}

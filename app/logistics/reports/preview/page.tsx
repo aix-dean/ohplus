@@ -23,6 +23,7 @@ import type { Product } from "@/lib/firebase-service"
 import { generateReportPDF } from "@/lib/pdf-service"
 import { useAuth } from "@/contexts/auth-context"
 import { SendReportDialog } from "@/components/send-report-dialog"
+import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -42,6 +43,8 @@ export default function ReportPreviewPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [companyLogo, setCompanyLogo] = useState<string>("/ohplus-new-logo.png")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [postedReportId, setPostedReportId] = useState<string | null>(null)
 
   useEffect(() => {
     loadPreviewData()
@@ -198,17 +201,11 @@ export default function ReportPreviewPage() {
 
       const reportId = await postReport(finalReportData)
 
-      sessionStorage.setItem("lastPostedReportId", reportId)
+      setPostedReportId(reportId)
+      setShowSuccessDialog(true)
 
       sessionStorage.removeItem("previewReportData")
       sessionStorage.removeItem("previewProductData")
-
-      toast({
-        title: "Success",
-        description: "Report posted successfully!",
-      })
-
-      router.push("/logistics/service-reports")
     } catch (error) {
       console.error("Error posting report:", error)
       toast({
@@ -218,6 +215,13 @@ export default function ReportPreviewPage() {
       })
     } finally {
       setPosting(false)
+    }
+  }
+
+  const handleSuccessDialogClose = (open: boolean) => {
+    setShowSuccessDialog(open)
+    if (!open) {
+      router.push("/logistics/service-reports")
     }
   }
 
@@ -485,8 +489,8 @@ export default function ReportPreviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
+    <>
+    <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -541,8 +545,7 @@ export default function ReportPreviewPage() {
           </div>
         </div>
 
-        <div className="mx-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto">
-          <div className="w-full relative">
+        <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-blue-900"></div>
               <div
@@ -784,7 +787,6 @@ export default function ReportPreviewPage() {
               </div>
             </div>
           </div>
-        </div>
       </div>
 
       <div className="fixed bottom-6 right-6 z-50">
@@ -803,6 +805,14 @@ export default function ReportPreviewPage() {
           onClose={() => setIsSendDialogOpen(false)}
           report={report}
           onSelectOption={handleSendOption}
+        />
+      )}
+
+      {postedReportId && (
+        <ReportPostSuccessDialog
+          open={showSuccessDialog}
+          onOpenChange={handleSuccessDialogClose}
+          reportId={postedReportId}
         />
       )}
 
@@ -884,6 +894,6 @@ export default function ReportPreviewPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }

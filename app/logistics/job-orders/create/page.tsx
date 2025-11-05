@@ -181,14 +181,12 @@ export default function CreateJobOrderPage() {
         remarks: jobOrderForm.remarks,
         assignTo: jobOrderForm.assignTo,
         attachments: jobOrderForm.attachmentUrl
-          ? [
-              {
-                url: jobOrderForm.attachmentUrl,
-                name: jobOrderForm.attachmentFile?.name || "Attachment",
-                type: jobOrderForm.attachmentFile?.type || "image",
-              },
-            ]
-          : [],
+          ? {
+              url: jobOrderForm.attachmentUrl,
+              name: jobOrderForm.attachmentFile?.name || "Attachment",
+              type: jobOrderForm.attachmentFile?.type || "image",
+            }
+          : null,
         siteName: siteName,
         siteLocation: siteLocation,
         jobDescription: jobDescription,

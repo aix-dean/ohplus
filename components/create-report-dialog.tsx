@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation"
 import { collection, query, where, getDocs, limit, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { postReport, type ReportData } from "@/lib/report-service"
+import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 
 interface CreateReportDialogProps {
   open: boolean
@@ -113,6 +114,8 @@ export function CreateReportDialog({
 
   // Description of Work field for completion reports
   const [descriptionOfWork, setDescriptionOfWork] = useState("")
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [successReportId, setSuccessReportId] = useState<string>("")
 
   const { toast } = useToast()
   const { user, userData, projectData } = useAuth()
@@ -957,6 +960,9 @@ export function CreateReportDialog({
         // Set sessionStorage to trigger success dialog on service-reports page (for logistics module)
         if (module === "logistics") {
           sessionStorage.setItem("lastPostedReportId", reportId)
+          setSuccessReportId(reportId)
+          onOpenChange(false)
+          setShowSuccessDialog(true)
         }
       }
 
@@ -976,16 +982,15 @@ export function CreateReportDialog({
         sessionStorage.setItem("previewProductData", JSON.stringify(product))
       }
 
-      toast({
-        title: "Success",
-        description: module === "sales"
-          ? "Service Report Created and Posted Successfully!"
-          : module === "logistics"
-          ? "Congratulations You have successfully posted a report!"
-          : "Service Report Generated Successfully!",
-      })
-
-      onOpenChange(false)
+      if (module !== "logistics") {
+        toast({
+          title: "Success",
+          description: module === "sales"
+            ? "Service Report Created and Posted Successfully!"
+            : "Service Report Generated Successfully!",
+        })
+        onOpenChange(false)
+      }
       // Reset form
       setReportType("completion-report")
       setDate("")
@@ -999,16 +1004,16 @@ export function CreateReportDialog({
       setDelayDays("")
       setDescriptionOfWork("")
 
-      const redirectPath = module === "sales"
-        ? "/sales/reports/preview"
-        : module === "admin"
-        ? "/admin/reports/preview"
-        : module === "logistics" && reportId
-        ? `/logistics/reports/${reportId}`
-        : "/logistics/service-reports"
+      if (module !== "logistics") {
+        const redirectPath = module === "sales"
+          ? "/sales/reports/preview"
+          : module === "admin"
+          ? "/admin/reports/preview"
+          : "/logistics/service-reports"
 
-      console.log("Redirecting to:", redirectPath, "Module:", module, "Report ID:", reportId, "Report ID type:", typeof reportId, "Report ID truthy:", !!reportId)
-      router.push(redirectPath)
+        console.log("Redirecting to:", redirectPath, "Module:", module, "Report ID:", reportId, "Report ID type:", typeof reportId, "Report ID truthy:", !!reportId)
+        router.push(redirectPath)
+      }
     } catch (error) {
       console.error("Error generating report:", error)
       toast({
@@ -1378,6 +1383,19 @@ export function CreateReportDialog({
           </div>
         </DialogContent>
       </Dialog>
+
+      <ReportPostSuccessDialog
+        open={showSuccessDialog}
+        onOpenChange={(open) => {
+          setShowSuccessDialog(open)
+          if (!open && successReportId) {
+            const redirectPath = `/logistics/reports/${successReportId}`
+            router.push(redirectPath)
+          }
+        }}
+        reportId={successReportId}
+        message="Congratulations You have successfully posted a report!"
+      />
 
       <style jsx global>{`
         .scrollbar-hide {

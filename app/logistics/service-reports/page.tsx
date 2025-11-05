@@ -9,8 +9,9 @@ import { useRouter } from "next/navigation"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { Pagination } from "@/components/ui/pagination"
+import { collection, query, where, getDocs } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 
 export default function ServiceReportsPage() {
   const [reports, setReports] = useState<ReportData[]>([])
@@ -23,15 +24,32 @@ export default function ServiceReportsPage() {
   const [lastDoc, setLastDoc] = useState<any>(null)
   const [pageLastDocs, setPageLastDocs] = useState<{ [page: number]: any }>({})
   const [isSearchMode, setIsSearchMode] = useState(false)
+  const [totalOverall, setTotalOverall] = useState(0)
   const itemsPerPage = 10
 
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
-  const [postedReportId, setPostedReportId] = useState<string>("")
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleString())
 
   const router = useRouter()
   const { user, userData } = useAuth()
   const { toast } = useToast()
+
+  // Function to get total count of reports
+  const getTotalCount = async () => {
+    try {
+      const reportsRef = collection(db, "reports")
+      let q = query(reportsRef, where("status", "!=", "draft"))
+
+      if (userData?.company_id) {
+        q = query(q, where("companyId", "==", userData.company_id))
+      }
+
+      const querySnapshot = await getDocs(q)
+      return querySnapshot.size
+    } catch (error) {
+      console.error("Error getting total count:", error)
+      return 0
+    }
+  }
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -39,6 +57,13 @@ export default function ServiceReportsPage() {
     }, 60000) // update every minute
     return () => clearInterval(interval)
   }, [])
+
+  // Effect to fetch total count for non-search mode
+  useEffect(() => {
+    if (!searchQuery.trim() && userData?.company_id) {
+      getTotalCount().then(setTotalOverall).catch(console.error)
+    }
+  }, [userData?.company_id, searchQuery])
 
   // Single useEffect to handle all data fetching
   useEffect(() => {
@@ -51,18 +76,12 @@ export default function ServiceReportsPage() {
     setLastDoc(null)
     setPageLastDocs({})
     setIsSearchMode(false)
+    if (searchQuery.trim()) {
+      // For search mode, total will be set by fetchReports
+      setTotalOverall(0)
+    }
   }, [searchQuery])
 
-  useEffect(() => {
-    // Check if we just posted a report
-    const lastPostedReportId = sessionStorage.getItem("lastPostedReportId")
-    if (lastPostedReportId) {
-      setPostedReportId(lastPostedReportId)
-      setShowSuccessDialog(true)
-      // Clear the session storage
-      sessionStorage.removeItem("lastPostedReportId")
-    }
-  }, [])
 
   const fetchReports = async (page: number = 1) => {
     setLoading(true)
@@ -91,6 +110,11 @@ export default function ServiceReportsPage() {
       setReports(result.reports)
       setHasNextPage(result.hasNextPage)
       setCurrentPage(page)
+
+      // Set total overall count for search mode
+      if (result.total !== undefined) {
+        setTotalOverall(result.total)
+      }
     } catch (error) {
       console.error("Error fetching reports:", error)
       toast({
@@ -100,6 +124,7 @@ export default function ServiceReportsPage() {
       })
       setReports([])
       setHasNextPage(false)
+      setTotalOverall(0)
     } finally {
       setLoading(false)
     }
@@ -324,14 +349,13 @@ export default function ServiceReportsPage() {
           currentPage={currentPage}
           itemsPerPage={itemsPerPage}
           totalItems={reports.length}
+          totalOverall={totalOverall}
           onNextPage={handleNextPage}
           onPreviousPage={handlePreviousPage}
           hasMore={hasNextPage}
         />
       )}
 
-      {/* Report Post Success Dialog */}
-      <ReportPostSuccessDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog} reportId={postedReportId} />
     </div>
   )
 }

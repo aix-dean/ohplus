@@ -47,6 +47,11 @@ export interface ReportData {
   status: string
   createdBy: string
   createdByName: string
+  requestedBy?: {
+    name: string
+    department?: string
+  }
+  campaignName?: string
   created?: Timestamp
   updated?: Timestamp
   location?: string
@@ -167,6 +172,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
       updated: Timestamp.now(),
     }
 
+    // Add requestedBy if provided
+    if (reportData.requestedBy) {
+      finalReportData.requestedBy = reportData.requestedBy
+    }
+
     // Add product information if provided
     if (reportData.product) {
       finalReportData.product = reportData.product
@@ -242,7 +252,7 @@ export async function getReports(options: {
   reportType?: string
   searchQuery?: string
   lastDoc?: any
-}): Promise<{ reports: ReportData[], hasNextPage: boolean, lastDoc: any }> {
+}): Promise<{ reports: ReportData[], hasNextPage: boolean, lastDoc: any, total?: number }> {
   try {
     console.log("getReports called with options:", options)
     const { page = 1, limit: pageLimit = 10, companyId, status, reportType, searchQuery, lastDoc } = options
@@ -297,7 +307,7 @@ export async function getReports(options: {
       const hasNextPage = allReports.length > offset + pageLimit
 
       console.log(`Search results: ${allReports.length} total, ${reports.length} on page ${page}`)
-      return { reports, hasNextPage, lastDoc: null }
+      return { reports, hasNextPage, lastDoc: null, total: allReports.length }
     }
 
     // For non-search: use server-side pagination
@@ -343,6 +353,7 @@ export async function getReports(options: {
     }) as ReportData[]
 
     console.log(`Fetched ${reports.length} reports for page ${page}, hasNextPage: ${hasNextPage}`)
+    // For non-search, we don't have the total count here, so we'll let the caller get it separately
     return { reports, hasNextPage, lastDoc: newLastDoc }
   } catch (error) {
     console.error("Error fetching reports:", error)

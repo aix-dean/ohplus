@@ -129,6 +129,7 @@ export interface Product {
     type: string
     isVideo: boolean
   }>
+  playerIds?: string[]
   categories?: string[]
   category_names?: string[]
   content_type?: string
@@ -219,7 +220,6 @@ export interface Product {
     created: any
     created_by: string
   }>
-  playerIds?: string[]
 }
 
 // ServiceAssignment interface
@@ -1339,12 +1339,19 @@ export async function getUserById(userId: string): Promise<User | null> {
 }
 
 // Update this function to make status filtering case-insensitive
-export async function getServiceAssignmentsByProductId(productId: string): Promise<ServiceAssignment[]> {
+export async function getServiceAssignmentsByProductId(productId: string, companyId?: string): Promise<ServiceAssignment[]> {
   try {
     const assignmentsRef = collection(db, "service_assignments")
 
-    // Only filter by productId in the Firestore query
-    const q = query(assignmentsRef, where("projectSiteId", "==", productId))
+    // Build query constraints
+    const constraints: any[] = [where("projectSiteId", "==", productId)]
+
+    // Add company_id filter if provided
+    if (companyId) {
+      constraints.push(where("company_id", "==", companyId))
+    }
+
+    const q = query(assignmentsRef, ...constraints)
 
     const querySnapshot = await getDocs(q)
 

@@ -25,6 +25,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -39,8 +40,10 @@ import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
 import { TeamFormDialog } from "@/components/team-form-dialog"
 import { JobOrderSelectionDialog } from "@/components/logistics/assignments/create/JobOrderSelectionDialog"
 import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
+import { CompanyService } from "@/lib/company-service"
+import { storage } from "@/lib/firebase"
 import { playerService } from "@/lib/player-service"
-
+import { createCMSContentDeployment } from "@/lib/cms-api"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll Up", "Roll Down", "Monitoring", "Change Material", "Maintenance", "Repair"]
@@ -66,6 +69,7 @@ export default function CreateServiceAssignmentPage() {
   const [draftId, setDraftId] = useState<string | null>(null)
   const [isJobOrderSelectionDialogOpen, setIsJobOrderSelectionDialogOpen] = useState(false) // State for JobOrderSelectionDialog
   const [jobOrderData, setJobOrderData] = useState<JobOrder | null>(null) // State to store fetched job order
+  const [hasManualSelection, setHasManualSelection] = useState(false) // Flag to prevent job order pre-filling after manual selection
   const [selectedJobOrderId, setSelectedJobOrderId] = useState<string | null>(null) // State to store selected job order ID
   const [showConfirmationDialog, setShowConfirmationDialog] = useState(false) // State for confirmation dialog
 
@@ -96,7 +100,7 @@ export default function CreateServiceAssignmentPage() {
     endDate: null as Date | null,
     alarmDate: null as Date | null,
     alarmTime: "",
-    attachments: [] as { name: string; type: string; file?: File }[],
+    attachments: [] as { name: string; type: string; file?: File; url?: string }[],
     serviceExpenses: [] as { name: string; amount: string }[],
     serviceCost: {
       crewFee: "",
@@ -202,6 +206,53 @@ export default function CreateServiceAssignmentPage() {
     fetchTeams()
   }, [userData?.company_id])
 
+  // Helper function to set form data from job order
+  const setFormDataForJobOrder = (fetchedJobOrder: JobOrder, productId: string) => {
+    // Helper function to safely parse dates
+    const parseDateSafely = (dateValue: any): Date | null => {
+      if (!dateValue) return null;
+
+      try {
+        let date: Date;
+
+        if (dateValue instanceof Date) {
+          date = dateValue;
+        } else if (typeof dateValue === 'string') {
+          date = new Date(dateValue);
+          if (isNaN(date.getTime())) {
+            return null;
+          }
+        } else if (typeof dateValue === 'number') {
+          date = new Date(dateValue * 1000);
+        } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+          date = new Date(dateValue.seconds * 1000);
+        } else {
+          return null;
+        }
+
+        if (isNaN(date.getTime())) {
+          return null;
+        }
+
+        return date;
+      } catch (error) {
+        console.warn('Error parsing date:', dateValue, error);
+        return null;
+      }
+    };
+
+    setFormData((prev) => ({
+      ...prev,
+      projectSite: productId,
+      serviceType: fetchedJobOrder.joType ? fetchedJobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
+      remarks: fetchedJobOrder.remarks || fetchedJobOrder.jobDescription || "",
+      campaignName: fetchedJobOrder.campaignName || "",
+      startDate: parseDateSafely(fetchedJobOrder.dateRequested),
+      endDate: parseDateSafely(fetchedJobOrder.deadline),
+      // You might want to pre-fill other fields like assignedTo, crew, etc.
+    }))
+  }
+
   // Load draft data if editing
   useEffect(() => {
     const loadDraft = async () => {
@@ -219,7 +270,7 @@ export default function CreateServiceAssignmentPage() {
             setFormData({
               projectSite: draftData.projectSiteId || "",
               serviceType: draftData.serviceType || "",
-              assignedTo: draftData.assignedTo || draftData.crew || "",
+              assignedTo: draftData.crew || draftData.assignedTo || "",
               serviceDuration: draftData.serviceDuration || "",
               priority: draftData.priority || "",
               equipmentRequired: draftData.equipmentRequired || "",
@@ -266,7 +317,7 @@ export default function CreateServiceAssignmentPage() {
   // Fetch job order data if jobOrderId is present
   useEffect(() => {
     const fetchJobOrder = async () => {
-      if (jobOrderId && !jobOrderData) {
+      if (jobOrderId && !hasManualSelection && !jobOrderData) {
         try {
           const jobOrderDoc = await getDoc(doc(db, "job_orders", jobOrderId))
           if (jobOrderDoc.exists()) {
@@ -283,50 +334,42 @@ export default function CreateServiceAssignmentPage() {
             // Set the project site from the job order's product_id
             const productId = fetchedJobOrder.product_id || ""
             if (productId) {
-              // Helper function to safely parse dates
-              const parseDateSafely = (dateValue: any): Date | null => {
-                if (!dateValue) return null;
-
+              // Guard: Prevent pre-fill if user has manually selected a different product
+              if (formData.projectSite && formData.projectSite !== productId) {
+                // Skip pre-fill logic to preserve manual selection
+                return
+              }
+              // First check if the product is already in the loaded products
+              const existingProduct = products.find(p => p.id === productId)
+              if (existingProduct) {
+                // Product exists, proceed with setting form data
+                setFormDataForJobOrder(fetchedJobOrder, productId)
+              } else {
+                // If not found in loaded products, fetch the specific product document
                 try {
-                  let date: Date;
-
-                  if (dateValue instanceof Date) {
-                    date = dateValue;
-                  } else if (typeof dateValue === 'string') {
-                    date = new Date(dateValue);
-                    if (isNaN(date.getTime())) {
-                      return null;
-                    }
-                  } else if (typeof dateValue === 'number') {
-                    date = new Date(dateValue * 1000);
-                  } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
-                    date = new Date(dateValue.seconds * 1000);
+                  const productDoc = await getDoc(doc(db, "products", productId))
+                  if (productDoc.exists()) {
+                    const productData = { id: productDoc.id, ...productDoc.data() } as Product
+                    // Add the product to the products array if it's not already there
+                    setProducts(prev => {
+                      const exists = prev.find(p => p.id === productData.id)
+                      if (!exists) {
+                        return [...prev, productData]
+                      }
+                      return prev
+                    })
+                    // Proceed with setting form data
+                    setFormDataForJobOrder(fetchedJobOrder, productId)
                   } else {
-                    return null;
+                    // Product not found, still set the form data but product won't be selectable
+                    setFormDataForJobOrder(fetchedJobOrder, productId)
                   }
-
-                  if (isNaN(date.getTime())) {
-                    return null;
-                  }
-
-                  return date;
                 } catch (error) {
-                  console.warn('Error parsing date:', dateValue, error);
-                  return null;
+                  console.error("Error fetching product for job order:", error)
+                  // Still set form data even if product fetch fails
+                  setFormDataForJobOrder(fetchedJobOrder, productId)
                 }
-              };
-
-              setFormData((prev) => ({
-                ...prev,
-                projectSite: productId,
-                serviceType: fetchedJobOrder.joType ? fetchedJobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
-                remarks: fetchedJobOrder.remarks || fetchedJobOrder.jobDescription || "",
-                campaignName: fetchedJobOrder.campaignName || "",
-                startDate: parseDateSafely(fetchedJobOrder.dateRequested),
-                endDate: parseDateSafely(fetchedJobOrder.deadline),
-                // You might want to pre-fill other fields like assignedTo, crew, etc.
-              }))
-
+              }
             }
 
             // Date inputs are now handled directly as Date objects
@@ -337,7 +380,21 @@ export default function CreateServiceAssignmentPage() {
       }
     }
     fetchJobOrder()
-  }, [jobOrderId]) // Rerun when jobOrderId changes
+  }, [jobOrderId, products, hasManualSelection]) // Added products to dependencies to check if product is already loaded
+
+  // Prevent job order data from overriding manual product selection
+  useEffect(() => {
+    if (jobOrderData && formData.projectSite && formData.projectSite !== jobOrderData.product_id) {
+      // If user has manually selected a different product, clear job order data
+      console.log("Manual product selection detected, clearing job order data")
+      setJobOrderData(null)
+    }
+  }, [formData.projectSite, jobOrderData])
+
+  // Reset manual selection flag when jobOrderId changes
+  useEffect(() => {
+    setHasManualSelection(false)
+  }, [jobOrderId])
 
   // Handle form input changes
   const handleInputChange = (field: string, value: any) => {
@@ -346,25 +403,37 @@ export default function CreateServiceAssignmentPage() {
 
 
   // Handle file upload
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
     if (!files) return
 
-    const newAttachments: { name: string; type: string; file: File }[] = []
+    const newAttachments: { name: string; type: string; file: File; url?: string }[] = []
 
-    Array.from(files).forEach((file) => {
+    for (const file of Array.from(files)) {
       // Check file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > 500 * 1024 * 1024) {
         alert(`File ${file.name} is too large. Maximum size is 10MB.`)
-        return
+        continue
       }
 
-      newAttachments.push({
-        name: file.name,
-        type: file.type,
-        file: file,
-      })
-    })
+      try {
+        // Upload file to Firebase Storage
+        const fileName = `attachments/${Date.now()}-${file.name}`
+        const fileRef = ref(storage, fileName)
+        await uploadBytes(fileRef, file)
+        const downloadURL = await getDownloadURL(fileRef)
+
+        newAttachments.push({
+          name: file.name,
+          type: file.type,
+          file: file,
+          url: downloadURL,
+        })
+      } catch (error) {
+        console.error(`Error uploading file ${file.name}:`, error)
+        alert(`Failed to upload ${file.name}. Please try again.`)
+      }
+    }
 
     if (newAttachments.length > 0) {
       setFormData((prev) => ({
@@ -417,235 +486,233 @@ export default function CreateServiceAssignmentPage() {
     return convertedAttachments
   }
 
-  // Handle form submission - shows confirmation dialog first
+  // Chunked base64 conversion to handle large PDFs efficiently
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer)
+    const chunkSize = 8192 // Process in 8KB chunks to avoid stack overflow
+    let result = ''
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.slice(i, i + chunkSize)
+      result += String.fromCharCode.apply(null, Array.from(chunk))
+    }
+
+    return btoa(result)
+  }
+
+  // Helper function to convert File objects to base64 data URLs
+  const fileToBase64DataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(new Error('Failed to read file'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  // Handle form submission (now navigates to PDF preview without creating assignment) - shows confirmation dialog first
   const handleSubmit = () => {
     setShowConfirmationDialog(true)
     return Promise.resolve()
   }
 
-  // Handle confirmed form submission
-  const handleSubmitConfirmed = async () => {
-    if (!user) return
+const handleSubmitConfirmed = async () => {
+  if (!user) return
 
-    // Validate that a site is selected
-    if (!formData.projectSite || formData.projectSite.trim() === "") {
+  // --- Validation ---
+  if (!formData.projectSite || formData.projectSite.trim() === "") {
+    toast({
+      title: "Site Selection Required",
+      description: "Please select a site before creating the service assignment.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair") {
+    if (!formData.campaignName || formData.campaignName.trim() === "") {
       toast({
-        title: "Site Selection Required",
-        description: "Please select a site before creating the service assignment.",
+        title: "Campaign Name Required",
+        description: "Please enter a campaign name.",
         variant: "destructive",
       });
       return;
     }
+  }
 
-    // Validate required fields based on service type
-    if (formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair") {
-      // Campaign Name is required for non-maintenance/repair services
-      if (!formData.campaignName || formData.campaignName.trim() === "") {
-        toast({
-          title: "Campaign Name Required",
-          description: "Please enter a campaign name.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    if (!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType)) {
-      // Material Specs is required for services that are not monitoring, change material, maintenance, or repair
-      if (!formData.materialSpecs || formData.materialSpecs.trim() === "") {
-        toast({
-          title: "Material Specs Required",
-          description: "Please select material specifications.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    // Crew is always required
-    if (!formData.crew || formData.crew.trim() === "") {
+  if (!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType)) {
+    if (!formData.materialSpecs || formData.materialSpecs.trim() === "") {
       toast({
-        title: "Crew Selection Required",
-        description: "Please select a crew for the assignment.",
+        title: "Material Specs Required",
+        description: "Please select material specifications.",
         variant: "destructive",
       });
       return;
     }
+  }
 
-    try {
-      setLoading(true)
-      const selectedProduct = products.find((p) => p.id === formData.projectSite)
-      const selectedTeam = teams.find((t) => t.id === (formData.assignedTo || formData.crew))
+  if (!formData.crew || formData.crew.trim() === "") {
+    toast({
+      title: "Crew Selection Required",
+      description: "Please select a crew for the assignment.",
+      variant: "destructive",
+    });
+    return;
+  }
 
-      const assignmentData = {
-        saNumber,
-        projectSiteId: formData.projectSite,
-        projectSiteName: selectedProduct?.name || "",
-        projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
-        serviceType: formData.serviceType,
-        assignedTo: formData.assignedTo || formData.crew,
-        assignedToName: selectedTeam?.name || "",
-        serviceDuration: `${formData.serviceDuration} days`,
-        priority: formData.priority,
-        equipmentRequired: formData.equipmentRequired,
-        materialSpecs: formData.materialSpecs,
-        crew: formData.crew,
-        gondola: formData.gondola,
-        technology: formData.technology,
-        sales: formData.sales,
-        remarks: formData.remarks,
-        requestedBy: {
-          id: user.uid,
-          name: userData?.first_name && userData?.last_name
-            ? `${userData.first_name} ${userData.last_name}`
-            : user?.displayName || "Unknown User",
-          department: "LOGISTICS",
-        },
-        message: formData.message,
-        campaignName: formData.campaignName,
-        joNumber: jobOrderData?.joNumber || null, // Add job order number if present
-        coveredDateStart: formData.startDate,
-        coveredDateEnd: formData.endDate,
-        alarmDate: formData.alarmDate,
-        alarmTime: formData.alarmTime,
-        attachments: await convertAttachmentsForFirestore(formData.attachments, saNumber),
-        serviceExpenses: formData.serviceExpenses,
-        status: "Pending", // Always set to Pending when submitting
-        updated: serverTimestamp(),
-        project_key: userData?.license_key || "",
-        company_id: userData?.company_id || null,
-        jobOrderId: selectedJobOrderId || null, // Add job order ID if present
-        reservation_number: jobOrderData?.reservation_number || null, // Add reservation number from job order
-        booking_id: jobOrderData?.booking_id || null, // Add booking ID from job order
-      }
+  try {
+    setGeneratingPDF(true)
+    setLoading(true)
 
-      let assignmentDocRef
+    const selectedProduct = products.find((p) => p.id === formData.projectSite)
+    const selectedTeam = teams.find((t) => t.id === (formData.assignedTo || formData.crew))
 
-      if (isEditingDraft && draftId) {
-        // Update existing draft to pending
-        assignmentDocRef = doc(db, "service_assignments", draftId)
-        await updateDoc(assignmentDocRef, assignmentData)
-      } else {
-        // Create new assignment
-        assignmentDocRef = await addDoc(collection(db, "service_assignments"), {
-          ...assignmentData,
-          created: serverTimestamp(),
-        })
-      }
+    // --- Prepare PDF and assignment data ---
+    const pdfAssignmentData = {
+      saNumber,
+      projectSiteName: selectedProduct?.name || "",
+      projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
+      serviceType: formData.serviceType,
+      assignedTo: selectedTeam?.id || formData.crew,
+      assignedToName: selectedTeam?.name || "",
+      serviceDuration: `${formData.serviceDuration} days`,
+      priority: formData.priority,
+      equipmentRequired: formData.equipmentRequired,
+      materialSpecs: formData.materialSpecs,
+      crew: formData.crew,
+      crewName: selectedTeam?.name || "",
+      gondola: formData.gondola,
+      technology: formData.technology,
+      sales: formData.sales,
+      campaignName: formData.campaignName,
+      remarks: formData.remarks,
+      requestedBy: {
+        name: userData?.first_name && userData?.last_name
+          ? `${userData.first_name} ${userData.last_name}`
+          : user?.displayName || "Unknown User",
+        department: "LOGISTICS",
+      },
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      alarmDate: formData.alarmDate,
+      alarmTime: formData.alarmTime,
+      attachments: await convertAttachmentsForFirestore(formData.attachments, saNumber),
+      serviceExpenses: formData.serviceExpenses,
+      status: "Draft",
+      created: new Date(),
+    }
 
-      // Create notification for Logistics and Admin
+    // Fetch company logo
+    const companyData = userData?.company_id ? await CompanyService.getCompanyData(userData.company_id) : null
+    let logoDataUrl = null
+    if (companyData?.logo) {
       try {
-        const notificationTitle = `New Service Assignment: ${saNumber}`
-        const notificationDescription = `A new ${formData.serviceType} service assignment has been created for ${selectedProduct?.name || "Unknown Site"}`
-
-        // Create notification for Logistics department
-        await addDoc(collection(db, "notifications"), {
-          type: "Service Assignment",
-          title: notificationTitle,
-          description: notificationDescription,
-          department_to: "Logistics",
-          uid_to: null, // Send to all Logistics users
-          company_id: userData?.company_id,
-          department_from: "Logistics",
-          viewed: false,
-          navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/assignments/${assignmentDocRef.id}`,
-          created: serverTimestamp(),
-        })
-
-        // Create notification for Admin department
-        await addDoc(collection(db, "notifications"), {
-          type: "Service Assignment",
-          title: notificationTitle,
-          description: notificationDescription,
-          department_to: "Admin",
-          uid_to: null, // Send to all Admin users
-          company_id: userData?.company_id,
-          department_from: "Logistics",
-          viewed: false,
-          navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/assignments/${assignmentDocRef.id}`,
-          created: serverTimestamp(),
-        })
-
-        console.log("Notifications created successfully for service assignment:", assignmentDocRef.id)
-      } catch (notificationError) {
-        console.error("Error creating notifications for service assignment:", notificationError)
-        // Don't throw here - we don't want notification failure to break assignment creation
-      }
-
-      // Integrate with Player Management API
-      // Temporarily disabled due to 404 API errors in development environment
-      /*
-      try {
-        const playerSns = ["24A12N000000101"] // Updated player SNS as requested
-        const playerIds = selectedProduct?.playerIds || ["bf1ae7a5dc7e4ac18c900b7b7943dc7c"] // Get player IDs from selected product
-
-        // Get player basic info
-        console.log("Fetching player basic info...")
-        const playerInfo = await playerService.getPlayerBasicInfo({
-          playerIds,
-          playerSns
-        })
-        console.log("Player basic info:", playerInfo)
-
-        // If it's a content-related service, create a player program
-        if (formData.serviceType === "Change Material" || formData.campaignName) {
-          console.log("Creating player program for service assignment...")
-
-          // Create a schedule based on the service assignment dates
-          const schedule = {
-            startDate: formData.startDate ? format(formData.startDate, "yyyy-MM-dd") : "2020-04-11",
-            endDate: formData.endDate ? format(formData.endDate, "yyyy-MM-dd") : "2060-05-12",
-            plans: [{
-              weekDays: [1, 2, 3, 4, 5], // Monday to Friday
-              startTime: "00:00",
-              endTime: "22:00"
-            }]
-          }
-
-          // Create program with a placeholder image (can be customized based on material specs)
-          const programRequest = {
-            playerIds,
-            schedule,
-            pages: [{
-              name: `sa-${saNumber}-page`,
-              widgets: [{
-                zIndex: 1,
-                type: "PICTURE" as const,
-                size: 12000, // Placeholder size
-                md5: "placeholder-md5", // Should be calculated from actual image
-                duration: 10000,
-                url: "https://firebasestorage.googleapis.com/v0/b/oh-app---dev.appspot.com/o/FIAMImages%2FKILIG-POPUP.png?alt=media&token=4b87cde2-b73a-4d8c-b2e2-54235d7aeae6", // Placeholder image
-                layout: {
-                  x: "0%",
-                  y: "0%",
-                  width: "100%",
-                  height: "100%"
-                }
-              }]
-            }]
-          }
-
-          const programResult = await playerService.createPlayerProgram(programRequest)
-          console.log("Player program created:", programResult)
+        const logoResponse = await fetch(companyData.logo)
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob()
+          logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
         }
-
-        // Get player configuration status
-        console.log("Fetching player configuration status...")
-        const configStatus = await playerService.getPlayerConfig({
-          playerIds,
-          commands: ["volumeValue", "brightnessValue", "videoSourceValue", "timeValue"],
-          noticeUrl: "http://www.abc.com/notice"
-        })
-        console.log("Player config status:", configStatus)
-
-      } catch (playerApiError) {
-        console.error("Error with Player API integration:", playerApiError)
-        // Don't throw here - we don't want API failure to break assignment creation
-        // Log the error for debugging but continue with the assignment creation
+      } catch (error) {
+        console.error('Error fetching company logo:', error)
       }
-      */
+    }
 
-      // Integrate with CMS API for content deployment
+    // --- Generate PDF ---
+    const response = await fetch('/api/generate-service-assignment-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        assignment: pdfAssignmentData,
+        companyData,
+        logoDataUrl,
+        format: 'pdf',
+        userData,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || 'Failed to generate PDF')
+    }
+
+    const pdfBuffer = await response.arrayBuffer()
+    const pdfBase64 = arrayBufferToBase64(pdfBuffer)
+    if (!pdfBase64) throw new Error('Failed to generate PDF')
+
+    localStorage.setItem('serviceAssignmentData', JSON.stringify({
+      ...pdfAssignmentData,
+      projectSiteId: formData.projectSite,
+      message: formData.message,
+      jobOrderId: jobOrderData?.id || null,
+      reservation_number: jobOrderData?.reservation_number || null,
+      booking_id: jobOrderData?.booking_id || null,
+      userData: {
+        uid: user.uid,
+        first_name: userData?.first_name,
+        last_name: userData?.last_name,
+        company_id: userData?.company_id,
+        license_key: userData?.license_key,
+      }
+    }))
+    localStorage.setItem('serviceAssignmentPDF', pdfBase64)
+
+    // --- Prepare Firestore assignment data ---
+    const assignmentData = {
+      ...pdfAssignmentData,
+      projectSiteId: formData.projectSite,
+      assignedTo: formData.assignedTo || formData.crew,
+      message: formData.message,
+      status: "Pending",
+      updated: serverTimestamp(),
+      project_key: userData?.license_key || "",
+      company_id: userData?.company_id || null,
+      jobOrderId: selectedJobOrderId || null,
+      reservation_number: jobOrderData?.reservation_number || null,
+      booking_id: jobOrderData?.booking_id || null,
+      attachments: await convertAttachmentsForFirestore(formData.attachments, saNumber),
+    }
+
+    // --- Save to Firestore ---
+    let assignmentDocRef
+    if (isEditingDraft && draftId) {
+      assignmentDocRef = doc(db, "service_assignments", draftId)
+      await updateDoc(assignmentDocRef, assignmentData)
+    } else {
+      assignmentDocRef = await addDoc(collection(db, "service_assignments"), {
+        ...assignmentData,
+        created: serverTimestamp(),
+      })
+    }
+
+    // --- Notifications ---
+    try {
+      const notificationTitle = `New Service Assignment: ${saNumber}`
+      const notificationDescription = `A new ${formData.serviceType} service assignment has been created for ${selectedProduct?.name || "Unknown Site"}`
+
+      const departments = ["Logistics", "Admin"]
+      for (const dept of departments) {
+        await addDoc(collection(db, "notifications"), {
+          type: "Service Assignment",
+          title: notificationTitle,
+          description: notificationDescription,
+          department_to: dept,
+          uid_to: null,
+          company_id: userData?.company_id,
+          department_from: "Logistics",
+          viewed: false,
+          navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/assignments/${assignmentDocRef.id}`,
+          created: serverTimestamp(),
+        })
+      }
+    } catch (notificationError) {
+      console.error("Error creating notifications:", notificationError)
+    }
+
+    // Integrate with CMS API for content deployment
       try {
         // Get the download URL from the first uploaded attachment
         const convertedAttachments = await convertAttachmentsForFirestore(formData.attachments, saNumber)
@@ -655,71 +722,41 @@ export default function CreateServiceAssignmentPage() {
           console.log("Creating CMS content deployment for service assignment...")
           console.log("Attachment URL:", attachmentDownloadUrl)
 
-          const cmsRequestBody = {
-            playerIds: selectedProduct?.playerIds || ["141a16d405254b8fb5c5173ef3a58cc5"], // Get player IDs from selected product
-            schedule: {
-              startDate: formData.startDate ? format(formData.startDate, "yyyy-MM-dd") : "2020-01-11",
-              endDate: formData.endDate ? format(formData.endDate, "yyyy-MM-dd") : "2060-05-12",
-              plans: [
-                {
-                  weekDays: [1, 2, 3, 4, 5],
-                  startTime: "00:00",
-                  endTime: "22:00"
-                }
-              ]
-            },
-            pages: [
+          const playerIds = selectedProduct?.playerIds || ["141a16d405254b8fb5c5173ef3a58cc5"]
+          const schedule = {
+            startDate: formData.startDate ? format(formData.startDate, "yyyy-MM-dd") : "2020-01-11",
+            endDate: formData.endDate ? format(formData.endDate, "yyyy-MM-dd") : "2060-05-12",
+            plans: [
               {
-                name: `sa-${saNumber}-page`,
-                widgets: [
-                  {
-                    zIndex: 1,
-                    type: "STREAM_MEDIA",
-                    size: 12000,
-                    md5: "placeholder-md5", // This should be calculated from the actual file
-                    duration: 9000,
-                    url: attachmentDownloadUrl,
-                    layout: {
-                      x: "0%",
-                      y: "0%",
-                      width: "100%",
-                      height: "100%"
-                    }
-                  }
-                ]
+                weekDays: [1, 2, 3, 4, 5],
+                startTime: "00:00",
+                endTime: "22:00"
               }
             ]
           }
+          const pages = [
+            {
+              name: `sa-${saNumber}-page`,
+              widgets: [
+                {
+                  zIndex: 1,
+                  type: "STREAM_MEDIA",
+                  size: 12000,
+                  md5: "placeholder-md5", // This should be calculated from the actual file
+                  duration: 9000,
+                  url: attachmentDownloadUrl,
+                  layout: {
+                    x: "0%",
+                    y: "0%",
+                    width: "100%",
+                    height: "100%"
+                  }
+                }
+              ]
+            }
+          ]
 
-          console.log("CMS Request Body:", JSON.stringify(cmsRequestBody, null, 2))
-
-          const cmsResponse = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/solutions/common-solutions", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify(cmsRequestBody)
-          })
-
-          console.log("CMS Response Status:", cmsResponse.status, cmsResponse.statusText)
-
-          if (cmsResponse.ok) {
-            const cmsResult = await cmsResponse.json()
-            console.log("CMS API Response Details:")
-            console.log("StatusCode        :", cmsResponse.status)
-            console.log("StatusDescription :", cmsResponse.statusText)
-            console.log("Content           :", JSON.stringify(cmsResult))
-            console.log("RawContent        :", `HTTP/1.1 ${cmsResponse.status} ${cmsResponse.statusText}`)
-            console.log("CMS content deployment created successfully:", cmsResult)
-          } else {
-            const errorText = await cmsResponse.text()
-            console.error("CMS API Response Details:")
-            console.error("StatusCode        :", cmsResponse.status)
-            console.error("StatusDescription :", cmsResponse.statusText)
-            console.error("Content           :", errorText)
-            console.error("RawContent        :", `HTTP/1.1 ${cmsResponse.status} ${cmsResponse.statusText}`)
-            console.error("CMS API error:", cmsResponse.status, cmsResponse.statusText, errorText)
-          }
+          await createCMSContentDeployment(playerIds, schedule, pages)
         } else {
           console.log("No attachment found for CMS deployment")
         }
@@ -728,16 +765,21 @@ export default function CreateServiceAssignmentPage() {
         // Don't throw here - we don't want CMS API failure to break assignment creation
       }
 
-      // Set session storage and navigate to assignments
-      sessionStorage.setItem('lastCreatedServiceAssignmentId', assignmentDocRef.id)
-      sessionStorage.setItem('lastCreatedServiceAssignmentSaNumber', saNumber)
-      router.push('/logistics/assignments')
-    } catch (error) {
-      console.error("Error creating service assignment:", error)
-    } finally {
-      setLoading(false)
-    }
+    // --- Navigate to PDF preview ---
+    router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=${jobOrderId || 'Df4wxbfrO5EnAbml0r2I'}&booking_id=${jobOrderData?.booking_id || ''}`)
+
+  } catch (error) {
+    console.error("Error submitting service assignment:", error)
+    toast({
+      title: "Submission Failed",
+      description: "Unable to process the service assignment. Please check your connection and try again.",
+      variant: "destructive",
+    })
+  } finally {
+    setGeneratingPDF(false)
+    setLoading(false)
   }
+}
 
   // Add this new function after the handleSubmit function
   const handleSaveDraft = async () => {
@@ -801,7 +843,7 @@ export default function CreateServiceAssignmentPage() {
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: formData.assignedTo || formData.crew,
+        assignedTo: selectedTeam?.id || formData.assignedTo || formData.crew,
         assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
         priority: formData.priority,
@@ -822,9 +864,9 @@ export default function CreateServiceAssignmentPage() {
         message: formData.message,
         campaignName: formData.campaignName,
         joNumber: jobOrderData?.joNumber || null, // Add job order number if present
-        coveredDateStart: formData.startDate,
-        coveredDateEnd: formData.endDate,
-        alarmDate: formData.alarmDate,
+        coveredDateStart: formData.startDate ? Timestamp.fromDate(formData.startDate) : null,
+        coveredDateEnd: formData.endDate ? Timestamp.fromDate(formData.endDate) : null,
+        alarmDate: formData.alarmDate ? Timestamp.fromDate(formData.alarmDate) : null,
         alarmTime: formData.alarmTime,
         attachments: await convertAttachmentsForFirestore(formData.attachments, saNumber),
         serviceExpenses: formData.serviceExpenses,
@@ -962,20 +1004,24 @@ export default function CreateServiceAssignmentPage() {
 
       // Create service assignment data structure for PDF
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
+      const selectedTeam = teams.find((t) => t.id === formData.crew)
       const serviceAssignmentData = {
         saNumber,
         projectSiteName: selectedProduct?.name || "",
         projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
         serviceType: formData.serviceType,
-        assignedTo: formData.assignedTo,
+        assignedTo: selectedTeam?.name || formData.assignedTo,
+        assignedToName: selectedTeam?.name || "",
         serviceDuration: `${formData.serviceDuration} days`,
          priority: formData.priority,
          equipmentRequired: formData.equipmentRequired,
          materialSpecs: formData.materialSpecs,
          crew: formData.crew,
+         crewName: selectedTeam?.name || "",
          gondola: formData.gondola,
          technology: formData.technology,
          sales: formData.sales,
+         campaignName: formData.campaignName,
          remarks: formData.remarks,
          requestedBy: {
            name:
@@ -988,7 +1034,11 @@ export default function CreateServiceAssignmentPage() {
          endDate: formData.endDate,
          alarmDate: formData.alarmDate,
          alarmTime: formData.alarmTime,
-         attachments: formData.attachments,
+         attachments: formData.attachments.map(att => ({
+           name: att.name,
+           type: att.type,
+           url: att.url
+         })),
          serviceExpenses: formData.serviceExpenses,
          status: "Draft",
          created: new Date(),
@@ -1003,7 +1053,11 @@ export default function CreateServiceAssignmentPage() {
       }
     } catch (error) {
       console.error("Error generating PDF:", error)
-      // You could add a toast notification here
+      toast({
+        title: "PDF Generation Failed",
+        description: "Unable to create PDF. Please check your connection and try again. If the problem persists, contact support.",
+        variant: "destructive",
+      });
     } finally {
       setGeneratingPDF(false)
     }
@@ -1019,15 +1073,20 @@ export default function CreateServiceAssignmentPage() {
 
   // Handle product selection
   const handleProductSelect = (product: Product) => {
+    console.log("handleProductSelect called with product:", product)
+    console.log("Setting projectSite to:", product.id)
     handleInputChange("projectSite", product.id || "")
-    // Add the product to the products array if it's not already there
+    // Clear job order data when manually selecting a product to allow the new selection to take precedence
+    setJobOrderData(null)
+    // Set flag to prevent job order pre-filling
+    setHasManualSelection(true)
+    // Replace the product in the products array with the selected product data
     setProducts(prev => {
-      const exists = prev.find(p => p.id === product.id)
-      if (!exists) {
-        return [...prev, product]
-      }
-      return prev
+      const filtered = prev.filter(p => p.id !== product.id)
+      console.log("Replacing product in products array:", product.name)
+      return [...filtered, product]
     })
+    console.log("handleProductSelect completed")
   }
 
   // Handle identify JO
@@ -1151,8 +1210,8 @@ export default function CreateServiceAssignmentPage() {
     return (
       <div className="container mx-auto py-4">
         <div className="flex justify-center items-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-          <span className="ml-2 text-gray-500">Loading...</span>
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <span className="ml-2 text-gray-700">Loading products...</span>
         </div>
       </div>
     )
@@ -1161,17 +1220,25 @@ export default function CreateServiceAssignmentPage() {
   return (
 <section className="p-8 bg-white">
       {/* Header */}
-
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 mb-6">
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center text-gray-600 hover:text-gray-800"
+          className="inline-flex items-center text-gray-600 hover:text-gray-800 transition-colors"
+          disabled={loading || generatingPDF}
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="text-xl font-semibold text-gray-800">
           {isEditingDraft ? "Edit Service Assignment Draft" : "Create Service Assignment"}
         </h1>
+        {(loading || generatingPDF) && (
+          <div className="ml-auto flex items-center gap-2 text-blue-600">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">
+              {generatingPDF ? "Generating PDF..." : "Processing..."}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Form Card */}
@@ -1179,6 +1246,7 @@ export default function CreateServiceAssignmentPage() {
         onSaveAsDraft={handleSaveDraft}
         onSubmit={handleSubmit}
         loading={loading}
+        generatingPDF={generatingPDF}
         companyId={userData?.company_id || null}
         productId={formData.projectSite}
         formData={formData}
@@ -1194,6 +1262,8 @@ export default function CreateServiceAssignmentPage() {
         onOpenProductSelection={() => setIsProductSelectionDialogOpen(true)}
         onIdentifyJO={handleIdentifyJO}
         onChangeJobOrder={handleChangeJobOrder}
+        onOpenJobOrderDialog={() => setIsJobOrderSelectionDialogOpen(true)}
+        onClearJobOrder={() => setJobOrderData(null)}
         onFileUpload={handleFileUpload}
         onRemoveAttachment={removeAttachment}
       />
