@@ -28,11 +28,7 @@ interface SiteControlsProps {
 }
 
 export default function SiteControls({ product }: SiteControlsProps) {
-  // State to store player status data
-  const [playerStatus, setPlayerStatus] = useState<any>(null);
 
-  // State to store player configuration data
-  const [playerConfiguration, setPlayerConfiguration] = useState<any>(null);
 
   // State for brightness slider - three-tier state management
   const oldBrightnessRef = useRef(50); // baseline value

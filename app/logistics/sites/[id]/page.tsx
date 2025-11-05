@@ -1,15 +1,20 @@
-"use client"
+"use client";
 
-import { getProductById, uploadFileToFirebaseStorage, updateProduct, getServiceAssignmentsByProductId } from "@/lib/firebase-service"
+import {
+  getProductById,
+  uploadFileToFirebaseStorage,
+  updateProduct,
+  getServiceAssignmentsByProductId,
+} from "@/lib/firebase-service";
 
 // Global type declarations for Google Maps
 declare global {
   interface Window {
-    google: any
+    google: any;
   }
 }
-import { notFound, useRouter, useSearchParams } from "next/navigation"
-import Image from "next/image"
+import { notFound, useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import {
   Calendar,
   MapPin,
@@ -28,124 +33,159 @@ import {
   Play,
   ChevronDown,
   Loader2,
-} from "lucide-react"
-import { loadGoogleMaps } from "@/lib/google-maps-loader"
-import { useRef, useState, useEffect, use } from "react"
-import { Document, Page, pdfjs } from "react-pdf"
+} from "lucide-react";
+import { loadGoogleMaps } from "@/lib/google-maps-loader";
+import { useRef, useState, useEffect, use } from "react";
+import { Document, Page, pdfjs } from "react-pdf";
 
 // Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { collection, query, where, orderBy, getDocs, serverTimestamp } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog"
-import { CreateReportDialog } from "@/components/create-report-dialog"
-import { SiteReportsTable } from "@/components/logistics/reports/SiteReportsTable"
-import { SiteServiceAssignmentsTable } from "@/components/logistics/assignments/SiteServiceAssignmentsTable"
-import SiteControls from "@/components/logistics/SiteControls"
-import Link from "next/link"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { AlarmSettingDialog } from "@/components/alarm-setting-dialog"
-import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog"
-import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog"
-import type { JobOrder } from "@/lib/types/job-order" // Import the JobOrder type
-import { useAuth } from "@/contexts/auth-context"
-import SiteInformation from "@/components/SiteInformation"
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  serverTimestamp,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { ServiceAssignmentDetailsDialog } from "@/components/service-assignment-details-dialog";
+import { CreateReportDialog } from "@/components/create-report-dialog";
+import { SiteReportsTable } from "@/components/logistics/reports/SiteReportsTable";
+import { SiteServiceAssignmentsTable } from "@/components/logistics/assignments/SiteServiceAssignmentsTable";
+import SiteControls from "@/components/logistics/SiteControls";
+import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { AlarmSettingDialog } from "@/components/alarm-setting-dialog";
+import { IlluminationIndexCardDialog } from "@/components/illumination-index-card-dialog";
+import { DisplayIndexCardDialog } from "@/components/display-index-card-dialog";
+import type { JobOrder } from "@/lib/types/job-order"; // Import the JobOrder type
+import { useAuth } from "@/contexts/auth-context";
+import SiteInformation from "@/components/SiteInformation";
 
 // Google Map Component
-const GoogleMap: React.FC<{ location: string; className?: string }> = ({ location, className }) => {
-  const mapRef = useRef<HTMLDivElement>(null)
-  const [mapLoaded, setMapLoaded] = useState(false)
-  const [mapError, setMapError] = useState(false)
+const GoogleMap: React.FC<{ location: string; className?: string }> = ({
+  location,
+  className,
+}) => {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState(false);
 
   useEffect(() => {
     const initializeMaps = async () => {
       try {
-        await loadGoogleMaps()
-        await initializeMap()
+        await loadGoogleMaps();
+        await initializeMap();
       } catch (error) {
-        console.error("Error loading Google Maps:", error)
-        setMapError(true)
+        console.error("Error loading Google Maps:", error);
+        setMapError(true);
       }
-    }
+    };
 
     const initializeMap = async () => {
-      if (!mapRef.current || !window.google) return
+      if (!mapRef.current || !window.google) return;
 
       try {
-        const geocoder = new window.google.maps.Geocoder()
+        const geocoder = new window.google.maps.Geocoder();
 
         // Geocode the location
-        geocoder.geocode({ address: location }, (results: google.maps.GeocoderResult[] | null, status: google.maps.GeocoderStatus) => {
-          if (status === "OK" && results && results[0]) {
-            const map = new window.google.maps.Map(mapRef.current!, {
-              center: results[0].geometry.location,
-              zoom: 15,
-              disableDefaultUI: true,
-              gestureHandling: "none",
-              zoomControl: false,
-              mapTypeControl: false,
-              scaleControl: false,
-              streetViewControl: false,
-              rotateControl: false,
-              fullscreenControl: false,
-              styles: [
-                {
-                  featureType: "poi",
-                  elementType: "labels",
-                  stylers: [{ visibility: "off" }],
-                },
-              ],
-            })
+        geocoder.geocode(
+          { address: location },
+          (
+            results: google.maps.GeocoderResult[] | null,
+            status: google.maps.GeocoderStatus
+          ) => {
+            if (status === "OK" && results && results[0]) {
+              const map = new window.google.maps.Map(mapRef.current!, {
+                center: results[0].geometry.location,
+                zoom: 15,
+                disableDefaultUI: true,
+                gestureHandling: "none",
+                zoomControl: false,
+                mapTypeControl: false,
+                scaleControl: false,
+                streetViewControl: false,
+                rotateControl: false,
+                fullscreenControl: false,
+                styles: [
+                  {
+                    featureType: "poi",
+                    elementType: "labels",
+                    stylers: [{ visibility: "off" }],
+                  },
+                ],
+              });
 
-            // Add marker
-            new window.google.maps.Marker({
-              position: results[0].geometry.location,
-              map: map,
-              title: location,
-              icon: {
-                url:
-                  "data:image/svg+xml;charset=UTF-8," +
-                  encodeURIComponent(`
+              // Add marker
+              new window.google.maps.Marker({
+                position: results[0].geometry.location,
+                map: map,
+                title: location,
+                icon: {
+                  url:
+                    "data:image/svg+xml;charset=UTF-8," +
+                    encodeURIComponent(`
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" fill="#ef4444"/>
                   </svg>
                 `),
-                scaledSize: new window.google.maps.Size(32, 32),
-                anchor: new window.google.maps.Point(16, 32),
-              },
-            })
+                  scaledSize: new window.google.maps.Size(32, 32),
+                  anchor: new window.google.maps.Point(16, 32),
+                },
+              });
 
-            setMapLoaded(true)
-          } else {
-            console.error("Geocoding failed:", status)
-            setMapError(true)
+              setMapLoaded(true);
+            } else {
+              console.error("Geocoding failed:", status);
+              setMapError(true);
+            }
           }
-        })
+        );
       } catch (error) {
-        console.error("Error initializing map:", error)
-        setMapError(true)
+        console.error("Error initializing map:", error);
+        setMapError(true);
       }
-    }
+    };
 
-    initializeMaps()
-  }, [location])
+    initializeMaps();
+  }, [location]);
 
   if (mapError) {
     return (
-      <div className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}>
+      <div
+        className={`bg-gray-100 rounded-lg flex items-center justify-center ${className}`}
+      >
         <div className="text-center text-gray-500">
           <p className="text-sm">Map unavailable</p>
           <p className="text-xs mt-1">{location}</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -160,27 +200,27 @@ const GoogleMap: React.FC<{ location: string; className?: string }> = ({ locatio
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
 // Helper function to convert Firebase timestamp to readable date
 export const formatFirebaseDate = (timestamp: any): string => {
-  if (!timestamp) return ""
+  if (!timestamp) return "";
 
   try {
     // Check if it's a Firebase Timestamp object
     if (timestamp && typeof timestamp === "object" && timestamp.seconds) {
-      const date = new Date(timestamp.seconds * 1000)
+      const date = new Date(timestamp.seconds * 1000);
       return date.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
-      })
+      });
     }
 
     // If it's already a string or Date, handle accordingly
     if (typeof timestamp === "string") {
-      return timestamp
+      return timestamp;
     }
 
     if (timestamp instanceof Date) {
@@ -188,86 +228,105 @@ export const formatFirebaseDate = (timestamp: any): string => {
         year: "numeric",
         month: "short",
         day: "numeric",
-      })
+      });
     }
 
-    return ""
+    return "";
   } catch (error) {
-    console.error("Error formatting date:", error)
-    return ""
+    console.error("Error formatting date:", error);
+    return "";
   }
-}
+};
 
 type Props = {
-  params: Promise<{ id: string }>
-}
+  params: Promise<{ id: string }>;
+};
 
 interface ServiceAssignment {
-  id: string
-  saNumber: string
-  projectSiteId: string
-  projectSiteName: string
-  projectSiteLocation: string
-  serviceType: string
-  assignedTo: string
-  jobDescription: string
+  id: string;
+  saNumber: string;
+  projectSiteId: string;
+  projectSiteName: string;
+  projectSiteLocation: string;
+  serviceType: string;
+  assignedTo: string;
+  jobDescription: string;
   requestedBy: {
-    id: string
-    name: string
-    department: string
-  }
-  message: string
-  campaignName?: string
-  coveredDateStart: any
-  coveredDateEnd: any
-  alarmDate: any
-  alarmTime: string
-  attachments: { name: string; type: string }[]
-  status: string
-  created: any
-  updated: any
+    id: string;
+    name: string;
+    department: string;
+  };
+  message: string;
+  campaignName?: string;
+  coveredDateStart: any;
+  coveredDateEnd: any;
+  alarmDate: any;
+  alarmTime: string;
+  attachments: { name: string; type: string }[];
+  status: string;
+  created: any;
+  updated: any;
 }
 
 export default function SiteDetailsPage({ params }: Props) {
-  const resolvedParams = use(params) as { id: string }
-  const [product, setProduct] = useState<any>(null)
-  const [jobOrders, setJobOrders] = useState<JobOrder[]>([]) // Changed from serviceAssignments
-  const [serviceAssignments, setServiceAssignments] = useState<ServiceAssignment[]>([]) // Keep service assignments for other parts if needed
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-  const [alarmDialogOpen, setAlarmDialogOpen] = useState(false)
-  const [illuminationIndexCardDialogOpen, setIlluminationIndexCardDialogOpen] = useState(false)
-  const [displayIndexCardDialogOpen, setDisplayIndexCardDialogOpen] = useState(false)
-  const [blueprintDialogOpen, setBlueprintDialogOpen] = useState(false)
-  const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false)
-  const [selectedBlueprintFile, setSelectedBlueprintFile] = useState<File | null>(null)
-  const [blueprintPreviewUrl, setBlueprintPreviewUrl] = useState<string | null>(null)
-  const [isUploadingBlueprint, setIsUploadingBlueprint] = useState(false)
-  const [blueprintSuccessDialogOpen, setBlueprintSuccessDialogOpen] = useState(false)
-  const [pdfNumPages, setPdfNumPages] = useState<number | null>(null)
-  const [pdfPageNumber, setPdfPageNumber] = useState(1)
-  const [isPdfLoading, setIsPdfLoading] = useState(false)
-  const [fullscreenBlueprint, setFullscreenBlueprint] = useState<{ blueprint: string, uploaded_by: string, created: any } | null>(null)
-  const [fullscreenDialogOpen, setFullscreenDialogOpen] = useState(false)
-  const [fullscreenPdfPageNumber, setFullscreenPdfPageNumber] = useState(1)
-  const [fullscreenPdfNumPages, setFullscreenPdfNumPages] = useState<number | null>(null)
-  const [structureUpdateDialogOpen, setStructureUpdateDialogOpen] = useState(false)
+  const resolvedParams = use(params) as { id: string };
+  const [product, setProduct] = useState<any>(null);
+  const [jobOrders, setJobOrders] = useState<JobOrder[]>([]); // Changed from serviceAssignments
+  const [serviceAssignments, setServiceAssignments] = useState<
+    ServiceAssignment[]
+  >([]); // Keep service assignments for other parts if needed
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [alarmDialogOpen, setAlarmDialogOpen] = useState(false);
+  const [illuminationIndexCardDialogOpen, setIlluminationIndexCardDialogOpen] =
+    useState(false);
+  const [displayIndexCardDialogOpen, setDisplayIndexCardDialogOpen] =
+    useState(false);
+  const [blueprintDialogOpen, setBlueprintDialogOpen] = useState(false);
+  const [createReportDialogOpen, setCreateReportDialogOpen] = useState(false);
+  const [selectedBlueprintFile, setSelectedBlueprintFile] =
+    useState<File | null>(null);
+  const [blueprintPreviewUrl, setBlueprintPreviewUrl] = useState<string | null>(
+    null
+  );
+  const [isUploadingBlueprint, setIsUploadingBlueprint] = useState(false);
+  const [blueprintSuccessDialogOpen, setBlueprintSuccessDialogOpen] =
+    useState(false);
+  const [pdfNumPages, setPdfNumPages] = useState<number | null>(null);
+  const [pdfPageNumber, setPdfPageNumber] = useState(1);
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
+  const [fullscreenBlueprint, setFullscreenBlueprint] = useState<{
+    blueprint: string;
+    uploaded_by: string;
+    created: any;
+  } | null>(null);
+  const [fullscreenDialogOpen, setFullscreenDialogOpen] = useState(false);
+  const [fullscreenPdfPageNumber, setFullscreenPdfPageNumber] = useState(1);
+  const [fullscreenPdfNumPages, setFullscreenPdfNumPages] = useState<
+    number | null
+  >(null);
+  const [structureUpdateDialogOpen, setStructureUpdateDialogOpen] =
+    useState(false);
   const [structureForm, setStructureForm] = useState({
-    color: '',
-    contractor: '',
-    condition: ''
-  })
-  const [maintenanceHistoryDialogOpen, setMaintenanceHistoryDialogOpen] = useState(false)
-  const [comingSoonDialogOpen, setComingSoonDialogOpen] = useState(false)
-  const [maintenanceHistory, setMaintenanceHistory] = useState<ServiceAssignment[]>([])
-  const [maintenanceHistoryLoading, setMaintenanceHistoryLoading] = useState(false)
-  const [isCreatingSA, setIsCreatingSA] = useState(false)
-  const [isCreatingReport, setIsCreatingReport] = useState(false)
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const view = searchParams.get("view")
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const { userData } = useAuth()
+    color: "",
+    contractor: "",
+    condition: "",
+  });
+  const [maintenanceHistoryDialogOpen, setMaintenanceHistoryDialogOpen] =
+    useState(false);
+  const [comingSoonDialogOpen, setComingSoonDialogOpen] = useState(false);
+  const [maintenanceHistory, setMaintenanceHistory] = useState<
+    ServiceAssignment[]
+  >([]);
+  const [maintenanceHistoryLoading, setMaintenanceHistoryLoading] =
+    useState(false);
+  const [isCreatingSA, setIsCreatingSA] = useState(false);
+  const [isCreatingReport, setIsCreatingReport] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const view = searchParams.get("view");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { userData } = useAuth();
 
   // Custom CSS for checkboxes
   const checkboxStyles = `
@@ -305,7 +364,7 @@ export default function SiteDetailsPage({ params }: Props) {
       outline: 2px solid #22c55e;
       outline-offset: 2px;
     }
-  `
+  `;
 
   // Custom CSS for switch
   const switchStyles = `
@@ -344,66 +403,65 @@ export default function SiteDetailsPage({ params }: Props) {
     .custom-switch[data-state="unchecked"] span {
       transform: translateX(0.25rem);
     }
-  `
+  `;
 
   const [compliance, setCompliance] = useState({
     lease_agreement: false,
     mayors_permit: false,
     bir_registration: false,
     structural_approval: false,
-  })
+  });
 
-  const [illuminationOn, setIlluminationOn] = useState(true)
-  const [illuminationMode, setIlluminationMode] = useState("Manual")
+  const [illuminationOn, setIlluminationOn] = useState(true);
+  const [illuminationMode, setIlluminationMode] = useState("Manual");
 
   // Fetch product data and job orders
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true)
+        setLoading(true);
 
         // Fetch product data
-        const productData = await getProductById(resolvedParams.id)
+        const productData = await getProductById(resolvedParams.id);
         if (!productData) {
-          notFound()
+          notFound();
         }
-        setProduct(productData)
+        setProduct(productData);
 
         // Fetch job orders for this product
         const jobOrdersQuery = query(
           collection(db, "job_orders"), // Changed collection to "job_orders"
           where("product_id", "==", resolvedParams.id), // Assuming "product_id" links to the site
           where("product_id", "==", resolvedParams.id), // Assuming "product_id" links to the site
-          orderBy("createdAt", "desc"), // Changed from 'created' to 'createdAt'
-        )
+          orderBy("createdAt", "desc") // Changed from 'created' to 'createdAt'
+        );
 
-        const jobOrdersSnapshot = await getDocs(jobOrdersQuery)
-        const jobOrdersData: JobOrder[] = [] // Changed to JobOrder[]
+        const jobOrdersSnapshot = await getDocs(jobOrdersQuery);
+        const jobOrdersData: JobOrder[] = []; // Changed to JobOrder[]
 
         jobOrdersSnapshot.forEach((doc) => {
           jobOrdersData.push({
             id: doc.id,
             ...doc.data(),
-          } as JobOrder) // Cast to JobOrder
-        })
+          } as JobOrder); // Cast to JobOrder
+        });
 
-        setJobOrders(jobOrdersData) // Set job orders
+        setJobOrders(jobOrdersData); // Set job orders
 
         // Optionally, fetch service assignments if they are still needed elsewhere
         // For now, we'll assume the "Job Orders" card is the primary place for this data.
         // If service assignments are needed for other components, their fetching logic
         // would need to be re-added here or in a separate useEffect.
-
       } catch (err) {
-        setError(err as Error)
-        console.error("Error fetching data (SiteDetailsPage):", err) // More specific error logging
+        setError(err as Error);
+        console.error("Error fetching data (SiteDetailsPage):", err); // More specific error logging
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchData()
-  }, [resolvedParams.id])
+    fetchData();
+  }, [resolvedParams.id]);
 
   // Initialize compliance and illumination state from product data
   useEffect(() => {
@@ -413,200 +471,225 @@ export default function SiteDetailsPage({ params }: Props) {
         mayors_permit: product.compliance.mayors_permit || false,
         bir_registration: product.compliance.bir_registration || false,
         structural_approval: product.compliance.structural_approval || false,
-      })
+      });
     }
     // Ensure illumination defaults to on state
-    setIlluminationOn(true)
-  }, [product])
+    setIlluminationOn(true);
+  }, [product]);
 
   const handleCreateServiceAssignment = () => {
-    setIsCreatingSA(true)
-    router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
-    setTimeout(() => setIsCreatingSA(false), 1000)
-  }
+    setIsCreatingSA(true);
+    router.push(
+      `/logistics/assignments/create?projectSite=${resolvedParams.id}`
+    );
+    setTimeout(() => setIsCreatingSA(false), 1000);
+  };
 
-  const handleBlueprintFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+  const handleBlueprintFileSelect = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0];
     if (file) {
       // Check if file is image or PDF
-      if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
-        alert('Please select an image or PDF file')
-        return
+      if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+        alert("Please select an image or PDF file");
+        return;
       }
 
-      setSelectedBlueprintFile(file)
-      setPdfNumPages(null)
-      setPdfPageNumber(1)
-      setIsPdfLoading(true)
+      setSelectedBlueprintFile(file);
+      setPdfNumPages(null);
+      setPdfPageNumber(1);
+      setIsPdfLoading(true);
 
       // Create preview URL for both images and PDFs
-      const previewUrl = URL.createObjectURL(file)
-      setBlueprintPreviewUrl(previewUrl)
+      const previewUrl = URL.createObjectURL(file);
+      setBlueprintPreviewUrl(previewUrl);
     }
-  }
+  };
 
   const handleBlueprintUpload = async () => {
-    if (!selectedBlueprintFile || !product || !userData) return
+    if (!selectedBlueprintFile || !product || !userData) return;
 
-    setIsUploadingBlueprint(true)
+    setIsUploadingBlueprint(true);
     try {
       // Upload to Firebase Storage
-      const downloadURL = await uploadFileToFirebaseStorage(selectedBlueprintFile, `blueprints/${product.id}/`)
+      const downloadURL = await uploadFileToFirebaseStorage(
+        selectedBlueprintFile,
+        `blueprints/${product.id}/`
+      );
 
       // Create new blueprint entry
-      const blueprintKey = Date.now().toString() // Use timestamp as unique key
-      const uploaderName = `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.email || 'Unknown User'
+      const blueprintKey = Date.now().toString(); // Use timestamp as unique key
+      const uploaderName =
+        `${userData.first_name || ""} ${userData.last_name || ""}`.trim() ||
+        userData.email ||
+        "Unknown User";
 
       const newBlueprintEntry = {
         blueprint: downloadURL,
         uploaded_by: uploaderName,
-        created: new Date()
-      }
+        created: new Date(),
+      };
 
       // Get existing blueprints or create empty array
       // Handle both old format (object) and new format (array)
-      let existingBlueprints: Array<{ blueprint: string, uploaded_by: string, created: any }> = []
+      let existingBlueprints: Array<{
+        blueprint: string;
+        uploaded_by: string;
+        created: any;
+      }> = [];
 
       if (product.blueprints) {
         if (Array.isArray(product.blueprints)) {
           // New format - already an array
-          existingBlueprints = product.blueprints
+          existingBlueprints = product.blueprints;
         } else {
           // Old format - convert object to array
-          existingBlueprints = Object.values(product.blueprints)
+          existingBlueprints = Object.values(product.blueprints);
         }
 
         // Convert old format blueprints to new format and sort by created timestamp (most recent first)
         existingBlueprints = existingBlueprints.map((bp: any) => ({
           blueprint: bp.blueprint,
-          uploaded_by: bp.uploaded_by || bp.uploaded || 'Unknown User', // Handle both old and new formats
-          created: bp.created
-        }))
+          uploaded_by: bp.uploaded_by || bp.uploaded || "Unknown User", // Handle both old and new formats
+          created: bp.created,
+        }));
 
         existingBlueprints.sort((a: { created: any }, b: { created: any }) => {
-          const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
-          const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
-          return timeB - timeA
-        })
+          const timeA =
+            a.created instanceof Date
+              ? a.created.getTime()
+              : a.created?.seconds * 1000 || 0;
+          const timeB =
+            b.created instanceof Date
+              ? b.created.getTime()
+              : b.created?.seconds * 1000 || 0;
+          return timeB - timeA;
+        });
       }
 
       // Add new blueprint to the array
-      const updatedBlueprints = [...existingBlueprints, newBlueprintEntry]
+      const updatedBlueprints = [...existingBlueprints, newBlueprintEntry];
 
       // Update product with new blueprints map
-      await updateProduct(product.id, { blueprints: updatedBlueprints })
+      await updateProduct(product.id, { blueprints: updatedBlueprints });
 
       // Update local product state
-      setProduct({ ...product, blueprints: updatedBlueprints })
+      setProduct({ ...product, blueprints: updatedBlueprints });
 
       // Reset states
-      setSelectedBlueprintFile(null)
-      setBlueprintPreviewUrl(null)
+      setSelectedBlueprintFile(null);
+      setBlueprintPreviewUrl(null);
 
       // Close blueprint dialog and show success dialog
-      setBlueprintDialogOpen(false)
-      setBlueprintSuccessDialogOpen(true)
+      setBlueprintDialogOpen(false);
+      setBlueprintSuccessDialogOpen(true);
     } catch (error) {
-      console.error('Error uploading blueprint:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      alert(`Failed to upload blueprint: ${errorMessage}. Please try again.`)
+      console.error("Error uploading blueprint:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      alert(`Failed to upload blueprint: ${errorMessage}. Please try again.`);
     } finally {
-      setIsUploadingBlueprint(false)
+      setIsUploadingBlueprint(false);
     }
-  }
+  };
 
   const handleUploadButtonClick = () => {
-    fileInputRef.current?.click()
-  }
+    fileInputRef.current?.click();
+  };
 
   const onPdfLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setPdfNumPages(numPages)
-    setIsPdfLoading(false)
-  }
+    setPdfNumPages(numPages);
+    setIsPdfLoading(false);
+  };
 
   const onPdfLoadError = (error: Error) => {
-    console.error('Error loading PDF:', error)
-    setIsPdfLoading(false)
-  }
+    console.error("Error loading PDF:", error);
+    setIsPdfLoading(false);
+  };
 
   const isPdfFile = (url: string) => {
-    return url.toLowerCase().endsWith('.pdf')
-  }
+    return url.toLowerCase().endsWith(".pdf");
+  };
 
-  const handleBlueprintClick = (blueprint: { blueprint: string, uploaded_by: string, created: any }) => {
-    setFullscreenBlueprint(blueprint)
-    setFullscreenDialogOpen(true)
-    setFullscreenPdfPageNumber(1)
-    setFullscreenPdfNumPages(null)
-  }
+  const handleBlueprintClick = (blueprint: {
+    blueprint: string;
+    uploaded_by: string;
+    created: any;
+  }) => {
+    setFullscreenBlueprint(blueprint);
+    setFullscreenDialogOpen(true);
+    setFullscreenPdfPageNumber(1);
+    setFullscreenPdfNumPages(null);
+  };
 
   const onFullscreenPdfLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setFullscreenPdfNumPages(numPages)
-  }
+    setFullscreenPdfNumPages(numPages);
+  };
 
   const handleStructureEdit = () => {
     // Pre-populate form with existing structure data
     setStructureForm({
-      color: product.structure?.color || '',
-      contractor: product.structure?.contractor || '',
-      condition: product.structure?.condition || ''
-    })
-    setStructureUpdateDialogOpen(true)
-  }
+      color: product.structure?.color || "",
+      contractor: product.structure?.contractor || "",
+      condition: product.structure?.condition || "",
+    });
+    setStructureUpdateDialogOpen(true);
+  };
 
   const handleStructureUpdate = async () => {
     try {
       const updatedStructure = {
         ...structureForm,
-        last_maintenance: new Date() // Update last maintenance to current date
-      }
+        last_maintenance: new Date(), // Update last maintenance to current date
+      };
 
-      await updateProduct(product.id, { structure: updatedStructure })
+      await updateProduct(product.id, { structure: updatedStructure });
 
       // Update local product state
-      setProduct({ ...product, structure: updatedStructure })
+      setProduct({ ...product, structure: updatedStructure });
 
-      setStructureUpdateDialogOpen(false)
+      setStructureUpdateDialogOpen(false);
     } catch (error) {
-      console.error('Error updating structure:', error)
-      alert('Failed to update structure. Please try again.')
+      console.error("Error updating structure:", error);
+      alert("Failed to update structure. Please try again.");
     }
-  }
+  };
 
   const fetchMaintenanceHistory = async () => {
-    if (!product?.id) return
+    if (!product?.id) return;
 
-    setMaintenanceHistoryLoading(true)
+    setMaintenanceHistoryLoading(true);
     try {
-      const assignments = await getServiceAssignmentsByProductId(product.id)
-      setMaintenanceHistory(assignments)
+      const assignments = await getServiceAssignmentsByProductId(product.id);
+      setMaintenanceHistory(assignments);
     } catch (error) {
-      console.error('Error fetching maintenance history:', error)
-      setMaintenanceHistory([])
+      console.error("Error fetching maintenance history:", error);
+      setMaintenanceHistory([]);
     } finally {
-      setMaintenanceHistoryLoading(false)
+      setMaintenanceHistoryLoading(false);
     }
-  }
+  };
 
   const handleViewHistory = () => {
-    setMaintenanceHistoryDialogOpen(true)
-    fetchMaintenanceHistory()
-  }
+    setMaintenanceHistoryDialogOpen(true);
+    fetchMaintenanceHistory();
+  };
 
   const handleComplianceChange = async (field: keyof typeof compliance) => {
-    const newCompliance = { ...compliance, [field]: !compliance[field] }
-    setCompliance(newCompliance)
+    const newCompliance = { ...compliance, [field]: !compliance[field] };
+    setCompliance(newCompliance);
     // Update product data
     try {
-      await updateProduct(product.id, { compliance: newCompliance } as any)
+      await updateProduct(product.id, { compliance: newCompliance } as any);
       // Update local product state
-      setProduct({ ...product, compliance: newCompliance })
+      setProduct({ ...product, compliance: newCompliance });
     } catch (error) {
-      console.error('Error updating compliance:', error)
+      console.error("Error updating compliance:", error);
       // Revert on error
-      setCompliance(compliance)
+      setCompliance(compliance);
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -628,45 +711,51 @@ export default function SiteDetailsPage({ params }: Props) {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (error) {
     return (
       <div className="container mx-auto py-4">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Site</h2>
+          <h2 className="text-xl font-semibold text-red-600 mb-2">
+            Error Loading Site
+          </h2>
           <p className="text-gray-600">{error.message}</p>
           <Button onClick={() => router.back()} className="mt-4">
             Go Back
           </Button>
         </div>
       </div>
-    )
+    );
   }
 
   if (!product) {
-    notFound()
+    notFound();
   }
 
   // Determine if this is a static or dynamic site
-  const contentType = (product.content_type || "").toLowerCase()
-  const isStatic = contentType === "static"
-  const isDynamic = contentType === "dynamic"
-  const showControlTab = contentType === "digital" || contentType === "dynamic"
-  const category = product.categories[0] || ""
+  const contentType = (product.content_type || "").toLowerCase();
+  const isStatic = contentType === "static";
+  const isDynamic = contentType === "dynamic";
+  const showControlTab = contentType === "digital" || contentType === "dynamic";
+  const category = product.categories[0] || "";
   // Format dimensions
-  const width = product.specs_rental?.width || 0
-  const height = product.specs_rental?.height || 0
-  const dimension = width && height ? `${width}ft x ${height}ft` : "Not specified"
+  const width = product.specs_rental?.width || 0;
+  const height = product.specs_rental?.height || 0;
+  const dimension =
+    width && height ? `${width}ft x ${height}ft` : "Not specified";
 
   // Get location
-  const location = product.specs_rental?.location || product.light?.location || "Unknown location"
+  const location =
+    product.specs_rental?.location ||
+    product.light?.location ||
+    "Unknown location";
 
   // Get geopoint
   const geopoint = product.specs_rental?.geopoint
     ? `${product.specs_rental.geopoint[0]},${product.specs_rental.geopoint[1]}`
-    : "12.5346567742,14.09346723"
+    : "12.5346567742,14.09346723";
 
   // Get the first media item for the thumbnail
   const thumbnailUrl =
@@ -674,34 +763,39 @@ export default function SiteDetailsPage({ params }: Props) {
       ? product.media[0].url
       : isStatic
         ? "/roadside-billboard.png"
-        : "/led-billboard-1.png"
+        : "/led-billboard-1.png";
 
   // Check if we should show specific view content
-  const isFromContent = view === "content"
-  const isFromStructure = view === "structure"
-  const isFromCompliance = view === "compliance"
-  const isFromIllumination = view === "illumination"
-  const isFromDisplayHealth = view === "display-health"
+  const isFromContent = view === "content";
+  const isFromStructure = view === "structure";
+  const isFromCompliance = view === "compliance";
+  const isFromIllumination = view === "illumination";
+  const isFromDisplayHealth = view === "display-health";
 
   return (
     <div className="container py-4 space-y-4">
-      <style dangerouslySetInnerHTML={{ __html: checkboxStyles + switchStyles }} />
+      <style
+        dangerouslySetInnerHTML={{ __html: checkboxStyles + switchStyles }}
+      />
 
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex flex-row items-center">
-          <Link href="/logistics/dashboard" className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mr-2">
+          <Link
+            href="/logistics/dashboard"
+            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 mr-2"
+          >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <h2
             className="text-lg"
             style={{
-              fontFamily: 'Inter',
+              fontFamily: "Inter",
               fontWeight: 600,
-              fontSize: '24px',
-              lineHeight: '120%',
-              letterSpacing: '0%',
-              color: '#000000'
+              fontSize: "24px",
+              lineHeight: "120%",
+              letterSpacing: "0%",
+              color: "#000000",
             }}
           >
             Site Information
@@ -716,32 +810,19 @@ export default function SiteDetailsPage({ params }: Props) {
             disabled={isCreatingSA}
             className="w-[140px] rounded-[6.02px] h-[23px] text-xs font-medium bg-white border-silver border-solid border-[1.2px] box-border h-6"
           >
-            {isCreatingSA ? (
-              <>
-                Service Assignment..
-              </>
-            ) : (
-              "Service Assignment"
-            )}
+            {isCreatingSA ? <>Service Assignment..</> : "Service Assignment"}
           </button>
           <button
             onClick={() => {
-              setIsCreatingReport(true)
-              console.log('Create Report button clicked');
+              setIsCreatingReport(true);
+              console.log("Create Report button clicked");
               setCreateReportDialogOpen(true);
-              setTimeout(() => setIsCreatingReport(false), 1000)
+              setTimeout(() => setIsCreatingReport(false), 1000);
             }}
             disabled={isCreatingReport}
             className="w-[93px] rounded-[6.02px] h-[23px] text-xs font-medium bg-white border-silver border-solid border-[1.2px] box-border h-6"
           >
-            {isCreatingReport ? (
-              <>
-                Report..
-
-              </>
-            ) : (
-              "Report"
-            )}
+            {isCreatingReport ? <>Report..</> : "Report"}
           </button>
         </div>
       </div>
@@ -761,8 +842,10 @@ export default function SiteDetailsPage({ params }: Props) {
                   fill
                   className="object-cover"
                   onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = isStatic ? "/roadside-billboard.png" : "/led-billboard-1.png"
+                    const target = e.target as HTMLImageElement;
+                    target.src = isStatic
+                      ? "/roadside-billboard.png"
+                      : "/led-billboard-1.png";
                   }}
                 />
               </div>
@@ -779,41 +862,63 @@ export default function SiteDetailsPage({ params }: Props) {
                 Site Calendar
               </button>
               <div className="flex flex-col w-full">
-                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left block">Site</span>
-                <b className="h-4 relative text-xs leading-[150%] inline-block font-inter text-darkslategray text-left">{product.name || "Unnamed Site"}</b>
+                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left block">
+                  Site
+                </span>
+                <b className="h-4 relative text-xs leading-[150%] inline-block font-inter text-darkslategray text-left">
+                  {product.name || "Unnamed Site"}
+                </b>
               </div>
               <div className="flex flex-col w-full">
-                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">Location</span>
+                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">
+                  Location
+                </span>
                 <b className="text-xs truncate">{location}</b>
               </div>
               <div className="flex flex-col w-full">
-                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">Geopoint</span>
-                <b className="h-4 relative text-xs leading-[150%] inline-block font-inter text-darkslategray text-left">{geopoint}</b>
+                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">
+                  Geopoint
+                </span>
+                <b className="h-4 relative text-xs leading-[150%] inline-block font-inter text-darkslategray text-left">
+                  {geopoint}
+                </b>
               </div>
               <div className="flex flex-row w-full justify-between">
                 <div className="flex flex-col w-full">
-                  <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">Type</span>
+                  <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">
+                    Type
+                  </span>
                   <b className="h-4 text-xs">{category}</b>
                 </div>
                 <div className="flex flex-col w-full">
-                  <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">Dimension</span>
+                  <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">
+                    Dimension
+                  </span>
                   <b className="h-4 text-xs">{dimension}</b>
                 </div>
               </div>
               <div className="flex flex-col w-full">
-                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">Orientation</span>
+                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">
+                  Orientation
+                </span>
                 <b className="h-4 relative text-xs leading-[150%] inline-block font-inter text-darkslategray text-left"></b>
               </div>
               <div className="flex flex-col w-full">
-                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">Site Owner</span>
+                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">
+                  Site Owner
+                </span>
                 <b className="h-4 relative text-xs leading-[150%] inline-block font-inter text-darkslategray text-left"></b>
               </div>
               <div className="flex flex-col w-full">
-                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">Land Owner</span>
+                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">
+                  Land Owner
+                </span>
                 <b className="h-4 relative text-xs leading-[150%] inline-block font-inter text-darkslategray text-left"></b>
               </div>
               <div className="flex flex-col w-full">
-                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">Partner</span>
+                <span className="text-[10px] leading-[150%] font-inter text-darkslategray text-left inline-block">
+                  Partner
+                </span>
                 <b className="h-4 relative text-xs leading-[150%] inline-block font-inter text-darkslategray text-left"></b>
               </div>
             </div>
@@ -825,31 +930,49 @@ export default function SiteDetailsPage({ params }: Props) {
           <Card>
             <CardHeader className="flex flex-row px-4 py-2 items-center justify-between">
               <span className="text-xs font-semibold">
-                Job Orders {jobOrders.length > 0 ? `(${jobOrders.length})` : "0"}
+                Job Orders{" "}
+                {jobOrders.length > 0 ? `(${jobOrders.length})` : "0"}
               </span>
             </CardHeader>
             <CardContent className="px-4">
               {jobOrders.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">No job orders found for this site.</div>
+                <div className="text-center py-8 text-gray-500">
+                  No job orders found for this site.
+                </div>
               ) : (
-                <div className="flex space-x-2">
+                <div className="w-full overflow-x-auto overflow-y-hidden whitespace-nowrap flex space-x-2">
                   {jobOrders.map((jobOrder) => (
                     <div
                       key={jobOrder.id}
-                      className="w-[225.5px] h-[83.1px] relative rounded-[7.91px] bg-[#f0f7ff] border-[#add0ff] border-[1.2px] box-border cursor-pointer"
-                      onClick={() => {
-                        router.push(`/logistics/assignments/create?jobOrderId=${jobOrder.id}`)
-                      }}
+                      className="flex-shrink-0 w-[225px] h-[83px] flex items-center gap-3 rounded-lg bg-[#f0f7ff] border border-[#add0ff] cursor-pointer hover:shadow-md transition-shadow px-3 py-2"
+                      onClick={() =>
+                        router.push(
+                          `/logistics/assignments/create?jobOrderId=${jobOrder.id}`
+                        )
+                      }
                     >
-                      <div className="absolute top-[17.4px] left-[70.24px] leading-[132%] inline-block w-[calc(100%-90px)] text-xs">
-                        <p className="m-0 text-base">
-                          <b>JO#{jobOrder.joNumber}</b>
-                        </p>
-                        <p className="m-0 truncate">from SALES-{jobOrder.requestedBy}</p>
-                        <p className="m-0 text-[10px]">Sent on {formatFirebaseDate(jobOrder.created)}</p>
+                      {/* Left Icon */}
+                      <div className="flex-shrink-0 w-[36px] h-[36px] bg-gray-300 rounded-full flex items-center justify-center">
+                        <Image
+                          src="/icons/suitcase.png"
+                          alt="JO"
+                          width={36}
+                          height={36}
+                          className="object-cover"
+                        />
                       </div>
-                      <div className="absolute top-[22.94px] left-[18.82px] w-[36.4px] h-[36.4px] bg-gray-300 rounded-full flex items-center justify-center">
-                        <Image className="w-full relative max-w-full overflow-hidden max-h-full object-cover" width={36.4} height={36.4} sizes="100vw" alt="JO" src={`/icons/suitcase.png`} />
+
+                      {/* Text Content */}
+                      <div className="flex flex-col justify-center overflow-hidden">
+                        <p className="text-base font-bold m-0 truncate">
+                          JO#{jobOrder.joNumber}
+                        </p>
+                        <p className="text-sm m-0 truncate">
+                          from SALES-{jobOrder.requestedBy}
+                        </p>
+                        <p className="text-[10px] text-gray-600 m-0">
+                          Sent on {formatFirebaseDate(jobOrder.created)}
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -859,12 +982,20 @@ export default function SiteDetailsPage({ params }: Props) {
           </Card>
           <div className="">
             <Tabs defaultValue="gen-info" className="w-full">
-              <TabsList className={`grid w-full ${showControlTab ? 'grid-cols-5' : 'grid-cols-4'}`}>
+              <TabsList
+                className={`grid w-full ${showControlTab ? "grid-cols-5" : "grid-cols-4"}`}
+              >
                 <TabsTrigger value="gen-info">Gen. Info</TabsTrigger>
-                <TabsTrigger value="content-history">Content History</TabsTrigger>
-                <TabsTrigger value="service-assignments">Service Assignments</TabsTrigger>
+                <TabsTrigger value="content-history">
+                  Content History
+                </TabsTrigger>
+                <TabsTrigger value="service-assignments">
+                  Service Assignments
+                </TabsTrigger>
                 <TabsTrigger value="reports">Reports</TabsTrigger>
-                {showControlTab && <TabsTrigger value="control">Control</TabsTrigger>}
+                {showControlTab && (
+                  <TabsTrigger value="control">Control</TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="gen-info" className="">
@@ -880,12 +1011,12 @@ export default function SiteDetailsPage({ params }: Props) {
                           <div
                             className="text-lg flex items-center"
                             style={{
-                              fontFamily: 'Inter',
+                              fontFamily: "Inter",
                               fontWeight: 700,
-                              fontSize: '16px',
-                              lineHeight: '100%',
-                              letterSpacing: '0%',
-                              color: '#333'
+                              fontSize: "16px",
+                              lineHeight: "100%",
+                              letterSpacing: "0%",
+                              color: "#333",
                             }}
                           >
                             <Sun className="h-4 w-4 mr-2" />
@@ -894,12 +1025,20 @@ export default function SiteDetailsPage({ params }: Props) {
                           <div className="flex items-center space-x-2">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => console.log("Edit illumination clicked")}>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    console.log("Edit illumination clicked")
+                                  }
+                                >
                                   <Edit className="mr-2 h-4 w-4" />
                                   Edit
                                 </DropdownMenuItem>
@@ -916,63 +1055,136 @@ export default function SiteDetailsPage({ params }: Props) {
                                   onCheckedChange={(checked) => {
                                     if (!checked) {
                                       // Show "Coming Soon" dialog when trying to turn off
-                                      setComingSoonDialogOpen(true)
-                                      return
+                                      setComingSoonDialogOpen(true);
+                                      return;
                                     }
-                                    setIlluminationOn(checked)
+                                    setIlluminationOn(checked);
                                     // Update product data
-                                    updateProduct(product.id, { illumination: { ...product.illumination, on: checked } } as any)
+                                    updateProduct(product.id, {
+                                      illumination: {
+                                        ...product.illumination,
+                                        on: checked,
+                                      },
+                                    } as any)
                                       .then(() => {
-                                        setProduct({ ...product, illumination: { ...product.illumination, on: checked } })
+                                        setProduct({
+                                          ...product,
+                                          illumination: {
+                                            ...product.illumination,
+                                            on: checked,
+                                          },
+                                        });
                                       })
                                       .catch((error) => {
-                                        console.error('Error updating illumination:', error)
-                                        setIlluminationOn(!checked) // Revert on error
-                                      })
+                                        console.error(
+                                          "Error updating illumination:",
+                                          error
+                                        );
+                                        setIlluminationOn(!checked); // Revert on error
+                                      });
                                   }}
                                   className="custom-switch"
                                 />
-                                <span className="text-xs text-gray-600">{illuminationOn ? 'ON' : 'OFF'}</span>
+                                <span className="text-xs text-gray-600">
+                                  {illuminationOn ? "ON" : "OFF"}
+                                </span>
                               </div>
                               <div className="flex flex-col">
-                                <b className="leading-[100%] inline-block w-40 h-3 text-sm font-semibold">Switch:</b>
-                                <div className="leading-[100%] inline-block w-[211px] h-3.5 text-sm pt-2">6:00pm to 12:00pm</div>
+                                <b className="leading-[100%] inline-block w-40 h-3 text-sm font-semibold">
+                                  Switch:
+                                </b>
+                                <div className="leading-[100%] inline-block w-[211px] h-3.5 text-sm pt-2">
+                                  6:00pm to 12:00pm
+                                </div>
                               </div>
                             </div>
 
-
                             <div className="flex">
-                              <div style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }} className="inline-block w-[107px]">
-                                
-                                 <p className="m-0">Upper:</p>
+                              <div
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 600,
+                                  lineHeight: "132%",
+                                }}
+                                className="inline-block w-[107px]"
+                              >
+                                <p className="m-0">Upper:</p>
                                 <p className="m-0">Bottom:</p>
                                 <p className="m-0">Side (Left):</p>
                                 <p className="m-0">Side (Right):</p>
                               </div>
-                              <div style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }} className="inline-block w-[134px]">
-                                
-                                <p className="m-0">{product.specs_rental?.illumination_upper_lighting_specs || "-"}</p>
-                                <p className="m-0">{product.specs_rental?.illumination_bottom_lighting_specs || "-"}</p>
-                                <p className="m-0">{product.specs_rental?.illumination_left_lighting_specs || "-"}</p>
-                                <p className="m-0">{product.specs_rental?.illumination_right_lighting_specs || "-"}</p>
+                              <div
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 400,
+                                  lineHeight: "132%",
+                                }}
+                                className="inline-block w-[134px]"
+                              >
+                                <p className="m-0">
+                                  {product.specs_rental
+                                    ?.illumination_upper_lighting_specs || "-"}
+                                </p>
+                                <p className="m-0">
+                                  {product.specs_rental
+                                    ?.illumination_bottom_lighting_specs || "-"}
+                                </p>
+                                <p className="m-0">
+                                  {product.specs_rental
+                                    ?.illumination_left_lighting_specs || "-"}
+                                </p>
+                                <p className="m-0">
+                                  {product.specs_rental
+                                    ?.illumination_right_lighting_specs || "-"}
+                                </p>
                               </div>
                             </div>
 
                             <div className="flex justify-between items-center">
-                              <div style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
-                                <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Average Monthly Electrical Consumption: </span>
-                                <span>{product.specs_rental?.power_consumption_monthly || "-"} kWh/month</span>
+                              <div
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 400,
+                                  lineHeight: "132%",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    color: "#333",
+                                    fontFamily: "Inter",
+                                    fontSize: "12px",
+                                    fontStyle: "normal",
+                                    fontWeight: 600,
+                                    lineHeight: "132%",
+                                  }}
+                                >
+                                  Average Monthly Electrical Consumption:{" "}
+                                </span>
+                                <span>
+                                  {product.specs_rental
+                                    ?.power_consumption_monthly || "-"}{" "}
+                                  kWh/month
+                                </span>
                               </div>
                               <button
                                 onClick={() => setComingSoonDialogOpen(true)}
                                 className="w-[93.971px] h-[23.493px] flex-shrink-0 border border-[#C4C4C4] bg-white rounded-[6.024px] text-center font-medium hover:bg-gray-50"
                                 style={{
-                                  color: '#333',
-                                  fontFamily: 'Inter',
-                                  fontSize: '12px',
-                                  fontStyle: 'normal',
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
                                   fontWeight: 500,
-                                  lineHeight: '100%'
+                                  lineHeight: "100%",
                                 }}
                               >
                                 Index Card
@@ -989,22 +1201,28 @@ export default function SiteDetailsPage({ params }: Props) {
                       <div>
                         <div className="flex flex-row items-center justify-between px-4">
                           <div>
-                            <span style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 700,
-                              fontSize: '16px',
-                              lineHeight: '100%',
-                              letterSpacing: '0%',
-                              color: '#333',
-                              transform: 'translate(0px, 0px)' // Add transform for position control
-                            }}>
+                            <span
+                              style={{
+                                fontFamily: "Inter",
+                                fontWeight: 700,
+                                fontSize: "16px",
+                                lineHeight: "100%",
+                                letterSpacing: "0%",
+                                color: "#333",
+                                transform: "translate(0px, 0px)", // Add transform for position control
+                              }}
+                            >
                               Structure
                             </span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -1020,195 +1238,90 @@ export default function SiteDetailsPage({ params }: Props) {
                         <div className="px-4 pb-4">
                           <div className="">
                             <div>
-                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Color:</span>{" "}
-                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                              <span
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 600,
+                                  lineHeight: "132%",
+                                }}
+                              >
+                                Color:
+                              </span>{" "}
+                              <span
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 400,
+                                  lineHeight: "132%",
+                                }}
+                              >
                                 {product.structure?.color || "Not Available"}
                               </span>
                             </div>
                             <div>
-                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Contractor:</span>{" "}
-                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
-                                {product.structure?.contractor || "Not Available"}
+                              <span
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 600,
+                                  lineHeight: "132%",
+                                }}
+                              >
+                                Contractor:
+                              </span>{" "}
+                              <span
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 400,
+                                  lineHeight: "132%",
+                                }}
+                              >
+                                {product.structure?.contractor ||
+                                  "Not Available"}
                               </span>
                             </div>
                             <div>
-                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Last Maintenance:</span>{" "}
-                              <span style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
-                                {formatFirebaseDate(product.structure?.last_maintenance) || "Not Available"}
+                              <span
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 600,
+                                  lineHeight: "132%",
+                                }}
+                              >
+                                Last Maintenance:
+                              </span>{" "}
+                              <span
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 400,
+                                  lineHeight: "132%",
+                                }}
+                              >
+                                {formatFirebaseDate(
+                                  product.structure?.last_maintenance
+                                ) || "Not Available"}
                               </span>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                        {/* Power Consumption */}
-                        <div className="border-t pt-3">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-1 text-sm">
-                              <div>
-                                <span className="font-medium">Power Consumption:</span>{" "}
-                                <span className="text-green-600">150 kWh/month</span>
-                              </div>
-                              <div>
-                                <span className="font-medium">Average Power Consumption:</span>{" "}
-                                <span className="text-blue-600">160 kWh /over last 3 months</span>
-                              </div>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="bg-transparent"
-                              onClick={() => setIlluminationIndexCardDialogOpen(true)}
-                            >
-                              View Index Card
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Site Data Grid - Updated layout without Illumination */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Display - Show only for Dynamic sites */}
-                  {isDynamic && (
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="text-base flex items-center">
-                          <Sun className="h-4 w-4 mr-2" />
-                          Display
-                        </CardTitle>
-                        <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                      </CardHeader>
-                      <CardContent className="p-4">
-                        <div className="space-y-3">
-                          <div className="text-sm">
-                            <div className="font-medium">July 1, 2025 (Tue), 2:00 pm</div>
-                            <div className="text-gray-600 text-xs">
-                              <span className="font-medium">Operating Time:</span> 6:00 pm to 11:00 pm
-                            </div>
-                          </div>
-
-                          <div className="space-y-1 text-sm">
-                            <div>
-                              <span className="font-medium">Brightness:</span>
-                              <div className="text-xs text-gray-600 ml-2">
-                                7:00 am-3:00 pm (20%)
-                                <br />
-                                3:00 pm-11:00 pm (100%)
-                              </div>
-                            </div>
-                            <div>
-                              <span className="font-medium">Spots in a loop:</span> 10 spots
-                            </div>
-                            <div>
-                              <span className="font-medium">Service Life:</span> 3 years, 8 months, and 10 days
-                            </div>
-                            <div>
-                              <span className="font-medium">Power Consumption:</span> 150 kWh/month
-                            </div>
-                            <div>
-                              <span className="font-medium">Average Power Consumption:</span> 160 kWh over last 3 months
-                            </div>
-                          </div>
-                        </div>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-4 w-full bg-transparent"
-                          onClick={() => setDisplayIndexCardDialogOpen(true)}
-                        >
-                          View Index Card
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {/* Compliance - Always show */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle
-                        className="text-base flex items-center"
-                        style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '22px',
-                          lineHeight: '120%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}
-                      >
-                        <Shield className="h-4 w-4 mr-2" />
-                        Compliance{" "}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      <div className="flex flex-col space-y-3" style={{ transform: 'translateX(35px) translateY(-20px)' }}>
-                        <div className="flex items-center space-x-2">
-                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.lease_agreement ? '✅' : '☐'}</span>
-                          <label
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '18px',
-                              lineHeight: '132%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            Lease Agreement
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.mayors_permit ? '✅' : '☐'}</span>
-                          <label
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '18px',
-                              lineHeight: '132%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            Mayor's Permit
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.bir_registration ? '✅' : '☐'}</span>
-                          <label
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '18px',
-                              lineHeight: '132%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            BIR Registration
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="w-4 h-4 flex items-center justify-center text-lg">{product.compliance?.structural_approval ? '✅' : '☐'}</span>
-                          <label
-                            style={{
-                              fontFamily: 'Inter',
-                              fontWeight: 600,
-                              fontSize: '18px',
-                              lineHeight: '132%',
-                              letterSpacing: '0%',
-                              color: '#000000'
-                            }}
-                          >
-                            Structural Approval
-                          </label>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
                       {/* Divider */}
                       <hr className="border-gray-300" />
 
@@ -1218,12 +1331,12 @@ export default function SiteDetailsPage({ params }: Props) {
                           <div
                             className="text-base flex items-center"
                             style={{
-                              fontFamily: 'Inter',
+                              fontFamily: "Inter",
                               fontWeight: 700,
-                              fontSize: '16px',
-                              lineHeight: '100%',
-                              letterSpacing: '0%',
-                              color: '#333'
+                              fontSize: "16px",
+                              lineHeight: "100%",
+                              letterSpacing: "0%",
+                              color: "#333",
                             }}
                           >
                             <Shield className="h-4 w-4 mr-2" />
@@ -1232,12 +1345,20 @@ export default function SiteDetailsPage({ params }: Props) {
                           <div className="flex items-center space-x-2">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => console.log("Edit compliance clicked")}>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    console.log("Edit compliance clicked")
+                                  }
+                                >
                                   <Edit className="mr-2 h-4 w-4" />
                                   Edit
                                 </DropdownMenuItem>
@@ -1257,7 +1378,14 @@ export default function SiteDetailsPage({ params }: Props) {
                               />
                               <label
                                 htmlFor="lease_agreement"
-                                style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 600,
+                                  lineHeight: "132%",
+                                }}
                               >
                                 Lease Agreement
                               </label>
@@ -1272,7 +1400,14 @@ export default function SiteDetailsPage({ params }: Props) {
                               />
                               <label
                                 htmlFor="mayors_permit"
-                                style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 600,
+                                  lineHeight: "132%",
+                                }}
                               >
                                 Mayor's Permit
                               </label>
@@ -1287,7 +1422,14 @@ export default function SiteDetailsPage({ params }: Props) {
                               />
                               <label
                                 htmlFor="bir_registration"
-                                style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 600,
+                                  lineHeight: "132%",
+                                }}
                               >
                                 BIR Registration
                               </label>
@@ -1302,7 +1444,14 @@ export default function SiteDetailsPage({ params }: Props) {
                               />
                               <label
                                 htmlFor="structural_approval"
-                                style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}
+                                style={{
+                                  color: "#333",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 600,
+                                  lineHeight: "132%",
+                                }}
                               >
                                 Structural Approval
                               </label>
@@ -1311,133 +1460,6 @@ export default function SiteDetailsPage({ params }: Props) {
                         </div>
                       </div>
 
-                  {/* Structure - Always show */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle>
-                        <span style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '20px',
-                          lineHeight: '100%',
-                          letterSpacing: '0%',
-                          transform: 'translate(0px, 0px)' // Add transform for position control
-                        }}>
-                          Structure
-                        </span>
-                      </CardTitle>
-                      <div className="flex items-center space-x-2">
-                        <Bell className="h-4 w-4 text-gray-500" />
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={handleStructureEdit}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      <div className="space-y-4" style={{ transform: 'translateY(-30px) translateX(15px)' }}>
-                        <div style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '18px',
-                          lineHeight: '132%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}>
-                          <span>Color:</span>{" "}
-                          <span style={{
-                            fontFamily: 'Inter',
-                            fontWeight: 400,
-                            fontSize: '18px',
-                            lineHeight: '132%',
-                            letterSpacing: '0%',
-                            color: '#333333'
-                          }}>
-                            {product.structure?.color || "Not Available"}
-                          </span>
-                        </div>
-                        <div style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '18px',
-                          lineHeight: '132%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}>
-                          <span>Contractor:</span>{" "}
-                          <span style={{
-                            fontFamily: 'Inter',
-                            fontWeight: 400,
-                            fontSize: '18px',
-                            lineHeight: '132%',
-                            letterSpacing: '0%',
-                            color: '#333333'
-                          }}>
-                            {product.structure?.contractor || "Not Available"}
-                          </span>
-                        </div>
-                        <div style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '18px',
-                          lineHeight: '132%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}>
-                          <span>Condition:</span>{" "}
-                          <span style={{
-                            fontFamily: 'Inter',
-                            fontWeight: 400,
-                            fontSize: '18px',
-                            lineHeight: '132%',
-                            letterSpacing: '0%',
-                            color: '#333333'
-                          }}>
-                            {product.structure?.condition || "Not Available"}
-                          </span>
-                        </div>
-                        <div style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '18px',
-                          lineHeight: '132%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}>
-                          <span>Last Maintenance:</span>{" "}
-                          <span style={{
-                            fontFamily: 'Inter',
-                            fontWeight: 400,
-                            fontSize: '18px',
-                            lineHeight: '132%',
-                            letterSpacing: '0%',
-                            color: '#333333'
-                          }}>
-                            {formatFirebaseDate(product.structure?.last_maintenance) || "Not Available"}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 mt-3">
-                        <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={() => setBlueprintDialogOpen(true)}>
-                          View Blueprint
-                        </Button>
-                        <Button variant="outline" size="sm" className="flex-1 bg-transparent" onClick={handleViewHistory}>
-                          <History className="h-4 w-4 mr-2" />
-                          View History
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
                       {/* Divider */}
                       <hr className="border-gray-300" />
 
@@ -1447,12 +1469,12 @@ export default function SiteDetailsPage({ params }: Props) {
                           <div
                             className="text-base flex items-center"
                             style={{
-                              fontFamily: 'Inter',
+                              fontFamily: "Inter",
                               fontWeight: 700,
-                              fontSize: '16px',
-                              lineHeight: '100%',
-                              letterSpacing: '0%',
-                              color: '#333'
+                              fontSize: "16px",
+                              lineHeight: "100%",
+                              letterSpacing: "0%",
+                              color: "#333",
                             }}
                           >
                             <Users className="h-4 w-4 mr-2" />
@@ -1461,12 +1483,20 @@ export default function SiteDetailsPage({ params }: Props) {
                           <div className="flex items-center space-x-2">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0"
+                                >
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => console.log("Edit crew clicked")}>
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    console.log("Edit crew clicked")
+                                  }
+                                >
                                   <Edit className="mr-2 h-4 w-4" />
                                   Edit
                                 </DropdownMenuItem>
@@ -1476,33 +1506,107 @@ export default function SiteDetailsPage({ params }: Props) {
                         </div>
                         <div className="px-4 pb-4">
                           {product.personnel && product.personnel.length > 0 ? (
-                            <Table className="border-none [&_tr]:border-none [&_td]:border-none [&_td]:py-1 [&_td]:pr-1 [&_td]:pl-0 [&_th]:border-none [&_th]:p-0 [&_tr]:hover:bg-transparent border-collapse" style={{ borderSpacing: '0 0' }}>
+                            <Table
+                              className="border-none [&_tr]:border-none [&_td]:border-none [&_td]:py-1 [&_td]:pr-1 [&_td]:pl-0 [&_th]:border-none [&_th]:p-0 [&_tr]:hover:bg-transparent border-collapse"
+                              style={{ borderSpacing: "0 0" }}
+                            >
                               <TableHeader>
                                 <TableRow className="h-8">
-                                  <TableHead style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Name</TableHead>
-                                  <TableHead style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Position</TableHead>
-                                  <TableHead style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 600, lineHeight: '132%' }}>Contact</TableHead>
+                                  <TableHead
+                                    style={{
+                                      color: "#333",
+                                      fontFamily: "Inter",
+                                      fontSize: "12px",
+                                      fontStyle: "normal",
+                                      fontWeight: 600,
+                                      lineHeight: "132%",
+                                    }}
+                                  >
+                                    Name
+                                  </TableHead>
+                                  <TableHead
+                                    style={{
+                                      color: "#333",
+                                      fontFamily: "Inter",
+                                      fontSize: "12px",
+                                      fontStyle: "normal",
+                                      fontWeight: 600,
+                                      lineHeight: "132%",
+                                    }}
+                                  >
+                                    Position
+                                  </TableHead>
+                                  <TableHead
+                                    style={{
+                                      color: "#333",
+                                      fontFamily: "Inter",
+                                      fontSize: "12px",
+                                      fontStyle: "normal",
+                                      fontWeight: 600,
+                                      lineHeight: "132%",
+                                    }}
+                                  >
+                                    Contact
+                                  </TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {product.personnel.map((person: any, index: number) => (
-                                  <TableRow key={index}>
-                                    <TableCell style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
-                                      {person.name || ""}
-                                    </TableCell>
-                                    <TableCell style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
-                                      {person.position || ""}
-                                    </TableCell>
-                                    <TableCell style={{ color: '#333', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
-                                      {person.contact || ""}
-                                    </TableCell>
-                                  </TableRow>
-                                ))}
+                                {product.personnel.map(
+                                  (person: any, index: number) => (
+                                    <TableRow key={index}>
+                                      <TableCell
+                                        style={{
+                                          color: "#333",
+                                          fontFamily: "Inter",
+                                          fontSize: "12px",
+                                          fontStyle: "normal",
+                                          fontWeight: 400,
+                                          lineHeight: "132%",
+                                        }}
+                                      >
+                                        {person.name || ""}
+                                      </TableCell>
+                                      <TableCell
+                                        style={{
+                                          color: "#333",
+                                          fontFamily: "Inter",
+                                          fontSize: "12px",
+                                          fontStyle: "normal",
+                                          fontWeight: 400,
+                                          lineHeight: "132%",
+                                        }}
+                                      >
+                                        {person.position || ""}
+                                      </TableCell>
+                                      <TableCell
+                                        style={{
+                                          color: "#333",
+                                          fontFamily: "Inter",
+                                          fontSize: "12px",
+                                          fontStyle: "normal",
+                                          fontWeight: 400,
+                                          lineHeight: "132%",
+                                        }}
+                                      >
+                                        {person.contact || ""}
+                                      </TableCell>
+                                    </TableRow>
+                                  )
+                                )}
                               </TableBody>
                             </Table>
                           ) : (
                             <div className="text-center py-4 text-gray-500">
-                              <p style={{ color: '#666', fontFamily: 'Inter', fontSize: '12px', fontStyle: 'normal', fontWeight: 400, lineHeight: '132%' }}>
+                              <p
+                                style={{
+                                  color: "#666",
+                                  fontFamily: "Inter",
+                                  fontSize: "12px",
+                                  fontStyle: "normal",
+                                  fontWeight: 400,
+                                  lineHeight: "132%",
+                                }}
+                              >
                                 No personnel information available
                               </p>
                             </div>
@@ -1514,63 +1618,6 @@ export default function SiteDetailsPage({ params }: Props) {
                 </Card>
               </TabsContent>
 
-                {/* Content and Crew - Single row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Content */}
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle
-                        className="text-base flex items-center"
-                        style={{
-                          fontFamily: 'Inter',
-                          fontWeight: 600,
-                          fontSize: '22px',
-                          lineHeight: '120%',
-                          letterSpacing: '0%',
-                          color: '#000000'
-                        }}
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        Content
-                      </CardTitle>
-                      <div className="flex items-center space-x-2">
-                        <Bell className="h-4 w-4 text-gray-500" />
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => console.log("Edit content clicked")}>
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4">
-                      {product.content_schedule && product.content_schedule.length > 0 ? (
-                        <div className="space-y-2 text-sm">
-                          {product.content_schedule.map((content: { start_date: any; end_date: any; name: string }, index: number) => (
-                            <div key={index}>
-                              <span className="font-medium">
-                                {formatFirebaseDate(content.start_date)} - {formatFirebaseDate(content.end_date)}:
-                              </span>{" "}
-                              {content.name}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm">No content scheduled</div>
-                      )}
-                      <Button variant="outline" size="sm" className="mt-3 w-full bg-transparent">
-                        <History className="h-4 w-4 mr-2" />
-                        View History
-                      </Button>
-                    </CardContent>
-                  </Card>
               <TabsContent value="content-history" className="">
                 <Card>
                   <CardHeader>
@@ -1590,7 +1637,10 @@ export default function SiteDetailsPage({ params }: Props) {
                     <CardTitle>Service Assignments</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <SiteServiceAssignmentsTable projectSiteId={resolvedParams.id} companyId={product.company_id} />
+                    <SiteServiceAssignmentsTable
+                      projectSiteId={resolvedParams.id}
+                      companyId={product.company_id}
+                    />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1601,7 +1651,10 @@ export default function SiteDetailsPage({ params }: Props) {
                     <CardTitle>Reports</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <SiteReportsTable projectSiteId={resolvedParams.id} companyId={product.company_id} />
+                    <SiteReportsTable
+                      projectSiteId={resolvedParams.id}
+                      companyId={product.company_id}
+                    />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1613,26 +1666,32 @@ export default function SiteDetailsPage({ params }: Props) {
               )}
             </Tabs>
           </div>
-
         </div>
       </div>
 
       {/* Keeping ServiceAssignmentDetailsDialog for now, but disabled, in case it's used elsewhere */}
       <ServiceAssignmentDetailsDialog
         open={false}
-        onOpenChange={() => { }}
+        onOpenChange={() => {}}
         assignmentId={null}
-        onStatusChange={() => { }}
+        onStatusChange={() => {}}
       />
-      <AlarmSettingDialog open={alarmDialogOpen} onOpenChange={setAlarmDialogOpen} />
+      <AlarmSettingDialog
+        open={alarmDialogOpen}
+        onOpenChange={setAlarmDialogOpen}
+      />
       <IlluminationIndexCardDialog
         open={illuminationIndexCardDialogOpen}
         onOpenChange={setIlluminationIndexCardDialogOpen}
         product={product}
         onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
-          router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
-          router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
+          router.push(
+            `/logistics/assignments/create?projectSite=${resolvedParams.id}`
+          );
+          router.push(
+            `/logistics/assignments/create?projectSite=${resolvedParams.id}`
+          );
         }}
       />
       <DisplayIndexCardDialog
@@ -1640,14 +1699,17 @@ export default function SiteDetailsPage({ params }: Props) {
         onOpenChange={setDisplayIndexCardDialogOpen}
         onCreateSA={() => {
           // Navigate to create service assignment with this site pre-selected
-          router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
-          router.push(`/logistics/assignments/create?projectSite=${resolvedParams.id}`)
+          router.push(
+            `/logistics/assignments/create?projectSite=${resolvedParams.id}`
+          );
+          router.push(
+            `/logistics/assignments/create?projectSite=${resolvedParams.id}`
+          );
         }}
       />
       <CreateReportDialog
         open={createReportDialogOpen}
         onOpenChange={setCreateReportDialogOpen}
-        siteId={resolvedParams.id}
         siteId={resolvedParams.id}
         module="logistics"
       />
@@ -1662,7 +1724,7 @@ export default function SiteDetailsPage({ params }: Props) {
             {/* Upload Preview (when selecting a new file) */}
             {blueprintPreviewUrl && (
               <div className="w-full h-32 bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden">
-                {selectedBlueprintFile?.type === 'application/pdf' ? (
+                {selectedBlueprintFile?.type === "application/pdf" ? (
                   <div className="w-full h-full">
                     <Document
                       file={blueprintPreviewUrl}
@@ -1674,10 +1736,7 @@ export default function SiteDetailsPage({ params }: Props) {
                         </div>
                       }
                     >
-                      <Page
-                        pageNumber={pdfPageNumber}
-                        width={200}
-                      />
+                      <Page pageNumber={pdfPageNumber} width={200} />
                     </Document>
                   </div>
                 ) : (
@@ -1694,74 +1753,96 @@ export default function SiteDetailsPage({ params }: Props) {
             <div className="max-h-96 overflow-y-auto space-y-3">
               {(() => {
                 // Get all blueprints (handle both old and new formats)
-                let blueprints: Array<{ blueprint: string, uploaded_by: string, created: any }> = []
+                let blueprints: Array<{
+                  blueprint: string;
+                  uploaded_by: string;
+                  created: any;
+                }> = [];
 
                 if (product?.blueprints) {
                   if (Array.isArray(product.blueprints)) {
                     // New format - already an array
-                    blueprints = product.blueprints
+                    blueprints = product.blueprints;
                   } else {
                     // Old format - convert object to array
-                    blueprints = Object.values(product.blueprints)
+                    blueprints = Object.values(product.blueprints);
                   }
                 }
 
                 if (blueprints && blueprints.length > 0) {
                   // Sort by created timestamp (most recent first)
-                  const sortedBlueprints = [...blueprints].sort((a: { created: any }, b: { created: any }) => {
-                    const timeA = a.created instanceof Date ? a.created.getTime() : (a.created?.seconds * 1000) || 0
-                    const timeB = b.created instanceof Date ? b.created.getTime() : (b.created?.seconds * 1000) || 0
-                    return timeB - timeA
-                  })
+                  const sortedBlueprints = [...blueprints].sort(
+                    (a: { created: any }, b: { created: any }) => {
+                      const timeA =
+                        a.created instanceof Date
+                          ? a.created.getTime()
+                          : a.created?.seconds * 1000 || 0;
+                      const timeB =
+                        b.created instanceof Date
+                          ? b.created.getTime()
+                          : b.created?.seconds * 1000 || 0;
+                      return timeB - timeA;
+                    }
+                  );
 
-                  return sortedBlueprints.map((blueprint: { blueprint: string, uploaded_by: string, created: any }, index: number) => (
-                    <div key={index} className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg bg-white">
-                      {/* Left side - Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-gray-900">{blueprint.uploaded_by}</div>
-                        <div className="text-xs text-gray-500">
-                          {formatFirebaseDate(blueprint.created)}
+                  return sortedBlueprints.map(
+                    (
+                      blueprint: {
+                        blueprint: string;
+                        uploaded_by: string;
+                        created: any;
+                      },
+                      index: number
+                    ) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-4 p-3 border border-gray-200 rounded-lg bg-white"
+                      >
+                        {/* Left side - Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm text-gray-900">
+                            {blueprint.uploaded_by}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatFirebaseDate(blueprint.created)}
+                          </div>
+                        </div>
+
+                        {/* Right side - Blueprint Preview */}
+                        <div
+                          className="w-20 h-20 bg-gray-100 rounded border overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => handleBlueprintClick(blueprint)}
+                        >
+                          {isPdfFile(blueprint.blueprint) ? (
+                            <div className="w-full h-full">
+                              <Document
+                                file={blueprint.blueprint}
+                                loading={
+                                  <div className="flex items-center justify-center h-full">
+                                    <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
+                                  </div>
+                                }
+                              >
+                                <Page pageNumber={1} width={80} height={80} />
+                              </Document>
+                            </div>
+                          ) : (
+                            <img
+                              src={blueprint.blueprint}
+                              alt="Blueprint"
+                              className="w-full h-full object-cover"
+                            />
+                          )}
                         </div>
                       </div>
-
-                      {/* Right side - Blueprint Preview */}
-                      <div
-                        className="w-20 h-20 bg-gray-100 rounded border overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => handleBlueprintClick(blueprint)}
-                      >
-                        {isPdfFile(blueprint.blueprint) ? (
-                          <div className="w-full h-full">
-                            <Document
-                              file={blueprint.blueprint}
-                              loading={
-                                <div className="flex items-center justify-center h-full">
-                                  <Loader2 className="h-3 w-3 animate-spin text-gray-400" />
-                                </div>
-                              }
-                            >
-                              <Page
-                                pageNumber={1}
-                                width={80}
-                                height={80}
-                              />
-                            </Document>
-                          </div>
-                        ) : (
-                          <img
-                            src={blueprint.blueprint}
-                            alt="Blueprint"
-                            className="w-full h-full object-cover"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  ))
+                    )
+                  );
                 } else {
                   return (
                     <div className="text-center py-8 text-gray-500">
                       <div className="text-sm">No blueprints uploaded yet</div>
                     </div>
-                  )
+                  );
                 }
               })()}
             </div>
@@ -1782,7 +1863,7 @@ export default function SiteDetailsPage({ params }: Props) {
                 onClick={handleUploadButtonClick}
                 disabled={isUploadingBlueprint}
               >
-                {selectedBlueprintFile ? 'Change File' : 'Add New Blueprints'}
+                {selectedBlueprintFile ? "Change File" : "Add New Blueprints"}
               </Button>
               {selectedBlueprintFile && (
                 <Button
@@ -1790,7 +1871,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   onClick={handleBlueprintUpload}
                   disabled={isUploadingBlueprint}
                 >
-                  {isUploadingBlueprint ? 'Uploading...' : 'Upload Blueprint'}
+                  {isUploadingBlueprint ? "Uploading..." : "Upload Blueprint"}
                 </Button>
               )}
             </div>
@@ -1799,7 +1880,10 @@ export default function SiteDetailsPage({ params }: Props) {
       </Dialog>
 
       {/* Blueprint Success Dialog */}
-      <Dialog open={blueprintSuccessDialogOpen} onOpenChange={setBlueprintSuccessDialogOpen}>
+      <Dialog
+        open={blueprintSuccessDialogOpen}
+        onOpenChange={setBlueprintSuccessDialogOpen}
+      >
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
             <DialogTitle className="text-center">Success</DialogTitle>
@@ -1809,7 +1893,10 @@ export default function SiteDetailsPage({ params }: Props) {
             <p className="text-gray-700">Blueprint uploaded successfully!</p>
           </div>
           <div className="flex justify-center">
-            <Button onClick={() => setBlueprintSuccessDialogOpen(false)} className="w-full">
+            <Button
+              onClick={() => setBlueprintSuccessDialogOpen(false)}
+              className="w-full"
+            >
               OK
             </Button>
           </div>
@@ -1817,13 +1904,18 @@ export default function SiteDetailsPage({ params }: Props) {
       </Dialog>
 
       {/* Fullscreen Blueprint Dialog */}
-      <Dialog open={fullscreenDialogOpen} onOpenChange={setFullscreenDialogOpen}>
+      <Dialog
+        open={fullscreenDialogOpen}
+        onOpenChange={setFullscreenDialogOpen}
+      >
         <DialogContent className="max-w-6xl mx-auto max-h-[90vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               {fullscreenBlueprint && (
                 <div className="text-left">
-                  <div className="font-medium">{fullscreenBlueprint.uploaded_by}</div>
+                  <div className="font-medium">
+                    {fullscreenBlueprint.uploaded_by}
+                  </div>
                   <div className="text-sm text-gray-500">
                     {formatFirebaseDate(fullscreenBlueprint.created)}
                   </div>
@@ -1856,20 +1948,34 @@ export default function SiteDetailsPage({ params }: Props) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setFullscreenPdfPageNumber(Math.max(1, fullscreenPdfPageNumber - 1))}
+                          onClick={() =>
+                            setFullscreenPdfPageNumber(
+                              Math.max(1, fullscreenPdfPageNumber - 1)
+                            )
+                          }
                           disabled={fullscreenPdfPageNumber <= 1}
                           className="text-white hover:bg-white hover:text-black"
                         >
                           ‹
                         </Button>
                         <span className="text-sm">
-                          Page {fullscreenPdfPageNumber} of {fullscreenPdfNumPages}
+                          Page {fullscreenPdfPageNumber} of{" "}
+                          {fullscreenPdfNumPages}
                         </span>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => setFullscreenPdfPageNumber(Math.min(fullscreenPdfNumPages, fullscreenPdfPageNumber + 1))}
-                          disabled={fullscreenPdfPageNumber >= fullscreenPdfNumPages}
+                          onClick={() =>
+                            setFullscreenPdfPageNumber(
+                              Math.min(
+                                fullscreenPdfNumPages,
+                                fullscreenPdfPageNumber + 1
+                              )
+                            )
+                          }
+                          disabled={
+                            fullscreenPdfPageNumber >= fullscreenPdfNumPages
+                          }
                           className="text-white hover:bg-white hover:text-black"
                         >
                           ›
@@ -1891,7 +1997,10 @@ export default function SiteDetailsPage({ params }: Props) {
       </Dialog>
 
       {/* Structure Update Dialog */}
-      <Dialog open={structureUpdateDialogOpen} onOpenChange={setStructureUpdateDialogOpen}>
+      <Dialog
+        open={structureUpdateDialogOpen}
+        onOpenChange={setStructureUpdateDialogOpen}
+      >
         <DialogContent className="max-w-md mx-auto">
           <DialogHeader>
             <DialogTitle>Structure</DialogTitle>
@@ -1902,7 +2011,9 @@ export default function SiteDetailsPage({ params }: Props) {
               <input
                 type="text"
                 value={structureForm.color}
-                onChange={(e) => setStructureForm({ ...structureForm, color: e.target.value })}
+                onChange={(e) =>
+                  setStructureForm({ ...structureForm, color: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter structure color"
               />
@@ -1912,7 +2023,12 @@ export default function SiteDetailsPage({ params }: Props) {
               <input
                 type="text"
                 value={structureForm.contractor}
-                onChange={(e) => setStructureForm({ ...structureForm, contractor: e.target.value })}
+                onChange={(e) =>
+                  setStructureForm({
+                    ...structureForm,
+                    contractor: e.target.value,
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter contractor name"
               />
@@ -1922,7 +2038,12 @@ export default function SiteDetailsPage({ params }: Props) {
               <input
                 type="text"
                 value={structureForm.condition}
-                onChange={(e) => setStructureForm({ ...structureForm, condition: e.target.value })}
+                onChange={(e) =>
+                  setStructureForm({
+                    ...structureForm,
+                    condition: e.target.value,
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter structure condition"
               />
@@ -1947,7 +2068,10 @@ export default function SiteDetailsPage({ params }: Props) {
       </Dialog>
 
       {/* Coming Soon Dialog */}
-      <Dialog open={comingSoonDialogOpen} onOpenChange={setComingSoonDialogOpen}>
+      <Dialog
+        open={comingSoonDialogOpen}
+        onOpenChange={setComingSoonDialogOpen}
+      >
         <DialogContent className="max-w-sm mx-auto">
           <DialogHeader>
             <DialogTitle className="text-center">Coming Soon</DialogTitle>
@@ -1956,7 +2080,10 @@ export default function SiteDetailsPage({ params }: Props) {
             <p className="text-gray-700">This feature is coming soon!</p>
           </div>
           <div className="flex justify-center">
-            <Button onClick={() => setComingSoonDialogOpen(false)} className="w-full">
+            <Button
+              onClick={() => setComingSoonDialogOpen(false)}
+              className="w-full"
+            >
               OK
             </Button>
           </div>
@@ -1964,17 +2091,20 @@ export default function SiteDetailsPage({ params }: Props) {
       </Dialog>
 
       {/* Maintenance History Dialog */}
-      <Dialog open={maintenanceHistoryDialogOpen} onOpenChange={setMaintenanceHistoryDialogOpen}>
+      <Dialog
+        open={maintenanceHistoryDialogOpen}
+        onOpenChange={setMaintenanceHistoryDialogOpen}
+      >
         <DialogContent className="max-w-3xl mx-auto max-h-[80vh] overflow-hidden">
           <DialogHeader>
             <DialogTitle
               style={{
-                fontFamily: 'Inter',
+                fontFamily: "Inter",
                 fontWeight: 600,
-                fontSize: '18px',
-                lineHeight: '120%',
-                letterSpacing: '0%',
-                color: '#000000'
+                fontSize: "18px",
+                lineHeight: "120%",
+                letterSpacing: "0%",
+                color: "#000000",
               }}
             >
               Maintenance History
@@ -1987,12 +2117,12 @@ export default function SiteDetailsPage({ params }: Props) {
                 <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
                 <p
                   style={{
-                    fontFamily: 'Inter',
+                    fontFamily: "Inter",
                     fontWeight: 400,
-                    fontSize: '14px',
-                    lineHeight: '120%',
-                    letterSpacing: '0%',
-                    color: '#666666'
+                    fontSize: "14px",
+                    lineHeight: "120%",
+                    letterSpacing: "0%",
+                    color: "#666666",
                   }}
                 >
                   Loading maintenance history...
@@ -2006,12 +2136,12 @@ export default function SiteDetailsPage({ params }: Props) {
                       <TableHead
                         className="w-1/4"
                         style={{
-                          fontFamily: 'Inter',
+                          fontFamily: "Inter",
                           fontWeight: 600,
-                          fontSize: '14px',
-                          lineHeight: '120%',
-                          letterSpacing: '0%',
-                          color: '#000000'
+                          fontSize: "14px",
+                          lineHeight: "120%",
+                          letterSpacing: "0%",
+                          color: "#000000",
                         }}
                       >
                         Date
@@ -2019,12 +2149,12 @@ export default function SiteDetailsPage({ params }: Props) {
                       <TableHead
                         className="w-1/4"
                         style={{
-                          fontFamily: 'Inter',
+                          fontFamily: "Inter",
                           fontWeight: 600,
-                          fontSize: '14px',
-                          lineHeight: '120%',
-                          letterSpacing: '0%',
-                          color: '#000000'
+                          fontSize: "14px",
+                          lineHeight: "120%",
+                          letterSpacing: "0%",
+                          color: "#000000",
                         }}
                       >
                         SA Type
@@ -2032,12 +2162,12 @@ export default function SiteDetailsPage({ params }: Props) {
                       <TableHead
                         className="w-1/4"
                         style={{
-                          fontFamily: 'Inter',
+                          fontFamily: "Inter",
                           fontWeight: 600,
-                          fontSize: '14px',
-                          lineHeight: '120%',
-                          letterSpacing: '0%',
-                          color: '#000000'
+                          fontSize: "14px",
+                          lineHeight: "120%",
+                          letterSpacing: "0%",
+                          color: "#000000",
                         }}
                       >
                         SA No.
@@ -2045,12 +2175,12 @@ export default function SiteDetailsPage({ params }: Props) {
                       <TableHead
                         className="w-1/4"
                         style={{
-                          fontFamily: 'Inter',
+                          fontFamily: "Inter",
                           fontWeight: 600,
-                          fontSize: '14px',
-                          lineHeight: '120%',
-                          letterSpacing: '0%',
-                          color: '#000000'
+                          fontSize: "14px",
+                          lineHeight: "120%",
+                          letterSpacing: "0%",
+                          color: "#000000",
                         }}
                       >
                         Report
@@ -2063,12 +2193,12 @@ export default function SiteDetailsPage({ params }: Props) {
                         <TableCell colSpan={4} className="text-center py-8">
                           <p
                             style={{
-                              fontFamily: 'Inter',
+                              fontFamily: "Inter",
                               fontWeight: 500,
-                              fontSize: '14px',
-                              lineHeight: '120%',
-                              letterSpacing: '0%',
-                              color: '#666666'
+                              fontSize: "14px",
+                              lineHeight: "120%",
+                              letterSpacing: "0%",
+                              color: "#666666",
                             }}
                           >
                             No maintenance history found for this site.
@@ -2077,55 +2207,59 @@ export default function SiteDetailsPage({ params }: Props) {
                       </TableRow>
                     ) : (
                       maintenanceHistory.map((assignment) => (
-                        <TableRow key={assignment.id} className="hover:bg-gray-50">
+                        <TableRow
+                          key={assignment.id}
+                          className="hover:bg-gray-50"
+                        >
                           <TableCell
                             style={{
-                              fontFamily: 'Inter',
+                              fontFamily: "Inter",
                               fontWeight: 500,
-                              fontSize: '14px',
-                              lineHeight: '120%',
-                              letterSpacing: '0%',
-                              color: '#000000'
+                              fontSize: "14px",
+                              lineHeight: "120%",
+                              letterSpacing: "0%",
+                              color: "#000000",
                             }}
                           >
                             {formatFirebaseDate(assignment.created)}
                           </TableCell>
                           <TableCell
                             style={{
-                              fontFamily: 'Inter',
+                              fontFamily: "Inter",
                               fontWeight: 400,
-                              fontSize: '14px',
-                              lineHeight: '120%',
-                              letterSpacing: '0%',
-                              color: '#333333'
+                              fontSize: "14px",
+                              lineHeight: "120%",
+                              letterSpacing: "0%",
+                              color: "#333333",
                             }}
                           >
                             {assignment.serviceType || "N/A"}
                           </TableCell>
                           <TableCell
                             style={{
-                              fontFamily: 'Inter',
+                              fontFamily: "Inter",
                               fontWeight: 400,
-                              fontSize: '14px',
-                              lineHeight: '120%',
-                              letterSpacing: '0%',
-                              color: '#333333'
+                              fontSize: "14px",
+                              lineHeight: "120%",
+                              letterSpacing: "0%",
+                              color: "#333333",
                             }}
                           >
                             {assignment.saNumber || "N/A"}
                           </TableCell>
                           <TableCell>
-                            {assignment.attachments && assignment.attachments.length > 0 ? (
+                            {assignment.attachments &&
+                            assignment.attachments.length > 0 ? (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 style={{
-                                  fontFamily: 'Inter',
+                                  fontFamily: "Inter",
                                   fontWeight: 600,
-                                  fontSize: '14px',
-                                  lineHeight: '120%',
-                                  letterSpacing: '0%',
-                                  color: '#000000'
+                                  fontSize: "14px",
+                                  lineHeight: "120%",
+                                  letterSpacing: "0%",
+                                  color: "#000000",
                                 }}
                               >
                                 View Report
@@ -2133,12 +2267,12 @@ export default function SiteDetailsPage({ params }: Props) {
                             ) : (
                               <span
                                 style={{
-                                  fontFamily: 'Inter',
+                                  fontFamily: "Inter",
                                   fontWeight: 500,
-                                  fontSize: '14px',
-                                  lineHeight: '120%',
-                                  letterSpacing: '0%',
-                                  color: '#666666'
+                                  fontSize: "14px",
+                                  lineHeight: "120%",
+                                  letterSpacing: "0%",
+                                  color: "#666666",
                                 }}
                               >
                                 N/A
@@ -2159,12 +2293,12 @@ export default function SiteDetailsPage({ params }: Props) {
               onClick={() => setMaintenanceHistoryDialogOpen(false)}
               className="w-32"
               style={{
-                fontFamily: 'Inter',
+                fontFamily: "Inter",
                 fontWeight: 600,
-                fontSize: '14px',
-                lineHeight: '120%',
-                letterSpacing: '0%',
-                color: '#FFFFFF'
+                fontSize: "14px",
+                lineHeight: "120%",
+                letterSpacing: "0%",
+                color: "#FFFFFF",
               }}
             >
               OK
@@ -2172,7 +2306,6 @@ export default function SiteDetailsPage({ params }: Props) {
           </div>
         </DialogContent>
       </Dialog>
-
     </div>
-  )
+  );
 }
