@@ -211,6 +211,7 @@ export function ProductSelectionDialog({
   }
 
   const handleProductSelect = (product: Product) => {
+    console.log("ProductSelectionDialog handleProductSelect called with:", product)
     onSelectProduct(product)
     onOpenChange(false)
   }

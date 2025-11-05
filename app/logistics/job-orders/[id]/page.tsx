@@ -316,7 +316,7 @@ export default function JobOrderDetailsPage({ params }: Props) {
           )}
 
           {/* Attachments */}
-          {jobOrder.attachments && jobOrder.attachments.length > 0 && (
+          {jobOrder.attachments && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -326,22 +326,20 @@ export default function JobOrderDetailsPage({ params }: Props) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {jobOrder.attachments.map((attachment, index) => (
-                    <div key={index} className="flex items-center gap-2 p-2 border rounded">
-                      <FileText className="h-4 w-4 text-gray-500" />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{attachment.name}</p>
-                        <p className="text-xs text-gray-500">{attachment.type}</p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(attachment.url, "_blank")}
-                      >
-                        View
-                      </Button>
+                  <div className="flex items-center gap-2 p-2 border rounded">
+                    <FileText className="h-4 w-4 text-gray-500" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{jobOrder.attachments.name}</p>
+                      <p className="text-xs text-gray-500">{jobOrder.attachments.type}</p>
                     </div>
-                  ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(jobOrder.attachments!.url, "_blank")}
+                    >
+                      View
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

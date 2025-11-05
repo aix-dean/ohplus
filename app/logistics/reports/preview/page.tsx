@@ -489,8 +489,8 @@ export default function ReportPreviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
+    <>
+    <div className="bg-white px-4 py-3 mb-4 flex items-center shadow-sm border-b">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -545,8 +545,7 @@ export default function ReportPreviewPage() {
           </div>
         </div>
 
-        <div className="mx-24 mb-8 bg-white shadow-lg rounded-lg overflow-auto">
-          <div className="w-full relative">
+        <div className="w-full relative">
             <div className="relative h-16 overflow-hidden">
               <div className="absolute inset-0 bg-blue-900"></div>
               <div
@@ -788,7 +787,6 @@ export default function ReportPreviewPage() {
               </div>
             </div>
           </div>
-        </div>
       </div>
 
       <div className="fixed bottom-6 right-6 z-50">
@@ -896,6 +894,6 @@ export default function ReportPreviewPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   )
 }
