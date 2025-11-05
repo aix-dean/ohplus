@@ -688,7 +688,7 @@ export function ServiceAssignmentCard({
                   >
                     Choose Files
                   </label>
-                  <span className="text-sm text-gray-500">Max 10MB per file (Images, PDFs, Docs, MP4)</span>
+                  <span className="text-sm text-gray-500">Max 100MB per file (Images, PDFs, Docs, MP4)</span>
                 </div>
 
                 {/* Display uploaded attachments */}
