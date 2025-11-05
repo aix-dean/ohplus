@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Slider } from "@/components/ui/slider"
-import Image from "next/image"
-import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import Image from "next/image";
+import { useState, useEffect, useRef } from "react";
 import {
   Settings,
   Power,
@@ -19,126 +19,165 @@ import {
   Play,
   Sun,
   FolderSyncIcon as Sync,
-} from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ComingSoonModal } from "../coming-soon-dialog";
 
 interface SiteControlsProps {
-  product: any
+  product: any;
 }
 
 export default function SiteControls({ product }: SiteControlsProps) {
-  // Mock LED status data - in a real app, this would come from the product data
-  const ledStatus = {
-    powerStatus: "On",
-    temperature: "32°C",
-    connection: "Online",
-    videoSource: "HDMI 1",
-    activeContent: "Current Campaign",
-    lastReboot: new Date().toLocaleDateString() + " 09:15 AM",
-    lastTimeSync: new Date().toLocaleDateString() + " 08:00 AM",
-    warnings: product.specs_rental?.elevation && product.specs_rental.elevation > 100 ? ["High elevation detected"] : [],
-  }
-
   // State to store player status data
-  const [playerStatus, setPlayerStatus] = useState<any>(null)
+  const [playerStatus, setPlayerStatus] = useState<any>(null);
 
   // State to store player configuration data
-  const [playerConfiguration, setPlayerConfiguration] = useState<any>(null)
+  const [playerConfiguration, setPlayerConfiguration] = useState<any>(null);
 
-  // State for brightness slider
-  const [brightnessValue, setBrightnessValue] = useState<number>(50)
+  // State for brightness slider - three-tier state management
+  const oldBrightnessRef = useRef(50); // baseline value
+  const [currentBrightness, setCurrentBrightness] = useState(50); // current displayed value
+  const [newBrightness, setNewBrightness] = useState(50); // proposed value
 
-  // State for volume slider
-  const [volumeValue, setVolumeValue] = useState<number>(60)
+  // State for volume slider - three-tier state management
+  const oldVolumeRef = useRef(50);
+  const [currentVolume, setCurrentVolume] = useState(50); // current displayed value
+  const [newVolume, setNewVolume] = useState(50); // proposed value
 
   // Toast hook
-  const { toast } = useToast()
-
-  // Fetch player status and configuration on component mount
-  useEffect(() => {
-    fetchPlayerStatus()
-    fetchPlayerConfiguration()
-  }, [])
+  const { toast } = useToast();
 
   const handleAutoBrightness = async () => {
-    try {
-      const response = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/brightness", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "playerIds": ["141a16d405254b8fb5c5173ef3a58cc5"],
-          "value": 50,
-          "noticeUrl": "http://www.abc.com/notice"
-        })
+    const previousValue = oldBrightnessRef.current;
+
+    if (!product.playerIds || product.playerIds.length === 0) {
+      toast({
+        title: "Failed",
+        description: "No Player ID",
+        variant: "destructive",
       });
+      return;
+    }
+    // Store the old value before attempting auto brightness
+    try {
+      const response = await fetch(
+        "https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/brightness",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            playerIds: product.playerIds,
+            value: 50,
+            noticeUrl: "http://www.abc.com/notice",
+          }),
+        }
+      );
 
       if (response.ok) {
         toast({
           title: "Success",
           description: "Auto Brightness request sent successfully",
         });
+        // Update old brightness to the new successful value
+        setNewBrightness(50);
       } else {
-        alert("Failed to send Auto Brightness request");
+        toast({
+          title: "Failed",
+          description: `Invalid Player ID`,
+          variant: "destructive",
+        });
+        // Revert to the old brightness value
+        setNewBrightness(previousValue);
       }
     } catch (error) {
       console.error("Error:", error);
-      alert("Error sending Auto Brightness request");
+      toast({
+        title: "Failed",
+        description: `Invalid Player ID`,
+        variant: "destructive",
+      });
+      setNewBrightness(previousValue);
     }
-  }
+  };
 
   const handleScreenshot = async () => {
-    try {
-      const response = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/screenshot", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "playerIds": ["141a16d405254b8fb5c5173ef3a58cc5"],
-          "noticeUrl": "http://www.abc.com/notice"
-        })
+    if (!product.playerIds || product.playerIds.length === 0) {
+      toast({
+        title: "Failed",
+        description: "No Player ID",
+        variant: "destructive",
       });
+    }
+    try {
+      const response = await fetch(
+        "https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/screenshot",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            playerIds: product.playerIds,
+            noticeUrl: "http://www.abc.com/notice",
+          }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`screen shot data: `)
+        console.log(`screen shot data: `);
         if (data.screenshotUrl || data.url) {
           // Automatically download the screenshot
           const screenshotUrl = data.screenshotUrl || data.url;
-          const link = document.createElement('a');
+          const link = document.createElement("a");
           link.href = screenshotUrl;
-          link.download = `screenshot_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+          link.download = `screenshot_${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.png`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
         } else {
           toast({
             title: "Success",
-            description: "Screenshot request sent, but no download URL received",
+            description:
+              "Screenshot request sent, but no download URL received",
           });
         }
       } else {
-        alert("Failed to take screenshot");
+        toast({
+          title: "Failed",
+          description: `Invalid Player ID`,
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error:", error);
       alert("Error taking screenshot");
     }
-  }
+  };
 
   const handlePauseContent = async () => {
-    try {
-      const response = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/solutions/cancel", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "playerIds": ["141a16d405254b8fb5c5173ef3a58cc5"]
-        })
+    if (!product.playerIds || product.playerIds.length === 0) {
+      toast({
+        title: "Failed",
+        description: "No Player ID",
+        variant: "destructive",
       });
+    }
+    try {
+      const response = await fetch(
+        "https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/solutions/cancel",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            playerIds: product.playerIds,
+          }),
+        }
+      );
 
       if (response.ok) {
         toast({
@@ -146,158 +185,178 @@ export default function SiteControls({ product }: SiteControlsProps) {
           description: "Content paused successfully",
         });
       } else {
-        alert("Failed to pause content");
+        toast({
+          title: "Failed",
+          description: `Invalid Player ID`,
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error:", error);
       alert("Error pausing content");
     }
-  }
+  };
 
   const handleRestart = async () => {
-    try{
-      const statusResponse = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/restart", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "playerIds": ["141a16d405254b8fb5c5173ef3a58cc5"],
-        })
-        
-      })
+    if (!product.playerIds || product.playerIds.length === 0) {
+      toast({
+        title: "Failed",
+        description: "No Player ID",
+        variant: "destructive",
+      });
+    }
+    try {
+      const statusResponse = await fetch(
+        "https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/restart",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            playerIds: product?.playerIds,
+          }),
+        }
+      );
       if (statusResponse.ok) {
-        fetchPlayerStatus()
-       toast({
+        toast({
           title: "Success",
           description: "The Player successfully restart",
         });
       } else {
-        console.error("Failed to fetch player status");
+        toast({
+          title: "Failed",
+          description: `Invalid Player ID`,
+          variant: "destructive",
+        });
       }
-    }catch(e){
+    } catch (e) {
       console.error("Error fetching player status:", e);
     }
-  }
+  };
 
-  // Function to fetch and store player status data
-  const fetchPlayerStatus = async () => {
-    try {
-      const statusResponse = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/status/player-info", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "playerIds": ["141a16d405254b8fb5c5173ef3a58cc5"],
-          "playerSns": ["2ZVA53C25W2A10067082"]
-        })
-      });
+  const setBrightnessValue = (value: number[]) => {
+    setNewBrightness(value[0]); // store the temporary new brightness
+    console.log(`new brightness : ${newBrightness}`);
+  };
 
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json();
-        setPlayerStatus(statusData);
-        console.log("Player status saved:", statusData);
-      } else {
-        console.error("Failed to fetch player status");
-      }
-    } catch (error) {
-      console.error("Error fetching player status:", error);
-    }
-  }
-
-  // Function to fetch and store player configuration data
-  const fetchPlayerConfiguration = async () => {
-    try {
-      const configResponse = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/status/configuration", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "playerIds": ["141a16d405254b8fb5c5173ef3a58cc5"],
-          "commands": ["volumeValue", "brightnessValue", "videoSourceValue", "timeValue"],
-          "noticeUrl": "http://www.abc.com/notice"
-        })
-      });
-
-      if (configResponse.ok) {
-        const configData = await configResponse.json();
-        setPlayerConfiguration(configData);
-        console.log("Player configuration saved:", configData);
-      } else {
-        console.error("Failed to fetch player configuration");
-      }
-    } catch (error) {
-      console.error("Error fetching player configuration:", error);
-    }
-  }
+  const setVolumeValue = (value: number[]) => {
+    setNewVolume(value[0]); // store the temporary new volume
+  };
 
   // Function to apply brightness control
   const handleApplyBrightness = async () => {
+    const valueToApply = newBrightness;
+    const previousValue = oldBrightnessRef.current;
+    console.log(`old brightness apply : ${previousValue}`);
     try {
-      const response = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/brightness", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "playerIds": ["141a16d405254b8fb5c5173ef3a58cc5"],
-          "value": brightnessValue,
-          "noticeUrl": "http://www.abc.com/notice"
-        })
-      });
+      if (!product.playerIds || product.playerIds.length === 0) {
+        toast({
+          title: "Failed",
+          description: "No Player ID",
+          variant: "destructive",
+        });
+        setNewBrightness(previousValue);
+        return;
+      }
+
+      const response = await fetch(
+        "https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/brightness",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            playerIds: product?.playerIds,
+            value: newBrightness,
+            noticeUrl: "http://www.abc.com/notice",
+          }),
+        }
+      );
 
       if (response.ok) {
         toast({
           title: "Success",
-          description: `Brightness set to ${brightnessValue}% successfully`,
+          description: `Brightness set to ${newBrightness}% successfully`,
         });
+        oldBrightnessRef.current = valueToApply;
+        // Update old brightness to the new successful value
       } else {
-        alert("Failed to set brightness");
+        toast({
+          title: "Failed",
+          description: `Invalid Player ID`,
+          variant: "destructive",
+        });
+        // Revert to the old brightness value
+        setNewBrightness(previousValue); // Also revert the slider position
       }
     } catch (error) {
       console.error("Error:", error);
       alert("Error setting brightness");
+      // Revert to the old brightness value
+      setNewBrightness(previousValue); // Also revert the slider position
     }
-  }
+  };
 
   // Function to apply volume control
   const handleApplyVolume = async () => {
+    const previousVolume = oldVolumeRef.current;
+    const applyToValue = newVolume
     try {
-      const response = await fetch("https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/volume", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          "playerIds": ["141a16d405254b8fb5c5173ef3a58cc5"],
-          "value": volumeValue,
-          "noticeUrl": "http://www.abc.com/notice"
-        })
-      });
+      if (!product.playerIds || product.playerIds.length === 0) {
+        toast({
+          title: "Failed",
+          description: "No Player ID",
+          variant: "destructive",
+        });
+        setNewVolume(previousVolume)
+        return;
+      }
+
+      const response = await fetch(
+        "https://cms-novacloud-272363630855.asia-southeast1.run.app/api/v1/players/realtime-control/volume",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            playerIds: product.playerIds,
+            value: newVolume,
+            noticeUrl: "http://www.abc.com/notice",
+          }),
+        }
+      );
 
       if (response.ok) {
         toast({
           title: "Success",
-          description: `Volume set to ${volumeValue}% successfully`,
+          description: `Volume set to ${newVolume}% successfully`,
         });
+        // Update old volume to the new successful value
+        setNewVolume(applyToValue);
       } else {
-        alert("Failed to set volume");
+        toast({
+          title: "Failed",
+          description: `Invalid Player ID`,
+          variant: "destructive",
+        });
+        // Revert to the old volume value
+        setNewVolume(previousVolume); // Also revert the slider position
       }
     } catch (error) {
       console.error("Error:", error);
       alert("Error setting volume");
+      // Revert to the old volume value
+      setNewVolume(previousVolume); // Also revert the slider position
     }
-  }
-
-
-
+  };
 
   return (
     <div className="space-y-6">
-        <div className="w-full">
-      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> */}
+      <div className="w-full">
+        {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-6"> */}
         {/* LED Site Status */}
         {/* <Card>
           <CardHeader>
@@ -374,12 +433,12 @@ export default function SiteControls({ product }: SiteControlsProps) {
                 className="flex items-center gap-2 bg-transparent"
               >
                 <Power size={16} />
-                
               </Button>
-              <Button 
-              variant="outline" 
-              onClick={handleRestart}
-              className="flex items-center gap-2 bg-transparent">
+              <Button
+                variant="outline"
+                onClick={handleRestart}
+                className="flex items-center gap-2 bg-transparent"
+              >
                 <RotateCcw size={16} />
                 Restart Players
               </Button>
@@ -396,7 +455,10 @@ export default function SiteControls({ product }: SiteControlsProps) {
                   <Pause size={16} />
                   Pause Content
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 bg-transparent"
+                >
                   <ToggleLeft size={16} />
                   Switch Source
                 </Button>
@@ -413,7 +475,10 @@ export default function SiteControls({ product }: SiteControlsProps) {
                   <Timer size={16} />
                   NTP Time Sync
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 bg-transparent"
+                >
                   <RefreshCw size={16} />
                   Screen Refresh
                 </Button>
@@ -431,7 +496,10 @@ export default function SiteControls({ product }: SiteControlsProps) {
                   <Camera size={16} />
                   Screenshot
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 bg-transparent"
+                >
                   <RefreshCw size={16} />
                   Refresh Status
                 </Button>
@@ -441,11 +509,17 @@ export default function SiteControls({ product }: SiteControlsProps) {
             <div>
               <h4 className="font-medium mb-3">Quick Actions</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 bg-transparent"
+                >
                   <TestTube size={16} />
                   Test Pattern
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 bg-transparent"
+                >
                   <Play size={16} />
                   Run Diagnostics
                 </Button>
@@ -457,7 +531,10 @@ export default function SiteControls({ product }: SiteControlsProps) {
                   <Sun size={16} />
                   Auto Brightness
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2 bg-transparent"
+                >
                   <Sync size={16} />
                   Sync Playback
                 </Button>
@@ -527,15 +604,15 @@ export default function SiteControls({ product }: SiteControlsProps) {
           <CardContent>
             <div className="space-y-4">
               <Slider
-                value={[brightnessValue]}
-                onValueChange={(value) => setBrightnessValue(value[0])}
+                value={[newBrightness]}
+                onValueChange={(value) => setBrightnessValue(value)}
                 max={100}
                 step={1}
                 className="w-full"
               />
               <div className="flex justify-between text-sm text-gray-500">
                 <span>0%</span>
-                <span>{brightnessValue}%</span>
+                <span>{newBrightness}%</span>
                 <span>100%</span>
               </div>
               <Button onClick={handleApplyBrightness} className="w-full">
@@ -552,15 +629,15 @@ export default function SiteControls({ product }: SiteControlsProps) {
           <CardContent>
             <div className="space-y-4">
               <Slider
-                value={[volumeValue]}
-                onValueChange={(value) => setVolumeValue(value[0])}
+                value={[newVolume]}
+                onValueChange={(value) => setVolumeValue(value)}
                 max={100}
                 step={1}
                 className="w-full"
               />
               <div className="flex justify-between text-sm text-gray-500">
                 <span>0%</span>
-                <span>{volumeValue}%</span>
+                <span>{currentVolume}%</span>
                 <span>100%</span>
               </div>
               <Button onClick={handleApplyVolume} className="w-full">
@@ -571,5 +648,5 @@ export default function SiteControls({ product }: SiteControlsProps) {
         </Card>
       </div>
     </div>
-  )
+  );
 }

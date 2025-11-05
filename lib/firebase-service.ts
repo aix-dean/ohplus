@@ -129,6 +129,7 @@ export interface Product {
     type: string
     isVideo: boolean
   }>
+  playerIds?: string[]
   categories?: string[]
   category_names?: string[]
   content_type?: string
