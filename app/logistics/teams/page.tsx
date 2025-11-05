@@ -113,27 +113,15 @@ export default function TeamsPage() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8" style={{ marginTop: '-32px' }}>
-      <div className="max-w-screen-2xl" style={{ marginLeft: '-25px', marginRight: 'auto' }}>
+    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-700" style={{ transform: 'translate(0px, -30px)' }}>
+          <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-700">
             Crew and Personnel
           </h1>
-          <div className="flex flex-col items-end gap-2" >
-            <button
-              onClick={() => {
-                setEditingTeam(null)
-                setFormData({ crewName: "", crewHead: "", contactNumber: "" })
-                setSelectedAvatar("")
-                setIsAddTeamDialogOpen(true)
-              }}
-              className="bg-white border border-gray-400 rounded-lg px-4 py-2 text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              style={{ transform: 'translate(275px, 0px)' }}
-            >
-              Add New Team
-            </button>
-            <div className="flex items-center gap-2" style={{ transform: 'translate(240px, 3px)' }}>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode('list')}
                 className={`w-6 h-6 ${viewMode === 'list' ? '' : 'opacity-30'}`}
@@ -147,18 +135,29 @@ export default function TeamsPage() {
                 <img alt="Grid view" src={imgGrid} className="w-full h-full" />
               </button>
             </div>
+            <button
+              onClick={() => {
+                setEditingTeam(null)
+                setFormData({ crewName: "", crewHead: "", contactNumber: "" })
+                setSelectedAvatar("")
+                setIsAddTeamDialogOpen(true)
+              }}
+              className="bg-white border border-gray-400 rounded-lg px-4 py-2 text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Add New Team
+            </button>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="relative mb-8 max-w-md" style={{ transform: 'translate(0px, -55px)' }}>
+        <div className="relative mb-8 w-full max-w-md">
           <div className="relative">
             <input
               type="text"
               placeholder="Search"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-xs bg-white border border-gray-400 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 text-sm bg-white border border-gray-400 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <div className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 opacity-30">
               <img alt="" src={imgMagnifyingGlass2} className="w-full h-full" />
@@ -168,12 +167,11 @@ export default function TeamsPage() {
 
         {/* Team Display */}
         {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5" style={{ transform: 'translate(0px, -55px)', columnGap: '315px', rowGap: '20px' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {paginatedTeams.map((team) => (
             <div
               key={team.id}
-              className="bg-white rounded-lg p-4 hover:shadow-2xl transition-shadow cursor-pointer"
-              style={{ width: '300px', height: '360px', flexShrink: 0, boxShadow: '-4px 4px 8px rgba(0,0,0,0.1)' }}
+              className="bg-white rounded-lg p-4 hover:shadow-2xl transition-shadow cursor-pointer min-h-[360px] shadow-lg"
               onClick={(e) => {
                 // Prevent navigation if clicking on dropdown menu
                 if (!(e.target as Element).closest('.dropdown-menu')) {
@@ -199,7 +197,7 @@ export default function TeamsPage() {
                   </button>
 
                   {menuOpen === team.id && (
-                      <div className="dropdown-menu absolute left-6 top-0 z-10 w-32 bg-white border border-gray-400 rounded-md shadow-lg" style={{ transform: 'translate(-150px, 0px)' }}>
+                      <div className="dropdown-menu absolute right-0 top-full z-10 w-32 bg-white border border-gray-400 shadow-lg">
                       <button
                         onClick={() => {
                           // Handle edit
@@ -215,7 +213,7 @@ export default function TeamsPage() {
                           setIsAddTeamDialogOpen(true)
                           setMenuOpen(null)
                         }}
-                        className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-md"
+                        className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         Edit
                       </button>
@@ -247,7 +245,7 @@ export default function TeamsPage() {
               </div>
 
               <div className="flex flex-col items-center mb-2">
-                <div className="w-48 h-48 md:w-52 md:h-52 bg-transparent border-0 outline-0 shadow-none flex items-center justify-center overflow-hidden" style={{ border: 'none', outline: 'none', boxShadow: 'none' }}>
+                <div className="w-full max-w-48 h-48 sm:max-w-52 sm:h-52 bg-transparent flex items-center justify-center overflow-hidden">
                   {(() => {
                     const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
                     const avatar = avatarMatch ? avatarMatch[1] : null
@@ -255,11 +253,10 @@ export default function TeamsPage() {
                       <img
                         src={`/icons/${avatar}`}
                         alt={`${team.name} avatar`}
-                        className="w-full h-full object-contain border-0 outline-0 shadow-none"
-                        style={{ outline: 'none', border: 'none', boxShadow: 'none', display: 'block' }}
+                        className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-2xl md:text-3xl text-gray-500 font-bold">
+                      <span className="text-2xl sm:text-3xl text-gray-500 font-bold">
                         {team.name.charAt(0)}
                       </span>
                     )
@@ -282,24 +279,23 @@ export default function TeamsPage() {
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-t-lg w-full" style={{ transform: 'translate(0px, -55px)' }}>
-            {/* Table Header */}
-            <div className="flex items-center px-6 py-4 border-b">
-              <div className="flex items-center">
-                <div className="w-80 text-sm font-semibold text-gray-700 text-left truncate">Crew Name</div>
-                <div className="w-64 text-sm font-semibold text-gray-700 text-left truncate">Crew Head</div>
-                <div className="w-64 text-sm font-semibold text-gray-700 text-left">Contact Number</div>
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+            {/* Table Header - Hidden on mobile, shown on larger screens */}
+            <div className="hidden md:flex items-center justify-between px-6 py-4 border-b bg-gray-50">
+              <div className="flex items-center space-x-8 flex-1">
+                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1">Crew Name</div>
+                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1">Crew Head</div>
+                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1">Contact Number</div>
               </div>
-              <div className="ml-auto w-20 text-left text-sm font-semibold text-gray-700">Actions</div>
+              <div className="w-16 text-center text-sm font-semibold text-gray-700">Actions</div>
             </div>
 
             {/* Table Rows */}
-            <div className="space-y-1 px-6 py-2">
+            <div className="divide-y divide-gray-200">
               {paginatedTeams.map((team) => (
                 <div
                   key={team.id}
-                  className="flex items-center h-16 px-6 cursor-pointer"
-                  style={{ borderRadius: '10px', border: '2px solid #B8D9FF', background: '#F6F9FF' }}
+                  className="bg-white hover:bg-gray-50 cursor-pointer transition-colors"
                   onClick={(e) => {
                     // Prevent navigation if clicking on dropdown menu
                     if (!(e.target as Element).closest('.dropdown-menu')) {
@@ -307,66 +303,136 @@ export default function TeamsPage() {
                     }
                   }}
                 >
-                  <div className="flex items-center">
-                    <div className="w-80 text-sm text-gray-700 text-left truncate">{team.name}</div>
-                    <div className="w-64 text-sm text-gray-700 text-left truncate">{team.leaderName || 'No Leader'}</div>
-                    <div className="w-64 text-sm text-gray-700 text-left">{team.contactNumber || 'N/A'}</div>
-                  </div>
-                  <div className="ml-auto w-20 flex justify-end relative">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setMenuOpen(menuOpen === team.id ? null : team.id)
-                      }}
-                      className="opacity-50 hover:opacity-100 transition-opacity"
-                    >
-                      <div className="w-4 h-4">
-                        <img alt="" src={imgDots} className="w-full h-full" />
+                  {/* Mobile Layout */}
+                  <div className="md:hidden p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="text-base font-semibold text-gray-900">{team.name}</h3>
+                        <p className="text-sm text-gray-600 mt-1">Head: {team.leaderName || 'No Leader'}</p>
+                        <p className="text-sm text-gray-600">Contact: {team.contactNumber || 'N/A'}</p>
                       </div>
-                    </button>
+                      <div className="relative">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMenuOpen(menuOpen === team.id ? null : team.id)
+                          }}
+                          className="opacity-50 hover:opacity-100 transition-opacity p-2"
+                        >
+                          <div className="w-4 h-4">
+                            <img alt="" src={imgDots} className="w-full h-full" />
+                          </div>
+                        </button>
 
-                    {menuOpen === team.id && (
-                      <div className="dropdown-menu absolute left-0 top-full z-10 w-32 bg-white border border-gray-400 rounded-md shadow-lg" style={{ transform: 'translate(-100%, 0px)' }}>
-                        <button
-                          onClick={() => {
-                            setEditingTeam(team)
-                            setFormData({
-                              crewName: team.name,
-                              crewHead: team.leaderName || "",
-                              contactNumber: team.contactNumber || ""
-                            })
-                            const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
-                            setSelectedAvatar(avatarMatch ? avatarMatch[1] : "")
-                            setIsAddTeamDialogOpen(true)
-                            setMenuOpen(null)
-                          }}
-                          className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-md"
-                        >
-                          Edit
-                        </button>
-                        <div className="border-t border-gray-200"></div>
-                        <button
-                          onClick={async () => {
-                            try {
-                              await updateTeam(team.id, { deleted: true } as any, userData?.company_id || undefined)
-                              const updatedTeams = await getTeams(userData?.company_id || undefined)
-                              setTeams(updatedTeams)
-                              setMenuOpen(null)
-                              toast({
-                                title: "Team deleted",
-                                description: "The team has been successfully deleted.",
-                              })
-                            } catch (error) {
-                              console.error('Error deleting team:', error)
-                              alert('Failed to delete team. Please try again.')
-                            }
-                          }}
-                          className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 last:rounded-b-md"
-                        >
-                          Delete
-                        </button>
+                        {menuOpen === team.id && (
+                          <div className="dropdown-menu absolute right-0 top-full z-10 w-32 bg-white border border-gray-400 rounded-md shadow-lg">
+                            <button
+                              onClick={() => {
+                                setEditingTeam(team)
+                                setFormData({
+                                  crewName: team.name,
+                                  crewHead: team.leaderName || "",
+                                  contactNumber: team.contactNumber || ""
+                                })
+                                const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
+                                setSelectedAvatar(avatarMatch ? avatarMatch[1] : "")
+                                setIsAddTeamDialogOpen(true)
+                                setMenuOpen(null)
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-md"
+                            >
+                              Edit
+                            </button>
+                            <div className="border-t border-gray-200"></div>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await updateTeam(team.id, { deleted: true } as any, userData?.company_id || undefined)
+                                  const updatedTeams = await getTeams(userData?.company_id || undefined)
+                                  setTeams(updatedTeams)
+                                  setMenuOpen(null)
+                                  toast({
+                                    title: "Team deleted",
+                                    description: "The team has been successfully deleted.",
+                                  })
+                                } catch (error) {
+                                  console.error('Error deleting team:', error)
+                                  alert('Failed to delete team. Please try again.')
+                                }
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 last:rounded-b-md"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
+                  </div>
+
+                  {/* Desktop Layout */}
+                  <div className="hidden md:flex items-center justify-between px-6 py-4">
+                    <div className="flex items-center space-x-8 flex-1">
+                      <div className="text-sm text-gray-700 text-left min-w-0 flex-1">{team.name}</div>
+                      <div className="text-sm text-gray-700 text-left min-w-0 flex-1">{team.leaderName || 'No Leader'}</div>
+                      <div className="text-sm text-gray-700 text-left min-w-0 flex-1">{team.contactNumber || 'N/A'}</div>
+                    </div>
+                    <div className="w-16 flex justify-center relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setMenuOpen(menuOpen === team.id ? null : team.id)
+                        }}
+                        className="opacity-50 hover:opacity-100 transition-opacity"
+                      >
+                        <div className="w-4 h-4">
+                          <img alt="" src={imgDots} className="w-full h-full" />
+                        </div>
+                      </button>
+
+                      {menuOpen === team.id && (
+                        <div className="dropdown-menu absolute left-0 top-full z-10 w-32 bg-white border border-gray-400 rounded-md shadow-lg">
+                          <button
+                            onClick={() => {
+                              setEditingTeam(team)
+                              setFormData({
+                                crewName: team.name,
+                                crewHead: team.leaderName || "",
+                                contactNumber: team.contactNumber || ""
+                              })
+                              const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
+                              setSelectedAvatar(avatarMatch ? avatarMatch[1] : "")
+                              setIsAddTeamDialogOpen(true)
+                              setMenuOpen(null)
+                            }}
+                            className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 first:rounded-t-md"
+                          >
+                            Edit
+                          </button>
+                          <div className="border-t border-gray-200"></div>
+                          <button
+                            onClick={async () => {
+                              try {
+                                await updateTeam(team.id, { deleted: true } as any, userData?.company_id || undefined)
+                                const updatedTeams = await getTeams(userData?.company_id || undefined)
+                                setTeams(updatedTeams)
+                                setMenuOpen(null)
+                                toast({
+                                  title: "Team deleted",
+                                  description: "The team has been successfully deleted.",
+                                })
+                              } catch (error) {
+                                console.error('Error deleting team:', error)
+                                alert('Failed to delete team. Please try again.')
+                              }
+                            }}
+                            className="w-full text-right px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 last:rounded-b-md"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -469,7 +535,7 @@ export default function TeamsPage() {
               </div>
 
               {/* Buttons */}
-              <div className="flex justify-end gap-4 mt-10" style={{ transform: 'translate(0px, 30px)'}}>
+              <div className="flex justify-end gap-4 mt-6">
                 <button
                   onClick={() => {
                     setIsAddTeamDialogOpen(false)
@@ -549,7 +615,6 @@ export default function TeamsPage() {
                   }}
                   disabled={isCreating}
                   className="px-6 py-2 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ transform: 'translate(0px, 0px)' }}
                 >
                   {isCreating ? "Creating..." : "Save"}
                 </button>
