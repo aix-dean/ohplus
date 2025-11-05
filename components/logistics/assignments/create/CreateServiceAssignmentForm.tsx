@@ -178,6 +178,8 @@ export function CreateServiceAssignmentForm({
   onOpenJobOrderDialog,
   onClearJobOrder,
   onReplaceJobOrder,
+  onFileUpload,
+  onRemoveAttachment,
 }: {
   onSaveAsDraft: () => Promise<void>;
   onSubmit: () => Promise<void>;
@@ -201,6 +203,8 @@ export function CreateServiceAssignmentForm({
   onOpenJobOrderDialog?: () => void;
   onClearJobOrder?: () => void;
   onReplaceJobOrder?: (jobOrder: JobOrder) => void;
+  onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveAttachment?: (index: number) => void;
 }) {
   const [showJobOrderSelectionDialog, setShowJobOrderSelectionDialog] = useState(false);
   const { toast } = useToast();
@@ -219,6 +223,8 @@ export function CreateServiceAssignmentForm({
           selectedJobOrder={jobOrderData}
           onOpenProductSelection={onOpenProductSelection}
           onClearJobOrder={onClearJobOrder}
+          onFileUpload={onFileUpload}
+          onRemoveAttachment={onRemoveAttachment}
         />
       </div>
       <div className="flex flex-col gap-6 w-full lg:w-[25%]">

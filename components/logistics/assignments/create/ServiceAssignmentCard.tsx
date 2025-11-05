@@ -151,6 +151,8 @@ interface ServiceAssignmentCardProps {
   selectedJobOrder: JobOrder | null;
   onOpenProductSelection: () => void;
   onClearJobOrder?: () => void;
+  onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemoveAttachment?: (index: number) => void;
 }
 
 export function ServiceAssignmentCard({
@@ -163,15 +165,17 @@ export function ServiceAssignmentCard({
   saNumber,
   selectedJobOrder,
   onOpenProductSelection,
-  onClearJobOrder
+  onClearJobOrder,
+  onFileUpload,
+  onRemoveAttachment
 }: ServiceAssignmentCardProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showJobOrderDetails, setShowJobOrderDetails] = useState(false); // State to manage JobOrderDetailsCard visibility
   const [localSelectedJobOrder, setLocalSelectedJobOrder] = useState<JobOrder | null>(selectedJobOrder); // State to hold selected job order data
   const [currentTime, setCurrentTime] = useState(""); // State for current time display
   const [showJobOrderSelectionDialog, setShowJobOrderSelectionDialog] = useState(false); // State for JobOrderSelectionDialog
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null); // State for uploaded image URL
   const [isUploading, setIsUploading] = useState(false); // State for upload loading
-  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for hidden file input
   const { toast } = useToast(); // Use the toast hook
 
   // Determine the current product ID to display (from form data, job order, or prop)
@@ -206,7 +210,7 @@ export function ServiceAssignmentCard({
     if (localSelectedJobOrder?.campaignName) {
       handleInputChange("campaignName", localSelectedJobOrder.campaignName);
     }
-  }, [localSelectedJobOrder]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [localSelectedJobOrder, showJobOrderDetails]);
 
   // Auto-calculate service duration when dates or service type change
   useEffect(() => {
@@ -370,7 +374,7 @@ export function ServiceAssignmentCard({
     }
 
     // Validate file size (optional, e.g., max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 500 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       toast({
         title: "File too large",
@@ -517,247 +521,251 @@ export function ServiceAssignmentCard({
             <Label className="w-32 flex-shrink-0 text-center" style={{ textAlign: 'left' }}>     Date:</Label>
             <span className="flex-1 text-start" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>{currentTime}</span>
           </div>
-          {/* Service Type */}
-          <div className="flex items-center space-x-4">
-            <Label htmlFor="serviceType" className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>Service Type:</Label>
-            <Select value={formData.serviceType} onValueChange={(value) => handleInputChange("serviceType", value)}>
-              <SelectTrigger id="serviceType" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}>
-                <SelectValue placeholder="Select service type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Roll Up" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Roll Up</SelectItem>
-                <SelectItem value="Roll Down" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Roll Down</SelectItem>
-                <SelectItem value="Monitoring" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Monitoring</SelectItem>
-                <SelectItem value="Change Material" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Change Material</SelectItem>
-                <SelectItem value="Maintenance" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Maintenance</SelectItem>
-                <SelectItem value="Repair" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Repair</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Campaign Name */}
-          {formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair" && (
+          <div className="grid gap-4">
+            {/* Service Type - Row Layout */}
             <div className="flex items-center space-x-4">
-              <Label htmlFor="campaignName" className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>
-                Campaign Name: <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="campaignName"
-                placeholder="Campaign name from job order"
-                value={formData.campaignName || ""}
-                onChange={(e) => handleInputChange("campaignName", e.target.value)}
-                className="flex-1"
-                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}
-                required
-              />
-            </div>
-          )}
-          {/* Service Start Date */}
-          <div className="flex items-center space-x-4">
-            <Label className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>
-              {["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) ? "Service Date:" : "Service Start Date:"}
-            </Label>
-            <div className="flex-1">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
-                      !formData.startDate && "text-gray-500",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                    {formData.startDate ? (
-                      format(formData.startDate, "PPP")
-                    ) : (
-                      <span style={{ fontSize: '10.681px' }}>Select Date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={formData.startDate || undefined}
-                    onSelect={(date) => handleInputChange("startDate", date || null)}
-                    disabled={{ before: new Date() }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-          {/* Service End Date */}
-          <div className="flex items-center space-x-4">
-            <Label className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>Service End Date:</Label>
-            <div className="flex-1">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
-                      !formData.endDate && "text-gray-500",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                    {formData.endDate ? (
-                      format(formData.endDate, "PPP")
-                    ) : (
-                      <span style={{ fontSize: '10.681px' }}>Select Date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={formData.endDate || undefined}
-                    onSelect={(date) => handleInputChange("endDate", date || null)}
-                    disabled={{ before: new Date() }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-          {/* Service Duration */}
-          <div className="flex items-center space-x-4">
-            <Label htmlFor="serviceDuration" className="w-32 flex-shrink-0 text-start">Service Duration:</Label>
-            <div className="flex-1 flex items-center space-x-2">
-              <Input
-                id="serviceDuration"
-                type="number"
-                placeholder="0"
-                value={formData.serviceDuration || ""}
-                onChange={(e) => handleInputChange("serviceDuration", parseInt(e.target.value) || 0)}
-                className="flex-1"
-                style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}
-                min="0"
-              />
-              <span className="text-sm text-gray-600 whitespace-nowrap">days</span>
-            </div>
-          </div>
-          {/* Material Specs */}
-          {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
-            <div className="flex items-center space-x-4">
-              <Label htmlFor="materialSpecs" className="w-32 flex-shrink-0" style={{ textAlign: 'left' }}>
-                Material Specs: <span className="text-red-500">*</span>
-              </Label>
-              <Select value={formData.materialSpecs} onValueChange={(value) => handleInputChange("materialSpecs", value)}>
-                <SelectTrigger id="materialSpecs" className="flex-1" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%', borderRadius: '5.341px', border: '1.068px solid var(--GREY, #C4C4C4)', background: '#FFF' }}>
-                  <SelectValue placeholder="Select material" />
+              <Label htmlFor="serviceType" className="w-32 flex-shrink-0">Service Type:</Label>
+              <Select value={formData.serviceType} onValueChange={(value) => handleInputChange("serviceType", value)}>
+                <SelectTrigger id="serviceType" className="flex-1">
+                  <SelectValue placeholder="Select service type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Tarpaulin" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Tarpaulin</SelectItem>
-                  <SelectItem value="Sticker" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Sticker</SelectItem>
-                  <SelectItem value="Digital File" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Digital File</SelectItem>
-                  <SelectItem value="Others" style={{ color: 'var(--DARK-GRAY, #A1A1A1)', fontFamily: 'Inter', fontSize: '10.681px', fontStyle: 'normal', fontWeight: 500, lineHeight: '100%' }}>Others</SelectItem>
+                  <SelectItem value="Roll Up">Roll Up</SelectItem>
+                  <SelectItem value="Roll Down">Roll Down</SelectItem>
+                  <SelectItem value="Monitoring">Monitoring</SelectItem>
+                  <SelectItem value="Change Material">Change Material</SelectItem>
+                  <SelectItem value="Maintenance">Maintenance</SelectItem>
+                  <SelectItem value="Repair">Repair</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          )}
-          {/* Attachment */}
-          <div className="flex items-start space-x-4">
-            <Label htmlFor="attachment" className="w-32 flex-shrink-0 pt-2" style={{ textAlign: 'left' }}>Attachment:</Label>
-            <div className="flex-1">
-              {formData.serviceType === "Change Material" ? (
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    {(() => {
-                      const imgSrc = selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl || "/logistics-sa-create-dl.png";
-                      return (
-                        <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
-                          <div className="relative">
-                            <img
-                              src={imgSrc}
-                              alt="Old Material"
-                              className={`rounded-md object-cover ${imgSrc === '/logistics-sa-create-dl.png' ? 'w-[24.33px] h-[24.33px]' : 'w-[69.962px] h-[69.962px]'}`}
-                            />
-                            <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
-                          </div>
-                          {imgSrc === '/logistics-sa-create-dl.png' && <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8' }}>Upload</p>}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                  <div className="flex items-center justify-center">
-                    <ArrowRight className="h-8 w-8" />
-                  </div>
-                  <div className="space-y-1">
-                    {(() => {
-                      const imgSrc = selectedJobOrder?.attachments?.url || "/logistics-sa-create-dl.png";
-                      return (
-                        <div className="w-[70px] h-[70px] flex flex-col justify-center items-center" style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}>
-                          <div className="relative">
-                            <img
-                              src={imgSrc}
-                              alt="New Material"
-                              className={`rounded-md object-cover ${imgSrc === '/logistics-sa-create-dl.png' ? 'w-[24.33px] h-[24.33px]' : 'w-[69.962px] h-[69.962px]'}`}
-                            />
-                            <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
-                          </div>
-                          {imgSrc === '/logistics-sa-create-dl.png' && <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8' }}>Upload</p>}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {uploadedImageUrl ? (
-                    <div className="relative shadow-sm w-[70px] h-[70px]">
-                      <img
-                        src={uploadedImageUrl}
-                        alt="Uploaded Attachment"
-                        className="w-[70px] h-[70px] rounded-md object-cover"
-                      />
-                      <button
-                        onClick={() => {
-                          setUploadedImageUrl(null);
-                          handleInputChange("attachments", []);
-                        }}
-                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ) : jobOrderImage ? (
-                    <div className="relative shadow-sm w-[70px] h-[70px]">
-                      <img
-                        src={jobOrderImage}
-                        alt="Job Order Image"
-                        className="w-[70px] h-[70px] rounded-md object-cover"
-                      />
-                      <button
-                        onClick={() => !isUploading && fileInputRef.current?.click()}
-                        className="absolute inset-0 w-full h-full cursor-pointer"
-                        style={{ background: 'transparent' }}
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      className={`w-[70px] h-[70px] flex flex-col justify-center items-center cursor-pointer ${isUploading ? 'opacity-50' : ''}`}
-                      style={{ background: 'rgba(196, 196, 196, 0.5)', borderRadius: '5.341px', gap: '0px' }}
-                      onClick={() => !isUploading && fileInputRef.current?.click()}
+
+            {/* Campaign Name - Row Layout */}
+            {formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair" && (
+              <div className="flex items-center space-x-4">
+                <Label htmlFor="campaignName" className="w-32 flex-shrink-0">
+                  Campaign Name: <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="campaignName"
+                  placeholder="Enter campaign name"
+                  value={formData.campaignName || ""}
+                  onChange={(e) => handleInputChange("campaignName", e.target.value)}
+                  className="flex-1"
+                  required
+                />
+              </div>
+            )}
+
+            {/* Service Start Date - Row Layout */}
+            <div className="flex items-center space-x-4">
+              <Label className="w-32 flex-shrink-0">
+                {["Monitoring", "Maintenance", "Repair"].includes(formData.serviceType) ? "Service Date:" : "Service Start Date:"}
+              </Label>
+              <div className="flex-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
+                        !formData.startDate && "text-gray-500",
+                      )}
                     >
-                      <img
-                        alt="Attachment"
-                        className="rounded-md object-cover w-[24.33px] h-[24.33px]"
-                        src="/logistics-sa-create-dl.png"
-                      />
-                      <p className="text-center text-sm text-gray-600" style={{ fontSize: '5.483px', fontStyle: 'normal', fontWeight: 600, lineHeight: '0.8' }}>
-                        {isUploading ? 'Uploading...' : 'Upload'}
-                      </p>
-                    </div>
-                  )}
+                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                      {formData.startDate ? (
+                        format(formData.startDate, "PPP")
+                      ) : (
+                        <span>Choose Date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.startDate || undefined}
+                      onSelect={(date) => handleInputChange("startDate", date || null)}
+                      disabled={{ before: new Date() }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            {/* Service End Date - Row Layout */}
+            <div className="flex items-center space-x-4">
+              <Label className="w-32 flex-shrink-0">Service End Date:</Label>
+              <div className="flex-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-white text-gray-800 border-gray-300 hover:bg-gray-50",
+                        !formData.endDate && "text-gray-500",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
+                      {formData.endDate ? (
+                        format(formData.endDate, "PPP")
+                      ) : (
+                        <span>Choose Date</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.endDate || undefined}
+                      onSelect={(date) => handleInputChange("endDate", date || null)}
+                      disabled={{ before: new Date() }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <Label htmlFor="serviceDuration" className="w-32 flex-shrink-0">Service Duration:</Label>
+              <div className="flex-1 flex items-center space-x-2">
+                <Input
+                  id="serviceDuration"
+                  type="number"
+                  placeholder="0"
+                  value={formData.serviceDuration || ""}
+                  onChange={(e) => handleInputChange("serviceDuration", parseInt(e.target.value) || 0)}
+                  className="flex-1"
+                  min="0"
+                />
+                <span className="text-sm text-gray-600 whitespace-nowrap">days</span>
+              </div>
+            </div>
+
+            {!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType) && (
+              <div className="flex items-center space-x-4">
+                <Label htmlFor="materialSpecs" className="w-32 flex-shrink-0">
+                  Material Specs: <span className="text-red-500">*</span>
+                </Label>
+                <Select value={formData.materialSpecs} onValueChange={(value) => handleInputChange("materialSpecs", value)}>
+                  <SelectTrigger id="materialSpecs" className="flex-1">
+                    <SelectValue placeholder="Select material" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Tarpaulin">Tarpaulin</SelectItem>
+                    <SelectItem value="Sticker">Sticker</SelectItem>
+                    <SelectItem value="Digital File">Digital File</SelectItem>
+                    <SelectItem value="Others">Others</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="flex items-start space-x-4">
+              <Label htmlFor="attachment" className="w-32 flex-shrink-0 pt-2">Attachment:</Label>
+              <div className="flex-1 space-y-2">
+                {/* File Upload Input */}
+                <div className="flex items-center space-x-2">
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
-                    onChange={handleFileSelect}
+                    id="attachment"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.mp4,video/mp4"
+                    onChange={(e) => {
+                      onFileUpload(e);
+                      // Reset the input after handling the files
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                    }}
                     className="hidden"
                   />
+                  <label
+                    htmlFor="attachment"
+                    className="cursor-pointer inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Choose Files
+                  </label>
+                  <span className="text-sm text-gray-500">Max 10MB per file (Images, PDFs, Docs, MP4)</span>
                 </div>
-              )}
+
+                {/* Display uploaded attachments */}
+                {formData.attachments && formData.attachments.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Uploaded Files:</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {formData.attachments.map((attachment, index) => (
+                        <div key={index} className="flex items-center space-x-2 p-2 border rounded-md bg-gray-50">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{attachment.name}</p>
+                            <p className="text-xs text-gray-500">{attachment.type}</p>
+                          </div>
+                          {onRemoveAttachment && (
+                            <button
+                              type="button"
+                              onClick={() => onRemoveAttachment(index)}
+                              className="text-red-500 hover:text-red-700 p-1"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Display existing job order attachments for reference */}
+                {formData.serviceType === "Change Material" && selectedJobOrder ? (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Reference Materials:</Label>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <div className="relative">
+                          {selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl ? (
+                            <img
+                              src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
+                              alt="Old Material"
+                              className="rounded-md h-32 w-32 object-cover"
+                            />
+                          ) : (
+                            <img src="https://via.placeholder.com/150" alt="Old Material" className="rounded-md h-32 w-32 object-cover" />
+                          )}
+                          <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">Old</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center">
+                        <ArrowRight className="h-8 w-8" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="relative">
+                          {(selectedJobOrder?.attachments as any)?.url ? (
+                            <img
+                              src={(selectedJobOrder?.attachments as any).url}
+                              alt="New Material"
+                              className="rounded-md h-32 w-32 object-cover"
+                            />
+                          ) : (
+                            <img src="https://via.placeholder.com/150" alt="New Material" className="rounded-md h-32 w-32 object-cover" />
+                          )}
+                          <div className="absolute top-0 left-0 bg-black bg-opacity-50 text-white p-1 rounded text-sm font-medium">New</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : selectedJobOrder?.projectCompliance?.finalArtwork?.fileUrl && formData.attachments.length === 0 ? (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Reference Image:</Label>
+                    <img
+                      src={selectedJobOrder.projectCompliance.finalArtwork.fileUrl}
+                      alt="Site Image"
+                      className="rounded-md h-32 w-32 object-cover"
+                    />
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
           {/* Crew */}

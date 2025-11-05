@@ -28,10 +28,12 @@ import {
   Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { useAuth } from "@/contexts/auth-context"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ServiceAssignmentSuccessDialog } from "@/components/service-assignment-success-dialog"
+import { ServiceAssignmentConfirmationDialog } from "@/components/service-assignment-confirmation-dialog"
 import { useToast } from "@/hooks/use-toast"
 
 import { generateServiceAssignmentPDF } from "@/lib/pdf-service"
@@ -39,9 +41,9 @@ import { TeamFormDialog } from "@/components/team-form-dialog"
 import { JobOrderSelectionDialog } from "@/components/logistics/assignments/create/JobOrderSelectionDialog"
 import { ProductSelectionDialog } from "@/components/logistics/assignments/create/ProductSelectionDialog"
 import { CompanyService } from "@/lib/company-service"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { storage } from "@/lib/firebase"
-
+import { playerService } from "@/lib/player-service"
+import { createCMSContentDeployment } from "@/lib/cms-api"
 
 // Service types as provided
 const SERVICE_TYPES = ["Roll Up", "Roll Down", "Monitoring", "Change Material", "Maintenance", "Repair"]
@@ -68,6 +70,8 @@ export default function CreateServiceAssignmentPage() {
   const [isJobOrderSelectionDialogOpen, setIsJobOrderSelectionDialogOpen] = useState(false) // State for JobOrderSelectionDialog
   const [jobOrderData, setJobOrderData] = useState<JobOrder | null>(null) // State to store fetched job order
   const [hasManualSelection, setHasManualSelection] = useState(false) // Flag to prevent job order pre-filling after manual selection
+  const [selectedJobOrderId, setSelectedJobOrderId] = useState<string | null>(null) // State to store selected job order ID
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false) // State for confirmation dialog
 
   const [teams, setTeams] = useState<Team[]>([])
   const [isProductSelectionDialogOpen, setIsProductSelectionDialogOpen] = useState(false) // State for ProductSelectionDialog
@@ -313,12 +317,13 @@ export default function CreateServiceAssignmentPage() {
   // Fetch job order data if jobOrderId is present
   useEffect(() => {
     const fetchJobOrder = async () => {
-      if (jobOrderId && !hasManualSelection) {
+      if (jobOrderId && !hasManualSelection && !jobOrderData) {
         try {
           const jobOrderDoc = await getDoc(doc(db, "job_orders", jobOrderId))
           if (jobOrderDoc.exists()) {
             const fetchedJobOrder = { id: jobOrderDoc.id, ...jobOrderDoc.data() } as JobOrder
             setJobOrderData(fetchedJobOrder)
+            setSelectedJobOrderId(fetchedJobOrder.id)
 
             // Debug logging to understand the job order structure
             console.log("Fetched job order data:", fetchedJobOrder)
@@ -406,7 +411,7 @@ export default function CreateServiceAssignmentPage() {
 
     for (const file of Array.from(files)) {
       // Check file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
+      if (file.size > 500 * 1024 * 1024) {
         alert(`File ${file.name} is too large. Maximum size is 10MB.`)
         continue
       }
@@ -437,8 +442,7 @@ export default function CreateServiceAssignmentPage() {
       }))
     }
 
-    // Reset the input
-    event.target.value = ""
+    // Note: Input reset is now handled in ServiceAssignmentCard component
   }
 
   // Remove attachment
@@ -450,15 +454,36 @@ export default function CreateServiceAssignmentPage() {
   }
 
   // Convert attachments to Firestore-compatible format
-  const convertAttachmentsForFirestore = (attachments: { name: string; type: string; file?: File; url?: string }[]) => {
-    return attachments.map((attachment) => ({
-      name: attachment.name,
-      type: attachment.type,
-      url: attachment.url || '',
-      // Remove the file object as it's not serializable
-      size: attachment.file?.size || 0,
-      lastModified: attachment.file?.lastModified || Date.now(),
-    }))
+  const convertAttachmentsForFirestore = async (attachments: { name: string; type: string; file?: File }[], saNumber: string) => {
+    const convertedAttachments = []
+
+    for (const attachment of attachments) {
+      let downloadUrl = null
+
+      // Upload file to Firebase Storage if it exists
+      if (attachment.file) {
+        try {
+          const storage = getStorage()
+          const fileName = `${attachment.name}`
+          const storageRef = ref(storage, fileName)
+
+          const snapshot = await uploadBytes(storageRef, attachment.file)
+          downloadUrl = await getDownloadURL(snapshot.ref)
+        } catch (error) {
+          console.error("Error uploading attachment to storage:", error)
+        }
+      }
+
+      convertedAttachments.push({
+        name: attachment.name,
+        type: attachment.type,
+        size: attachment.file?.size || 0,
+        lastModified: attachment.file?.lastModified || Date.now(),
+        url: downloadUrl, // Include the download URL
+      })
+    }
+
+    return convertedAttachments
   }
 
   // Chunked base64 conversion to handle large PDFs efficiently
@@ -485,218 +510,276 @@ export default function CreateServiceAssignmentPage() {
     })
   }
 
-  // Handle form submission (now navigates to PDF preview without creating assignment)
-  const handleSubmit = async () => {
-    if (!user) return
+  // Handle form submission (now navigates to PDF preview without creating assignment) - shows confirmation dialog first
+  const handleSubmit = () => {
+    setShowConfirmationDialog(true)
+    return Promise.resolve()
+  }
 
-    // Validate that a site is selected
-    if (!formData.projectSite || formData.projectSite.trim() === "") {
+const handleSubmitConfirmed = async () => {
+  if (!user) return
+
+  // --- Validation ---
+  if (!formData.projectSite || formData.projectSite.trim() === "") {
+    toast({
+      title: "Site Selection Required",
+      description: "Please select a site before creating the service assignment.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  if (formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair") {
+    if (!formData.campaignName || formData.campaignName.trim() === "") {
       toast({
-        title: "Site Selection Required",
-        description: "Please select a site before creating the service assignment.",
+        title: "Campaign Name Required",
+        description: "Please enter a campaign name.",
         variant: "destructive",
       });
       return;
-    }
-
-    // Validate required fields based on service type
-    if (formData.serviceType !== "Maintenance" && formData.serviceType !== "Repair") {
-      // Campaign Name is required for non-maintenance/repair services
-      if (!formData.campaignName || formData.campaignName.trim() === "") {
-        toast({
-          title: "Campaign Name Required",
-          description: "Please enter a campaign name.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    if (!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType)) {
-      // Material Specs is required for services that are not monitoring, change material, maintenance, or repair
-      if (!formData.materialSpecs || formData.materialSpecs.trim() === "") {
-        toast({
-          title: "Material Specs Required",
-          description: "Please select material specifications.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
-    // Crew is always required
-    if (!formData.crew || formData.crew.trim() === "") {
-      toast({
-        title: "Crew Selection Required",
-        description: "Please select a crew for the assignment.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setGeneratingPDF(true)
-
-      // Prepare assignment data for PDF generation
-      const selectedProduct = products.find((p) => p.id === formData.projectSite)
-      const selectedTeam = teams.find((t) => t.id === formData.crew)
-
-      const pdfAssignmentData = {
-        saNumber,
-        projectSiteName: selectedProduct?.name || "",
-        projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
-        serviceType: formData.serviceType,
-        assignedTo: selectedTeam?.id || formData.crew,
-        assignedToName: selectedTeam?.name || "",
-        serviceDuration: `${formData.serviceDuration} days`,
-        priority: formData.priority,
-        equipmentRequired: formData.equipmentRequired,
-        materialSpecs: formData.materialSpecs,
-        crew: formData.crew,
-        crewName: selectedTeam?.name || "",
-        gondola: formData.gondola,
-        technology: formData.technology,
-        sales: formData.sales,
-        campaignName: formData.campaignName,
-        remarks: formData.remarks,
-        requestedBy: {
-          name: userData?.first_name && userData?.last_name
-            ? `${userData.first_name} ${userData.last_name}`
-            : user?.displayName || "Unknown User",
-          department: "LOGISTICS",
-        },
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        alarmDate: formData.alarmDate,
-        alarmTime: formData.alarmTime,
-        attachments: formData.attachments.map((att) => ({
-          name: att.name,
-          type: att.type,
-          url: att.url
-        })),
-        serviceExpenses: formData.serviceExpenses,
-        status: "Draft",
-        created: new Date(),
-      }
-
-      // Fetch company data for PDF generation
-      const companyData = userData?.company_id ? await CompanyService.getCompanyData(userData.company_id) : null
-
-      // Get logo URL (simplified - using company logo if available)
-      let logoDataUrl = null
-      if (companyData?.logo) {
-        try {
-          const logoResponse = await fetch(companyData.logo)
-          if (logoResponse.ok) {
-            const logoBlob = await logoResponse.blob()
-            logoDataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader()
-              reader.onload = () => resolve(reader.result as string)
-              reader.readAsDataURL(logoBlob)
-            })
-          }
-        } catch (error) {
-          console.error('Error fetching company logo:', error)
-          // Continue without logo if fetch fails
-        }
-      }
-
-      // Generate PDF using server-side API
-      const response = await fetch('/api/generate-service-assignment-pdf', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          assignment: pdfAssignmentData,
-          companyData,
-          logoDataUrl,
-          format: 'pdf',
-          userData,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Failed to generate PDF')
-      }
-
-      // Get PDF as ArrayBuffer and convert to base64
-      const pdfBuffer = await response.arrayBuffer()
-      const pdfBase64 = arrayBufferToBase64(pdfBuffer)
-
-      if (!pdfBase64) {
-        throw new Error('Failed to generate PDF')
-      }
-
-      // Store minimal assignment data in local storage (avoid quota issues)
-      const assignmentData = {
-        saNumber,
-        projectSiteName: selectedProduct?.name || "",
-        projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
-        serviceType: formData.serviceType,
-        assignedTo: selectedTeam?.id || formData.crew,
-        assignedToName: selectedTeam?.name || "",
-        serviceDuration: `${formData.serviceDuration} days`,
-        priority: formData.priority,
-        equipmentRequired: formData.equipmentRequired,
-        materialSpecs: formData.materialSpecs,
-        crew: formData.crew,
-        crewName: selectedTeam?.name || "",
-        gondola: formData.gondola,
-        technology: formData.technology,
-        sales: formData.sales,
-        campaignName: formData.campaignName,
-        remarks: formData.remarks,
-        requestedBy: {
-          name: userData?.first_name && userData?.last_name
-            ? `${userData.first_name} ${userData.last_name}`
-            : user?.displayName || "Unknown User",
-          department: "LOGISTICS",
-        },
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        alarmDate: formData.alarmDate,
-        alarmTime: formData.alarmTime,
-        attachments: formData.attachments.map((att) => ({
-          name: att.name,
-          type: att.type,
-          url: att.url
-        })),
-        serviceExpenses: formData.serviceExpenses,
-        status: "Draft",
-        created: new Date(),
-        // Additional data needed for assignment creation
-        projectSiteId: formData.projectSite,
-        message: formData.message,
-        jobOrderId: jobOrderData?.id || null,
-        reservation_number: jobOrderData?.reservation_number || null, // Add reservation number from job order
-        booking_id: jobOrderData?.booking_id || null, // Add booking ID from job order
-        userData: {
-          uid: user.uid,
-          first_name: userData?.first_name,
-          last_name: userData?.last_name,
-          company_id: userData?.company_id,
-          license_key: userData?.license_key,
-        },
-      };
-
-      localStorage.setItem('serviceAssignmentData', JSON.stringify(assignmentData));
-      localStorage.setItem('serviceAssignmentPDF', pdfBase64);
-
-      // Navigate to view-pdf page with the exact URL format including booking_id
-      router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=${jobOrderId || 'Df4wxbfrO5EnAbml0r2I'}&booking_id=${jobOrderData?.booking_id || ''}`);
-    } catch (error) {
-      console.error("Error generating PDF:", error)
-      toast({
-        title: "PDF Generation Failed",
-        description: "Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.",
-        variant: "destructive",
-      });
-    } finally {
-      setGeneratingPDF(false)
     }
   }
+
+  if (!["Monitoring", "Change Material", "Maintenance", "Repair"].includes(formData.serviceType)) {
+    if (!formData.materialSpecs || formData.materialSpecs.trim() === "") {
+      toast({
+        title: "Material Specs Required",
+        description: "Please select material specifications.",
+        variant: "destructive",
+      });
+      return;
+    }
+  }
+
+  if (!formData.crew || formData.crew.trim() === "") {
+    toast({
+      title: "Crew Selection Required",
+      description: "Please select a crew for the assignment.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    setGeneratingPDF(true)
+    setLoading(true)
+
+    const selectedProduct = products.find((p) => p.id === formData.projectSite)
+    const selectedTeam = teams.find((t) => t.id === (formData.assignedTo || formData.crew))
+
+    // --- Prepare PDF and assignment data ---
+    const pdfAssignmentData = {
+      saNumber,
+      projectSiteName: selectedProduct?.name || "",
+      projectSiteLocation: selectedProduct?.light?.location || selectedProduct?.specs_rental?.location || "",
+      serviceType: formData.serviceType,
+      assignedTo: selectedTeam?.id || formData.crew,
+      assignedToName: selectedTeam?.name || "",
+      serviceDuration: `${formData.serviceDuration} days`,
+      priority: formData.priority,
+      equipmentRequired: formData.equipmentRequired,
+      materialSpecs: formData.materialSpecs,
+      crew: formData.crew,
+      crewName: selectedTeam?.name || "",
+      gondola: formData.gondola,
+      technology: formData.technology,
+      sales: formData.sales,
+      campaignName: formData.campaignName,
+      remarks: formData.remarks,
+      requestedBy: {
+        name: userData?.first_name && userData?.last_name
+          ? `${userData.first_name} ${userData.last_name}`
+          : user?.displayName || "Unknown User",
+        department: "LOGISTICS",
+      },
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      alarmDate: formData.alarmDate,
+      alarmTime: formData.alarmTime,
+      attachments: await convertAttachmentsForFirestore(formData.attachments, saNumber),
+      serviceExpenses: formData.serviceExpenses,
+      status: "Draft",
+      created: new Date(),
+    }
+
+    // Fetch company logo
+    const companyData = userData?.company_id ? await CompanyService.getCompanyData(userData.company_id) : null
+    let logoDataUrl = null
+    if (companyData?.logo) {
+      try {
+        const logoResponse = await fetch(companyData.logo)
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob()
+          logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(logoBlob)
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching company logo:', error)
+      }
+    }
+
+    // --- Generate PDF ---
+    const response = await fetch('/api/generate-service-assignment-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        assignment: pdfAssignmentData,
+        companyData,
+        logoDataUrl,
+        format: 'pdf',
+        userData,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(errorData.error || 'Failed to generate PDF')
+    }
+
+    const pdfBuffer = await response.arrayBuffer()
+    const pdfBase64 = arrayBufferToBase64(pdfBuffer)
+    if (!pdfBase64) throw new Error('Failed to generate PDF')
+
+    localStorage.setItem('serviceAssignmentData', JSON.stringify({
+      ...pdfAssignmentData,
+      projectSiteId: formData.projectSite,
+      message: formData.message,
+      jobOrderId: jobOrderData?.id || null,
+      reservation_number: jobOrderData?.reservation_number || null,
+      booking_id: jobOrderData?.booking_id || null,
+      userData: {
+        uid: user.uid,
+        first_name: userData?.first_name,
+        last_name: userData?.last_name,
+        company_id: userData?.company_id,
+        license_key: userData?.license_key,
+      }
+    }))
+    localStorage.setItem('serviceAssignmentPDF', pdfBase64)
+
+    // --- Prepare Firestore assignment data ---
+    const assignmentData = {
+      ...pdfAssignmentData,
+      projectSiteId: formData.projectSite,
+      assignedTo: formData.assignedTo || formData.crew,
+      message: formData.message,
+      status: "Pending",
+      updated: serverTimestamp(),
+      project_key: userData?.license_key || "",
+      company_id: userData?.company_id || null,
+      jobOrderId: selectedJobOrderId || null,
+      reservation_number: jobOrderData?.reservation_number || null,
+      booking_id: jobOrderData?.booking_id || null,
+      attachments: await convertAttachmentsForFirestore(formData.attachments, saNumber),
+    }
+
+    // --- Save to Firestore ---
+    let assignmentDocRef
+    if (isEditingDraft && draftId) {
+      assignmentDocRef = doc(db, "service_assignments", draftId)
+      await updateDoc(assignmentDocRef, assignmentData)
+    } else {
+      assignmentDocRef = await addDoc(collection(db, "service_assignments"), {
+        ...assignmentData,
+        created: serverTimestamp(),
+      })
+    }
+
+    // --- Notifications ---
+    try {
+      const notificationTitle = `New Service Assignment: ${saNumber}`
+      const notificationDescription = `A new ${formData.serviceType} service assignment has been created for ${selectedProduct?.name || "Unknown Site"}`
+
+      const departments = ["Logistics", "Admin"]
+      for (const dept of departments) {
+        await addDoc(collection(db, "notifications"), {
+          type: "Service Assignment",
+          title: notificationTitle,
+          description: notificationDescription,
+          department_to: dept,
+          uid_to: null,
+          company_id: userData?.company_id,
+          department_from: "Logistics",
+          viewed: false,
+          navigate_to: `${process.env.NEXT_PUBLIC_APP_URL || window?.location?.origin || ""}/logistics/assignments/${assignmentDocRef.id}`,
+          created: serverTimestamp(),
+        })
+      }
+    } catch (notificationError) {
+      console.error("Error creating notifications:", notificationError)
+    }
+
+    // Integrate with CMS API for content deployment
+      try {
+        // Get the download URL from the first uploaded attachment
+        const convertedAttachments = await convertAttachmentsForFirestore(formData.attachments, saNumber)
+        const attachmentDownloadUrl = convertedAttachments.length > 0 ? convertedAttachments[0].url : null
+
+        if (attachmentDownloadUrl) {
+          console.log("Creating CMS content deployment for service assignment...")
+          console.log("Attachment URL:", attachmentDownloadUrl)
+
+          const playerIds = selectedProduct?.playerIds || ["141a16d405254b8fb5c5173ef3a58cc5"]
+          const schedule = {
+            startDate: formData.startDate ? format(formData.startDate, "yyyy-MM-dd") : "2020-01-11",
+            endDate: formData.endDate ? format(formData.endDate, "yyyy-MM-dd") : "2060-05-12",
+            plans: [
+              {
+                weekDays: [1, 2, 3, 4, 5],
+                startTime: "00:00",
+                endTime: "22:00"
+              }
+            ]
+          }
+          const pages = [
+            {
+              name: `sa-${saNumber}-page`,
+              widgets: [
+                {
+                  zIndex: 1,
+                  type: "STREAM_MEDIA",
+                  size: 12000,
+                  md5: "placeholder-md5", // This should be calculated from the actual file
+                  duration: 9000,
+                  url: attachmentDownloadUrl,
+                  layout: {
+                    x: "0%",
+                    y: "0%",
+                    width: "100%",
+                    height: "100%"
+                  }
+                }
+              ]
+            }
+          ]
+
+          await createCMSContentDeployment(playerIds, schedule, pages)
+        } else {
+          console.log("No attachment found for CMS deployment")
+        }
+      } catch (cmsApiError) {
+        console.error("Error with CMS API integration:", cmsApiError)
+        // Don't throw here - we don't want CMS API failure to break assignment creation
+      }
+
+    // --- Navigate to PDF preview ---
+    router.push(`/logistics/assignments/view-pdf/preview?jobOrderId=${jobOrderId || 'Df4wxbfrO5EnAbml0r2I'}&booking_id=${jobOrderData?.booking_id || ''}`)
+
+  } catch (error) {
+    console.error("Error submitting service assignment:", error)
+    toast({
+      title: "Submission Failed",
+      description: "Unable to process the service assignment. Please check your connection and try again.",
+      variant: "destructive",
+    })
+  } finally {
+    setGeneratingPDF(false)
+    setLoading(false)
+  }
+}
 
   // Add this new function after the handleSubmit function
   const handleSaveDraft = async () => {
@@ -749,6 +832,8 @@ export default function CreateServiceAssignmentPage() {
 
     try {
       setLoading(true)
+      console.log("jobOrderData:", jobOrderData)
+      console.log("jobOrderData.booking_id:", jobOrderData?.booking_id)
       const selectedProduct = products.find((p) => p.id === formData.projectSite)
       const selectedTeam = teams.find((t) => t.id === (formData.assignedTo || formData.crew))
 
@@ -783,13 +868,13 @@ export default function CreateServiceAssignmentPage() {
         coveredDateEnd: formData.endDate ? Timestamp.fromDate(formData.endDate) : null,
         alarmDate: formData.alarmDate ? Timestamp.fromDate(formData.alarmDate) : null,
         alarmTime: formData.alarmTime,
-        attachments: convertAttachmentsForFirestore(formData.attachments),
+        attachments: await convertAttachmentsForFirestore(formData.attachments, saNumber),
         serviceExpenses: formData.serviceExpenses,
         status: "Draft",
         updated: serverTimestamp(),
         project_key: userData?.license_key || "",
         company_id: userData?.company_id || null,
-        jobOrderId: jobOrderData?.id || null, // Add job order ID if present
+        jobOrderId: selectedJobOrderId || null, // Add job order ID if present
         reservation_number: jobOrderData?.reservation_number || null, // Add reservation number from job order
         booking_id: jobOrderData?.booking_id || null, // Add booking ID from job order
       }
@@ -1022,14 +1107,81 @@ export default function CreateServiceAssignmentPage() {
   };
 
   // Handle job order selection
-  const handleJobOrderSelect = (jobOrder: JobOrder) => {
-    // Navigate to the same page with the selected job order ID
-    router.push(`/logistics/assignments/create?jobOrderId=${jobOrder.id}`);
+  const handleJobOrderSelect = async (jobOrder: JobOrder) => {
+    try {
+      // Fetch the complete job order document to get all fields including booking_id and jobOrderId
+      const jobOrderDoc = await getDoc(doc(db, "job_orders", jobOrder.id))
+      if (jobOrderDoc.exists()) {
+        const completeJobOrder = { id: jobOrderDoc.id, ...jobOrderDoc.data() } as JobOrder
+        console.log("Fetched job order data:", completeJobOrder)
+        console.log("booking_id:", completeJobOrder.booking_id)
+        console.log("jobOrderId:", completeJobOrder.id)
+        setJobOrderData(completeJobOrder)
+        setSelectedJobOrderId(completeJobOrder.id)
+
+        // Get the product_id during the selection
+        const productId = completeJobOrder.product_id || ""
+        if (productId) {
+          // Helper function to safely parse dates
+          const parseDateSafely = (dateValue: any): Date | null => {
+            if (!dateValue) return null;
+
+            try {
+              let date: Date;
+
+              if (dateValue instanceof Date) {
+                date = dateValue;
+              } else if (typeof dateValue === 'string') {
+                date = new Date(dateValue);
+                if (isNaN(date.getTime())) {
+                  return null;
+                }
+              } else if (typeof dateValue === 'number') {
+                date = new Date(dateValue * 1000);
+              } else if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+                date = new Date(dateValue.seconds * 1000);
+              } else {
+                return null;
+              }
+
+              if (isNaN(date.getTime())) {
+                return null;
+              }
+
+              return date;
+            } catch (error) {
+              console.warn('Error parsing date:', dateValue, error);
+              return null;
+            }
+          };
+
+          setFormData((prev) => ({
+            ...prev,
+            projectSite: productId,
+            serviceType: completeJobOrder.joType ? completeJobOrder.joType.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : "",
+            remarks: completeJobOrder.remarks || completeJobOrder.jobDescription || "",
+            campaignName: completeJobOrder.campaignName || "",
+            startDate: parseDateSafely(completeJobOrder.dateRequested),
+            endDate: parseDateSafely(completeJobOrder.deadline),
+          }))
+
+          // Update the URL to include the jobOrderId for consistency
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.set('jobOrderId', completeJobOrder.id);
+          window.history.replaceState({}, '', newUrl.toString());
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching complete job order:", error)
+    }
+
+    setIsJobOrderSelectionDialogOpen(false)
   };
 
   // Handle changing job order
   const handleChangeJobOrder = () => {
     setJobOrderData(null);
+    setSelectedJobOrderId(null);
     // Clear the jobOrderId from URL
     const newUrl = new URL(window.location.href);
     newUrl.searchParams.delete('jobOrderId');
@@ -1112,6 +1264,8 @@ export default function CreateServiceAssignmentPage() {
         onChangeJobOrder={handleChangeJobOrder}
         onOpenJobOrderDialog={() => setIsJobOrderSelectionDialogOpen(true)}
         onClearJobOrder={() => setJobOrderData(null)}
+        onFileUpload={handleFileUpload}
+        onRemoveAttachment={removeAttachment}
       />
 
 
@@ -1168,7 +1322,20 @@ export default function CreateServiceAssignmentPage() {
         productId={formData.projectSite}
         companyId={userData?.company_id || ""}
         onSelectJobOrder={handleJobOrderSelect}
-        selectedJobOrderId={jobOrderId}
+        selectedJobOrderId={selectedJobOrderId}
+      />
+
+      <ServiceAssignmentConfirmationDialog
+        open={showConfirmationDialog}
+        onOpenChange={setShowConfirmationDialog}
+        onConfirm={() => {
+          setShowConfirmationDialog(false)
+          handleSubmitConfirmed()
+        }}
+        formData={formData}
+        selectedProductName={products.find(p => p.id === formData.projectSite)?.name}
+        selectedTeamName={teams.find(t => t.id === (formData.assignedTo || formData.crew))?.name}
+        isSubmitting={loading}
       />
     </section>
   )
