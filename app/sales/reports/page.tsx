@@ -11,6 +11,7 @@ import {
   History,
   Download,
   Share,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table"
+import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,7 +73,8 @@ export default function SalesReportsPage() {
   const [selectedReportForHistory, setSelectedReportForHistory] =
     useState<ReportData | null>(null);
   const [showSendReportDialog, setShowSendReportDialog] = useState(false);
-  const [selectedReportForShare, setSelectedReportForShare] =
+  const [selectedReportForShare,
+  FileText, setSelectedReportForShare] =
     useState<ReportData | null>(null);
 
   const router = useRouter();

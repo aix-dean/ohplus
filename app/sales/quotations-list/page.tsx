@@ -452,23 +452,23 @@ export default function QuotationsListPage() {
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
       case "booked":
-        return "bg-red-100 text-red-800 border-red-200"
+        return "text-red-800"
       case "sent":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+        return "text-blue-800"
       case "reserved":
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return "text-[#30C71D]"
       case "accepted":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "text-[#30C71D]"
       case "draft":
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return "text-[#A1A1A1]"
       case "rejected":
-        return "bg-red-100 text-red-800 border-red-200"
+        return "text-red-800"
       case "expired":
-        return "bg-orange-100 text-orange-800 border-orange-200"
+        return "text-orange-800"
       case "viewed":
-        return "bg-purple-100 text-purple-800 border-purple-200"
+        return "text-purple-800"
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return "text-gray-800 "
     }
   }
 
@@ -1927,12 +1927,12 @@ export default function QuotationsListPage() {
                 )}
               </div>
             </div>
-            <Button
+            <button
               onClick={() => router.push("/sales/dashboard?tab=quotations")}
-              className="bg-white border-2 border-gray-300 hover:bg-gray-50 text-gray-900 font-medium rounded-lg px-6 py-2"
+              className="text-[12px] px-6 border-[#C4C4C4] border-[2px] rounded-[5px] bg-white"
             >
               Create Quotation
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -1943,7 +1943,6 @@ export default function QuotationsListPage() {
                 <TableRow className="border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Quotation ID</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Client</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Status</TableHead>
@@ -1959,9 +1958,6 @@ export default function QuotationsListPage() {
                     </TableCell>
                     <TableCell className="py-3">
                       <Skeleton className="h-5 w-20" />
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Skeleton className="h-5 w-24" />
                     </TableCell>
                     <TableCell className="py-3">
                       <Skeleton className="h-5 w-24" />
@@ -1990,7 +1986,6 @@ export default function QuotationsListPage() {
                 <TableRow className="border-b border-gray-200">
                   <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Quotation ID</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Company</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Client</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
                   <TableHead className="font-semibold text-gray-900 border-0">Status</TableHead>
@@ -2020,28 +2015,24 @@ export default function QuotationsListPage() {
                         </div>
                       </TableCell>
                       <TableCell className="py-3" >
-                        <div className="font-medium text-gray-900"   >{quotation.quotation_number || quotation.id || "—"}</div>
+                        <div className="text-gray-900">{quotation.quotation_number || quotation.id || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <div className="text-sm text-gray-600">{quotation.client_company_name || "—"}</div>
+                        <div className="text-gray-900">{quotation.client_company_name ? `${quotation.client_company_name} - ${quotation.client_name || ""}` : quotation.client_name || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <div className="font-medium text-gray-900">{quotation.client_name || "—"}</div>
+                        <div className="text-sm text-[#333333] font-bold">{quotation.items?.name || quotation.product_name || "—"}</div>
                       </TableCell>
                       <TableCell className="py-3">
-                        <div className="text-sm text-gray-600">{quotation.items?.name || quotation.product_name || "—"}</div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Badge
-                          variant="secondary"
-                          className={`${getStatusColor(quotation.status)} border`}
+                        <div
+                          className={`${getStatusColor(quotation.status)} text-[12px] font-bold`}
                         >
                           {quotation.status ? quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1).toLowerCase() : "Draft"}
-                        </Badge>
+                        </div>
                       </TableCell>
                       <TableCell className="py-3">
                         <span
-                          className="font-bold text-[#2d3fff] font-medium underline leading-[0.5] cursor-pointer"
+                          className="font-bold text-[#2D3FFF] leading-[0.5] cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation()
                             handleViewCompliance(quotation)
