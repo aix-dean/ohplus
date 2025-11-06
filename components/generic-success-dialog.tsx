@@ -7,6 +7,7 @@ import { CheckCircle, Upload, Save } from "lucide-react"
 interface GenericSuccessDialogProps {
   isOpen: boolean
   onClose: () => void
+  onConfirm?: () => void
   title?: string
   message: string
   type?: "upload" | "save" | "general"
@@ -15,6 +16,7 @@ interface GenericSuccessDialogProps {
 export function GenericSuccessDialog({
   isOpen,
   onClose,
+  onConfirm,
   title = "Success!",
   message,
   type = "general"
@@ -46,7 +48,7 @@ export function GenericSuccessDialog({
             {message}
           </p>
           <div className="flex justify-center">
-            <Button onClick={onClose} className="px-8">
+            <Button onClick={onConfirm || onClose} className="px-8">
               OK
             </Button>
           </div>

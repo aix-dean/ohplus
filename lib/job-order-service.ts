@@ -1,5 +1,5 @@
 import { db } from "./firebase"
-import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp, orderBy } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, getDoc, addDoc, serverTimestamp, orderBy, limit, startAfter } from "firebase/firestore"
 import type { Quotation, QuotationProduct } from "./types/quotation" // Import QuotationProduct
 import type { JobOrder, JobOrderStatus } from "./types/job-order"
 import type { Product } from "./firebase-service"
@@ -478,19 +478,83 @@ export async function getJobOrderById(jobOrderId: string): Promise<JobOrder | nu
   }
 }
 
-export async function getJobOrders(companyId: string): Promise<JobOrder[]> {
+export async function getJobOrders(
+  companyId: string,
+  options: {
+    page?: number;
+    limit?: number;
+    searchQuery?: string;
+    lastDoc?: any;
+  } = {}
+): Promise<{
+  jobOrders: JobOrder[];
+  hasNextPage: boolean;
+  lastDoc: any;
+  totalItems?: number;
+}> {
   try {
-    const q = query(
+    const { page = 1, limit: pageLimit = 10, searchQuery, lastDoc } = options;
+
+    let q = query(
       collection(db, JOB_ORDERS_COLLECTION),
       where("company_id", "==", companyId),
-      orderBy("createdAt", "desc"),
-    )
-    const querySnapshot = await getDocs(q)
-    const jobOrders: JobOrder[] = querySnapshot.docs.map((doc) => ({
+      orderBy("createdAt", "desc")
+    );
+
+    // Apply pagination
+    if (lastDoc) {
+      q = query(q, startAfter(lastDoc));
+    }
+
+    // Fetch one extra to check if there's a next page
+    const fetchLimit = pageLimit + 1;
+    q = query(q, limit(fetchLimit));
+
+    const querySnapshot = await getDocs(q);
+    let jobOrders: JobOrder[] = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    })) as JobOrder[]
-    return jobOrders
+    })) as JobOrder[];
+
+    // Apply search filter if provided
+    if (searchQuery && searchQuery.trim()) {
+      const query = searchQuery.trim().toLowerCase();
+      jobOrders = jobOrders.filter(jo =>
+        jo.joNumber?.toLowerCase().includes(query) ||
+        jo.siteName?.toLowerCase().includes(query) ||
+        jo.requestedBy?.toLowerCase().includes(query)
+      );
+    }
+
+    // Check if there's a next page
+    const hasNextPage = jobOrders.length > pageLimit;
+    if (hasNextPage) {
+      jobOrders = jobOrders.slice(0, pageLimit);
+    }
+
+    // Get the last document for pagination
+    const newLastDoc = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null;
+
+    // Get total count (without pagination and search for efficiency)
+    let totalItems: number | undefined;
+    try {
+      const countQuery = query(
+        collection(db, JOB_ORDERS_COLLECTION),
+        where("company_id", "==", companyId)
+      );
+      const countSnapshot = await getDocs(countQuery);
+      totalItems = countSnapshot.size;
+    } catch (error) {
+      // If count fails, leave undefined
+      console.warn("Could not get total count:", error);
+    }
+
+    return {
+      jobOrders,
+      hasNextPage,
+      lastDoc: newLastDoc,
+      totalItems,
+    };
   } catch (error: any) { // Explicitly type error
     console.error("Error fetching job orders:", error)
     throw error

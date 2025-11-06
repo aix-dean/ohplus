@@ -7,6 +7,7 @@ import type { ReportData } from "@/lib/report-service"
 import type { JobOrder } from "@/lib/types/job-order"
 import { doc, getDoc, Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { PDFDocument, PDFName } from 'pdf-lib'
 
 // Helper function to load image and convert to base64
 export async function loadImageAsBase64(url: string): Promise<string | null> {
@@ -14,7 +15,7 @@ export async function loadImageAsBase64(url: string): Promise<string | null> {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-    const response = await fetch(url, {
+    const response = await fetch(fetchUrl, {
       signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; PDF-Generator/1.0)",
@@ -33,6 +34,7 @@ export async function loadImageAsBase64(url: string): Promise<string | null> {
     return `data:${response.headers.get('content-type')};base64,${buffer.toString('base64')}`
   } catch (error) {
     console.error("Error loading image:", url, error)
+    // Return null for failed image loads instead of throwing
     return null
   }
 }
@@ -117,6 +119,29 @@ function safeToDate(dateValue: any): Date {
     return dateValue.toDate()
   }
   return new Date() // fallback to current date
+}
+
+// Helper function to set PDF viewer preferences including initial zoom
+async function setPDFViewerPreferences(pdfBytes: Uint8Array, zoom: number = 1.25): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.load(pdfBytes)
+
+  // Get the first page
+  const pages = pdfDoc.getPages()
+  if (pages.length > 0) {
+    const firstPage = pages[0]
+
+    // Create a GoTo action with zoom
+    const action = pdfDoc.context.obj({
+      Type: PDFName.of('Action'),
+      S: PDFName.of('GoTo'),
+      D: [firstPage.ref, PDFName.of('XYZ'), null, null, zoom]
+    })
+
+    // Set OpenAction on catalog
+    pdfDoc.catalog.set(PDFName.of('OpenAction'), action)
+  }
+
+  return await pdfDoc.save()
 }
 
 async function logProposalPDFGenerated(proposalId: string, userId: string, userName: string): Promise<void> {
@@ -289,20 +314,23 @@ interface ServiceAssignmentPDFData {
   equipmentRequired: string
   materialSpecs: string
   crew: string
+  crewName?: string
   illuminationNits?: string
   gondola: string
   technology: string
   sales: string
+  campaignName?: string
   remarks: string
-  requestedBy: {
+  requestedBy?: {
     name: string
     department: string
   }
+  requestBy?: string // User ID field
   startDate: Date | null
   endDate: Date | null
   alarmDate: Date | null
   alarmTime: string
-  attachments: { name: string; type: string }[]
+  attachments: { name: string; type: string; url?: string; fileUrl?: string }[]
   serviceExpenses: { name: string; amount: string }[]
   status: string
   created: Date
@@ -730,15 +758,27 @@ export async function generateServiceAssignmentDetailsPDF(
       pdf.text("No service expenses recorded", margin, yPosition)
     }
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `service-assignment-${assignmentData.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Service Assignment Details PDF:", error)
-    throw new Error("Failed to generate Service Assignment Details PDF")
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -777,12 +817,12 @@ export async function generateServiceAssignmentPDF(
 
     // Add white text for header
     pdf.setTextColor(255, 255, 255)
-    pdf.setFontSize(20)
+    pdf.setFontSize(16)
     pdf.setFont("helvetica", "bold")
     pdf.text("SERVICE ASSIGNMENT", margin, 15)
 
     // Add logistics badge
-    pdf.setFontSize(10)
+    pdf.setFontSize(8)
     pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
 
     yPosition = 35
@@ -1001,7 +1041,7 @@ export async function generateServiceAssignmentPDF(
 
     pdf.setFontSize(11)
     pdf.setFont("helvetica", "normal")
-    pdf.text(`${serviceAssignment.requestedBy.department} - ${serviceAssignment.requestedBy.name}`, margin, yPosition)
+    pdf.text(`${serviceAssignment.requestedBy?.department || "LOGISTICS"} - ${serviceAssignment.requestedBy?.name || "Unknown User"}`, margin, yPosition)
     yPosition += 15
 
     // Footer
@@ -1027,17 +1067,30 @@ export async function generateServiceAssignmentPDF(
     pdf.setFont("helvetica", "bold")
     pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
       // Return base64 string for email attachment
-      return pdf.output("datauristring").split(",")[1]
+      const base64 = Buffer.from(modifiedPdfBytes).toString('base64')
+      return base64
     } else {
       // Save the PDF for download
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `service-assignment-${serviceAssignment.saNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Service Assignment PDF:", error)
-    throw new Error("Failed to generate Service Assignment PDF")
+    throw new Error("Unable to create service assignment PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1083,7 +1136,7 @@ export async function generateJobOrderPDF(jobOrder: JobOrder, returnBase64 = fal
     pdf.setFont("helvetica", "bold")
     pdf.text("JOB ORDER", margin, 15)
 
-    // Add logistics badge
+    // Add department badge from props
     pdf.setFontSize(10)
     pdf.text("LOGISTICS DEPARTMENT", pageWidth - margin - 50, 15)
 
@@ -1358,17 +1411,29 @@ export async function generateJobOrderPDF(jobOrder: JobOrder, returnBase64 = fal
     pdf.setFont("helvetica", "bold")
     pdf.text("OH+", pageWidth - margin - 15, yPosition + 5)
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
       // Return base64 string for email attachment
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
       // Save the PDF for download
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `job-order-${jobOrder.joNumber.replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating Job Order PDF:", error)
-    throw new Error("Failed to generate Job Order PDF")
+    throw new Error("Unable to create job order PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1626,15 +1691,27 @@ try {
       }
     }
 
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
+
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
       const fileName = `proposal-${(proposal.title || "proposal").replace(/[^a-z0-9]/gi, "_").toLowerCase()}-${Date.now()}.pdf`
-      pdf.save(fileName)
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
     }
   } catch (error) {
     console.error("Error generating PDF:", error)
-    throw new Error("Failed to generate PDF")
+    throw new Error("Unable to create proposal PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1733,7 +1810,7 @@ export async function generateSeparateCostEstimatePDFs(
     }
   } catch (error) {
     console.error("Error generating separate PDFs:", error)
-    throw error
+    throw new Error("Unable to create separate cost estimate PDFs. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 
@@ -1810,7 +1887,8 @@ export async function generateCostEstimatePDF(
       throw new Error("No sites selected for PDF generation")
     }
 
-    sitesToProcess.forEach(async (siteName, siteIndex) => {
+    for (const siteName of sitesToProcess) {
+      const siteIndex = sitesToProcess.indexOf(siteName)
       if (siteIndex > 0) {
         pdf.addPage()
         yPosition = margin
@@ -2097,10 +2175,14 @@ export async function generateCostEstimatePDF(
 
       console.log("[v0] Final yPosition after signature section:", yPosition)
       console.log("[v0] Page dimensions - width:", pageWidth, "height:", pageHeight)
-    })
+    }
+
+    // Apply PDF viewer preferences for initial zoom
+    const pdfBytes = new Uint8Array(pdf.output("arraybuffer"))
+    const modifiedPdfBytes = await setPDFViewerPreferences(pdfBytes)
 
     if (returnBase64) {
-      return pdf.output("datauristring").split(",")[1]
+      return Buffer.from(modifiedPdfBytes).toString('base64')
     } else {
       const baseFileName = (costEstimate.title || "cost-estimate").replace(/[^a-z0-9]/gi, "_").toLowerCase()
       const sitesSuffix =
@@ -2114,12 +2196,20 @@ export async function generateCostEstimatePDF(
       const fileName = `cost-estimate-${baseFileName}${sitesSuffix}-${Date.now()}.pdf`
 
       console.log("[v0] Attempting to download PDF:", fileName)
-      pdf.save(fileName)
+      const blob = new Blob([new Uint8Array(modifiedPdfBytes)], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
       console.log("[v0] PDF download triggered successfully")
     }
   } catch (error) {
     console.error("Error generating Cost Estimate PDF:", error)
-    throw new Error("Failed to generate Cost Estimate PDF")
+    throw new Error("Unable to create cost estimate PDF. Please check your connection and try again. If the problem persists, contact support.")
   }
 }
 

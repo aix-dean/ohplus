@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation"
 import { getReports, type ReportData } from "@/lib/report-service"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 import { Pagination } from "@/components/ui/pagination"
 import {
   DropdownMenu,
@@ -21,6 +20,7 @@ import { searchReports, type SearchResult } from "@/lib/algolia-service"
 import { useDebounce } from "@/hooks/use-debounce"
 import { Timestamp } from "firebase/firestore"
 import { getUserById, type User } from "@/lib/access-management-service"
+import { ReportPostSuccessDialog } from "@/components/report-post-success-dialog"
 
 export default function ServiceReportsPage() {
   const [reports, setReports] = useState<ReportData[]>([])
@@ -38,6 +38,7 @@ export default function ServiceReportsPage() {
   const [searchLoading, setSearchLoading] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [isSearchMode, setIsSearchMode] = useState(false)
+  const [totalOverall, setTotalOverall] = useState(0)
   const itemsPerPage = 10
   // Debounce search term
   const debouncedSearchTerm = useDebounce(searchQuery, 300)
@@ -64,16 +65,6 @@ export default function ServiceReportsPage() {
     setIsSearchMode(false)
   }, [debouncedSearchTerm, filterType])
 
-  useEffect(() => {
-    // Check if we just posted a report
-    const lastPostedReportId = sessionStorage.getItem("lastPostedReportId")
-    if (lastPostedReportId) {
-      setPostedReportId(lastPostedReportId)
-      setShowSuccessDialog(true)
-      // Clear the session storage
-      sessionStorage.removeItem("lastPostedReportId")
-    }
-  }, [])
 
   const fetchReports = async (page: number = 1) => {
     setLoading(true)
@@ -187,6 +178,7 @@ export default function ServiceReportsPage() {
       })
       setReports([])
       setHasNextPage(false)
+      setTotalOverall(0)
     } finally {
       setLoading(false)
     }

@@ -10,6 +10,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Pagination } from "@/components/ui/pagination"
 import { useAuth } from "@/contexts/auth-context"
 import { getJobOrders } from "@/lib/job-order-service"
 import type { JobOrder } from "@/lib/types/job-order"
@@ -74,54 +75,81 @@ const parseDateSafely = (dateValue: any): Date | null => {
 };
 
 export default function JobOrdersPage() {
-   const { user, userData } = useAuth()
-   const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
-   const [searchTerm, setSearchTerm] = useState("")
-   const [loading, setLoading] = useState(true)
-   const [error, setError] = useState<string | null>(null)
+    const { user, userData } = useAuth()
+    const [jobOrders, setJobOrders] = useState<JobOrder[]>([])
+    const [searchTerm, setSearchTerm] = useState("")
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
-   // Report dialog state
-   const [reportDialogOpen, setReportDialogOpen] = useState(false)
-   const [selectedSiteId, setSelectedSiteId] = useState<string>("")
-   const [preSelectedJobOrder, setPreSelectedJobOrder] = useState<string>("")
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1)
+    const [hasNextPage, setHasNextPage] = useState(false)
+    const [lastDoc, setLastDoc] = useState<any>(null)
+    const [totalItems, setTotalItems] = useState(0)
+    const itemsPerPage = 10
 
-   const router = useRouter()
+    // Report dialog state
+    const [reportDialogOpen, setReportDialogOpen] = useState(false)
+    const [selectedSiteId, setSelectedSiteId] = useState<string>("")
+    const [preSelectedJobOrder, setPreSelectedJobOrder] = useState<string>("")
+
+    const router = useRouter()
+
+   // Function to fetch job orders with pagination
+   const fetchJobOrders = async (page: number = 1) => {
+     if (!userData?.company_id) {
+       setError("Company ID not found. Please contact support.")
+       setLoading(false)
+       return
+     }
+     try {
+       setLoading(true)
+       setError(null)
+       const hasSearch = !!(searchTerm && searchTerm.trim())
+       const result = await getJobOrders(userData.company_id, {
+         page,
+         limit: itemsPerPage,
+         searchQuery: hasSearch ? searchTerm.trim() : undefined,
+         lastDoc: page > 1 ? lastDoc : undefined
+       })
+
+       setJobOrders(result.jobOrders)
+       setHasNextPage(result.hasNextPage)
+       setLastDoc(result.lastDoc)
+       if (result.totalItems !== undefined) {
+         setTotalItems(result.totalItems)
+       }
+       setCurrentPage(page)
+     } catch (err) {
+       console.error("Failed to fetch job orders:", err)
+       setError("Failed to load job orders. Please try again.")
+     } finally {
+       setLoading(false)
+     }
+   }
 
    useEffect(() => {
-     const fetchJOs = async () => {
-       if (!userData?.company_id) {
-         setError("Company ID not found. Please contact support.")
-         setLoading(false)
-         return
-       }
-       try {
-         setLoading(true)
-         const fetchedJOs = await getJobOrders(userData.company_id)
-         setJobOrders(fetchedJOs)
-       } catch (err) {
-         console.error("Failed to fetch job orders:", err)
-         setError("Failed to load job orders. Please try again.")
-       } finally {
-         setLoading(false)
-       }
-     }
-     fetchJOs()
-   }, [userData?.company_id])
+     fetchJobOrders(currentPage)
+   }, [currentPage, searchTerm, userData?.company_id])
 
-  const filteredJobOrders = useMemo(() => {
-    if (!searchTerm) {
-      return jobOrders
+  // Pagination handlers
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      setCurrentPage(prev => prev + 1)
     }
-    const lowerCaseSearchTerm = searchTerm.toLowerCase()
-    return jobOrders.filter(
-      (jo) =>
-        jo.joNumber.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.siteName.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.joType.toLowerCase().includes(lowerCaseSearchTerm) ||
-        jo.requestedBy.toLowerCase().includes(lowerCaseSearchTerm) ||
-        (jo.assignTo && jo.assignTo.toLowerCase().includes(lowerCaseSearchTerm)),
-    )
-  }, [jobOrders, searchTerm])
+  }
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(prev => prev - 1)
+    }
+  }
+
+  // Reset pagination when search changes
+  useEffect(() => {
+    setCurrentPage(1)
+    setLastDoc(null)
+  }, [searchTerm])
 
   // Helper function to get status color (using joType for now, as no 'status' field exists)
   const getJoTypeColor = (joType: string) => {
@@ -241,7 +269,7 @@ export default function JobOrdersPage() {
           )}
         </div>
 
-        {filteredJobOrders.length === 0 ? (
+        {jobOrders.length === 0 ? (
           <Card className="border-gray-200 shadow-sm rounded-xl">
             <CardContent className="text-center py-12">
               <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
@@ -281,7 +309,7 @@ export default function JobOrdersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredJobOrders.map((jo) => {
+                {jobOrders.map((jo) => {
                   return (
                     <TableRow
                       key={jo.id}
@@ -358,6 +386,19 @@ export default function JobOrdersPage() {
               </TableBody>
             </Table>
           </Card>
+        )}
+
+        {/* Pagination Controls */}
+        {jobOrders.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            itemsPerPage={itemsPerPage}
+            totalItems={jobOrders.length}
+            totalOverall={totalItems}
+            onNextPage={handleNextPage}
+            onPreviousPage={handlePreviousPage}
+            hasMore={hasNextPage}
+          />
         )}
 
         {/* Report Dialog */}

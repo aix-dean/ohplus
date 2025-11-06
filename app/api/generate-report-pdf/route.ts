@@ -128,8 +128,8 @@ export async function generateReportPDF(
     }
 
     // Fetch user signatures for prepared by and received by
-    let preparedBySignature = "https://placehold.co/152x91"
-    let receivedBySignature = "https://placehold.co/152x91"
+    let preparedBySignature = ""
+    let receivedBySignature = ""
     let receivedByName = "Noemi Abellanada"
 
     // Fetch signature for createdBy (prepared by)
