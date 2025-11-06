@@ -84,6 +84,7 @@ export default function ServiceAssignmentsPage() {
             <div className="bg-white rounded-[20px] p-8">
               <ServiceAssignmentsTable
                 onSelectAssignment={handleSelectAssignment}
+                companyId={userData?.company_id ?? undefined}
                 searchQuery={searchQuery}
               />
             </div>

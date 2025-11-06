@@ -1639,7 +1639,7 @@ export default function SiteDetailsPage({ params }: Props) {
                   <CardContent>
                     <SiteServiceAssignmentsTable
                       projectSiteId={resolvedParams.id}
-                      companyId={product.company_id}
+                      companyId={userData?.company_id || ''}
                     />
                   </CardContent>
                 </Card>
