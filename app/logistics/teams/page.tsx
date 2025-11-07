@@ -14,7 +14,7 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 
-const imgMagnifyingGlass2 = "http://localhost:3845/assets/87240337af8d03b498dfc56870ac33cc3a3bd565.png";
+const imgMagnifyingGlass2 = "/icons/magnifying-glass 2.svg";
 const imgDots = "/icons/dots.svg";
 const imgView = "/icons/listview.png";
 const imgGrid = "/icons/cardview.png";
@@ -27,7 +27,6 @@ export default function TeamsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(9)
   const [isAddTeamDialogOpen, setIsAddTeamDialogOpen] = useState(false)
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [selectedAvatar, setSelectedAvatar] = useState<string>("")
@@ -39,6 +38,7 @@ export default function TeamsPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [menuOpen, setMenuOpen] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const itemsPerPage = viewMode === 'list' ? 10 : 12
 
   useEffect(() => {
     const fetchTeams = async () => {
@@ -62,10 +62,10 @@ export default function TeamsPage() {
     }
   }, [userData?.company_id])
 
-  // Reset to page 1 when search term changes
+  // Reset to page 1 when search term or view mode changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm])
+  }, [searchTerm, viewMode])
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -113,14 +113,25 @@ export default function TeamsPage() {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen pt-0 pb-4 pl-4 pr-4 md:pt-0 md:pb-6 md:pl-6 md:pr-6 lg:pt-0 lg:pb-8 lg:pl-8 lg:pr-8">
+      <div className="max-w-screen-2xl">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-700">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+          <h1 className="text-lg md:text-xl lg:text-2xl font-bold text-gray-700 md:-mt-16">
             Crew and Personnel
           </h1>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={() => {
+                setEditingTeam(null)
+                setFormData({ crewName: "", crewHead: "", contactNumber: "" })
+                setSelectedAvatar("")
+                setIsAddTeamDialogOpen(true)
+              }}
+              className="bg-white border border-gray-400 rounded-lg px-4 py-2 text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Add New Team
+            </button>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode('list')}
@@ -135,22 +146,11 @@ export default function TeamsPage() {
                 <img alt="Grid view" src={imgGrid} className="w-full h-full" />
               </button>
             </div>
-            <button
-              onClick={() => {
-                setEditingTeam(null)
-                setFormData({ crewName: "", crewHead: "", contactNumber: "" })
-                setSelectedAvatar("")
-                setIsAddTeamDialogOpen(true)
-              }}
-              className="bg-white border border-gray-400 rounded-lg px-4 py-2 text-sm md:text-base font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              Add New Team
-            </button>
           </div>
         </div>
 
         {/* Search Bar */}
-        <div className="relative mb-8 w-full max-w-md">
+        <div className="relative mb-6 w-full max-w-md md:-mt-16">
           <div className="relative">
             <input
               type="text"
@@ -167,7 +167,7 @@ export default function TeamsPage() {
 
         {/* Team Display */}
         {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
             {paginatedTeams.map((team) => (
             <div
               key={team.id}
@@ -189,7 +189,7 @@ export default function TeamsPage() {
                       e.stopPropagation()
                       setMenuOpen(menuOpen === team.id ? null : team.id)
                     }}
-                    className="opacity-50 hover:opacity-100 transition-opacity"
+                    className="hover:opacity-100 transition-opacity"
                   >
                     <div className="w-5 h-5">
                       <img alt="" src={imgDots} className="w-full h-full" />
@@ -197,7 +197,7 @@ export default function TeamsPage() {
                   </button>
 
                   {menuOpen === team.id && (
-                      <div className="dropdown-menu absolute right-0 top-full z-10 w-32 bg-white border border-gray-400 shadow-lg">
+                      <div className="dropdown-menu absolute right-[1rem] top-full z-10 w-32 bg-white border border-gray-400 shadow-lg">
                       <button
                         onClick={() => {
                           // Handle edit
@@ -207,9 +207,18 @@ export default function TeamsPage() {
                             crewHead: team.leaderName || "",
                             contactNumber: team.contactNumber || ""
                           })
-                          // Extract avatar from description
-                          const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
-                          setSelectedAvatar(avatarMatch ? avatarMatch[1] : "")
+                          // Extract avatar from description with migration
+                          let editAvatar = "";
+                          const oldEditMatch = team.description?.match(/\|avatar:(person\d+\.svg)/);
+                          if (oldEditMatch) {
+                            const numMatch = oldEditMatch[1].match(/\d+/);
+                            const num = numMatch ? numMatch[0] : '';
+                            editAvatar = `avatar${num}.svg`;
+                          } else {
+                            const newEditMatch = team.description?.match(/\|avatar:(avatar\d+\.svg)/);
+                            editAvatar = newEditMatch ? newEditMatch[1] : "";
+                          }
+                          setSelectedAvatar(editAvatar);
                           setIsAddTeamDialogOpen(true)
                           setMenuOpen(null)
                         }}
@@ -247,19 +256,28 @@ export default function TeamsPage() {
               <div className="flex flex-col items-center mb-2">
                 <div className="w-full max-w-48 h-48 sm:max-w-52 sm:h-52 bg-transparent flex items-center justify-center overflow-hidden">
                   {(() => {
-                    const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
-                    const avatar = avatarMatch ? avatarMatch[1] : null
-                    return avatar ? (
+                    let avatar = null;
+                    const oldMatch = team.description?.match(/\|avatar:(person\d+\.svg)/);
+                    if (oldMatch) {
+                      const numMatch = oldMatch[1].match(/\d+/);
+                      const num = numMatch ? numMatch[0] : '';
+                      avatar = `avatar${num}.svg`;
+                    } else {
+                      const newMatch = team.description?.match(/\|avatar:(avatar\d+\.svg)/);
+                      avatar = newMatch ? newMatch[1] : null;
+                    }
+                    if (!avatar) {
+                      const hash = team.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+                      const index = (hash % 8) + 1;
+                      avatar = `avatar${index}.svg`;
+                    }
+                    return (
                       <img
-                        src={`/icons/${avatar}`}
+                        src={`/icons/crew-card-avatars/${avatar}`}
                         alt={`${team.name} avatar`}
                         className="w-full h-full object-cover"
                       />
-                    ) : (
-                      <span className="text-2xl sm:text-3xl text-gray-500 font-bold">
-                        {team.name.charAt(0)}
-                      </span>
-                    )
+                    );
                   })()}
                 </div>
               </div>
@@ -279,23 +297,23 @@ export default function TeamsPage() {
             ))}
           </div>
         ) : (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="bg-white rounded-lg shadow-lg overflow-hidden px-6 pt-2 pb-24 h-[550px] md:h-[650px] lg:h-[750px]">
             {/* Table Header - Hidden on mobile, shown on larger screens */}
-            <div className="hidden md:flex items-center justify-between px-6 py-4 border-b bg-gray-50">
-              <div className="flex items-center space-x-8 flex-1">
-                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1">Crew Name</div>
-                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1">Crew Head</div>
-                <div className="text-sm font-semibold text-gray-700 text-left min-w-0 flex-1">Contact Number</div>
+            <div className="flex items-center justify-between px-6 py-4 border-b-[1px] border-black bg-white mb-4">
+              <div className="flex items-center space-x-4 md:space-x-6">
+                <div className="text-sm font-semibold text-gray-700 text-left w-20 md:w-32 truncate">Crew Name</div>
+                <div className="text-sm font-semibold text-gray-700 text-left w-28 md:w-48 truncate">Crew Head</div>
+                <div className="text-sm font-semibold text-gray-700 text-left w-24 md:w-36 truncate">Contact Number</div>
               </div>
-              <div className="w-16 text-center text-sm font-semibold text-gray-700">Actions</div>
+              <div className="w-12 md:w-16 text-center text-sm font-semibold text-gray-700">Actions</div>
             </div>
 
             {/* Table Rows */}
-            <div className="divide-y divide-gray-200">
+            <div className="space-y-2">
               {paginatedTeams.map((team) => (
                 <div
                   key={team.id}
-                  className="bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                  className="bg-[#F6F9FF] border-2 border-[#B8D9FF] rounded-[10px] hover:bg-[#E6F2FF] cursor-pointer transition-colors"
                   onClick={(e) => {
                     // Prevent navigation if clicking on dropdown menu
                     if (!(e.target as Element).closest('.dropdown-menu')) {
@@ -317,7 +335,7 @@ export default function TeamsPage() {
                             e.stopPropagation()
                             setMenuOpen(menuOpen === team.id ? null : team.id)
                           }}
-                          className="opacity-50 hover:opacity-100 transition-opacity p-2"
+                          className="hover:opacity-100 transition-opacity p-2"
                         >
                           <div className="w-4 h-4">
                             <img alt="" src={imgDots} className="w-full h-full" />
@@ -325,7 +343,7 @@ export default function TeamsPage() {
                         </button>
 
                         {menuOpen === team.id && (
-                          <div className="dropdown-menu absolute right-0 top-full z-10 w-32 bg-white border border-gray-400 rounded-md shadow-lg">
+                          <div className="dropdown-menu absolute right-[1rem] top-full z-10 w-32 bg-white border border-gray-400 shadow-lg">
                             <button
                               onClick={() => {
                                 setEditingTeam(team)
@@ -334,8 +352,18 @@ export default function TeamsPage() {
                                   crewHead: team.leaderName || "",
                                   contactNumber: team.contactNumber || ""
                                 })
-                                const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
-                                setSelectedAvatar(avatarMatch ? avatarMatch[1] : "")
+                                // Extract avatar from description with migration
+                                let editAvatar = "";
+                                const oldEditMatch = team.description?.match(/\|avatar:(person\d+\.svg)/);
+                                if (oldEditMatch) {
+                                  const numMatch = oldEditMatch[1].match(/\d+/);
+                                  const num = numMatch ? numMatch[0] : '';
+                                  editAvatar = `avatar${num}.svg`;
+                                } else {
+                                  const newEditMatch = team.description?.match(/\|avatar:(avatar\d+\.svg)/);
+                                  editAvatar = newEditMatch ? newEditMatch[1] : "";
+                                }
+                                setSelectedAvatar(editAvatar);
                                 setIsAddTeamDialogOpen(true)
                                 setMenuOpen(null)
                               }}
@@ -371,19 +399,19 @@ export default function TeamsPage() {
                   </div>
 
                   {/* Desktop Layout */}
-                  <div className="hidden md:flex items-center justify-between px-6 py-4">
-                    <div className="flex items-center space-x-8 flex-1">
-                      <div className="text-sm text-gray-700 text-left min-w-0 flex-1">{team.name}</div>
-                      <div className="text-sm text-gray-700 text-left min-w-0 flex-1">{team.leaderName || 'No Leader'}</div>
-                      <div className="text-sm text-gray-700 text-left min-w-0 flex-1">{team.contactNumber || 'N/A'}</div>
+                  <div className="hidden md:flex items-center justify-between px-6 py-4" >
+                    <div className="flex items-center space-x-4 md:space-x-6">
+                      <div className="text-sm text-gray-700 text-left w-20 md:w-32 truncate">{team.name}</div>
+                      <div className="text-sm text-gray-700 text-left w-28 md:w-48 truncate">{team.leaderName || 'No Leader'}</div>
+                      <div className="text-sm text-gray-700 text-left w-24 md:w-36 truncate">{team.contactNumber || 'N/A'}</div>
                     </div>
-                    <div className="w-16 flex justify-center relative">
+                    <div className="w-12 md:w-16 flex justify-center relative">
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           setMenuOpen(menuOpen === team.id ? null : team.id)
                         }}
-                        className="opacity-50 hover:opacity-100 transition-opacity"
+                        className="hover:opacity-100 transition-opacity"
                       >
                         <div className="w-4 h-4">
                           <img alt="" src={imgDots} className="w-full h-full" />
@@ -391,7 +419,7 @@ export default function TeamsPage() {
                       </button>
 
                       {menuOpen === team.id && (
-                        <div className="dropdown-menu absolute left-0 top-full z-10 w-32 bg-white border border-gray-400 rounded-md shadow-lg">
+                        <div className="dropdown-menu absolute right-[3rem] top-full z-10 w-32 bg-white border border-gray-400 shadow-lg">
                           <button
                             onClick={() => {
                               setEditingTeam(team)
@@ -400,8 +428,18 @@ export default function TeamsPage() {
                                 crewHead: team.leaderName || "",
                                 contactNumber: team.contactNumber || ""
                               })
-                              const avatarMatch = team.description?.match(/\|avatar:(person\d+\.svg)/)
-                              setSelectedAvatar(avatarMatch ? avatarMatch[1] : "")
+                              // Extract avatar from description with migration
+                              let editAvatar = "";
+                              const oldEditMatch = team.description?.match(/\|avatar:(person\d+\.svg)/);
+                              if (oldEditMatch) {
+                                const numMatch = oldEditMatch[1].match(/\d+/);
+                                const num = numMatch ? numMatch[0] : '';
+                                editAvatar = `avatar${num}.svg`;
+                              } else {
+                                const newEditMatch = team.description?.match(/\|avatar:(avatar\d+\.svg)/);
+                                editAvatar = newEditMatch ? newEditMatch[1] : "";
+                              }
+                              setSelectedAvatar(editAvatar);
                               setIsAddTeamDialogOpen(true)
                               setMenuOpen(null)
                             }}
@@ -517,15 +555,15 @@ export default function TeamsPage() {
                   {Array.from({ length: 8 }, (_, i) => (
                     <button
                       key={i + 1}
-                      onClick={() => setSelectedAvatar(`person${i + 1}.svg`)}
+                      onClick={() => setSelectedAvatar(`avatar${i + 1}.svg`)}
                       className={`w-16 h-16 rounded-full border-2 overflow-hidden ${
-                        selectedAvatar === `person${i + 1}.svg`
+                        selectedAvatar === `avatar${i + 1}.svg`
                           ? 'border-blue-500'
                           : 'border-gray-300 hover:border-gray-400'
                       }`}
                     >
                       <img
-                        src={`/icons/person${i + 1}.svg`}
+                        src={`/icons/crew-card-avatars/avatar${i + 1}.svg`}
                         alt={`Avatar ${i + 1}`}
                         className="w-full h-full object-cover"
                       />
