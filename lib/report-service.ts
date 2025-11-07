@@ -41,7 +41,6 @@ export interface ReportData {
     end: Timestamp
   }
   start_date: Timestamp
-  booking_id?: string
   sales: string
   reportType: string
   end_date: Timestamp

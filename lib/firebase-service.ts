@@ -239,6 +239,8 @@ export interface ServiceAssignment {
     name: string
     department: string
   }
+  startDate: Date | null
+  endDate: Date | null
   message: string
   campaignName?: string
   crew?: string

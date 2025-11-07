@@ -277,7 +277,7 @@ const SelectServiceAssignmentPage = () => {
                     <div>{assignment.projectSiteName || "—"}</div>
                     <div>{assignment.campaignName || "—"}</div>
                     <div className="truncate">{assignment.assignedToName || assignment.assignedTo || "—"}</div>
-                    <div >{formatDate(assignment.coveredDateEnd) || "—"}</div>
+                    <div >{assignment.coveredDateEnd ? formatDate(assignment.coveredDateEnd) : formatDate(assignment.endDate) || "—"}</div>
                     <div className="capitalize">{assignment.status || "—"}</div>
                   </div>
                 </div>

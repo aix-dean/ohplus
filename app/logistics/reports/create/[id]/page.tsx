@@ -89,15 +89,15 @@ export default function CreateReportPage() {
   const [companyDataLoading, setCompanyDataLoading] = useState(true);
 
   const updateBeforePhotoNote = useCallback((index: number, note: string) => {
-    setBeforePhotoAttachments(prev => prev.map((att, i) => i === index ? {...att, note} : att));
+    setBeforePhotoAttachments(prev => prev.map((att, i) => i === index ? { ...att, note } : att));
   }, []);
 
   const updateAfterPhotoNote = useCallback((index: number, note: string) => {
-    setAfterPhotoAttachments(prev => prev.map((att, i) => i === index ? {...att, note} : att));
+    setAfterPhotoAttachments(prev => prev.map((att, i) => i === index ? { ...att, note } : att));
   }, []);
 
   const updatePhotosNote = useCallback((index: number, note: string) => {
-    setPhotosAttachments(prev => prev.map((att, i) => i === index ? {...att, note} : att));
+    setPhotosAttachments(prev => prev.map((att, i) => i === index ? { ...att, note } : att));
   }, []);
 
   const onCreateAReportClick = useCallback(() => {
@@ -255,8 +255,8 @@ export default function CreateReportPage() {
           start: bookingData.start_date || Timestamp.now(),
           end: bookingData.end_date || Timestamp.now(),
         },
-        start_date: assignmentData.coveredDateStart || Timestamp.now(),
-        end_date: assignmentData.coveredDateEnd || Timestamp.now(),
+        start_date: assignmentData.coveredDateStart || assignmentData.startDate || Timestamp.now(),
+        end_date: assignmentData.coveredDateEnd || assignmentData.endDate || Timestamp.now(),
         booking_id: assignmentData.booking_id || "",
         sales: assignmentData.sales || "",
         saNumber: assignmentData.saNumber || "",
@@ -275,7 +275,7 @@ export default function CreateReportPage() {
       };
 
 
-   
+
       const reportId = await createReport(reportData);
 
 
@@ -308,7 +308,8 @@ export default function CreateReportPage() {
 
       // Navigate to the created report page
       setTimeout(() => {
-        router.push(`/logistics/reports/${reportId}`);
+        const redirectPath = `/logistics/reports/review/${reportId}`
+        router.push(redirectPath);
       }, 1000);
     } catch (err) {
       console.error("Error creating report:", err);
@@ -472,11 +473,11 @@ export default function CreateReportPage() {
   }
 
   const getTeamName = async (teamId: string) => {
-    
-    if(teamId){
+
+    if (teamId) {
       const team = await getTeamById(teamId);
       return team?.name || "";
-    }else{  
+    } else {
       return "N/A"
     }
   };
@@ -558,7 +559,7 @@ export default function CreateReportPage() {
             <div>
               <p className="font-semibold">Crew</p>
               <p>
-                { assignmentData.assignedToName ||
+                {assignmentData.assignedToName ||
                   "Production- Jonathan Dela Cruz"}
               </p>
             </div>
@@ -601,7 +602,7 @@ export default function CreateReportPage() {
                 className="object-cover rounded-md"
               />
               {/* Site Info */}
-              <div>
+              <div className="mt-2">
                 <p className="font-bold text-[18px]">
                   {productData?.name ||
                     assignmentData?.projectSiteName ||
@@ -615,7 +616,7 @@ export default function CreateReportPage() {
               </div>
 
               {/* Remarks */}
-              <div className="mt-4">
+              <div className="mt-4 absolute bottom-0">
                 <textarea
                   className="w-[182px] h-[64px] p-3 text-xs text-[#c4c4c4] border border-[#c4c4c4] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   rows={3}
@@ -727,6 +728,10 @@ export default function CreateReportPage() {
                         type="date"
                         className="w-full text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded-[6.05px] focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         defaultValue={assignmentData.coveredDateStart
+                          ? assignmentData.coveredDateStart
+                          .toDate()
+                          .toLocaleDateString("en-CA"): 
+                          assignmentData.startDate
                           .toDate()
                           .toLocaleDateString("en-CA")}
                       />
@@ -734,12 +739,17 @@ export default function CreateReportPage() {
                     <input
                       type="time"
                       className="flex-1 text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden [-webkit-appearance:none] [appearance:none]"
-                      defaultValue={assignmentData.coveredDateStart
-                        .toDate()
-                        .toLocaleTimeString("en-GB", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                      defaultValue={
+                        assignmentData.coveredDateStart
+                          ? assignmentData.coveredDateStart.toDate().toLocaleTimeString("en-GB", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                          : assignmentData.startDate.toDate().toLocaleTimeString("en-GB", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                      }
                     />
                   </div>
                 </div>
@@ -753,19 +763,28 @@ export default function CreateReportPage() {
                         type="date"
                         className="w-full text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         defaultValue={assignmentData.coveredDateEnd
+                          ? assignmentData.coveredDateEnd
+                          .toDate()
+                          .toLocaleDateString("en-CA") :
+                          assignmentData.endDate
                           .toDate()
                           .toLocaleDateString("en-CA")}
                       />
                     </div>
                     <input
                       type="time"
-                      className="flex-1  text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden [-webkit-appearance:none] [appearance:none]"
-                      defaultValue={assignmentData.coveredDateEnd
-                        .toDate()
-                        .toLocaleTimeString("en-GB", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                      className="flex-1 text-xs h-[25px] font-medium p-2 border-[1.2px] border-[#c4c4c4] text-[#c4c4c4] rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden [-webkit-appearance:none] [appearance:none]"
+                      defaultValue={
+                        assignmentData.coveredDateEnd
+                          ? assignmentData.coveredDateEnd.toDate().toLocaleTimeString("en-GB", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                          : assignmentData.endDate.toDate().toLocaleTimeString("en-GB", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
+                      }
                     />
                   </div>
                 </div>

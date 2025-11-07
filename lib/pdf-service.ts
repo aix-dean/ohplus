@@ -15,7 +15,7 @@ export async function loadImageAsBase64(url: string): Promise<string | null> {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-    const response = await fetch(fetchUrl, {
+    const response = await fetch(url, {
       signal: controller.signal,
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; PDF-Generator/1.0)",
@@ -2213,3 +2213,817 @@ export async function generateCostEstimatePDF(
   }
 }
 
+export async function generateServiceAssignmentHTMLSimple(
+  assignment: ServiceAssignmentPDFData,
+  companyData?: any,
+  logoDataUrl?: string,
+  signatureDataUrl?: string,
+): Promise<string> {
+  const companyName = companyData?.name || companyData?.company_name || "Golden Touch Imaging Specialist"
+  const companyAddress = companyData?.address ? (() => {
+    // Model 2: address as object with city, province, street
+    if (companyData.address && typeof companyData.address === "object") {
+      const { street, city, province } = companyData.address
+      const addressParts = [street, city, province].filter(
+        (part) => part && part.trim() !== "" && !part.toLowerCase().includes("default"),
+      )
+      return addressParts.join(", ")
+    }
+
+    // Model 3: address as string
+    if (companyData.address && typeof companyData.address === "string") {
+      return companyData.address
+    }
+
+    return "721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines"
+  })() : "721 Gen Solano St., San Miguel, Manila City, Metro Manila, Philippines"
+  const logoSrc = logoDataUrl || "/placeholder.svg?height=32&width=60"
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Service Assignment - ${assignment.saNumber}</title>
+      <style>
+        body {
+           font-family: 'Helvetica', 'Arial', sans-serif;
+           margin: 0;
+           padding: 0;
+           background-color: #ffffff;
+           color: #000000;
+           line-height: 1.4;
+         }
+
+         .container {
+           width: 816px;
+           height: 1056px;
+           margin: auto;
+         }
+
+        .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding: 16px;
+          padding-bottom: 8px;
+        }
+
+        .header-left {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+        }
+
+        .company-logo {
+          height: 32px;
+        }
+
+        .company-name {
+          font-size: 16px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .company-contact {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .header-right {
+          text-align: right;
+        }
+
+        .tagged-jo-label {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .tagged-jo-number {
+          font-size: 14px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .recipient-section {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding-left: 16px;
+          padding-right: 16px;
+          padding-top: 8px;
+          padding-bottom: 8px;
+        }
+
+        .recipient-left {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .recipient-label {
+          font-size: 12px;
+          color: #6b7280;
+          margin-bottom: 4px;
+        }
+
+        .recipient-name {
+          font-size: 20px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+        }
+
+        .recipient-dept {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 4px 0 0 0;
+        }
+
+        .recipient-right {
+          text-align: right;
+        }
+
+        .sa-badge {
+          background-color: #2196f3;
+          color: white;
+          padding: 8px 16px;
+          font-size: 20px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 130px;
+          height: 30px;
+          flex-shrink: 0;
+          margin-bottom: 8px;
+        }
+
+        .issued-date {
+          font-size: 12px;
+          color: #6b7280;
+          margin-top: 8px;
+        }
+
+        .info-section {
+          padding-left: 16px;
+          padding-right: 16px;
+          padding-top: 8px;
+          padding-bottom: 16px;
+        }
+
+        .info-header {
+          background-color: #2196f3;
+          color: #ffffff;
+          padding: 12px 16px;
+          font-size: 16px;
+          font-weight: 700;
+          line-height: 1;
+          margin-bottom: 0;
+        }
+
+        .info-table {
+          width: 100%;
+          border-collapse: collapse;
+          height: 253px;
+        }
+
+        .info-table tr {
+          border: 1px solid #d1d5db;
+        }
+
+        .info-table td {
+          padding: 4px 16px;
+          font-size: 12px;
+          color: #6b7280;
+        }
+
+        .info-table td:first-child {
+          background-color: #ffffff;
+          width: 33.33%;
+          border-right: 1px solid #d1d5db;
+        }
+
+        .info-table td:nth-child(2) {
+          font-weight: 700;
+        }
+
+        .attachments-section {
+          padding-left: 24px;
+          padding-right: 24px;
+          padding-bottom: 24px;
+        }
+
+        .attachments-label {
+          font-size: 12px;
+          font-weight: 700;
+          color: #333333;
+          line-height: 1;
+          margin-bottom: 16px;
+        }
+
+        .attachments-content {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: 24px;
+        }
+
+        .attachment-box {
+          width: 200px;
+          height: 200px;
+          border: 1px solid #d1d5db;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #ffffff;
+        }
+
+        .attachment-image {
+          max-width: 190px;
+          max-height: 190px;
+          object-fit: contain;
+        }
+
+        .prepared-by-section {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+        }
+
+        .prepared-by-label {
+          font-size: 12px;
+          color: #6b7280;
+          margin-bottom: 8px;
+        }
+
+        .signature-box {
+          width: 152px;
+          height: 91px;
+          border: 1px solid #d1d5db;
+          margin-bottom: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background-color: #ffffff;
+        }
+
+        .signature-image {
+          max-width: 140px;
+          max-height: 80px;
+          object-fit: contain;
+        }
+
+        .prepared-by-name {
+          font-size: 20px;
+          font-weight: 700;
+          color: #111827;
+          margin: 0;
+          text-align: right;
+          margin-top: 16px;
+        }
+
+        .prepared-by-dept {
+          font-size: 12px;
+          color: #6b7280;
+          margin: 4px 0 0 0;
+          text-align: right;
+        }
+
+        .footer {
+          background-color: #ffffff;
+          padding: 16px 24px;
+          text-align: center;
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+        }
+
+        .footer-company {
+          font-size: 12px;
+          font-weight: 600;
+          color: #6b7280;
+          margin: 0;
+        }
+
+        .footer-address {
+          font-size: 12px;
+          color: #9ca3af;
+          margin: 4px 0 0 0;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <!-- Header -->
+        <div class="header">
+          <div class="header-left">
+            <img src="${logoSrc}" alt="Company Logo" class="company-logo" />
+            <p class="company-name">${companyName}</p>
+            <p class="company-contact">${companyAddress}</p>
+          </div>
+          <div class="header-right">
+            <p class="tagged-jo-label">Tagged JO</p>
+            <p class="tagged-jo-number">JO#${assignment.saNumber.slice(-4)}</p>
+          </div>
+        </div>
+
+        <!-- Recipient Section -->
+        <div class="recipient-section">
+          <div class="recipient-left">
+            <p class="recipient-label">Recipient</p>
+            <h2 class="recipient-name">
+              ${assignment.requestedBy?.name || assignment.assignedTo}
+            </h2>
+            <p class="recipient-dept">Sales</p>
+          </div>
+          <div class="recipient-right">
+            <div class="sa-badge">
+              SA#${assignment.saNumber}
+            </div>
+            <p class="issued-date">Issued on ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+          </div>
+        </div>
+
+        <!-- Service Assignment Information Table -->
+        <div class="info-section">
+          <div class="info-header">
+            Service Assignment Information
+          </div>
+          <table class="info-table">
+            <tbody>
+              <tr>
+                <td>Site Name</td>
+                <td>${assignment.projectSiteName}</td>
+              </tr>
+              <tr>
+                <td>Site Address</td>
+                <td>${assignment.projectSiteLocation}</td>
+              </tr>
+              <tr>
+                <td>Campaign Name</td>
+                <td>${assignment.campaignName || "N/A"}</td>
+              </tr>
+              <tr>
+                <td>Service Type</td>
+                <td>${assignment.serviceType}</td>
+              </tr>
+              <tr>
+                <td>Material Specs</td>
+                <td>${assignment.materialSpecs}</td>
+              </tr>
+              <tr>
+                <td>Service Start Date</td>
+                <td>${assignment.startDate ? new Date(assignment.startDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
+              </tr>
+              <tr>
+                <td>Service End Date</td>
+                <td>${assignment.endDate ? new Date(assignment.endDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A'}</td>
+              </tr>
+              <tr>
+                <td>Crew</td>
+                <td>${assignment.crewName || assignment.crew}</td>
+              </tr>
+              <tr>
+                <td>Remarks</td>
+                <td>${assignment.remarks}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="attachments-section">
+          <p class="attachments-label">
+            Attachments:
+          </p>
+          <div class="attachments-content">
+            <div class="attachment-box">
+              ${assignment.attachments && assignment.attachments.length > 0 && (assignment.attachments[0].url || assignment.attachments[0].fileUrl) ? `<img src="${assignment.attachments[0].url || assignment.attachments[0].fileUrl}" alt="Attachment" class="attachment-image" />` : ''}
+            </div>
+            <div class="prepared-by-section">
+              <p class="prepared-by-label">Prepared By</p>
+              <div class="signature-box">
+                ${signatureDataUrl ? `<img src="${signatureDataUrl}" alt="Signature" class="signature-image" />` : ''}
+              </div>
+              <p class="prepared-by-name">${assignment.requestedBy?.name || "User"}</p>
+              <p class="prepared-by-dept">${assignment.requestedBy?.department || "Logistics Team"}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+          <p class="footer-company">${companyName}</p>
+          <p class="footer-address">
+            ${companyAddress}
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
+export async function generateServiceAssignmentHTML(
+  assignmentData: ServiceAssignmentPDFData,
+  companyData: any,
+  logoDataUrl: string,
+): Promise<string> {
+  const companyName = companyData?.name || companyData?.company_name || "Company Name"
+  const companyTagline = companyData?.tagline || "Smart. Seamless. Scalable."
+
+  return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Service Assignment - ${assignmentData.saNumber}</title>
+      <style>
+        body {
+          font-family: 'Helvetica', 'Arial', sans-serif;
+          margin: 0;
+          padding: 20px;
+          background-color: #ffffff;
+          color: #000000;
+          line-height: 1.4;
+        }
+
+        .header {
+          background: linear-gradient(135deg, #1e3a8a 60%, #34d3eb 100%);
+          color: white;
+          padding: 20px;
+          text-align: center;
+          margin: -20px -20px 20px -20px;
+          position: relative;
+        }
+
+        .header-logo {
+          position: absolute;
+          top: 10px;
+          right: 20px;
+          width: 60px;
+          height: 60px;
+          object-fit: contain;
+        }
+
+        .header h1 {
+          margin: 0;
+          font-size: 28px;
+          font-weight: bold;
+        }
+
+        .header p {
+          margin: 5px 0 0 0;
+          font-size: 14px;
+        }
+
+        .sa-number {
+          font-size: 32px;
+          font-weight: bold;
+          color: #1e3a8a;
+          margin: 20px 0;
+          text-align: center;
+        }
+
+        .status-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 4px;
+          font-size: 12px;
+          font-weight: bold;
+          color: white;
+          margin: 10px 0;
+        }
+
+        .status-completed { background-color: #22c55e; }
+        .status-pending { background-color: #eab308; }
+        .status-in-progress { background-color: #3b82f6; }
+        .status-draft { background-color: #6b7280; }
+
+        .section {
+          margin: 20px 0;
+          padding: 15px;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          background-color: #ffffff;
+        }
+
+        .section h2 {
+          margin: 0 0 15px 0;
+          font-size: 18px;
+          font-weight: bold;
+          color: #111827;
+          border-bottom: 2px solid #e5e7eb;
+          padding-bottom: 5px;
+        }
+
+        .field-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 15px;
+        }
+
+        .field {
+          margin-bottom: 10px;
+        }
+
+        .field label {
+          display: block;
+          font-weight: bold;
+          color: #374151;
+          margin-bottom: 3px;
+          font-size: 12px;
+        }
+
+        .field span {
+          color: #111827;
+          font-size: 14px;
+        }
+
+        .expenses-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+        }
+
+        .expenses-table th,
+        .expenses-table td {
+          padding: 8px 12px;
+          text-align: left;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .expenses-table th {
+          background-color: #f9fafb;
+          font-weight: bold;
+          color: #374151;
+        }
+
+        .total-row {
+          border-top: 2px solid #374151;
+          font-weight: bold;
+        }
+
+        .terms-section {
+          margin: 20px 0;
+          padding: 15px;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          background-color: #ffffff;
+        }
+
+        .terms-section h2 {
+          margin: 0 0 15px 0;
+          font-size: 18px;
+          font-weight: bold;
+          color: #111827;
+          border-bottom: 2px solid #e5e7eb;
+          padding-bottom: 5px;
+        }
+
+        .terms-list {
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        .terms-list div {
+          margin-bottom: 8px;
+        }
+
+        .signatures-section {
+          margin: 20px 0;
+          padding: 15px;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          background-color: #ffffff;
+        }
+
+        .signatures-section h2 {
+          margin: 0 0 15px 0;
+          font-size: 18px;
+          font-weight: bold;
+          color: #111827;
+          border-bottom: 2px solid #e5e7eb;
+          padding-bottom: 5px;
+        }
+
+        .signature-row {
+          display: flex;
+          justify-content: space-between;
+          margin: 20px 0;
+        }
+
+        .signature-box {
+          flex: 1;
+          margin: 0 10px;
+          text-align: center;
+        }
+
+        .signature-line {
+          border-bottom: 1px solid #000;
+          margin: 20px 0;
+          height: 30px;
+        }
+
+        .signature-name {
+          font-weight: bold;
+          font-size: 12px;
+        }
+
+        .footer {
+          margin-top: 30px;
+          padding-top: 20px;
+          border-top: 1px solid #e5e7eb;
+          text-align: center;
+          color: #6b7280;
+          font-size: 12px;
+        }
+
+        @media print {
+          body { margin: 0; }
+          .header { margin: 0 -20px 20px -20px; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        ${logoDataUrl ? `<img src="${logoDataUrl}" alt="Company Logo" class="header-logo">` : ''}
+        <h1>SERVICE ASSIGNMENT</h1>
+        <p>LOGISTICS DEPARTMENT</p>
+      </div>
+
+      <div class="sa-number">SA# ${assignmentData.saNumber}</div>
+
+      <div class="status-badge status-${assignmentData.status.toLowerCase().replace(' ', '-')}">
+        ${assignmentData.status.toUpperCase()}
+      </div>
+
+      <div class="section">
+        <h2>SERVICE ASSIGNMENT INFORMATION</h2>
+        <div class="field-grid">
+          <div class="field">
+            <label>SA Number:</label>
+            <span>${assignmentData.saNumber}</span>
+          </div>
+          <div class="field">
+            <label>Project Site:</label>
+            <span>${assignmentData.projectSiteName}</span>
+          </div>
+          <div class="field">
+            <label>Location:</label>
+            <span>${assignmentData.projectSiteLocation || "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Service Type:</label>
+            <span>${assignmentData.serviceType}</span>
+          </div>
+          <div class="field">
+            <label>Assigned To:</label>
+            <span>${assignmentData.assignedToName || assignmentData.assignedTo}</span>
+          </div>
+          <div class="field">
+            <label>Duration:</label>
+            <span>${assignmentData.serviceDuration ? `${assignmentData.serviceDuration} hours` : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Priority:</label>
+            <span>${assignmentData.priority}</span>
+          </div>
+          <div class="field">
+            <label>Created:</label>
+            <span>${safeToDate(assignmentData.created).toLocaleDateString()}</span>
+          </div>
+          <div class="field">
+            <label>Start Date:</label>
+            <span>${assignmentData.startDate ? safeToDate(assignmentData.startDate).toLocaleDateString() : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>End Date:</label>
+            <span>${assignmentData.endDate ? safeToDate(assignmentData.endDate).toLocaleDateString() : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Alarm Date:</label>
+            <span>${assignmentData.alarmDate ? safeToDate(assignmentData.alarmDate).toLocaleDateString() : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Alarm Time:</label>
+            <span>${assignmentData.alarmTime || "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Illumination:</label>
+            <span>${assignmentData.illuminationNits ? `${assignmentData.illuminationNits} nits` : "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Gondola:</label>
+            <span>${assignmentData.gondola || "N/A"}</span>
+          </div>
+          <div class="field">
+            <label>Technology:</label>
+            <span>${assignmentData.technology || "N/A"}</span>
+          </div>
+        </div>
+      </div>
+
+      ${assignmentData.equipmentRequired || assignmentData.materialSpecs ? `
+      <div class="section">
+        <h2>EQUIPMENT & MATERIALS</h2>
+        ${assignmentData.equipmentRequired ? `
+        <div class="field">
+          <label>Equipment Required:</label>
+          <span>${assignmentData.equipmentRequired}</span>
+        </div>
+        ` : ''}
+        ${assignmentData.materialSpecs ? `
+        <div class="field">
+          <label>Material Specifications:</label>
+          <span>${assignmentData.materialSpecs}</span>
+        </div>
+        ` : ''}
+      </div>
+      ` : ''}
+
+      ${assignmentData.serviceExpenses && assignmentData.serviceExpenses.length > 0 ? `
+      <div class="section">
+        <h2>SERVICE COST BREAKDOWN</h2>
+        <table class="expenses-table">
+          <thead>
+            <tr>
+              <th>Expense Name</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${assignmentData.serviceExpenses.map(expense => `
+            <tr>
+              <td>${expense.name}</td>
+              <td>PHP ${Number.parseFloat(expense.amount).toLocaleString()}</td>
+            </tr>
+            `).join('')}
+            <tr class="total-row">
+              <td><strong>TOTAL COST</strong></td>
+              <td><strong>PHP ${assignmentData.serviceExpenses.reduce((sum, expense) => sum + (Number.parseFloat(expense.amount) || 0), 0).toLocaleString()}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      ` : ''}
+
+      ${assignmentData.remarks ? `
+      <div class="section">
+        <h2>REMARKS</h2>
+        <div class="field">
+          <span>${assignmentData.remarks}</span>
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="section">
+        <h2>REQUESTED BY</h2>
+        <div class="field">
+          <span>${assignmentData.requestedBy?.department || "LOGISTICS"} - ${assignmentData.requestedBy?.name || "Unknown User"}</span>
+        </div>
+      </div>
+
+      <div class="terms-section">
+        <h2>TERMS AND CONDITIONS</h2>
+        <div class="terms-list">
+          <div>1. Service assignments are subject to the terms and conditions outlined in the original service agreement.</div>
+          <div>2. All work must be completed within the specified duration and meet quality standards.</div>
+          <div>3. Equipment and materials provided must be handled with care and returned in good condition.</div>
+          <div>4. Any additional costs incurred must be approved in advance.</div>
+          <div>5. Safety protocols must be followed at all times during service execution.</div>
+        </div>
+      </div>
+
+      <div class="signatures-section">
+        <h2>SIGNATURES</h2>
+        <div class="signature-row">
+          <div class="signature-box">
+            <div class="signature-line"></div>
+            <div class="signature-name">Service Provider</div>
+            <div style="font-size: 10px; color: #6b7280; margin-top: 5px;">${assignmentData.assignedToName || assignmentData.assignedTo}</div>
+          </div>
+          <div class="signature-box">
+            <div class="signature-line"></div>
+            <div class="signature-name">Client Representative</div>
+            <div style="font-size: 10px; color: #6b7280; margin-top: 5px;">${assignmentData.requestedBy?.name || "Unknown User"}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        <p>Generated by OH Plus Platform - Logistics Department</p>
+        <p>Generated on ${new Date().toLocaleDateString()}</p>
+        <p>${companyTagline} - ${companyName}</p>
+      </div>
+    </body>
+    </html>
+  `
+}
