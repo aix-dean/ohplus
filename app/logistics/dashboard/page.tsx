@@ -11,14 +11,11 @@ import { useAuth } from "@/contexts/auth-context"
 import { RouteProtection } from "@/components/route-protection"
 
 export default function LogisticsDashboardPage() {
-  const router = useRouter()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [contentTypeFilter, setContentTypeFilter] = useState("Static")
-  const [activeTab, setActiveTab] = useState<'Static' | 'Digital'>('Static')
-  const { user, userData } = useAuth()
-  const [isLoading, setIsLoading] = useState(false)
-  const [jobOrdersIndicators, setJobOrdersIndicators] = useState({ static: false, digital: false })
+   const router = useRouter()
+   const [searchQuery, setSearchQuery] = useState("")
+   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+   const { user, userData } = useAuth()
+   const [isLoading, setIsLoading] = useState(false)
 
   const clearSearch = () => {
     setSearchQuery("")
@@ -96,50 +93,25 @@ export default function LogisticsDashboardPage() {
 
                 {/* View Toggle */}
                 <div className="flex items-center gap-1 p-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
                     onClick={() => setViewMode("list")}
                     className="h-8 w-8 p-0 "
                   >
-                    <Menu className="h-4 w-4 text-gray-600" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                    <img src="/icons/view.png" alt="view" />
+                  </button>
+                  <button
                     onClick={() => setViewMode("grid")}
                     className="h-8 w-8 p-0"
                   >
-                    <LayoutGrid className="h-4 w-4 text-gray-600" />
-                  </Button>
+                    <img src="/icons/grid.png"/>
+                  </button>
                 </div>
               </div>
 
-              {/* Tab Buttons */}
-              <div className="flex gap-2">
-                <div className="relative h-8">
-                  <button
-                    onClick={() => { setActiveTab('Static'); setContentTypeFilter('Static'); }}
-                    className={`px-6 rounded-lg ${activeTab === 'Static' ? 'bg-green-500 text-white border' : 'border border-gray-200 text-black'}`}
-                  >
-                    Static
-                  </button>
-                  {jobOrdersIndicators.static && <div className="absolute top-[-0.3rem] right-[-0.1rem] bg-[#48a7fa] rounded-full w-3 h-3 z-10"></div>}
-                </div>
-                <div className="relative h-8">
-                  <button
-                    onClick={() => { setActiveTab('Digital'); setContentTypeFilter('Dynamic'); }}
-                    className={`px-6 rounded-lg ${activeTab === 'Digital' ? 'bg-green-500 text-white border' : 'border border-gray-200 text-black'}`}
-                  >
-                    Digital
-                  </button>
-                  {jobOrdersIndicators.digital && <div className="absolute top-[-0.5rem] right-[-0.5rem] bg-[#48a7fa] rounded-full w-4 h-4 z-10"></div>}
-                </div>
-              </div>
             </div>
 
             {/* All Sites Display */}
-              <AllSitesTab searchQuery={searchQuery} contentTypeFilter={contentTypeFilter} viewMode={viewMode} onJobOrdersChange={setJobOrdersIndicators} />
+              <AllSitesTab searchQuery={searchQuery} viewMode={viewMode} />
             
           </div>
         </main>
