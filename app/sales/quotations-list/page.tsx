@@ -58,6 +58,7 @@ import { ComplianceConfirmationDialog } from "@/components/compliance-confirmati
 import { bookingService } from "@/lib/booking-service"
 import { searchQuotations } from "@/lib/algolia-service"
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { useResponsive } from "@/hooks/use-responsive"
 
 // Helper function to get current user's signature date
 const getCurrentUserSignatureDate = async (user: any): Promise<Date | null> => {
@@ -234,6 +235,7 @@ export default function QuotationsListPage() {
   }
   const pageSize = 10
   const { toast } = useToast()
+  const { isMobile } = useResponsive()
 
   // Note: Filtering is now handled server-side or removed for server-side pagination
   // We'll focus on pagination controls for now
@@ -1902,18 +1904,18 @@ export default function QuotationsListPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+      <div className="w-full p-4 md:p-6 lg:p-8">
         <div className="mb-6">
           <div className="flex justify-between items-start mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-4">Quotations</h1>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4 opacity-30" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-[25px] w-4 opacity-30" />
                 <Input
                   placeholder="Search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-10 w-96 border-gray-300 rounded-full"
+                  className="pl-10 pr-10 w-[257px] border-gray-300 rounded-full h-[25px]"
                 />
                 {searchTerm && (
                   <Button
@@ -1980,31 +1982,144 @@ export default function QuotationsListPage() {
             </Table>
           </Card>
         ) : quotations.length > 0 ? (
-          <Card className="border-gray-200 shadow-sm overflow-hidden rounded-xl">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b border-gray-200">
-                  <TableHead className="font-semibold text-gray-900 border-0">Date</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Quotation ID</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Client</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Site</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Status</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Compliance</TableHead>
-                  <TableHead className="font-semibold text-gray-900 border-0">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {quotations.map((quotation: any) => {
-                  const compliance = getProjectCompliance(quotation)
+          <div className="bg-white mt-6 rounded-tl-[10px] rounded-tr-[10px] overflow-hidden">
+            {/* Table Headers */}
+            <div className="bg-white px-6 pt-4 hidden sm:block">
+              <div className="grid grid-cols-[minmax(100px,150px)_minmax(140px,auto)_minmax(150px,1fr)_1fr_minmax(100px,auto)_minmax(100px,auto)_minmax(80px,auto)] pb-4 border-b border-gray-300 gap-4 text-xs font-semibold text-gray-900">
+                <div>Date</div>
+                <div>Quotation ID</div>
+                <div>Client</div>
+                <div>Site</div>
+                <div>Status</div>
+                <div>Compliance</div>
+                <div>Actions</div>
+              </div>
+            </div>
 
-                  return (
-                    <TableRow key={quotation.id} className="cursor-pointer border-b border-gray-200" 
+            <div className="space-y-3">
+              {quotations.map((quotation: any) => {
+                const compliance = getProjectCompliance(quotation)
+
+                return (
+                  <div
+                    key={quotation.id}
+                    className="bg-[#f6f9ff] border-2 border-[#b8d9ff] rounded-[10px] p-4 cursor-pointer hover:bg-[#e8f0ff]"
                     onClick={(e) => {
                       e.stopPropagation()
                       router.push(`/sales/quotations/${quotation.id}`)
-                      }}>
-                      <TableCell className="py-3">
-                        <div className="text-sm text-gray-600">
+                    }}
+                  >
+                    {isMobile ? (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">Date:</span>
+                          <span className="text-gray-900">
+                            {(() => {
+                              const date = quotation.created instanceof Date ? quotation.created : (quotation.created && typeof quotation.created.toDate === 'function' ? quotation.created.toDate() : null);
+                              if (!date || isNaN(date.getTime())) {
+                                return "—";
+                              }
+                              return format(date, "MMM d, yyyy");
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">Quotation ID:</span>
+                          <span className="text-gray-900">{quotation.quotation_number || quotation.id || "—"}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">Client:</span>
+                          <span className="text-gray-900">{quotation.client_company_name ? `${quotation.client_company_name} - ${quotation.client_name || ""}` : quotation.client_name || "—"}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">Site:</span>
+                          <span className="text-gray-900 font-bold">{quotation.items?.name || quotation.product_name || "—"}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">Status:</span>
+                          <span className={`${getStatusColor(quotation.status)} text-[12px] font-bold`}>
+                            {quotation.status ? quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1).toLowerCase() : "Draft"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">Compliance:</span>
+                          <span
+                            className="font-bold text-[#2D3FFF] leading-[0.5] cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleViewCompliance(quotation)
+                            }}
+                          >
+                            ({compliance.completed}/{compliance.total})
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-gray-700">Actions:</span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="p-1">
+                                <MoreVertical className="h-4 w-4 opacity-50" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => router.push(`/sales/quotations/${quotation.id}`)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                   e.stopPropagation()
+                                  handleDownloadPDF(quotation.id)
+                                }}
+                                disabled={generatingPDFs.has(quotation.id)}
+                              >
+                                {generatingPDFs.has(quotation.id) ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                    Generating PDF...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download PDF
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleShareQuotation(quotation.id)}>
+                                <Share2 className="mr-2 h-4 w-4" />
+                                Share
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleViewSentHistory(quotation)}>
+                                <History className="mr-2 h-4 w-4" />
+                                View Sent History
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handlePrintQuotation(quotation.id)}
+                                disabled={generatingPDFs.has(quotation.id)}
+                              >
+                                {generatingPDFs.has(quotation.id) ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                    Generating PDF...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Printer className="mr-2 h-4 w-4" />
+                                    Print
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-[minmax(100px,auto)_minmax(140px,auto)_minmax(150px,1fr)_1fr_minmax(100px,auto)_minmax(100px,auto)_minmax(80px,auto)] gap-4 items-center text-sm">
+                        <div className="text-gray-900">
                           {(() => {
                             const date = quotation.created instanceof Date ? quotation.created : (quotation.created && typeof quotation.created.toDate === 'function' ? quotation.created.toDate() : null);
                             if (!date || isNaN(date.getTime())) {
@@ -2013,25 +2128,19 @@ export default function QuotationsListPage() {
                             return format(date, "MMM d, yyyy");
                           })()}
                         </div>
-                      </TableCell>
-                      <TableCell className="py-3" >
-                        <div className="text-gray-900">{quotation.quotation_number || quotation.id || "—"}</div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="text-gray-900">{quotation.client_company_name ? `${quotation.client_company_name} - ${quotation.client_name || ""}` : quotation.client_name || "—"}</div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="text-sm text-[#333333] font-bold">{quotation.items?.name || quotation.product_name || "—"}</div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div
-                          className={`${getStatusColor(quotation.status)} text-[12px] font-bold`}
-                        >
+                        <div className="text-gray-900 truncate">
+                          {quotation.quotation_number || quotation.id || "—"}
+                        </div>
+                        <div className="text-gray-900 truncate">
+                          {quotation.client_company_name ? `${quotation.client_company_name} - ${quotation.client_name || ""}` : quotation.client_name || "—"}
+                        </div>
+                        <div className="text-gray-900 font-bold truncate">
+                          {quotation.items?.name || quotation.product_name || "—"}
+                        </div>
+                        <div className={`${getStatusColor(quotation.status)} text-[12px] font-bold`}>
                           {quotation.status ? quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1).toLowerCase() : "Draft"}
                         </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <span
+                        <div
                           className="font-bold text-[#2D3FFF] leading-[0.5] cursor-pointer"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -2039,80 +2148,76 @@ export default function QuotationsListPage() {
                           }}
                         >
                           ({compliance.completed}/{compliance.total})
-                        </span>
-                      </TableCell>
-                      <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-gray-400 hover:text-gray-600"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => router.push(`/sales/quotations/${quotation.id}`)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={(e) => {
-                                 e.stopPropagation()
-                                handleDownloadPDF(quotation.id)
-                              }}
-                              disabled={generatingPDFs.has(quotation.id)}
-                            >
-                              {generatingPDFs.has(quotation.id) ? (
-                                <>
-                                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                  Generating PDF...
-                                </>
-                              ) : (
-                                <>
-                                  <Download className="mr-2 h-4 w-4" />
-                                  Download PDF
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleShareQuotation(quotation.id)}>
-                              <Share2 className="mr-2 h-4 w-4" />
-                              Share
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleViewSentHistory(quotation)}>
-                              <History className="mr-2 h-4 w-4" />
-                              View Sent History
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => handlePrintQuotation(quotation.id)}
-                              disabled={generatingPDFs.has(quotation.id)}
-                            >
-                              {generatingPDFs.has(quotation.id) ? (
-                                <>
-                                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                                  Generating PDF...
-                                </>
-                              ) : (
-                                <>
-                                  <Printer className="mr-2 h-4 w-4" />
-                                  Print
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </Card>
+                        </div>
+                        <div className="text-gray-500">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="p-1">
+                                <MoreVertical className="h-4 w-4 opacity-50" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => router.push(`/sales/quotations/${quotation.id}`)}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                   e.stopPropagation()
+                                  handleDownloadPDF(quotation.id)
+                                }}
+                                disabled={generatingPDFs.has(quotation.id)}
+                              >
+                                {generatingPDFs.has(quotation.id) ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                    Generating PDF...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Download PDF
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleShareQuotation(quotation.id)}>
+                                <Share2 className="mr-2 h-4 w-4" />
+                                Share
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleViewSentHistory(quotation)}>
+                                <History className="mr-2 h-4 w-4" />
+                                View Sent History
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handlePrintQuotation(quotation.id)}
+                                disabled={generatingPDFs.has(quotation.id)}
+                              >
+                                {generatingPDFs.has(quotation.id) ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                    Generating PDF...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Printer className="mr-2 h-4 w-4" />
+                                    Print
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         ) : (
           <Card className="bg-white rounded-xl">
             <CardContent className="text-center py-12">
