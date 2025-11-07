@@ -45,6 +45,10 @@ import { GoogleMap } from "@/components/GoogleMap"
 import SiteInformation from "@/components/SiteInformation"
 import { SpotSelectionDialog } from "@/components/spot-selection-dialog"
 
+const formatNumberWithCommasNoDecimals = (num: number) => {
+  return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+}
+
 const CalendarView: React.FC<{ bookedDates: Date[] }> = ({ bookedDates }) => {
   const [currentDate, setCurrentDate] = useState(new Date())
 
@@ -1608,10 +1612,10 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                               <div className="flex items-center text-center break-all min-w-0 text-gray-900">{booking.client?.name || "N/A"}</div>
                               <div className="flex items-center text-center break-all min-w-0 text-gray-900">{booking.project_name || booking.product_name || "N/A"}</div>
                               <div className="flex items-center text-center break-all min-w-0 text-gray-900">
-                                ₱{booking.costDetails?.pricePerMonth?.toLocaleString() || "0"}/month
+                                ₱{formatNumberWithCommasNoDecimals(booking.costDetails?.pricePerMonth || 0)}/month
                                 <br />
                               </div>
-                              <div className="flex items-center text-center break-all min-w-0 text-gray-900">₱{booking.total_cost?.toLocaleString() || "0"}</div>
+                              <div className="flex items-center text-center break-all min-w-0 text-gray-900">₱{formatNumberWithCommasNoDecimals(booking.total_cost || 0)}</div>
                               <div className="flex items-center text-center break-all min-w-0">
                                 {getStatusBadge(booking.status)}
                               </div>
@@ -1712,7 +1716,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                               </Badge>
                             </div>
                             <div className="flex items-center text-center break-all min-w-0 text-gray-900">
-                              ₱{estimate.totalAmount?.toLocaleString() || "0"}/month
+                              ₱{formatNumberWithCommasNoDecimals(estimate.totalAmount || 0)}/month
                             </div>
                           </div>
                         ))}
@@ -1799,7 +1803,7 @@ export default function ProductDetailPage({ params }: { params: Promise<{ id: st
                                 {statusConfig.label}
                               </span>
                             </div>
-                            <div className="flex items-center text-center break-all min-w-0 text-gray-900">₱{quotation.total_amount?.toLocaleString() || "0"}/month</div>
+                            <div className="flex items-center text-center break-all min-w-0 text-gray-900">₱{formatNumberWithCommasNoDecimals(quotation.total_amount || 0)}/month</div>
                           </div>
                         )
                       })}

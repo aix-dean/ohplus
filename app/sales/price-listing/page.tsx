@@ -48,6 +48,10 @@ import { useDebounce } from "@/hooks/use-debounce"
 // Number of items to display per page
 const ITEMS_PER_PAGE = 15
 
+const formatNumberWithCommasNoDecimals = (num: number) => {
+  return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+}
+
 // Function to get site code from product
 const getSiteCode = (product: Product | null) => {
   if (!product) return null
@@ -566,7 +570,7 @@ function PriceListingContent() {
 
       toast({
         title: "Price Updated",
-        description: `Price for ${selectedProductForUpdate.name} has been updated to ₱${priceValue.toLocaleString()}.`,
+        description: `Price for ${selectedProductForUpdate.name} has been updated to ₱${formatNumberWithCommasNoDecimals(priceValue)}.`,
       })
 
       // Update search results in real-time if this was from search
@@ -848,7 +852,7 @@ function PriceListingContent() {
                                     </div>
                                   </td>
                                   <td className="px-6 py-4 text-sm font-medium text-[#000000]">
-                                    {product.price ? `₱${Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month` : "Not set"}
+                                    {product.price ? `₱${formatNumberWithCommasNoDecimals(Number(product.price))}/month` : "Not set"}
                                   </td>
                                   <td className="px-6 py-4 text-sm text-[#000000]">
                                     As of {product.updated instanceof Timestamp
@@ -905,7 +909,7 @@ function PriceListingContent() {
                                         <tr key={`history-${history.id || index}`} className="border-b border-gray-200 last:border-0">
                                           <td className="px-6 py-2 w-[20%]"></td>
                                           <td className="px-6 py-2 text-sm font-medium text-[#000000] w-[20%]">
-                                            ₱{Number(history.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            ₱{formatNumberWithCommasNoDecimals(Number(history.price))}
                                           </td>
                                           <td className="px-6 py-2 text-sm text-[#000000] w-[20%]">
                                             {history.created instanceof Timestamp
@@ -1069,7 +1073,7 @@ function PriceListingContent() {
                       <span className="font-medium text-[#a1a1a1]">Current Price:</span>{" "}
                       <span className="text-[#000000]">
                         {selectedProductForUpdate.price
-                          ? `₱${Number(selectedProductForUpdate.price).toLocaleString()}`
+                          ? `₱${formatNumberWithCommasNoDecimals(Number(selectedProductForUpdate.price))}`
                           : "Not set"}
                       </span>
                     </div>
@@ -1188,10 +1192,10 @@ console.log('Rendering ProductCard for:', product);
 
   const formattedPrice = isSearchResult
     ? (product as SearchResult).price
-      ? `₱${Number((product as SearchResult).price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month`
+      ? `₱${formatNumberWithCommasNoDecimals(Number((product as SearchResult).price))}/month`
       : "Price not set"
     : (product as Product).price
-      ? `₱${Number((product as Product).price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month`
+      ? `₱${formatNumberWithCommasNoDecimals(Number((product as Product).price))}/month`
       : "Price not set"
 
   // Get site code
@@ -1323,7 +1327,7 @@ console.log('Rendering ProductCard for:', product);
 
             {/* Price - More prominent */}
             <div className="text-sm font-semibold text-gray-900 mt-1">
-              {product.price ? `₱${Number(product.price).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/month` : "Price not set"}
+              {product.price ? `₱${formatNumberWithCommasNoDecimals(Number(product.price))}/month` : "Price not set"}
             </div>
           </div>
         </CardContent>
