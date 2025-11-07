@@ -59,6 +59,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
+import { getUserById, type User } from "@/lib/access-management-service"
 
 interface CompanyData {
   id: string
@@ -232,23 +233,26 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [generatingPDFsForSend, setGeneratingPDFsForSend] = useState(false)
-  const [unitPriceInput, setUnitPriceInput] = useState("")
+  const [userSignatureUrl, setUserSignatureUrl] = useState<string | null>(null)
+  const [creatorUser, setCreatorUser] = useState<User | null>(null)
 
-  const formatNumberWithCommas = (num: number) => {
-    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-
-  const formatNumberWithCommasForInput = (value: string) => {
-    // Split into integer and decimal parts
-    const parts = value.split('.')
-    const integerPart = parts[0]
-    const decimalPart = parts[1] || ''
-
-    // Format integer part with commas
-    const formattedInteger = parseInt(integerPart).toLocaleString('en-US')
-
-    // Return formatted integer with decimal part if it exists
-    return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger
+  // Helper function to fetch current user's signature.updated date
+  const getCurrentUserSignatureDate = async (): Promise<Date | null> => {
+    if (!costEstimate?.createdBy) return null
+    try {
+      const userDocRef = doc(db, "iboard_users", costEstimate.createdBy)
+      const userDoc = await getDoc(userDocRef)
+      if (userDoc.exists()) {
+        const userData = userDoc.data()
+        if (userData.signature && typeof userData.signature === 'object' && userData.signature.updated) {
+          return userData.signature.updated.toDate ? userData.signature.updated.toDate() : new Date(userData.signature.updated)
+        }
+      }
+      return null
+    } catch (error) {
+      console.error('Error fetching current user signature date:', error)
+      return null
+    }
   }
 
   const groupLineItemsBySite = (lineItems: CostEstimateLineItem[]) => {
@@ -600,21 +604,62 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           }
         }
 
-        const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, userData ? {
-          first_name: userData.first_name || undefined,
-          last_name: userData.last_name || undefined,
-          email: userData.email || undefined,
-          company_id: userData.company_id || undefined,
-        } : undefined, companyData ? {
-          name: companyData.name || "Company Name",
-          address: companyData.address,
-          phone: companyData.phone,
-          email: companyData.email,
-          website: companyData.website || companyData.company_website,
-        } : undefined)
+      // Prepare signature data URL if user signature exists
+      let userSignatureDataUrl: string | null = null
+      if (userSignatureUrl) {
+        try {
+          const signatureResponse = await fetch(userSignatureUrl)
+          if (signatureResponse.ok) {
+            const signatureBlob = await signatureResponse.blob()
+            userSignatureDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(signatureBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching user signature:', error)
+          // Continue without signature if fetch fails
+        }
+      }
 
-        // Update cost estimate with new PDF URL and password
-        await updateCostEstimate(updatedCostEstimate.id, { pdf: pdfUrl, password: password })
+      // Fetch signature date directly if not available from creatorUser
+      let signatureDate: Date | null = null
+      if (updatedCostEstimate.createdBy) {
+        try {
+          const userDocRef = doc(db, "iboard_users", updatedCostEstimate.createdBy)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching signature date:', error)
+        }
+      }
+
+      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(updatedCostEstimate, creatorUser ? {
+        first_name: creatorUser.first_name || undefined,
+        last_name: creatorUser.last_name || undefined,
+        email: creatorUser.email || undefined,
+        company_id: creatorUser.company_id || undefined,
+      } : undefined, companyData ? {
+        name: companyData.name || "Company Name",
+        address: companyData.address,
+        phone: companyData.phone,
+        email: companyData.email,
+        website: companyData.website || companyData.company_website,
+      } : undefined, userSignatureDataUrl)
+
+      // Update cost estimate with new PDF URL, password, and signature date
+      await updateCostEstimate(updatedCostEstimate.id, {
+        pdf: pdfUrl,
+        password: password,
+        signature_date: signatureDate
+      })
 
         // Update state with the new data including PDF
         const finalCostEstimate = { ...updatedCostEstimate, pdf: pdfUrl, password: password }
@@ -839,6 +884,24 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }, [fetchClientHistory])
 
+  // Fetch user signature
+
+  useEffect(() => {
+    const fetchCreatorUser = async () => {
+      if (!costEstimate?.createdBy) return
+
+      try {
+        const creator = await getUserById(costEstimate.createdBy)
+        setCreatorUser(creator)
+        console.log("Fetched creator user:", creator)
+        setUserSignatureUrl(creator?.signature.url || null)
+      } catch (error) {
+        console.error("Error fetching creator user:", error)
+      }
+    }
+
+    fetchCreatorUser()
+  }, [costEstimate?.createdBy])
 
   // Handle automatic share when page loads with action parameter
   useEffect(() => {
@@ -898,12 +961,33 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     console.log("=== DEBUG SEND BUTTON ===")
     console.log("Current costEstimate.pdf:", costEstimate?.pdf, "Type:", typeof costEstimate?.pdf)
 
-    // Check if current cost estimate has PDF - if so, assume all related ones do too
+    // Check if current cost estimate has PDF and signature dates match
     if (costEstimate.pdf) {
-      console.log("✅ Skipping PDF generation - current estimate has PDF")
-      // Current estimate has PDF, assume all related estimates have PDFs too
-      setIsSendOptionsDialogOpen(true)
-      return
+      const currentSignatureDate = await getCurrentUserSignatureDate()
+      const storedSignatureDate = costEstimate.signature_date
+
+      let needsRegeneration = false
+
+      if (currentSignatureDate && storedSignatureDate) {
+        const currentDate = new Date(currentSignatureDate).getTime()
+        const storedDate = new Date(storedSignatureDate).getTime()
+
+        if (currentDate !== storedDate) {
+          console.log('[COST_ESTIMATE_SEND] Signature dates do not match, regenerating PDF')
+          needsRegeneration = true
+        } else {
+          console.log('[COST_ESTIMATE_SEND] Signature dates match, using existing PDF')
+        }
+      } else {
+        console.log('[COST_ESTIMATE_SEND] Missing signature date info, regenerating PDF')
+        needsRegeneration = true
+      }
+
+      if (!needsRegeneration) {
+        console.log("✅ Skipping PDF generation - signature dates match")
+        setIsSendOptionsDialogOpen(true)
+        return
+      }
     }
 
     console.log("⚠️ Generating PDFs...")
@@ -918,8 +1002,59 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         for (let i = 0; i < relatedCostEstimates.length; i++) {
           const estimate = relatedCostEstimates[i]
 
-          // Check if PDF already exists
-          if (!estimate.pdf) {
+          // Check if PDF already exists and signature dates match
+          let needsRegeneration = !estimate.pdf
+          if (estimate.pdf) {
+            const currentSignatureDate = await getCurrentUserSignatureDate()
+            const storedSignatureDate = estimate.signature_date
+
+            if (currentSignatureDate && storedSignatureDate) {
+              const currentDate = new Date(currentSignatureDate).getTime()
+              const storedDate = new Date(storedSignatureDate).getTime()
+              needsRegeneration = currentDate !== storedDate
+            } else {
+              needsRegeneration = true
+            }
+          }
+
+          if (needsRegeneration) {
+            // Prepare signature data URL if user signature exists
+            let userSignatureDataUrl: string | null = null
+            if (userSignatureUrl) {
+              try {
+                const signatureResponse = await fetch(userSignatureUrl)
+                if (signatureResponse.ok) {
+                  const signatureBlob = await signatureResponse.blob()
+                  userSignatureDataUrl = await new Promise<string>((resolve) => {
+                    const reader = new FileReader()
+                    reader.onload = () => resolve(reader.result as string)
+                    reader.readAsDataURL(signatureBlob)
+                  })
+                }
+              } catch (error) {
+                console.error('Error fetching user signature:', error)
+                // Continue without signature if fetch fails
+              }
+            }
+
+            // Fetch signature date directly if not available from creatorUser
+            let signatureDate: Date | null = null
+            if (estimate.createdBy) {
+              try {
+                const userDocRef = doc(db, "iboard_users", estimate.createdBy)
+                const userDoc = await getDoc(userDocRef)
+
+                if (userDoc.exists()) {
+                  const userDataFetched = userDoc.data()
+                  if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                    signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+                  }
+                }
+              } catch (error) {
+                console.error('Error fetching signature date:', error)
+              }
+            }
+
             // Generate PDF and get URL/password
             const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(estimate, userData ? {
               first_name: userData.first_name || undefined,
@@ -932,10 +1067,10 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
               phone: companyData.phone,
               email: companyData.email,
               website: companyData.website || companyData.company_website,
-            } : undefined)
+            } : undefined, userSignatureDataUrl)
 
             // Update the cost estimate with PDF URL and password
-            await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password })
+            await updateCostEstimate(estimate.id, { pdf: pdfUrl, password: password, signature_date: signatureDate })
             // Update the local state
             updatedRelatedEstimates[i] = { ...estimate, pdf: pdfUrl, password: password }
             generatedCount++
@@ -943,8 +1078,22 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         }
         setRelatedCostEstimates(updatedRelatedEstimates)
       } else {
-        // Single cost estimate - check if PDF exists before generating
-        if (!costEstimate.pdf) {
+        // Single cost estimate - check if PDF exists and signature dates match
+        let needsRegeneration = !costEstimate.pdf
+        if (costEstimate.pdf) {
+          const currentSignatureDate = await getCurrentUserSignatureDate()
+          const storedSignatureDate = costEstimate.signature_date
+
+          if (currentSignatureDate && storedSignatureDate) {
+            const currentDate = new Date(currentSignatureDate).getTime()
+            const storedDate = new Date(storedSignatureDate).getTime()
+            needsRegeneration = currentDate !== storedDate
+          } else {
+            needsRegeneration = true
+          }
+        }
+
+        if (needsRegeneration) {
           await generatePDFIfNeeded(costEstimate)
           generatedCount++
         }
@@ -1087,24 +1236,77 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
   }
 
   const generatePDFIfNeeded = async (costEstimate: CostEstimate) => {
+    // Check if PDF exists and signature dates match
     if (costEstimate.pdf) {
-      return { pdfUrl: costEstimate.pdf, password: costEstimate.password }
+      const currentSignatureDate = await getCurrentUserSignatureDate()
+      const storedSignatureDate = costEstimate.signature_date
+
+      if (currentSignatureDate && storedSignatureDate) {
+        const currentDate = new Date(currentSignatureDate).getTime()
+        const storedDate = new Date(storedSignatureDate).getTime()
+
+        if (currentDate === storedDate) {
+          console.log('[PDF_GENERATE] Signature dates match, using existing PDF')
+          return { pdfUrl: costEstimate.pdf, password: costEstimate.password }
+        } else {
+          console.log('[PDF_GENERATE] Signature dates do not match, regenerating PDF')
+        }
+      } else {
+        console.log('[PDF_GENERATE] Missing signature date info, regenerating PDF')
+      }
     }
 
     try {
-      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, userData ? {
-        first_name: userData.first_name || undefined,
-        last_name: userData.last_name || undefined,
-        email: userData.email || undefined,
-        company_id: userData.company_id || undefined,
+      // Prepare signature data URL if user signature exists
+      let userSignatureDataUrl: string | null = null
+      if (userSignatureUrl) {
+        try {
+          const signatureResponse = await fetch(userSignatureUrl)
+          if (signatureResponse.ok) {
+            const signatureBlob = await signatureResponse.blob()
+            userSignatureDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.readAsDataURL(signatureBlob)
+            })
+          }
+        } catch (error) {
+          console.error('Error fetching user signature:', error)
+          // Continue without signature if fetch fails
+        }
+      }
+
+      // Fetch signature date directly if not available from creatorUser
+      let signatureDate: Date | null = null
+      if (costEstimate.createdBy) {
+        try {
+          const userDocRef = doc(db, "iboard_users", costEstimate.createdBy)
+          const userDoc = await getDoc(userDocRef)
+
+          if (userDoc.exists()) {
+            const userDataFetched = userDoc.data()
+            if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+              signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching signature date:', error)
+        }
+      }
+
+      const { pdfUrl, password } = await generateAndUploadCostEstimatePDF(costEstimate, creatorUser ? {
+        first_name: creatorUser.first_name || undefined,
+        last_name: creatorUser.last_name || undefined,
+        email: creatorUser.email || undefined,
+        company_id: creatorUser.company_id || undefined,
       } : undefined, companyData ? {
         name: companyData.name || "Company Name",
         address: companyData.address,
         phone: companyData.phone,
         email: companyData.email,
         website: companyData.website || companyData.company_website,
-      } : undefined)
-      await updateCostEstimate(costEstimate.id, { pdf: pdfUrl, password: password })
+      } : undefined, userSignatureDataUrl)
+      await updateCostEstimate(costEstimate.id, { pdf: pdfUrl, password: password, signature_date: signatureDate })
       setCostEstimate(prev => prev ? { ...prev, pdf: pdfUrl, password: password } : null)
       // Also update the relatedCostEstimates if this estimate is in there
       setRelatedCostEstimates(prev => prev.map(est =>
@@ -1119,7 +1321,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
     }
   }
 
-  const handleDownloadPDF = async (userData: any) => {
+  const handleDownloadPDF = async () => {
     if (!costEstimate) return
 
     console.log('[PDF_DOWNLOAD] Starting PDF download process for cost estimate:', costEstimate.id)
@@ -1143,13 +1345,34 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
         // Check if PDF field has value
         let pdfUrl = freshCostEstimate.pdf
         let wasExisting = !!pdfUrl
-        if (!pdfUrl) {
+        if (pdfUrl) {
+          // If PDF exists, check signature dates
+          const currentSignatureDate = await getCurrentUserSignatureDate()
+          const storedSignatureDate = freshCostEstimate.signature_date
+
+          if (currentSignatureDate && storedSignatureDate) {
+            const currentDate = new Date(currentSignatureDate).getTime()
+            const storedDate = new Date(storedSignatureDate).getTime()
+
+            if (currentDate !== storedDate) {
+              console.log('[PDF_DOWNLOAD] Signature dates do not match, regenerating PDF')
+              const result = await generatePDFIfNeeded(freshCostEstimate)
+              pdfUrl = result.pdfUrl
+              wasExisting = false
+            } else {
+              console.log('[PDF_DOWNLOAD] Signature dates match, using existing PDF')
+            }
+          } else {
+            console.log('[PDF_DOWNLOAD] Missing signature date info, regenerating PDF')
+            const result = await generatePDFIfNeeded(freshCostEstimate)
+            pdfUrl = result.pdfUrl
+            wasExisting = false
+          }
+        } else {
           // Generate PDF if field is null or doesn't exist
           const result = await generatePDFIfNeeded(freshCostEstimate)
           pdfUrl = result.pdfUrl
           wasExisting = false
-        } else {
-          console.log('[PDF_DOWNLOAD] Using existing PDF URL from database:', pdfUrl)
         }
 
         if (!pdfUrl) {
@@ -1230,11 +1453,11 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
     setDownloadingPDF(true)
     try {
-      await generateCostEstimatePDF(costEstimate, selectedPages, false, undefined, userData ? {
-        first_name: userData.first_name || undefined,
-        last_name: userData.last_name || undefined,
-        email: userData.email || undefined,
-        company_id: userData.company_id || undefined,
+      await generateCostEstimatePDF(costEstimate, selectedPages, false, undefined, creatorUser ? {
+        first_name: creatorUser.first_name || undefined,
+        last_name: creatorUser.last_name || undefined,
+        email: creatorUser.email || undefined,
+        company_id: creatorUser.company_id || undefined,
       } : undefined)
       toast({
         title: "PDF Generated",
@@ -1470,6 +1693,48 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
           endDate: historyItem.endDate?.toISOString ? historyItem.endDate.toISOString() : historyItem.endDate,
         }
 
+        // Fetch user signature if available
+        let userSignatureDataUrl: string | null = null
+        let signatureDate: Date | null = null
+        if (historyItem.createdBy) {
+          try {
+            console.log('[HISTORY_PDF] Fetching user signature for createdBy:', historyItem.createdBy)
+            const userDocRef = doc(db, "iboard_users", historyItem.createdBy)
+            const userDoc = await getDoc(userDocRef)
+
+            if (userDoc.exists()) {
+              const userDataFetched = userDoc.data()
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.url) {
+                const signatureUrl = userDataFetched.signature.url
+                console.log('[HISTORY_PDF] Found user signature URL:', signatureUrl)
+
+                // Convert signature image to base64 data URL
+                try {
+                  const response = await fetch(signatureUrl)
+                  if (response.ok) {
+                    const blob = await response.blob()
+                    const arrayBuffer = await blob.arrayBuffer()
+                    const base64 = Buffer.from(arrayBuffer).toString('base64')
+                    const mimeType = blob.type || 'image/png'
+                    userSignatureDataUrl = `data:${mimeType};base64,${base64}`
+                    console.log('[HISTORY_PDF] Converted signature to base64 data URL')
+                  } else {
+                    console.warn('[HISTORY_PDF] Failed to fetch signature image:', response.status)
+                  }
+                } catch (fetchError) {
+                  console.error('[HISTORY_PDF] Error converting signature to base64:', fetchError)
+                }
+              }
+              // Also fetch signature date
+              if (userDataFetched.signature && typeof userDataFetched.signature === 'object' && userDataFetched.signature.updated) {
+                signatureDate = userDataFetched.signature.updated.toDate ? userDataFetched.signature.updated.toDate() : new Date(userDataFetched.signature.updated)
+              }
+            }
+          } catch (error) {
+            console.error('[HISTORY_PDF] Error fetching user signature:', error)
+          }
+        }
+
         // Call the generate-cost-estimate-pdf API
         const response = await fetch('/api/generate-cost-estimate-pdf', {
           method: 'POST',
@@ -1480,7 +1745,9 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             costEstimate: serializableCostEstimate,
             companyData,
             logoDataUrl,
-            userData,
+            userSignatureDataUrl,
+            creatorUser,
+            signatureDate: historyItem.signature_date || costEstimate?.signature_date,
           }),
         })
 
@@ -1506,8 +1773,8 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             phone: companyData.phone,
             email: companyData.email,
             website: companyData.website || companyData.company_website,
-          } : undefined)
-          await updateCostEstimate(historyItem.id, { pdf: pdfUrl })
+          } : undefined, userSignatureDataUrl)
+          await updateCostEstimate(historyItem.id, { pdf: pdfUrl, signature_date: signatureDate })
           console.log("PDF saved to cost estimate:", pdfUrl)
         } catch (saveError) {
           console.error("Error saving PDF to cost estimate:", saveError)
@@ -2120,12 +2387,23 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
 
           <div className="space-y-8 mb-8">
             <div className="text-left">
-              <p className="mb-16">Very truly yours,</p>
+              <p className="mb-4">Very truly yours,</p>
               <div>
-                <div className="border-b border-gray-400 w-48 mb-2"></div>
+                {userSignatureUrl ? (
+                  <div className="mb-2">
+                    <img
+                      src={userSignatureUrl}
+                      alt="Signature"
+                      className="max-w-48 max-h-16 object-contain border-b border-gray-400"
+                      style={{ width: 'auto', height: 'auto' }}
+                    />
+                  </div>
+                ) : (
+                  <div className="border-b border-gray-400 w-48 mb-2"></div>
+                )}
                 <p className="font-medium">
-                  {userData?.first_name && userData?.last_name
-                    ? `${userData.first_name} ${userData.last_name}`
+                  {creatorUser?.first_name && creatorUser?.last_name
+                    ? `${creatorUser.first_name} ${creatorUser.last_name}`
                     : "Golden Touch Imaging Specialist"}
                 </p>
                 {isEditing && editingField === "signature_position" ? (
@@ -2143,7 +2421,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
                     onClick={() => isEditing && handleFieldEdit("signature_position", tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "")}
                     title={isEditing ? "Click to edit position" : ""}
                   >
-                    {tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "Account Manager"}
+                    {tempValues.signature_position ?? currentCostEstimate?.signature_position ?? "Sales"}
                     {isEditing && <span className="ml-1 text-blue-500 text-xs">✏️</span>}
                   </p>
                 )}
@@ -2226,7 +2504,7 @@ export default function CostEstimatePage({ params }: { params: Promise<{ id: str
             </Button>
             <Button
               variant="ghost"
-              onClick={() => handleDownloadPDF(userData)}
+              onClick={() => handleDownloadPDF()}
               disabled={downloadingPDF}
               className="h-16 w-16 flex flex-col items-center justify-center p-2 rounded-lg bg-white shadow-md border border-gray-200 hover:bg-gray-50"
             >

@@ -28,6 +28,7 @@ export interface ReportData {
   client_email?: string
   joNumber?: string
   joType?: string
+  booking_id?: string
   bookingDates: {
     start: Timestamp
     end: Timestamp
@@ -46,6 +47,11 @@ export interface ReportData {
   status: string
   createdBy: string
   createdByName: string
+  requestedBy?: {
+    name: string
+    department?: string
+  }
+  campaignName?: string
   created?: Timestamp
   updated?: Timestamp
   location?: string
@@ -74,6 +80,8 @@ export interface ReportData {
   // Site image URL
   siteImageUrl?: string
   logistics_report?: string
+  reservation_number?: string
+  booking_id?: string
 }
 
 // Helper function to clean data by removing undefined values recursively
@@ -164,6 +172,11 @@ export async function createReport(reportData: ReportData): Promise<string> {
       updated: Timestamp.now(),
     }
 
+    // Add requestedBy if provided
+    if (reportData.requestedBy) {
+      finalReportData.requestedBy = reportData.requestedBy
+    }
+
     // Add product information if provided
     if (reportData.product) {
       finalReportData.product = reportData.product
@@ -203,6 +216,16 @@ export async function createReport(reportData: ReportData): Promise<string> {
     if (reportData.descriptionOfWork && reportData.descriptionOfWork.trim() !== "") {
       finalReportData.descriptionOfWork = reportData.descriptionOfWork.trim()
     }
+    // Add service assignment specific fields
+    if (reportData.reservation_number && reportData.reservation_number.trim() !== "") {
+      finalReportData.reservation_number = reportData.reservation_number.trim()
+    }
+
+    if (reportData.booking_id && reportData.booking_id.trim() !== "") {
+      finalReportData.booking_id = reportData.booking_id.trim()
+    }
+
+    console.log("Final report data to be saved:", finalReportData)
 
     console.log("Final report data to be saved:", finalReportData)
 
@@ -229,7 +252,7 @@ export async function getReports(options: {
   reportType?: string
   searchQuery?: string
   lastDoc?: any
-}): Promise<{ reports: ReportData[], hasNextPage: boolean, lastDoc: any }> {
+}): Promise<{ reports: ReportData[], hasNextPage: boolean, lastDoc: any, total?: number }> {
   try {
     console.log("getReports called with options:", options)
     const { page = 1, limit: pageLimit = 10, companyId, status, reportType, searchQuery, lastDoc } = options
@@ -284,7 +307,7 @@ export async function getReports(options: {
       const hasNextPage = allReports.length > offset + pageLimit
 
       console.log(`Search results: ${allReports.length} total, ${reports.length} on page ${page}`)
-      return { reports, hasNextPage, lastDoc: null }
+      return { reports, hasNextPage, lastDoc: null, total: allReports.length }
     }
 
     // For non-search: use server-side pagination
@@ -330,6 +353,7 @@ export async function getReports(options: {
     }) as ReportData[]
 
     console.log(`Fetched ${reports.length} reports for page ${page}, hasNextPage: ${hasNextPage}`)
+    // For non-search, we don't have the total count here, so we'll let the caller get it separately
     return { reports, hasNextPage, lastDoc: newLastDoc }
   } catch (error) {
     console.error("Error fetching reports:", error)
@@ -573,6 +597,47 @@ export async function postReport(reportData: ReportData): Promise<string> {
     throw error
   }
 }
+export async function getLatestReportsByBookingIds(bookingIds: string[]): Promise<{ [bookingId: string]: ReportData | null }> {
+  try {
+    const reportsMap: { [bookingId: string]: ReportData | null } = {}
+
+    // Fetch reports for each booking ID
+    const promises = bookingIds.map(async (bookingId) => {
+      const q = query(
+        collection(db, "reports"),
+        where("booking_id", "==", bookingId),
+        orderBy("created", "desc"),
+        limit(1)
+      )
+      const querySnapshot = await getDocs(q)
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0]
+        const data = doc.data()
+        return {
+          bookingId,
+          report: {
+            id: doc.id,
+            ...data,
+            attachments: Array.isArray(data.attachments) ? data.attachments : [],
+          } as ReportData
+        }
+      }
+      return { bookingId, report: null }
+    })
+
+    const results = await Promise.all(promises)
+
+    // Build the reports map from results
+    results.forEach(({ bookingId, report }) => {
+      reportsMap[bookingId] = report
+    })
+    return reportsMap
+  } catch (error) {
+    console.error("Error fetching latest reports by booking IDs:", error)
+    throw error
+  }
+}
+
 
 // Get sent emails for a report
 export async function getSentEmailsForReport(reportId: string): Promise<any[]> {

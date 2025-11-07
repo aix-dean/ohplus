@@ -175,9 +175,9 @@ export function ServiceAssignmentViewCard({
                     </div>
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">New Material</Label>
-                      {jobOrderData?.projectCompliance?.finalArtwork?.fileUrl ? (
+                      {jobOrderData?.attachments ? (
                         <img
-                          src={jobOrderData.projectCompliance.finalArtwork.fileUrl}
+                          src={jobOrderData.attachments.url}
                           alt="New Material"
                           className="rounded-md h-32 w-full object-cover"
                         />

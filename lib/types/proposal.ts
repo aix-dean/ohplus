@@ -17,11 +17,37 @@ export type ProposalClient = {
 export type ProductSpecsRental = {
   location?: string
   traffic_count?: number
+  traffic_unit?: string
   elevation?: number
+  elevation_unit?: string
   height?: number
   width?: number
+  dimension_unit?: string
   audience_type?: string
   audience_types?: string[]
+  location_visibility?: number
+  location_visibility_unit?: string
+  orientation?: string
+  partner?: string
+  land_owner?: string
+  geopoint?: number[]
+  illumination?: {
+    bottom_count?: number
+    bottom_lighting_specs?: string
+    left_count?: number
+    left_lighting_specs?: string
+    power_consumption_monthly?: number
+    right_count?: number
+    right_lighting_specs?: string
+    upper_count?: number
+    upper_lighting_specs?: string
+  }
+  structure?: {
+    color?: string
+    condition?: string
+    contractor?: string
+    last_maintenance?: string
+  }
 }
 
 export type ProductLight = {
@@ -105,22 +131,24 @@ export type ProposalContactInfo = {
 }
 
 export type Proposal = {
-    id: string
-    title: string
-    description?: string
-    proposalNumber?: string // Add proposal number field
-    proposalTitle?: string // Add proposal title field for the main heading
-    proposalMessage?: string // Add proposal message field for the outro page
-    contactInfo?: ProposalContactInfo // Add contact info field for the outro page
-    fieldVisibility?: { // Add field visibility for site details per product
-      [productId: string]: {
-        location?: boolean
-        dimension?: boolean
-        type?: boolean
-        traffic?: boolean
-        srp?: boolean
-      }
-    }
+     id: string
+     title: string
+     description?: string
+     proposalNumber?: string // Add proposal number field
+     proposalTitle?: string // Add proposal title field for the main heading
+     proposalMessage?: string // Add proposal message field for the outro page
+     contactInfo?: ProposalContactInfo // Add contact info field for the outro page
+     fieldVisibility?: { // Add field visibility for site details per product
+       [productId: string]: {
+         location?: boolean
+         dimension?: boolean
+         type?: boolean
+         traffic?: boolean
+         location_visibility?: boolean
+         srp?: boolean
+         additionalMessage?: boolean
+       }
+     }
     client: ProposalClient
     products: ProposalProduct[]
     customPages?: CustomPage[] // Add custom blank pages

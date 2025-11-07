@@ -50,6 +50,8 @@ export type User = {
   lastLogin?: any
   created?: any
   updated?: any
+  signature?: any
+  company_id?: string
 }
 
 // Permission Management
@@ -243,6 +245,28 @@ export async function getUsers(licenseKey?: string): Promise<User[]> {
   } catch (error) {
     console.error("Error getting users:", error)
     throw new Error("Failed to get users")
+  }
+}
+export async function getUserById(userId: string): Promise<User | null> {
+  try {
+    const userDocRef = doc(db, "iboard_users", userId)
+    const userDoc = await getDoc(userDocRef)
+
+    if (userDoc.exists()) {
+      const userData = userDoc.data()
+      return {
+        id: userDoc.id,
+        ...userData,
+        email: userData.email || "",
+        displayName: userData.display_name || userData.displayName || "",
+        photoURL: userData.photo_url || userData.photoURL || "",
+      } as User
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error getting user by ID:", error)
+    throw new Error("Failed to get user by ID")
   }
 }
 

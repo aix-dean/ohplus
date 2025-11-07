@@ -3,9 +3,14 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react({
+    jsxRuntime: 'automatic',
+    babel: {
+      plugins: [],
+    },
+  })],
   test: {
-    environment: 'jsdom',
+    environment: 'happy-dom',
     setupFiles: ['./__tests__/setup.ts'],
     globals: true,
     include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
@@ -42,7 +47,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './')
+      '@': path.resolve(__dirname, './'),
+      // Alias React to React 18 for testing compatibility
+      'react': 'react',
+      'react-dom': 'react-dom',
+      'react/jsx-runtime': 'react/jsx-runtime'
     }
   },
   esbuild: {

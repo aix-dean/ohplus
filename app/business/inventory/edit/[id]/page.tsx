@@ -84,10 +84,146 @@ const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>, setPrice: (va
 };
 
 const handlePriceBlur = (e: React.FocusEvent<HTMLInputElement>, setPrice: (value: string) => void) => {
-  const value = e.target.value;
-  const formatted = formatPriceOnBlur(value);
-  setPrice(formatted);
-};
+   const value = e.target.value;
+   const formatted = formatPriceOnBlur(value);
+   setPrice(formatted);
+ };
+
+// Enhanced validation function for dynamic content with detailed calculations
+const validateDynamicContent = (cms: typeof cms, contentType: string, setValidationError: (error: string | null) => void) => {
+  if (contentType !== "digital") {
+    setValidationError(null)
+    return true
+  }
+
+  const { start_time, end_time, spot_duration, loops_per_day } = cms
+
+  if (!start_time || !end_time || !spot_duration || !loops_per_day) {
+    setValidationError("All dynamic content fields are required.")
+    return false
+  }
+
+  try {
+    // Parse start and end times
+    const [startHour, startMinute] = start_time.split(":").map(Number)
+    const [endHour, endMinute] = end_time.split(":").map(Number)
+
+    // Validate time format
+    if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+      setValidationError("Invalid time format.")
+      return false
+    }
+
+    // Convert to total minutes
+    const startTotalMinutes = startHour * 60 + startMinute
+    let endTotalMinutes = endHour * 60 + endMinute
+
+    // Handle next day scenario (e.g., 22:00 to 06:00)
+    if (endTotalMinutes <= startTotalMinutes) {
+      endTotalMinutes += 24 * 60 // Add 24 hours
+    }
+
+    // Calculate duration in minutes, then convert to seconds
+    const durationMinutes = endTotalMinutes - startTotalMinutes
+    const durationSeconds = durationMinutes * 60
+
+    // Parse numeric values
+    const spotDurationNum = Number.parseInt(spot_duration)
+    const spotsPerLoopNum = Number.parseInt(loops_per_day)
+
+    if (isNaN(spotDurationNum) || isNaN(spotsPerLoopNum) || spotDurationNum <= 0 || spotsPerLoopNum <= 0) {
+      setValidationError("Spot duration and spots per loop must be positive numbers.")
+      return false
+    }
+
+    // Calculate total spot time needed per loop
+    const totalSpotTimePerLoop = spotDurationNum * spotsPerLoopNum
+
+    // Calculate how many complete loops can fit in the time duration
+    const loopsResult = durationSeconds / totalSpotTimePerLoop
+
+    // Check if the division results in a whole number (integer)
+    if (!Number.isInteger(loopsResult)) {
+      // Find suggested values that result in whole number of loops
+      const findWorkingValues = (currentValue: number, isSpotDuration: boolean) => {
+        const suggestions: number[] = []
+        const maxOffset = 5 // Look for values within ±5 of current value
+
+        for (let offset = 1; offset <= maxOffset; offset++) {
+          // Try values above current
+          const higher = currentValue + offset
+          const lower = Math.max(1, currentValue - offset)
+
+          // Check if higher value works
+          const higherTotal = isSpotDuration
+            ? higher * spotsPerLoopNum
+            : spotDurationNum * higher
+          if (durationSeconds % higherTotal === 0) {
+            suggestions.push(higher)
+            if (suggestions.length >= 2) break
+          }
+
+          // Check if lower value works
+          const lowerTotal = isSpotDuration
+            ? lower * spotsPerLoopNum
+            : spotDurationNum * lower
+          if (durationSeconds % lowerTotal === 0) {
+            suggestions.push(lower)
+            if (suggestions.length >= 2) break
+          }
+        }
+
+        return suggestions
+      }
+
+      const spotDurationSuggestions = findWorkingValues(spotDurationNum, true)
+      const spotsPerLoopSuggestions = findWorkingValues(spotsPerLoopNum, false)
+
+      // Format duration for display
+      const durationHours = Math.floor(durationMinutes / 60)
+      const remainingMinutes = durationMinutes % 60
+      const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
+
+      // Build suggestions message
+      let suggestionsText = "Suggested corrections:\n"
+      let optionCount = 1
+
+      if (spotDurationSuggestions.length > 0) {
+        spotDurationSuggestions.forEach(suggestion => {
+          const loops = Math.floor(durationSeconds / (suggestion * spotsPerLoopNum))
+          suggestionsText += `• Option ${optionCount}: Change spot duration to ${suggestion}s (${loops} complete loops)\n`
+          optionCount++
+        })
+      }
+
+      if (spotsPerLoopSuggestions.length > 0) {
+        spotsPerLoopSuggestions.forEach(suggestion => {
+          const loops = Math.floor(durationSeconds / (spotDurationNum * suggestion))
+          suggestionsText += `• Option ${optionCount}: Change spots per loop to ${suggestion} (${loops} complete loops)\n`
+          optionCount++
+        })
+      }
+
+      if (optionCount === 1) {
+        // Fallback if no good suggestions found
+        suggestionsText += "• Try adjusting spot duration or spots per loop to values that divide evenly into the total time"
+      }
+
+      setValidationError(
+        `Invalid Input: The current configuration results in ${loopsResult.toFixed(2)} loops, which is not a whole number. \n\nTime Duration: ${durationDisplay} (${durationSeconds} seconds)\nCurrent Configuration: ${spotDurationNum}s × ${spotsPerLoopNum} spots = ${totalSpotTimePerLoop}s per loop\nResult: ${durationSeconds}s ÷ ${totalSpotTimePerLoop}s = ${loopsResult.toFixed(2)} loops\n\n${suggestionsText}`,
+      )
+      return false
+    }
+
+    // Success case - simple validation message
+    setValidationError("✓ Configuration is valid and will fit complete loops within the time period.")
+    return true
+  } catch (error) {
+    console.error("Validation error:", error)
+    setValidationError("Invalid time format or values.")
+    return false
+  }
+}
 export default function BusinessEditProductPage() {
   const params = useParams()
   const router = useRouter()
@@ -114,6 +250,14 @@ export default function BusinessEditProductPage() {
   const [selectedAudienceTypes, setSelectedAudienceTypes] = useState<string[]>([])
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [showAudienceDropdown, setShowAudienceDropdown] = useState(false)
+
+  // Dynamic settings state
+  const [cms, setCms] = useState({
+    start_time: "06:00",
+    end_time: "22:00",
+    spot_duration: "10",
+    loops_per_day: "18",
+  })
 
   // Form state
   const [formData, setFormData] = useState({
@@ -170,10 +314,10 @@ export default function BusinessEditProductPage() {
           price: productData.price ? String(productData.price) : "",
           content_type: productData.content_type === "Dynamic" ? "digital" : productData.content_type || "Static",
           cms: {
-            start_time: productData.cms?.start_time || "",
-            end_time: productData.cms?.end_time || "",
-            spot_duration: productData.cms?.spot_duration ? String(productData.cms.spot_duration) : "",
-            loops_per_day: productData.cms?.loops_per_day ? String(productData.cms.loops_per_day) : "",
+            start_time: "",
+            end_time: "",
+            spot_duration: "",
+            loops_per_day: "",
           },
           specs_rental: {
             audience_type: productData.specs_rental?.audience_type || "",
@@ -189,6 +333,13 @@ export default function BusinessEditProductPage() {
           },
           type: productData.type || "RENTAL",
           status: productData.status || "PENDING",
+        })
+
+        setCms({
+          start_time: productData.cms?.start_time || "",
+          end_time: productData.cms?.end_time || "",
+          spot_duration: productData.cms?.spot_duration ? String(productData.cms.spot_duration) : "",
+          loops_per_day: productData.cms?.loops_per_day ? String(productData.cms.loops_per_day) : "",
         })
 
         // Set existing media
@@ -255,15 +406,29 @@ export default function BusinessEditProductPage() {
     fetchCategories()
   }, [])
 
+  // Set default values when content type changes to digital
   useEffect(() => {
     if (formData.content_type === "digital") {
-      validateDynamicContent()
+      setCms({
+        start_time: "06:00",
+        end_time: "22:00",
+        spot_duration: "10",
+        loops_per_day: "18",
+      })
+    }
+  }, [formData.content_type])
+
+  useEffect(() => {
+    if (formData.content_type === "digital") {
+      validateDynamicContent(cms, formData.content_type, setValidationError)
+    } else {
+      setValidationError(null)
     }
   }, [
-    formData.cms.start_time,
-    formData.cms.end_time,
-    formData.cms.spot_duration,
-    formData.cms.loops_per_day,
+    cms.start_time,
+    cms.end_time,
+    cms.spot_duration,
+    cms.loops_per_day,
     formData.content_type,
   ])
 
@@ -459,108 +624,6 @@ export default function BusinessEditProductPage() {
       .filter(Boolean)
   }
 
-  // Enhanced validation function for dynamic content with detailed calculations
-  const validateDynamicContent = () => {
-    if (formData.content_type !== "digital") {
-      setValidationError(null)
-      return true
-    }
-
-    const { start_time, end_time, spot_duration, loops_per_day } = formData.cms
-
-    if (!start_time || !end_time || !spot_duration || !loops_per_day) {
-      setValidationError("All dynamic content fields are required.")
-      return false
-    }
-
-    try {
-      // Parse start and end times
-      const [startHour, startMinute] = start_time.split(":").map(Number)
-      const [endHour, endMinute] = end_time.split(":").map(Number)
-
-      // Validate time format
-      if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
-        setValidationError("Invalid time format.")
-        return false
-      }
-
-      // Convert to total minutes
-      const startTotalMinutes = startHour * 60 + startMinute
-      let endTotalMinutes = endHour * 60 + endMinute
-
-      // Handle next day scenario (e.g., 22:00 to 06:00)
-      if (endTotalMinutes <= startTotalMinutes) {
-        endTotalMinutes += 24 * 60 // Add 24 hours
-      }
-
-      // Calculate duration in minutes, then convert to seconds
-      const durationMinutes = endTotalMinutes - startTotalMinutes
-      const durationSeconds = durationMinutes * 60
-
-      // Parse numeric values
-      const spotDurationNum = Number.parseInt(spot_duration)
-      const spotsPerLoopNum = Number.parseInt(loops_per_day)
-
-      if (isNaN(spotDurationNum) || isNaN(spotsPerLoopNum) || spotDurationNum <= 0 || spotsPerLoopNum <= 0) {
-        setValidationError("Spot duration and spots per loop must be positive numbers.")
-        return false
-      }
-
-      // Calculate total spot time needed per loop
-      const totalSpotTimePerLoop = spotDurationNum * spotsPerLoopNum
-
-      // Calculate how many complete loops can fit in the time duration
-      const loopsResult = durationSeconds / totalSpotTimePerLoop
-
-      // Check if the division results in a whole number (integer)
-      if (!Number.isInteger(loopsResult)) {
-        // Calculate suggested values for correction
-        const floorResult = Math.floor(loopsResult)
-        const ceilResult = Math.ceil(loopsResult)
-
-        // Calculate suggested spot durations for current spots per loop
-        const suggestedSpotDurationFloor = Math.floor(durationSeconds / spotsPerLoopNum / floorResult)
-        const suggestedSpotDurationCeil = Math.floor(durationSeconds / spotsPerLoopNum / ceilResult)
-
-        // Calculate suggested spots per loop for current spot duration
-        const suggestedSpotsPerLoopFloor = Math.floor(durationSeconds / spotDurationNum / floorResult)
-        const suggestedSpotsPerLoopCeil = Math.floor(durationSeconds / spotDurationNum / ceilResult)
-
-        // Format duration for display
-        const durationHours = Math.floor(durationMinutes / 60)
-        const remainingMinutes = durationMinutes % 60
-        const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
-
-        setValidationError(
-          `Invalid Input: The current configuration results in ${loopsResult.toFixed(2)} loops, which is not a whole number. ` +
-            `\n\nTime Duration: ${durationDisplay} (${durationSeconds} seconds)` +
-            `\nCurrent Configuration: ${spotDurationNum}s × ${spotsPerLoopNum} spots = ${totalSpotTimePerLoop}s per loop` +
-            `\nResult: ${durationSeconds}s ÷ ${totalSpotTimePerLoop}s = ${loopsResult.toFixed(2)} loops` +
-            `\n\nSuggested corrections:` +
-            `\n• Option 1: Change spot duration to ${suggestedSpotDurationFloor}s (for ${floorResult} complete loops)` +
-            `\n• Option 2: Change spot duration to ${suggestedSpotDurationCeil}s (for ${ceilResult} complete loops)` +
-            `\n• Option 3: Change spots per loop to ${suggestedSpotsPerLoopFloor} (for ${floorResult} complete loops)` +
-            `\n• Option 4: Change spots per loop to ${suggestedSpotsPerLoopCeil} (for ${ceilResult} complete loops)`,
-        )
-        return false
-      }
-
-      // Success case - show calculation details
-      const durationHours = Math.floor(durationMinutes / 60)
-      const remainingMinutes = durationMinutes % 60
-      const durationDisplay = durationHours > 0 ? `${durationHours}h ${remainingMinutes}m` : `${remainingMinutes}m`
-
-      setValidationError(
-        `✓ Valid Configuration: ${Math.floor(loopsResult)} complete loops will fit in the ${durationDisplay} time period. ` +
-          `Each loop uses ${totalSpotTimePerLoop}s (${spotDurationNum}s × ${spotsPerLoopNum} spots).`,
-      )
-      return true
-    } catch (error) {
-      console.error("Validation error:", error)
-      setValidationError("Invalid time format or values.")
-      return false
-    }
-  }
 
   const validateCurrentStep = () => {
     switch (currentStep) {
@@ -585,7 +648,7 @@ export default function BusinessEditProductPage() {
 
       case 2: // Dynamic Settings (only if Dynamic type)
         if (formData.content_type === "digital") {
-          return validateDynamicContent()
+          return validateDynamicContent(cms, formData.content_type, setValidationError)
         }
         return true
 
@@ -637,9 +700,19 @@ export default function BusinessEditProductPage() {
   }
 
   const handleSubmit = async () => {
-    if (!validateCurrentStep()) {
-      return
-    }
+     if (!validateCurrentStep()) {
+       return
+     }
+
+     // Additional validation for dynamic content
+     if (formData.content_type === "digital" && !validateDynamicContent(cms, formData.content_type, setValidationError)) {
+       toast({
+         title: "Validation Error",
+         description: "Please fix the dynamic content configuration errors.",
+         variant: "destructive",
+       })
+       return
+     }
 
     if (!user || !product) {
       toast({
@@ -667,22 +740,22 @@ export default function BusinessEditProductPage() {
       const contentType = formData.content_type === "digital" ? "Dynamic" : formData.content_type
 
       const productData = {
-        name: productName,
-        description,
-        price: Number.parseFloat(price),
-        content_type: contentType,
-        media: combinedMedia,
-        categories: selectedCategories,
-        category_names: getCategoryNames(),
-        cms:
-          contentType === "Dynamic"
-            ? {
-                start_time: formData.cms.start_time,
-                end_time: formData.cms.end_time,
-                spot_duration: Number.parseInt(formData.cms.spot_duration) || 0,
-                loops_per_day: Number.parseInt(formData.cms.loops_per_day) || 0,
-              }
-            : null,
+         name: productName,
+         description,
+         price: Number.parseFloat(price),
+         content_type: contentType,
+         media: combinedMedia,
+         categories: selectedCategories,
+         category_names: getCategoryNames(),
+         cms:
+           contentType === "Dynamic"
+             ? {
+                 start_time: cms.start_time,
+                 end_time: cms.end_time,
+                 spot_duration: Number.parseInt(cms.spot_duration) || 0,
+                 loops_per_day: Number.parseInt(cms.loops_per_day) || 0,
+               }
+             : null,
         specs_rental: {
           ...formData.specs_rental,
           audience_types: selectedAudienceTypes,
@@ -785,7 +858,7 @@ export default function BusinessEditProductPage() {
               <Label htmlFor="price">Price</Label>
               <Input
                 id="price"
-                
+
                 type="number"
                 placeholder="0.00"
                 value={price}
@@ -817,54 +890,54 @@ export default function BusinessEditProductPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="start_time">Start Time</Label>
+                <Label htmlFor="start_time" className="text-[#4e4e4e] font-medium mb-3 block">Start Time</Label>
                 <Input
                   id="start_time"
                   name="cms.start_time"
                   type="time"
-                  value={formData.cms.start_time || ""}
-                  onChange={(e) => handlePriceChange(e, setPrice)}
-                onBlur={(e) => handlePriceBlur(e, setPrice)}
+                  className="border-[#c4c4c4]"
+                  value={cms.start_time}
+                  onChange={(e) => setCms(prev => ({ ...prev, start_time: e.target.value }))}
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="end_time">End Time</Label>
+                <Label htmlFor="end_time" className="text-[#4e4e4e] font-medium mb-3 block">End Time</Label>
                 <Input
                   id="end_time"
                   name="cms.end_time"
                   type="time"
-                  value={formData.cms.end_time || ""}
-                  onChange={(e) => handlePriceChange(e, setPrice)}
-                onBlur={(e) => handlePriceBlur(e, setPrice)}
+                  className="border-[#c4c4c4]"
+                  value={cms.end_time}
+                  onChange={(e) => setCms(prev => ({ ...prev, end_time: e.target.value }))}
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="spot_duration">Spot Duration (seconds)</Label>
+                <Label htmlFor="spot_duration" className="text-[#4e4e4e] font-medium mb-3 block">Spot Duration (seconds)</Label>
                 <Input
                   id="spot_duration"
                   name="cms.spot_duration"
                   type="number"
-                  value={formData.cms.spot_duration || ""}
-                  onChange={(e) => handlePriceChange(e, setPrice)}
-                onBlur={(e) => handlePriceBlur(e, setPrice)}
+                  className="border-[#c4c4c4]"
+                  value={cms.spot_duration}
+                  onChange={(e) => setCms(prev => ({ ...prev, spot_duration: e.target.value }))}
                   placeholder="Enter duration in seconds"
                   required
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="spot_per_loop">Spots Per Loop</Label>
+                <Label htmlFor="loops_per_day" className="text-[#4e4e4e] font-medium mb-3 block">Spots Per Loop</Label>
                 <Input
                   id="loops_per_day"
                   name="cms.loops_per_day"
                   type="number"
-                  value={formData.cms.loops_per_day || ""}
-                  onChange={(e) => handlePriceChange(e, setPrice)}
-                onBlur={(e) => handlePriceBlur(e, setPrice)}
+                  className="border-[#c4c4c4]"
+                  value={cms.loops_per_day}
+                  onChange={(e) => setCms(prev => ({ ...prev, loops_per_day: e.target.value }))}
                   placeholder="Enter spots per loop"
                   required
                 />

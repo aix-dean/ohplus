@@ -290,25 +290,23 @@ export default function JobOrderDetailsPage() {
                 )}
 
                 {/* Attachments Section */}
-                {jobOrder.attachments && jobOrder.attachments.length > 0 && (
+                {jobOrder.attachments && (
                   <div className="space-y-4">
                     <h2 className="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-2">
                       Attachments
                     </h2>
                     <div className="space-y-2">
-                      {jobOrder.attachments.map((attachment, index) => (
-                        <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                          <FileText className="w-5 h-5 text-gray-500" />
-                          <a
-                            href={attachment.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline flex-1"
-                          >
-                            {attachment.name}
-                          </a>
-                        </div>
-                      ))}
+                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                        <FileText className="w-5 h-5 text-gray-500" />
+                        <a
+                          href={jobOrder.attachments.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline flex-1"
+                        >
+                          {jobOrder.attachments.name}
+                        </a>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -429,7 +427,7 @@ export default function JobOrderDetailsPage() {
                 {jobOrder.attachments && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">Attachments:</span>
-                    <span className="font-medium">{jobOrder.attachments.length}</span>
+                    <span className="font-medium">{jobOrder.attachments ? 1 : 0}</span>
                   </div>
                 )}
               </div>

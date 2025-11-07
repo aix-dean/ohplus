@@ -49,6 +49,7 @@ vi.mock('lucide-react', () => ({
   LogOut: () => <div data-testid="logout-icon" />,
   User: () => <div data-testid="user-icon" />,
   Bell: () => <div data-testid="bell-icon" />,
+  ChevronLeft: () => <div data-testid="chevron-left-icon" />,
 }))
 
 describe('TopNavigation', () => {

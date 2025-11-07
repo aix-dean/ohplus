@@ -16,13 +16,14 @@ export interface JobOrder {
   deadline: string | Date
   jobDescription?: string
   message?: string
-  attachments: { url: string; name: string; type: string }[] // Changed to array of objects
+  attachments: { name: string; type: string; url: string } | null
   status: JobOrderStatus | string
   created?: Date | Timestamp
   updated?: Date | Timestamp
   created_by: string
   company_id: string
   quotation_id?: string
+  booking_id?: string
 
   // Additional fields from the actual database structure
   clientCompany?: string
@@ -44,4 +45,5 @@ export interface JobOrder {
   illumination?: string // Illumination specification for the job order
   client_email?: string // Client email for the job order
   campaignName?: string // Campaign name for the job order
+  reservation_number?: string // Reservation number from booking
 }

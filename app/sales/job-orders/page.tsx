@@ -68,7 +68,7 @@ export default function JobOrdersPage() {
       try {
         setLoading(true)
         const fetchedJOs = await getJobOrders(userData?.company_id || "")
-        setJobOrders(fetchedJOs)
+        setJobOrders(fetchedJOs.jobOrders)
       } catch (err) {
         console.error("Failed to fetch job orders:", err)
         setError("Failed to load job orders. Please try again.")
@@ -238,7 +238,7 @@ export default function JobOrdersPage() {
           <Button
             onClick={() => {
               setIsCreating(true);
-              router.push("/sales/job-orders/select-quotation");
+              router.push("/sales/job-orders/select-booking");
             }}
             size="sm"
             className="flex items-center gap-2"

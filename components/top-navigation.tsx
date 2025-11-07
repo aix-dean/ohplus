@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Settings, LogOut, User, Bell } from "lucide-react"
+import { Menu, X, Settings, LogOut, User, Bell, ChevronLeft } from "lucide-react"
 import { format } from "date-fns"
 import { useAuth } from "@/contexts/auth-context"
 import { useUnreadMessages } from "@/hooks/use-unread-messages"
@@ -54,6 +54,8 @@ export function TopNavigation() {
     if (path === "/admin/dashboard") return "Admin - Dashboard"
     if (path === "/ai-assistant") return "AI Assistant"
     if (path === "/account") return "Account Settings"
+    if (path === "/account/change-password") return "Account Settings"
+    if (path === "/account/signature") return "Account Settings"
     if (path === "/settings") return "Settings"
     if (path === "/settings/subscription") return "Settings - Subscription"
     if (path === "/help") return "Help & Support"
@@ -139,7 +141,7 @@ export function TopNavigation() {
   const isTreasurySection = pathname.startsWith("/treasury")
   const isAccountingSection = pathname.startsWith("/accounting")
   const isBusinessSection = pathname.startsWith("/business")
-  const isAccountPage = pathname === "/account" // New check for account page
+  const isAccountPage = pathname.startsWith("/account")
 
   const navBgColor = isSalesSection
     ? "bg-department-sales-red"
@@ -159,7 +161,8 @@ export function TopNavigation() {
                   ? "bg-[#4169e1]"
                   : isLogisticsSection
                     ? "bg-[#48a7fa]"
-                    : "bg-[#48a7fa]"
+                    : "bg-[#A1A1A1]"
+                    
 
   const diagonalBgColor = isSalesSection
     ? "bg-card-content-sales"
@@ -216,7 +219,7 @@ export function TopNavigation() {
             isFinanceSection ? '#04933480' :
             isBusinessSection ? '#a0b4f0' :
             isAccountingSection ? '#2A31B480' :
-            '#98d3fd'
+            '#CFCFCF'
           }
         />
       </svg>
@@ -224,15 +227,27 @@ export function TopNavigation() {
       <div className="top-nav-container text-white relative z-10">
         <div className="top-nav-content flex items-center justify-between w-full px-4 md:px-8">
           <div className="top-nav-left">
-            <div className="top-nav-logo flex items-center">
-              <DepartmentDropdown />
-              <h1 className="text-xl font-semibold text-white ml-4 hidden">
-                {(() => {
-                  let title = pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle.replace(/\bIt\b/g, "I.T")
-                  return title.includes(" - ") ? title.split(" - ").slice(1).join(" - ") : title
-                })()}
-              </h1>
-            </div>
+            {isAccountPage ? (
+              <div className="flex items-center">
+                <button
+                  onClick={() => router.back()}
+                  className="flex items-center text-white hover:text-gray-200 transition-colors"
+                >
+                  <ChevronLeft className="h-5 w-5 mr-2" />
+                  <span className="text-base font-black">Account Setting</span>
+                </button>
+              </div>
+            ) : (
+              <div className="top-nav-logo flex items-center">
+                <DepartmentDropdown />
+                <h1 className="text-xl font-semibold text-white ml-4 hidden">
+                  {(() => {
+                    let title = pageTitle == "Admin - Subscriptions" ? "Admin - Plan Profile" : pageTitle.replace(/\bIt\b/g, "I.T")
+                    return title.includes(" - ") ? title.split(" - ").slice(1).join(" - ") : title
+                  })()}
+                </h1>
+              </div>
+            )}
             <div className="top-nav-links hidden md:flex"></div>
           </div>
 
@@ -240,11 +255,18 @@ export function TopNavigation() {
              {" "}
              {/* Added relative z-20 and flex-shrink-0 */}
              {/* Date display in the light blue section with adjusted padding */}
-             <div className="hidden md:flex items-center justify-end h-full pl-8 pr-8 relative z-10">
-               {" "}
-               {/* Adjusted pl-8 */}
-               <span className="text-sm font-medium text-white">{format(currentTime, "MMMM d, yyyy, h:mm a")}</span>
-             </div>
+             {(isAccountPage || !isAccountPage) && (
+               <div className="hidden md:flex items-center justify-end h-full pl-8 pr-8 relative z-10">
+                 {" "}
+                 {/* Adjusted pl-8 */}
+                 <span className="text-sm font-medium text-white">
+                   {isAccountPage
+                     ? format(currentTime, "h:mm a | MMM d, yyyy")
+                     : format(currentTime, "MMMM d, yyyy, h:mm a")
+                   }
+                 </span>
+               </div>
+             )}
              {/* User controls section (bell and profile) - Conditionally rendered */}
              {!isAccountPage && ( // Only render if NOT on the account page
                <div className="flex items-center mr-6 md:mr-12 relative z-10">

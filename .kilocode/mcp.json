@@ -1,17 +1,11 @@
 {
   "mcpServers": {
-    "@magicuidesign/mcp": {
+    "sequentialthinking": {
       "command": "npx",
       "args": [
         "-y",
         "@magicuidesign/mcp@latest"
       ]
-    },
-    "figma-dev-mode": {
-      "type": "sse",
-      "url": "http://127.0.0.1:3845/sse",
-      "disabled": false,
-      "alwaysAllow": []
     },
     "memory": {
       "command": "npx",
@@ -19,6 +13,28 @@
         "-y",
         "@modelcontextprotocol/server-memory"
       ]
+    },
+    "firebase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "firebase-tools@14.15.2",
+        "experimental:mcp"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "env": {
+        "DEFAULT_MINIMUM_TOKENS": ""
+      }
+    },
+    "figma-dev-mode": {
+      "type": "sse",
+      "url": "http://127.0.0.1:3845/sse"
     }
   }
 }
