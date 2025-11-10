@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import type { Product } from "@/lib/firebase-service"
@@ -17,36 +17,77 @@ import { JobOrdersListDialog } from "@/components/job-orders-list-dialog"
 // CSS for static gradient border
 const gradientBorderStyles = `
 .gradient-border {
-  background: linear-gradient(45deg, #ff0000, #ffff00, #00ff00, #0000ff, #8B00FF);
+  position: relative;
+  border-radius: 12px;
+  padding: 3px; /* border thickness */
+  background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #0000ff, #8B00FF);
+  background-size: 300% 300%;
+  animation: gradientMove 5s linear infinite;
 }
-`
+
+.gradient-border > * {
+  background: #fff; /* inner background color */
+  border-radius: 10px;
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+/* Keyframes for moving gradient */
+@keyframes gradientMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}`
 
 // Direct Firebase imports for job order fetching
 import { collection, query, where, getDocs, onSnapshot, orderBy, limit, startAfter } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+// Import Algolia search function
+import { searchProducts, type SearchResult } from "@/lib/algolia-service"
 
 // Number of items to display per page
-const ITEMS_PER_PAGE = 12
+const ITEMS_PER_PAGE = 15
 
 interface AllSitesTabProps {
   searchQuery?: string
   contentTypeFilter?: string
   viewMode?: "grid" | "list"
+  onJobOrdersChange?: (jobOrders: { static: boolean; digital: boolean }) => void
 }
 
 export default function AllSitesTab({
   searchQuery = "",
   contentTypeFilter = "All",
   viewMode = "grid",
+  onJobOrdersChange,
 }: AllSitesTabProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [jobOrderCounts, setJobOrderCounts] = useState<Record<string, number>>({})
+  const [contentTypeMap, setContentTypeMap] = useState<Record<string, string>>({})
+  const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [globalJobOrderCounts, setGlobalJobOrderCounts] = useState<Record<string, number>>({})
 
   const { toast } = useToast()
   const { userData } = useAuth()
   const router = useRouter()
+
+  // Global content type map
+  const globalContentTypeMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    allProducts.forEach(p => {
+      map[p.id || ''] = (p.content_type || 'static').toLowerCase()
+    })
+    return map
+  }, [allProducts])
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -71,110 +112,175 @@ export default function AllSitesTab({
 
 
   // Reset pagination when search or filter changes
-    useEffect(() => {
-      setCurrentPage(1)
-      lastDocsRef.current = new Map()
-      setHasNextPage(false)
-    }, [searchQuery, contentTypeFilter])
-  
-  // Debug effect to log JO counts when they change
-    useEffect(() => {
-      Object.entries(jobOrderCounts).forEach(([productId, count]) => {
-        console.log(`Product ${productId}: ${count} JOs`)
+  useEffect(() => {
+    setCurrentPage(1)
+    lastDocsRef.current = new Map()
+    setHasNextPage(false)
+  }, [searchQuery, contentTypeFilter])
+
+  // Fetch all products for global indicators
+  useEffect(() => {
+    if (!userData?.company_id) return
+
+    const fetchAllProducts = async () => {
+      const q = query(collection(db, "products"), where("company_id", "==", userData.company_id), where("active", "==", true))
+      const querySnapshot = await getDocs(q)
+      const allProds: Product[] = []
+      querySnapshot.forEach((doc) => {
+        allProds.push({ id: doc.id, ...doc.data() } as Product)
       })
-    }, [jobOrderCounts])
-  
-    // Real-time job orders listener
-      useEffect(() => {
-        if (!userData?.company_id) return
-    
-        const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id), where("status", "==", "pending"))
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const counts: Record<string, number> = {}
-          const productIds = products.map(p => p.id).filter(Boolean)
-    
-          querySnapshot.forEach((doc) => {
-            const data = doc.data()
-            const productId = data.product_id
-            if (productId && productIds.includes(productId)) {
-              counts[productId] = (counts[productId] || 0) + 1
-            }
-          })
-    
-          setJobOrderCounts(counts)
-        })
-    
-        return unsubscribe
-      }, [userData?.company_id, products])
-    
-      // Fetch paginated products
-      const fetchProducts = useCallback(async (page: number = 1) => {
-        if (!userData?.company_id) return
-    
-        setLoading(true)
-        try {
-          // Build base query
-          let constraints: any[] = [
-            where("company_id", "==", userData.company_id),
-            where("active", "==", true),
-            orderBy("created", "desc"),
-            limit(ITEMS_PER_PAGE + 1) // +1 to check if there's a next page
-          ]
-    
-          // Add startAfter cursor for pagination
-          const lastDoc = lastDocsRef.current.get(page - 1)
-          if (lastDoc && page > 1) {
-            constraints.splice(-1, 0, startAfter(lastDoc)) // Insert before limit
-          }
-    
-          const q = query(collection(db, "products"), ...constraints)
-          const querySnapshot = await getDocs(q)
-    
-          const productsData: Product[] = []
-          querySnapshot.forEach((doc) => {
-            const product = { id: doc.id, ...doc.data() } as Product
-            productsData.push(product)
-          })
-    
-          // Check if there's a next page
-          const hasNext = productsData.length > ITEMS_PER_PAGE
-          const currentPageProducts = hasNext ? productsData.slice(0, ITEMS_PER_PAGE) : productsData
-    
-          // Store the last document for next page
-          const lastDocOfPage = querySnapshot.docs[querySnapshot.docs.length - (hasNext ? 2 : 1)]
-          lastDocsRef.current.set(page, lastDocOfPage || null)
-          setHasNextPage(hasNext)
-    
-          // Apply client-side filters
-          let filtered = currentPageProducts
-          if (searchQuery) {
-            filtered = currentPageProducts.filter(p =>
-              p.name?.toLowerCase().includes(searchQuery.toLowerCase())
-            )
-          }
-    
-          if (contentTypeFilter !== "All") {
-            filtered = filtered.filter((product) => {
-              const productType = (product.content_type || "").toLowerCase()
-              const filterType = contentTypeFilter.toLowerCase()
-              return productType === filterType
-            })
-          }
-    
-          setProducts(filtered)
-          setLoading(false)
-          setError(null)
-        } catch (error) {
-          console.error("Error fetching products:", error)
-          setError("Failed to load sites. Please try again.")
-          setLoading(false)
+      setAllProducts(allProds)
+    }
+
+    fetchAllProducts()
+  }, [userData?.company_id])
+
+  // Debug effect to log JO counts when they change
+  useEffect(() => {
+    Object.entries(jobOrderCounts).forEach(([productId, count]) => {
+      console.log(`Product ${productId}: ${count} JOs`)
+    })
+  }, [jobOrderCounts])
+
+  // Effect to notify parent about job orders presence
+  useEffect(() => {
+    let hasStatic = false
+    let hasDigital = false
+    Object.entries(globalJobOrderCounts).forEach(([productId, count]) => {
+      if (count > 0) {
+        const contentType = globalContentTypeMap[productId]
+        if (contentType === 'static') hasStatic = true
+        else if (contentType === 'digital' || contentType === 'dynamic') hasDigital = true
+      }
+    })
+    onJobOrdersChange?.({ static: hasStatic, digital: hasDigital })
+  }, [globalJobOrderCounts, globalContentTypeMap, onJobOrdersChange])
+
+  // Real-time job orders listener for filtered products
+  useEffect(() => {
+    if (!userData?.company_id) return
+
+    const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id), where("status", "==", "pending"))
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const counts: Record<string, number> = {}
+      const productIds = products.map(p => p.id).filter(Boolean)
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        const productId = data.product_id
+        if (productId && productIds.includes(productId)) {
+          counts[productId] = (counts[productId] || 0) + 1
         }
-      }, [userData?.company_id, searchQuery, contentTypeFilter])
-    
-      // Fetch products when dependencies change
-      useEffect(() => {
-        fetchProducts(currentPage)
-      }, [currentPage, searchQuery, contentTypeFilter, userData?.company_id])
+      })
+
+      setJobOrderCounts(counts)
+    })
+
+    return unsubscribe
+  }, [userData?.company_id, products])
+
+  // Global job orders listener for indicators
+  useEffect(() => {
+    if (!userData?.company_id) return
+
+    const q = query(collection(db, "job_orders"), where("company_id", "==", userData.company_id), where("status", "==", "pending"))
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const counts: Record<string, number> = {}
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data()
+        const productId = data.product_id
+        if (productId) {
+          counts[productId] = (counts[productId] || 0) + 1
+        }
+      })
+
+      setGlobalJobOrderCounts(counts)
+    })
+
+    return unsubscribe
+  }, [userData?.company_id])
+
+  // Fetch paginated products
+  const fetchProducts = useCallback(async (page: number = 1) => {
+    if (!userData?.company_id) return
+
+    setLoading(true)
+    try {
+      // Build base query
+      let constraints: any[] = [
+        where("company_id", "==", userData.company_id),
+        where("active", "==", true),
+      ]
+
+      // Add content type filter server-side (case insensitive)
+      if (contentTypeFilter !== "All") {
+        const filterType = contentTypeFilter.toLowerCase()
+        if (filterType === "static") {
+          constraints.push(where("content_type", "in", ["static", "Static", "STATIC"]))
+        } else if (filterType === "dynamic") {
+          constraints.push(where("content_type", "in", ["dynamic", "Dynamic", "DYNAMIC", "digital", "Digital", "DIGITAL"]))
+        }
+      }
+
+      constraints.push(
+        orderBy("created", "desc"),
+        limit(ITEMS_PER_PAGE + 1) // +1 to check if there's a next page
+      )
+
+      // Add startAfter cursor for pagination
+      const lastDoc = lastDocsRef.current.get(page - 1)
+      if (lastDoc && page > 1) {
+        constraints.splice(-1, 0, startAfter(lastDoc)) // Insert before limit
+      }
+
+      const q = query(collection(db, "products"), ...constraints)
+      const querySnapshot = await getDocs(q)
+
+      const productsData: Product[] = []
+      querySnapshot.forEach((doc) => {
+        const product = { id: doc.id, ...doc.data() } as Product
+        productsData.push(product)
+      })
+
+      // Check if there's a next page
+      const hasNext = productsData.length > ITEMS_PER_PAGE
+      const currentPageProducts = hasNext ? productsData.slice(0, ITEMS_PER_PAGE) : productsData
+
+      // Store the last document for next page
+      const lastDocOfPage = querySnapshot.docs[querySnapshot.docs.length - (hasNext ? 2 : 1)]
+      lastDocsRef.current.set(page, lastDocOfPage || null)
+      setHasNextPage(hasNext)
+
+      // Apply client-side filters (only search query now)
+      let filtered = currentPageProducts
+      if (searchQuery) {
+        filtered = currentPageProducts.filter(p =>
+          p.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      }
+
+      // Update content type map
+      const newContentTypeMap: Record<string, string> = {}
+      filtered.forEach(p => {
+        newContentTypeMap[p.id || ''] = (p.content_type || 'static').toLowerCase()
+      })
+      setContentTypeMap(newContentTypeMap)
+
+      setProducts(filtered)
+      setLoading(false)
+      setError(null)
+    } catch (error) {
+      console.error("Error fetching products:", error)
+      setError("Failed to load sites. Please try again.")
+      setLoading(false)
+    }
+  }, [userData?.company_id, searchQuery, contentTypeFilter])
+
+  // Fetch products when dependencies change
+  useEffect(() => {
+    fetchProducts(currentPage)
+  }, [currentPage, searchQuery, contentTypeFilter, userData?.company_id])
 
   // Pagination handlers
   const goToPage = (page: number) => {
@@ -222,10 +328,10 @@ export default function AllSitesTab({
       (product.status === "ACTIVE"
         ? Math.floor(Math.random() * 20) + 80
         : // 80-100 for operational
-          product.status === "PENDING"
+        product.status === "PENDING"
           ? Math.floor(Math.random() * 30) + 50
           : // 50-80 for warning
-            Math.floor(Math.random() * 40) + 10) // 10-50 for error
+          Math.floor(Math.random() * 40) + 10) // 10-50 for error
 
     // Extract address information from different possible locations
     const address =
@@ -239,6 +345,7 @@ export default function AllSitesTab({
     const joCount = jobOrderCounts[product.id || ""] || 0
 
     return {
+      price: product.price || "",
       id: product.id,
       name: product.name || `Site ${product.id?.substring(0, 8)}`,
       status: product.status || "UNKNOWN",
@@ -453,7 +560,7 @@ function UnifiedSiteCard({
 
   return (
     <div className="relative">
-      {product.content_type === "Dynamic" ? (
+      {(product.content_type?.toLowerCase() === "dynamic" || product.content_type?.toLowerCase() === "digital") ? (
         <div
           className="p-[2px] rounded-[12px] gradient-border"
         >
@@ -462,18 +569,18 @@ function UnifiedSiteCard({
             onClick={handleCardClick}
           >
             {site.joCount > 0 && (
-              <div className="absolute top-[-0.5rem] right-[-0.5rem] bg-[#48a7fa] text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold z-10">
+              <div className="absolute top-[-0.1rem] right-[-0.1rem] bg-[#48a7fa] text-white rounded-full w-6 h-6 flex items-center justify-center text-[13px] z-10">
                 {site.joCount}
               </div>
             )}
-            <CardContent className="p-3">
-              <div className="relative w-full aspect-square bg-gray-200">
+            <CardContent className="p-[13.5px]">
+              <div className="relative w-full aspect-square bg-gray-200 rounded-[10px]">
                 <Image
                   src={site.image || "/placeholder.svg"}
                   alt={site.name}
-                  width={192}
-                  height={192}
-                  className="object-cover w-full h-full"
+                  width={159}
+                  height={147}
+                  className="object-cover w-full h-full rounded-[10px]"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
                     target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
@@ -481,100 +588,47 @@ function UnifiedSiteCard({
                   }}
                 />
               </div>
-              <div className="flex flex-col pt-2">
+              <div className="flex flex-col pt-2  mt-[13px]">
                 {/* Site Code */}
-                <div className="text-sm font-bold text-gray-400 uppercase tracking-wide truncate" title={site.siteCode}>{site.siteCode}</div>
+                <div className="text-[10.82px] text-[#a1a1a1] uppercase tracking-wide truncate">{site.siteCode || "N/A"}</div>
 
                 {/* Site Name */}
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-gray-700 truncate">{site.name}</h3>
+                <div className="text-[10.82px] font-semibold text-[#000000] truncate">
+                  {site.name || "N/A"}
                 </div>
 
                 {/* Location Information */}
-                {site.location && (
-                  <div className="text-sm font-bold text-gray-700 truncate" title={site.location}>
-                    <span className="font-bold">Location:</span> {site.location}
-                  </div>
-                )}
-
-                {/* Specs Rental Information */}
-                {site.specs_rental && (
-                  <div className="text-sm font-bold text-gray-700">
-                    <span className="font-bold">Specs:</span> {site.specs_rental}
-                  </div>
-                )}
-
-                {/* Site Information */}
-                <div className="">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-700">
-                      <span className="font-bold">Status:</span>
-                      <span className="ml-1">
-                        {site.operationalStatus === "Operational"
-                          ? "Active"
-                          : site.operationalStatus === "Under Maintenance"
-                            ? "Maintenance"
-                            : site.operationalStatus === "Pending Setup"
-                              ? "Pending"
-                              : "Inactive"}
-                      </span>
-                    </span>
-                  </div>
-
-                  {site.contentType === "static" ? (
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-gray-700">
-                        <span className="font-bold">Illumination:</span>
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-gray-700">
-                        <span className="font-bold">Display Health:</span>
-                        <span className="ml-1 text-green-600">
-                          {site.healthPercentage > 90
-                            ? "100%"
-                            : site.healthPercentage > 80
-                              ? "90%"
-                              : site.healthPercentage > 60
-                                ? "75%"
-                                : "50%"}
-                        </span>
-                      </span>
-                    </div>
-                  )}
+                <div className="text-[10.82px] font-semibold text-[#000000] truncate">
+                  {site.location || "N/A"}
+                </div>
+                {/* Site Price  */}
+                <div className="text-[10.82px] font-semibold text-[#000000]  truncate">
+                  {site.price ? new Intl.NumberFormat("en-US", { minimumFractionDigits: 2 }).format(site.price) : "N/A"}
                 </div>
 
-                {/* Create Report Button */}
-                <Button
-                  variant="outline"
-                  className="mt-3 w-full h-8 text-xs text-black border hover:bg-gray-50 rounded-md font-bold bg-transparent"
-                  onClick={handleCreateReport}
-                >
-                  Create Report
-                </Button>
+
               </div>
             </CardContent>
           </Card>
         </div>
       ) : (
         <Card
-          className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer bg-white rounded-[12px] border-2 border-gray-300 w-full relative"
+          className="overflow-hidden shadow-lg transition-shadow cursor-pointer bg-white rounded-[12px] border-gray-300 w-full relative"
           onClick={handleCardClick}
         >
           {site.joCount > 0 && (
-            <div className="absolute top-[-0.5rem] right-[-0.5rem] bg-[#48a7fa] text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold z-10">
+            <div className="absolute top-[-0.1rem] right-[-0.1rem] bg-[#48a7fa] text-white rounded-full w-6 h-6 flex items-center justify-center text-[13px] z-10">
               {site.joCount}
             </div>
           )}
           <CardContent className="p-3">
-            <div className="relative w-full aspect-square bg-gray-200">
+            <div className="relative w-full aspect-square bg-gray-200 rounded-[10px]">
               <Image
                 src={site.image || "/placeholder.svg"}
                 alt={site.name}
-                width={192}
-                height={192}
-                className="object-cover w-full h-full"
+                width={159}
+                height={147}
+                className="object-cover w-full h-full rounded-[10px]"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement
                   target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
@@ -582,78 +636,24 @@ function UnifiedSiteCard({
                 }}
               />
             </div>
-            <div className="flex flex-col pt-2">
+            <div className="flex flex-col pt-2 mt-[13px]">
               {/* Site Code */}
-              <div className="text-sm font-bold text-gray-400 uppercase tracking-wide truncate" title={site.siteCode}>{site.siteCode}</div>
+              <div className="text-[10.82px] text-[#a1a1a1] uppercase tracking-wide truncate">{site.siteCode || "N/A"}</div>
 
               {/* Site Name */}
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-gray-700 truncate">{site.name}</h3>
+              <div className="text-[10.82px] font-semibold text-[#000000] truncate">
+               {site.name || "N/A"}
               </div>
 
               {/* Location Information */}
-              {site.location && (
-                <div className="text-sm font-bold text-gray-700 truncate" title={site.location}>
-                  <span className="font-bold">Location:</span> {site.location}
-                </div>
-              )}
-
-              {/* Specs Rental Information */}
-              {site.specs_rental && (
-                <div className="text-sm font-bold text-gray-700">
-                  <span className="font-bold">Specs:</span> {site.specs_rental}
-                </div>
-              )}
-
-              {/* Site Information */}
-              <div className="">
-                <div className="flex flex-col">
-                  <span className="text-sm font-bold text-gray-700">
-                    <span className="font-bold">Status:</span>
-                    <span className="ml-1">
-                      {site.operationalStatus === "Operational"
-                        ? "Active"
-                        : site.operationalStatus === "Under Maintenance"
-                          ? "Maintenance"
-                          : site.operationalStatus === "Pending Setup"
-                            ? "Pending"
-                            : "Inactive"}
-                    </span>
-                  </span>
-                </div>
-
-                {site.contentType === "static" ? (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-700">
-                      <span className="font-bold">Illumination:</span>
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-700">
-                      <span className="font-bold">Display Health:</span>
-                      <span className="ml-1 text-green-600">
-                        {site.healthPercentage > 90
-                          ? "100%"
-                          : site.healthPercentage > 80
-                            ? "90%"
-                            : site.healthPercentage > 60
-                              ? "75%"
-                              : "50%"}
-                      </span>
-                    </span>
-                  </div>
-                )}
+              <div className="text-[10.82px] font-semibold text-[#000000]  truncate">
+                {site.location || "N/a"}
+              </div>
+              {/* Site Price  */}
+              <div className="text-[10.82px] font-semibold text-[#000000] truncate">
+                {site.price ? new Intl.NumberFormat("en-US", { minimumFractionDigits: 2 }).format(site.price) : "N/A"}
               </div>
 
-              {/* Create Report Button */}
-              <Button
-                variant="outline"
-                className="mt-3 w-full h-8 text-xs text-black border hover:bg-gray-50 rounded-md font-bold bg-transparent"
-                onClick={handleCreateReport}
-              >
-                Create Report
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -696,106 +696,95 @@ function UnifiedSiteListItem({
       onClick={handleCardClick}
     >
       <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            {/* Site Image */}
-            <div className="relative w-20 h-20 bg-gray-200 rounded-lg flex-shrink-0">
-              <Image
-                src={site.image || "/placeholder.svg"}
-                alt={site.name}
-                fill
-                className="object-cover rounded-lg"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
-                  target.className = "opacity-50 object-contain rounded-lg"
-                }}
-              />
+        <div className="flex items-center gap-4">
+          {/* Site Image */}
+          <div className="relative w-20 h-20 bg-gray-200 rounded-lg flex-shrink-0">
+            <Image
+              src={site.image || "/placeholder.svg"}
+              alt={site.name}
+              fill
+              className="object-cover rounded-lg"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement
+                target.src = site.contentType === "dynamic" ? "/led-billboard-1.png" : "/roadside-billboard.png"
+                target.className = "opacity-50 object-contain rounded-lg"
+              }}
+            />
+          </div>
+
+          {/* Site Information */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="text-sm font-bold text-gray-800 uppercase tracking-wide truncate" title={site.siteCode}>{site.siteCode}</div>
+              <div className="bg-purple-500 text-white text-sm font-bold px-1.5 py-0.5 rounded">
+                {site.contentType === "dynamic" ? "M" : "S"}
+              </div>
             </div>
 
-            {/* Site Information */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="text-sm font-bold text-gray-800 uppercase tracking-wide truncate" title={site.siteCode}>{site.siteCode}</div>
-                <div className="bg-purple-500 text-white text-sm font-bold px-1.5 py-0.5 rounded">
-                  {site.contentType === "dynamic" ? "M" : "S"}
+            <h3 className="text-sm font-bold text-gray-700 mb-0.5 truncate">{site.name}</h3>
+
+            {/* Location Information */}
+            {site.location && (
+              <div className="text-sm font-bold text-gray-700 mb-0.5 truncate" title={site.location}>
+                <span className="font-bold">Location:</span> {site.location}
+              </div>
+            )}
+
+            {/* Specs Rental Information */}
+            {site.specs_rental && (
+              <div className="text-sm font-bold text-gray-700 mb-0.5">
+                <span className="font-bold">Specs:</span> {site.specs_rental}
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4 mb-0.5">
+              <div>
+                <span className="text-sm font-bold text-gray-700">Status:</span>
+                <div className="text-sm font-bold text-gray-700">
+                  {site.operationalStatus === "Operational"
+                    ? "Active"
+                    : site.operationalStatus === "Under Maintenance"
+                      ? "Maintenance"
+                      : site.operationalStatus === "Pending Setup"
+                        ? "Pending"
+                        : "Inactive"}
                 </div>
               </div>
 
-              <h3 className="text-sm font-bold text-gray-700 mb-0.5 truncate">{site.name}</h3>
-
-              {/* Location Information */}
-              {site.location && (
-                <div className="text-sm font-bold text-gray-700 mb-0.5 truncate" title={site.location}>
-                  <span className="font-bold">Location:</span> {site.location}
-                </div>
-              )}
-
-              {/* Specs Rental Information */}
-              {site.specs_rental && (
-                <div className="text-sm font-bold text-gray-700 mb-0.5">
-                  <span className="font-bold">Specs:</span> {site.specs_rental}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4 mb-0.5">
+              {site.contentType !== "static" && (
                 <div>
-                  <span className="text-sm font-bold text-gray-700">Status:</span>
-                  <div className="text-sm font-bold text-gray-700">
-                    {site.operationalStatus === "Operational"
-                      ? "Active"
-                      : site.operationalStatus === "Under Maintenance"
-                        ? "Maintenance"
-                        : site.operationalStatus === "Pending Setup"
-                          ? "Pending"
-                          : "Inactive"}
+                  <span className="text-sm font-bold text-gray-700">Display Health:</span>
+                  <div className="text-sm font-bold text-green-600">
+                    {site.healthPercentage > 90
+                      ? "100%"
+                      : site.healthPercentage > 80
+                        ? "90%"
+                        : site.healthPercentage > 60
+                          ? "75%"
+                          : "50%"}
                   </div>
                 </div>
-
-                {site.contentType !== "static" && (
-                  <div>
-                    <span className="text-sm font-bold text-gray-700">Display Health:</span>
-                    <div className="text-sm font-bold text-green-600">
-                      {site.healthPercentage > 90
-                        ? "100%"
-                        : site.healthPercentage > 80
-                          ? "90%"
-                          : site.healthPercentage > 60
-                            ? "75%"
-                            : "50%"}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* JO Notification */}
-              <div className="flex items-center gap-1">
-                <Bell className="h-4 w-4 text-gray-400" />
-                {site.joCount > 0 ? (
-                  <button
-                    onClick={handleJOClick}
-                    className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                  >
-                    JO ({site.joCount})
-                  </button>
-                ) : (
-                  <span className="text-sm font-bold text-gray-700">None</span>
-                )}
-                {/* Debug info - remove in production */}
-              </div>
+              )}
             </div>
 
-            {/* Create Report Button */}
-            <div className="flex-shrink-0">
-              <Button
-                variant="outline"
-                className="h-10 px-6 text-sm text-black border hover:bg-gray-50 rounded-md font-bold bg-transparent"
-                onClick={handleCreateReport}
-              >
-                Create Report
-              </Button>
+            {/* JO Notification */}
+            <div className="flex items-center gap-1">
+              <Bell className="h-4 w-4 text-gray-400" />
+              {site.joCount > 0 ? (
+                <button
+                  onClick={handleJOClick}
+                  className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                >
+                  JO ({site.joCount})
+                </button>
+              ) : (
+                <span className="text-sm font-bold text-gray-700">None</span>
+              )}
+              {/* Debug info - remove in production */}
             </div>
           </div>
-        </CardContent>
+        </div>
+      </CardContent>
     </Card>
   )
 }

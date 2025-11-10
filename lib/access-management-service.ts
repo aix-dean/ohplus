@@ -218,6 +218,7 @@ export async function removePermissionFromRole(roleId: string, permissionId: str
 }
 
 // User Management
+// User Management
 export async function getUsers(licenseKey?: string): Promise<User[]> {
   try {
     const usersCollection = collection(db, "iboard_users")

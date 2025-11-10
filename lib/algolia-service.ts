@@ -122,7 +122,14 @@ export async function searchServiceAssignments(query: string, companyId?: string
     console.log(`Searching service assignments for: "${query}"${companyId ? ` with company filter: ${companyId}` : ""} page: ${page}, hitsPerPage: ${hitsPerPage}`)
 
     // Create the request body
-    const requestBody: any = { query, indexName: 'service_assignments', page, hitsPerPage }
+    const requestBody: any = {
+      query,
+      indexName: 'service_assignments',
+      page,
+      hitsPerPage,
+      restrictSearchableAttributes: ['saNumber', 'projectSiteName', 'serviceType', 'campaignName', 'assignedTo'],
+      sort: ['created:desc']
+    }
 
     // Add filters if companyId is provided
     if (companyId) {

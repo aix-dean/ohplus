@@ -6,7 +6,7 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ChevronDown, Download, Send, Eye, Share, Printer } from "lucide-react"
-import { getReportById, type ReportData } from "@/lib/report-service"
+import { getReportById, updateReport, type ReportData } from "@/lib/report-service"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import {
@@ -15,16 +15,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { SendReportDialog } from "@/components/send-report-dialog"
+import { useToast } from "@/hooks/use-toast"
 
-export default function ReportPreviewPage() {
+export default function ReportReviewPage() {
   const params = useParams()
   const router = useRouter()
+  const { toast } = useToast()
   const reportId = params.id as string
   const [logisticsReportUrl, setLogisticsReportUrl] = useState<string | null>(null)
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [crewName, setCrewName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false)
 
   useEffect(() => {
     if (reportId) {
@@ -34,15 +38,15 @@ export default function ReportPreviewPage() {
 
   const fetchLogisticsReport = async () => {
     try {
-      console.log("[ReportPreviewPage] Fetching report for ID:", reportId);
+      console.log("[ReportReviewPage] Fetching report for ID:", reportId);
       const report = await getReportById(reportId);
-      console.log("[ReportPreviewPage] Fetched report:", report);
+      console.log("[ReportReviewPage] Fetched report:", report);
       setReportData(report);
       if (report?.logistics_report) {
-        console.log("[ReportPreviewPage] Found logistics_report URL:", report.logistics_report);
+        console.log("[ReportReviewPage] Found logistics_report URL:", report.logistics_report);
         setLogisticsReportUrl(report.logistics_report);
       } else {
-        console.log("[ReportPreviewPage] No logistics_report URL found in report.");
+        console.log("[ReportReviewPage] No logistics_report URL found in report.");
         setLogisticsReportUrl(null);
       }
 
@@ -65,12 +69,12 @@ export default function ReportPreviewPage() {
         setCrewName(null)
       }
     } catch (error) {
-      console.error("[ReportPreviewPage] Error fetching logistics report:", error);
+      console.error("[ReportReviewPage] Error fetching logistics report:", error);
       setError("Failed to load logistics report");
     } finally {
       setLoading(false);
-      console.log("[ReportPreviewPage] Loading finished. logisticsReportUrl:", logisticsReportUrl);
-      console.log("[ReportPreviewPage] Error state:", error);
+      console.log("[ReportReviewPage] Loading finished. logisticsReportUrl:", logisticsReportUrl);
+      console.log("[ReportReviewPage] Error state:", error);
     }
   }
 
@@ -118,6 +122,35 @@ export default function ReportPreviewPage() {
     }
   };
 
+  const handleSaveAsDraft = async () => {
+    if (!reportData?.id) return;
+
+    try {
+      await updateReport(reportData.id, { status: "draft" });
+      toast({
+        title: "Report saved as draft",
+        description: "The report has been saved as a draft successfully.",
+      });
+    } catch (error) {
+      console.error("Failed to save as draft:", error);
+      toast({
+        title: "Failed to save draft",
+        description: "There was an error saving the report as draft.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSendReport = () => {
+    setIsSendDialogOpen(true);
+  };
+
+  const handleSendOptionSelect = (option: "email" | "whatsapp" | "viber" | "messenger") => {
+    // Handle the selected send option
+    console.log("Selected send option:", option);
+    setIsSendDialogOpen(false);
+  };
+
 
   if (loading) {
     return (
@@ -137,57 +170,8 @@ export default function ReportPreviewPage() {
             className="text-[#333] flex items-center hover:text-gray-800 hover:bg-gray-100 rounded-full p-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            <h1 className="text-sm font-semibold text-gray-900 ml-2">View Report</h1>
+            <h1 className="text-sm font-semibold text-gray-900 ml-2">Review Report</h1>
           </button>
-        </div>
-        {/* Report Details Container */}
-        <div className="px-4 py-4 border-t border-gray-100">
-          <div className="flex flex-wrap gap-4 text-sm w-full md:w-auto items-center justify-between">
-            <div>
-              <span className="text-gray-500">Report ID:</span>
-              <p className="font-medium text-gray-900">{reportData?.report_id || reportData?.id || "N/A"}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Type:</span>
-              <p className="font-medium text-gray-900">{reportData?.reportType || "N/A"}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Site:</span>
-              <p className="font-medium text-blue-800">{reportData?.site?.name || "N/A"}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Campaign:</span>
-              <p className="font-medium text-gray-900">{reportData?.campaignName || "N/A"}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Crew:</span>
-              <p className="font-medium text-gray-900">{crewName || "N/A"}</p>
-            </div>
-            <div>
-              <span className="text-gray-500">Issued Date:</span>
-              <p className="font-medium text-gray-900">
-                {reportData?.created && typeof reportData.created.toDate === "function"
-                  ? formatDate(reportData.created.toDate().toISOString().split("T")[0])
-                  : "N/A"}
-              </p>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="w-[100px] text-[12px] p-[1.2px] h-[25px] flex border border-gray-300 rounded-[6px] items-center justify-center hover:bg-gray-100">
-                  Actions
-                  <ChevronDown className="h-3 w-3 ml-1" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-48">
-                <DropdownMenuItem onClick={handleShare} className="border-b">
-                  Share
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handlePrint}>
-                  Print
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </div>
       </div>
 
@@ -224,7 +208,7 @@ export default function ReportPreviewPage() {
           </div>
         </div>
       ) : logisticsReportUrl ? (
-        <div className="w-full" style={{ height: 'calc(100vh - 200px)' }}>
+        <div className="w-full" style={{ height: 'calc(100vh - 80px)' }}>
           <iframe
             src={`${logisticsReportUrl}#zoom=110&navpanes=0&scrollbar=0`}
             className="w-full h-full border-0 bg-white"
@@ -251,6 +235,36 @@ export default function ReportPreviewPage() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Fixed Bottom Buttons */}
+      {logisticsReportUrl && reportData && (
+        <div className="fixed bottom-6 left-1/2 transform-translate-x-1/2 z-50 bg-white w-[346px] h-[67px] p-[1.5px] flex items-center justify-center rounded-full shadow-lg border border-gray-200">
+          <div className="flex gap-4">
+            <button
+              onClick={handleSaveAsDraft}
+              className="underline font-bold"
+            >
+              Save as Draft
+            </button>
+            <button
+              onClick={handleSendReport}
+              className="bg-[#1d0beb] text-white font-bold w-[159px] h-[27px] rounded-[10px]"
+            >
+              Send Report
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Send Report Dialog */}
+      {reportData && (
+        <SendReportDialog
+          isOpen={isSendDialogOpen}
+          onClose={() => setIsSendDialogOpen(false)}
+          report={reportData}
+          onSelectOption={handleSendOptionSelect}
+        />
       )}
     </div>
   )

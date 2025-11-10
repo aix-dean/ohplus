@@ -82,7 +82,7 @@ export default function LEDSitesTab() {
         searchTerm: debouncedSearchTerm,
       })
 
-      const dynamicProducts = allProducts.items.filter((product) => product.content_type?.toLowerCase() === "dynamic")
+      const dynamicProducts = allProducts.items.filter((product) => product.content_type?.toLowerCase() === "dynamic" || "digital")
       const count = dynamicProducts.length
 
       setTotalItems(count)

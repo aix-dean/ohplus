@@ -31,8 +31,8 @@ function initializeServiceAssignmentsAlgolia() {
     try {
       algoliasearch = require('algoliasearch')
       const client = algoliasearch(
-        process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_APP_ID,
-        process.env.ALGOLIA_ASSIGNMENTS_ADMIN_API_KEY
+        process.env.NEXT_PUBLIC_ALGOLIA_APP_ID,
+        process.env.ALGOLIA_ADMIN_API_KEY
       )
       serviceAssignmentsIndex = client.initIndex(process.env.NEXT_PUBLIC_ALGOLIA_ASSIGNMENTS_INDEX_NAME)
     } catch (error) {
@@ -232,14 +232,18 @@ export interface ServiceAssignment {
   projectSiteLocation: string
   serviceType: string
   assignedTo: string
+  assignedToName: string  
   jobDescription: string
   requestedBy: {
     id: string
     name: string
     department: string
   }
+  startDate: Date | null
+  endDate: Date | null
   message: string
   campaignName?: string
+  crew?: string
   coveredDateStart: Date | null
   coveredDateEnd: Date | null
   alarmDate: Date | null
@@ -260,10 +264,12 @@ export interface Booking {
   product_id: string
   client_id: string
   client_name: string
+  client: any
   seller_id: string
   start_date: string | Timestamp
   end_date: string | Timestamp
   status: string
+  items: any
   total_amount: number
   payment_status: string
   created: string | Timestamp
@@ -1004,6 +1010,37 @@ export async function getServiceAssignmentsByCompanyId(companyId: string): Promi
   }
 }
 
+// Get service assignments by company ID with real-time updates
+export function getServiceAssignmentsByCompanyIdRealtime(
+  companyId: string,
+  callback: (assignments: ServiceAssignment[]) => void,
+): () => void {
+  const assignmentsRef = collection(db, "service_assignments")
+  const q = query(
+    assignmentsRef,
+    where("company_id", "==", companyId),
+    orderBy("created", "desc")
+  )
+
+  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    try {
+      const assignments: ServiceAssignment[] = []
+      querySnapshot.forEach((doc) => {
+        assignments.push({ id: doc.id, ...doc.data() } as ServiceAssignment)
+      })
+      callback(assignments)
+    } catch (error) {
+      console.error("Error processing real-time service assignments updates:", error)
+      callback([])
+    }
+  }, (error) => {
+    console.error("Error in real-time service assignments listener:", error)
+    callback([])
+  })
+
+  return unsubscribe
+}
+
 // Calendar Event interface for unified calendar display
 export interface CalendarEvent {
   id: string
@@ -1245,6 +1282,7 @@ export async function updateServiceAssignment(
           projectSiteLocation: updatedData.projectSiteLocation,
           serviceType: updatedData.serviceType,
           assignedTo: updatedData.assignedTo,
+          assignedToName: updatedData.assignedToName,
           jobDescription: updatedData.jobDescription,
           requestedBy: updatedData.requestedBy,
           message: updatedData.message,
@@ -1334,6 +1372,22 @@ export async function getUserById(userId: string): Promise<User | null> {
     return null
   } catch (error) {
     console.error("Error fetching user:", error)
+    return null
+  }
+}
+
+// Get a single booking by ID
+export async function getBookingById(bookingId: string): Promise<Booking | null> {
+  try {
+    const bookingDoc = await getDoc(doc(db, "booking", bookingId))
+
+    if (bookingDoc.exists()) {
+      return { id: bookingDoc.id, ...bookingDoc.data() } as Booking
+    }
+
+    return null
+  } catch (error) {
+    console.error("Error fetching booking:", error)
     return null
   }
 }
@@ -1775,6 +1829,23 @@ export async function uploadFileToFirebaseStorage(file: File, path: string): Pro
   } catch (error) {
     console.error("Error uploading file to Firebase Storage:", error)
     throw error
+  }
+}
+
+// Uploads a PDF buffer to Firebase Storage.
+export async function uploadPdfBufferToFirebaseStorage(buffer: Buffer, fileName: string, path: string): Promise<string> {
+  try {
+    const storageRef = ref(storage, `${path}${fileName}`);
+    const metadata = {
+      contentType: 'application/pdf',
+    };
+    const snapshot = await uploadBytes(storageRef, buffer, metadata);
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    console.log("PDF uploaded successfully:", downloadURL);
+    return downloadURL;
+  } catch (error) {
+    console.error("Error uploading PDF buffer to Firebase Storage:", error);
+    throw error;
   }
 }
 
@@ -2328,5 +2399,56 @@ export async function getNewsItemsByCategory(categoryId: string, limitCount = 5)
   } catch (error) {
     console.error("Error fetching news items by category:", error)
     return []
+  }
+}
+
+// Get paginated service assignments by company ID (server-side pagination only)
+export async function getPaginatedServiceAssignmentsByCompanyId(
+  companyId: string,
+  itemsPerPage = 10,
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null = null,
+): Promise<PaginatedResult<ServiceAssignment>> {
+  try {
+    const assignmentsRef = collection(db, "service_assignments")
+
+    // Create server-side query with pagination
+    let q = query(
+      assignmentsRef,
+      where("company_id", "==", companyId),
+      orderBy("created", "desc"),
+      limit(itemsPerPage)
+    )
+
+    // If we have a last document, start after it for pagination
+    if (lastDoc) {
+      q = query(q, startAfter(lastDoc))
+    }
+
+    const querySnapshot = await getDocs(q)
+
+    // Get the last visible document for next pagination
+    const lastVisible = querySnapshot.docs.length > 0 ? querySnapshot.docs[querySnapshot.docs.length - 1] : null
+
+    // Check if there are more documents to fetch
+    const hasMore = querySnapshot.docs.length === itemsPerPage
+
+    // Convert the documents to ServiceAssignment objects (server-side only, no client filtering)
+    const assignments: ServiceAssignment[] = []
+    querySnapshot.forEach((doc) => {
+      assignments.push({ id: doc.id, ...doc.data() } as ServiceAssignment)
+    })
+
+    return {
+      items: assignments,
+      lastDoc: lastVisible,
+      hasMore,
+    }
+  } catch (error) {
+    console.error("Error fetching paginated service assignments:", error)
+    return {
+      items: [],
+      lastDoc: null,
+      hasMore: false,
+    }
   }
 }

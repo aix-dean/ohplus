@@ -18,14 +18,21 @@ import { db } from "./firebase"
 export interface ReportData {
   id?: string
   report_id?: string
-  siteId: string
-  siteName: string
-  siteCode?: string
+  site: {
+    name: string
+    id: string
+    location: string
+    media_url: string
+  }
+  remarks?: string
+  materialSpecs?: string
+  joRequestBy: string
+  siteName?: string
   companyId: string
   sellerId: string
-  client: string
-  clientId: string
-  client_email?: string
+  client: any
+  campaignName?: string
+  crew?: string
   joNumber?: string
   joType?: string
   booking_id?: string
@@ -33,10 +40,10 @@ export interface ReportData {
     start: Timestamp
     end: Timestamp
   }
-  breakdate: Timestamp
+  start_date: Timestamp
   sales: string
   reportType: string
-  date: string
+  end_date: Timestamp
   attachments: Array<{
     note: string
     fileName: string
@@ -44,20 +51,18 @@ export interface ReportData {
     fileUrl: string
     label?: string
   }>
+  requestedBy?: {
+    department: string
+    name: string
+    id: string
+  }
+  saNumber?: string
+  saId?: string
+  saType?: string
   status: string
   createdBy: string
-  createdByName: string
-  requestedBy?: {
-    name: string
-    department?: string
-  }
-  campaignName?: string
   created?: Timestamp
   updated?: Timestamp
-  location?: string
-  category: string
-  subcategory: string
-  priority: string
   completionPercentage: number
   tags: string[]
   assignedTo?: string
@@ -81,7 +86,12 @@ export interface ReportData {
   siteImageUrl?: string
   logistics_report?: string
   reservation_number?: string
-  booking_id?: string
+  costEstimateId?: string
+  quotationId?: string
+  // Note fields for report attachments
+  beforeNote?: string
+  afterNote?: string
+  monitoringNote?: string
 }
 
 // Helper function to clean data by removing undefined values recursively
@@ -113,13 +123,17 @@ function cleanReportData(data: any): any {
 export async function createReport(reportData: ReportData): Promise<string> {
   try {
     console.log("Creating report with data:", reportData)
-    console.log("Report attachments before processing:", reportData.attachments)
+    console.log("Report attachments before processing:", reportData.attachments?.length || 0)
 
     // Process attachments - ensure they have all required fields
     const processedAttachments = (reportData.attachments || [])
       .filter((attachment: any) => {
         // Only include attachments that have a fileUrl (successfully uploaded)
-        return attachment && attachment.fileUrl && attachment.fileName
+        const hasRequiredFields = attachment && attachment.fileUrl && attachment.fileName
+        if (!hasRequiredFields) {
+          console.log("Filtering out attachment due to missing fields:", attachment)
+        }
+        return hasRequiredFields
       })
       .map((attachment: any) => {
         const processedAttachment = {
@@ -134,40 +148,14 @@ export async function createReport(reportData: ReportData): Promise<string> {
         return processedAttachment
       })
 
-    console.log("Processed attachments:", processedAttachments)
+    console.log("Total processed attachments:", processedAttachments.length)
 
     // Generate report_id in format "RP-[currentmillis]"
     const reportId = `RP-${Date.now()}`
 
     // Create the final report data with proper structure
     const finalReportData: any = {
-      report_id: reportId,
-      siteId: reportData.siteId,
-      siteName: reportData.siteName,
-      companyId: reportData.companyId,
-      sellerId: reportData.sellerId,
-      client: reportData.client,
-      clientId: reportData.clientId,
-      client_email: reportData.client_email,
-      joNumber: reportData.joNumber,
-      joType: reportData.joType,
-      bookingDates: {
-        start: reportData.bookingDates.start,
-        end: reportData.bookingDates.end,
-      },
-      breakdate: reportData.breakdate,
-      sales: reportData.sales,
-      reportType: reportData.reportType,
-      date: reportData.date,
-      attachments: processedAttachments,
-      status: reportData.status || "draft",
-      createdBy: reportData.createdBy,
-      createdByName: reportData.createdByName,
-      category: reportData.category,
-      subcategory: reportData.subcategory,
-      priority: reportData.priority,
-      completionPercentage: reportData.completionPercentage,
-      tags: reportData.tags || [],
+      ...reportData,
       created: Timestamp.now(),
       updated: Timestamp.now(),
     }
@@ -180,15 +168,6 @@ export async function createReport(reportData: ReportData): Promise<string> {
     // Add product information if provided
     if (reportData.product) {
       finalReportData.product = reportData.product
-    }
-
-    // Add optional fields only if they have values
-    if (reportData.siteCode) {
-      finalReportData.siteCode = reportData.siteCode
-    }
-
-    if (reportData.location) {
-      finalReportData.location = reportData.location
     }
 
     if (reportData.assignedTo) {
@@ -249,68 +228,13 @@ export async function getReports(options: {
   limit?: number
   companyId?: string
   status?: string
-  reportType?: string
-  searchQuery?: string
   lastDoc?: any
 }): Promise<{ reports: ReportData[], hasNextPage: boolean, lastDoc: any, total?: number }> {
   try {
     console.log("getReports called with options:", options)
-    const { page = 1, limit: pageLimit = 10, companyId, status, reportType, searchQuery, lastDoc } = options
+    const { page = 1, limit: pageLimit = 10, companyId, status, lastDoc } = options
 
-    // For search queries, we need to fetch all and filter client-side
-    if (searchQuery && searchQuery.trim()) {
-      console.log(`Fetching all reports for search: "${searchQuery}"`)
-      let q = query(collection(db, "reports"), orderBy("created", "desc"))
-
-      if (companyId) {
-        q = query(q, where("companyId", "==", companyId))
-      }
-
-      const querySnapshot = await getDocs(q)
-      let allReports = querySnapshot.docs.map((doc) => {
-        const data = doc.data()
-        return {
-          id: doc.id,
-          ...data,
-          attachments: Array.isArray(data.attachments) ? data.attachments : [],
-        }
-      }) as ReportData[]
-
-      // Apply search filtering
-      const searchTerm = searchQuery.trim().toLowerCase()
-      allReports = allReports.filter(report =>
-        report.siteName?.toLowerCase().includes(searchTerm) ||
-        report.reportType?.toLowerCase().includes(searchTerm) ||
-        report.createdByName?.toLowerCase().includes(searchTerm) ||
-        report.id?.toLowerCase().includes(searchTerm) ||
-        report.report_id?.toLowerCase().includes(searchTerm) ||
-        report.client?.toLowerCase().includes(searchTerm)
-      )
-
-      // Apply status filtering
-      if (status && status !== "all") {
-        if (status === "published") {
-          allReports = allReports.filter(report => report.status !== "draft")
-        } else {
-          allReports = allReports.filter(report => report.status === status)
-        }
-      }
-
-      // Apply report type filtering
-      if (reportType && reportType !== "All") {
-        allReports = allReports.filter(report => report.reportType === reportType)
-      }
-
-      // Apply pagination
-      const offset = (page - 1) * pageLimit
-      const reports = allReports.slice(offset, offset + pageLimit)
-      const hasNextPage = allReports.length > offset + pageLimit
-
-      console.log(`Search results: ${allReports.length} total, ${reports.length} on page ${page}`)
-      return { reports, hasNextPage, lastDoc: null, total: allReports.length }
-    }
-
-    // For non-search: use server-side pagination
+    // Use server-side pagination for all queries (search is handled by Algolia)
     let q = query(collection(db, "reports"), orderBy("created", "desc"), limit(pageLimit + 1))
 
     if (companyId) {
@@ -324,11 +248,6 @@ export async function getReports(options: {
       } else {
         q = query(q, where("status", "==", status))
       }
-    }
-
-    // Apply report type filtering server-side
-    if (reportType && reportType !== "All") {
-      q = query(q, where("reportType", "==", reportType))
     }
 
     // Handle pagination cursor
