@@ -399,7 +399,7 @@ export default function BookingDetailPage() {
                       <span className="text-xl text-gray-900">
                         ₱{(() => {
                           const value = booking.costDetails?.total || booking.total_cost || booking.cost || 0;
-                          return Number(value).toFixed(2);
+                          return Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         })()}
                       </span>
                     </div>
@@ -408,7 +408,7 @@ export default function BookingDetailPage() {
                       <span className="text-xl text-gray-900">
                         ₱{(() => {
                           const subtotal = booking.costDetails?.total || booking.total_cost || booking.cost || 0;
-                          return (subtotal * 0.12).toFixed(2);
+                          return (subtotal * 0.12).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         })()}
                       </span>
                     </div>
@@ -417,7 +417,7 @@ export default function BookingDetailPage() {
                       <span className="text-xl font-bold text-gray-900">
                         ₱{(() => {
                           const subtotal = booking.costDetails?.total || booking.total_cost || booking.cost || 0;
-                          return (subtotal + (subtotal * 0.12)).toFixed(2);
+                          return (subtotal + (subtotal * 0.12)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                         })()}
                       </span>
                     </div>

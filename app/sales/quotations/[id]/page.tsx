@@ -1430,20 +1430,30 @@ The OH Plus Team`,
             {isEditing && editingField === "price" ? (
               <div className="flex items-center gap-2 ml-1">
                 <Input
-                  type="number"
-                  value={tempValues.price || ""}
+                  type="text"
+                  value={tempValues.price ? Number(tempValues.price).toLocaleString('en-US') : ''}
                   onChange={(e) => {
-                    const value = e.target.value;
-                    const parsed = Number.parseFloat(value);
-                    if (!isNaN(parsed)) {
+                    const rawValue = e.target.value.replace(/,/g, '');
+                    // Allow only numbers and one decimal point with up to 2 decimal places
+                    const regex = /^\d*\.?\d{0,2}$/;
+                    if (regex.test(rawValue) || rawValue === "") {
+                      const parsed = rawValue === "" ? 0 : Number.parseFloat(rawValue);
+                      if (!isNaN(parsed)) {
+                        updateTempValues("price", Number(parsed.toFixed(2)));
+                      } else if (rawValue === "") {
+                        updateTempValues("price", 0);
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const rawValue = tempValues.price ? tempValues.price.toString().replace(/[^\d.]/g, '') : '';
+                    if (rawValue && !isNaN(Number.parseFloat(rawValue))) {
+                      const parsed = Number.parseFloat(rawValue);
                       updateTempValues("price", Number(parsed.toFixed(2)));
-                    } else if (value === "") {
-                      updateTempValues("price", 0);
                     }
                   }}
                   className="w-32 h-6 text-sm"
                   placeholder={item?.price?.toString() || "0.00"}
-                  step="0.01"
                 />
                 <span className="text-sm text-gray-600">(Exclusive of VAT)</span>
               </div>
