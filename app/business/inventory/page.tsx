@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2, Plus, MapPin, ChevronLeft, ChevronRight, Search, List, Grid3X3, Upload, Edit, Trash2, X } from "lucide-react"
 import { getPaginatedUserProducts, getUserProductsCount, softDeleteProduct, createProduct, updateProduct, uploadFileToFirebaseStorage, getUserProductsRealtime, type Product } from "@/lib/firebase-service"
+import { GeoPoint } from "firebase/firestore"
 import { searchProducts, type SearchResult } from "@/lib/algolia-service"
 import type { DocumentData, QueryDocumentSnapshot } from "firebase/firestore"
 import { toast } from "@/components/ui/use-toast"
@@ -94,6 +95,12 @@ const handlePriceBlur = (e: React.FocusEvent<HTMLInputElement>, setPrice: (value
    const formatted = formatPriceOnBlur(value);
    setPrice(formatted);
  };
+// Function to format geopoint array to display string
+const formatGeopoint = (geopoint: [number, number] | null): string | null => {
+  if (!geopoint || geopoint.length !== 2) return null;
+  const [lat, lng] = geopoint;
+  return `[${lat}° N, ${lng}° E]`;
+};
 
 // Type for CMS data
 type CmsData = {

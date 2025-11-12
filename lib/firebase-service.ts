@@ -142,7 +142,7 @@ export interface Product {
   } | null
   specs_rental?: {
     audience_types?: string[]
-    geopoint?: [number, number]
+    geopoint?: GeoPoint
     location?: string
     location_label?: string
     land_owner?: string
